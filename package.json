@@ -1,0 +1,49 @@
+{
+  "name": "healthcareproviderdb-",
+  "version": "1.0.0",
+  "description": "Healthcare provider database with NPI registry integration and insurance plan matching",
+  "main": "dist/src/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/src/index.js",
+    "dev": "tsx watch src/index.ts",
+    "test": "vitest",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "import:npi": "tsx scripts/import-npi.ts",
+    "lint": "tsc --noEmit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/breilly1296/HealthcareProviderDB-.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/breilly1296/HealthcareProviderDB-/issues"
+  },
+  "homepage": "https://github.com/breilly1296/HealthcareProviderDB-#readme",
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "cors": "^2.8.5",
+    "csv-parse": "^5.5.6",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "helmet": "^8.1.0",
+    "prisma": "^5.22.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3",
+    "zod": "^4.2.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.0.2",
+    "tsx": "^4.21.0",
+    "vitest": "^4.0.15"
+  }
+}
