@@ -43,13 +43,16 @@ RUN addgroup --system --gid 1001 nodejs && \
 # Install only production dependencies
 ENV NODE_ENV=production
 
-# Copy package files
+# Copy package files and install all production dependencies
 COPY package.json package-lock.json ./
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/backend/package.json ./packages/backend/
 
+# Create empty directories so npm recognizes workspaces
+RUN mkdir -p packages/shared packages/backend
+
 # Install production dependencies only
-RUN npm ci --workspace=@healthcareproviderdb/shared --workspace=@healthcareproviderdb/backend --omit=dev
+RUN npm ci --omit=dev
 
 # Copy built files
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
