@@ -94,13 +94,39 @@ export async function submitVerification(input: SubmitVerificationInput) {
     // Get existing verification stats
     const verificationCount = acceptance.verificationCount + 1;
 
-    // Calculate new confidence score
+    // Query all past verifications for this provider-plan pair to count agreement
+    const pastVerifications = await prisma.verificationLog.findMany({
+      where: {
+        providerId: provider.id,
+        planId: plan.id,
+        verificationType: VerificationType.PLAN_ACCEPTANCE,
+      },
+      select: {
+        newValue: true,
+      },
+    });
+
+    // Count how many past verifications agree with the NEW status
+    // Agreement means their newValue.acceptanceStatus matches our newStatus
+    let upvotes = 1; // Start with 1 for the current verification (it agrees with itself)
+    let downvotes = 0;
+
+    for (const v of pastVerifications) {
+      const pastValue = v.newValue as { acceptanceStatus?: string } | null;
+      if (pastValue?.acceptanceStatus === newStatus) {
+        upvotes++;
+      } else if (pastValue?.acceptanceStatus) {
+        downvotes++;
+      }
+    }
+
+    // Calculate new confidence score with accurate agreement data
     const { score, factors } = calculateConfidenceScore({
       dataSource: VerificationSource.CROWDSOURCE,
       lastVerifiedAt: new Date(),
       verificationCount,
-      upvotes: 1, // Initial upvote from submitter
-      downvotes: 0,
+      upvotes,
+      downvotes,
     });
 
     acceptance = await prisma.providerPlanAcceptance.update({

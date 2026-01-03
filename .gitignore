@@ -1,8 +1,13 @@
 # Dependencies
 node_modules/
+.pnp
+.pnp.js
 
 # Build output
 dist/
+build/
+.next/
+out/
 
 # Environment files
 .env
