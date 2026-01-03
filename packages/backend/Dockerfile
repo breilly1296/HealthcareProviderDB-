@@ -17,7 +17,7 @@ COPY packages/backend/package.json ./packages/backend/
 RUN mkdir -p packages/shared packages/backend
 
 # Install all dependencies
-RUN npm install
+RUN npm install --force
 
 # Copy source code
 COPY packages/shared ./packages/shared
@@ -55,7 +55,7 @@ COPY packages/backend/package.json ./packages/backend/
 RUN mkdir -p packages/shared packages/backend
 
 # Install production dependencies only
-RUN npm install --omit=dev
+RUN npm install --omit=dev --force
 
 # Copy built files
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
