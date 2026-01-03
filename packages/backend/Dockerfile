@@ -6,7 +6,7 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Install dependencies for native modules
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libc6-compat openssl openssl-dev
 
 # Copy root package files for workspaces
 COPY package.json package-lock.json ./
@@ -42,6 +42,9 @@ WORKDIR /app
 # Add non-root user for security
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 expressjs
+
+# Install dependencies for native modules
+RUN apk add --no-cache libc6-compat openssl openssl-dev
 
 # Install only production dependencies
 ENV NODE_ENV=production
