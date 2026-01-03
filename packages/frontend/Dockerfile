@@ -13,8 +13,11 @@ COPY package.json package-lock.json ./
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/frontend/package.json ./packages/frontend/
 
+# Create directories so npm recognizes workspaces
+RUN mkdir -p packages/shared packages/frontend
+
 # Install all dependencies
-RUN npm ci --workspace=@healthcareproviderdb/shared --workspace=@healthcareproviderdb/frontend
+RUN npm install --force
 
 # ================================
 # Build stage
@@ -38,7 +41,7 @@ COPY packages/shared ./packages/shared
 COPY packages/frontend ./packages/frontend
 
 # Build shared package first
-RUN npm run build -w @healthcareproviderdb/shared
+RUN cd packages/shared && npm run build
 
 # Set environment variables for build
 ARG NEXT_PUBLIC_API_URL
@@ -46,7 +49,7 @@ ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 
 # Build Next.js app
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build -w @healthcareproviderdb/frontend
+RUN cd packages/frontend && npm run build
 
 # ================================
 # Production stage
