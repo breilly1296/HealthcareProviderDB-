@@ -48,7 +48,7 @@ ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 # Build Next.js app
 RUN ln -s /app/node_modules /app/packages/frontend/node_modules
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build --prefix packages/frontend
+RUN cd packages/frontend && npm run build
 
 # ================================
 # Production stage
