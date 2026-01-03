@@ -13,8 +13,11 @@ COPY package.json package-lock.json ./
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/backend/package.json ./packages/backend/
 
+# Create directories so npm recognizes workspaces
+RUN mkdir -p packages/shared packages/backend
+
 # Install all dependencies
-RUN npm ci --workspace=@healthcareproviderdb/shared --workspace=@healthcareproviderdb/backend
+RUN npm ci
 
 # Copy source code
 COPY packages/shared ./packages/shared
