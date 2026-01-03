@@ -1,54 +1,48 @@
 {
-  "name": "healthcareproviderdb-",
+  "name": "healthcareproviderdb",
   "version": "1.0.0",
   "description": "Healthcare provider database with NPI registry integration and insurance plan matching",
-  "main": "dist/src/index.js",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/src/index.js",
-    "dev": "tsx watch src/index.ts",
-    "test": "jest",
-    "db:generate": "prisma generate",
-    "db:push": "prisma db push",
-    "db:migrate": "prisma migrate dev",
-    "db:studio": "prisma studio",
-    "import:npi": "tsx scripts/import-npi.ts",
-    "lint": "tsc --noEmit"
+    "build": "npm run build --workspaces",
+    "build:shared": "npm run build -w @healthcareproviderdb/shared",
+    "build:backend": "npm run build -w @healthcareproviderdb/backend",
+    "build:frontend": "npm run build -w @healthcareproviderdb/frontend",
+    "dev": "npm run build:shared && concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "npm run dev -w @healthcareproviderdb/backend",
+    "dev:frontend": "npm run dev -w @healthcareproviderdb/frontend",
+    "db:generate": "npm run db:generate -w @healthcareproviderdb/backend",
+    "db:push": "npm run db:push -w @healthcareproviderdb/backend",
+    "db:migrate": "npm run db:migrate -w @healthcareproviderdb/backend",
+    "db:studio": "npm run db:studio -w @healthcareproviderdb/backend",
+    "db:seed": "npm run db:seed -w @healthcareproviderdb/backend",
+    "docker:dev": "docker compose -f docker-compose.dev.yml up -d",
+    "docker:dev:down": "docker compose -f docker-compose.dev.yml down",
+    "docker:build": "docker compose build",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "clean": "npm run clean --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/breilly1296/HealthcareProviderDB-.git"
   },
-  "keywords": [],
+  "keywords": [
+    "healthcare",
+    "npi",
+    "providers",
+    "insurance"
+  ],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
-  "bugs": {
-    "url": "https://github.com/breilly1296/HealthcareProviderDB-/issues"
+  "engines": {
+    "node": ">=20.0.0"
   },
-  "homepage": "https://github.com/breilly1296/HealthcareProviderDB-#readme",
   "dependencies": {
-    "@prisma/client": "^5.22.0",
-    "@rollup/rollup-win32-arm64-msvc": "^4.53.5",
-    "cors": "^2.8.5",
-    "csv-parse": "^5.5.6",
-    "dotenv": "^17.2.3",
-    "express": "^5.2.1",
-    "helmet": "^8.1.0",
-    "prisma": "^5.22.0",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.9.3",
-    "zod": "^4.2.0"
-  },
-  "devDependencies": {
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.6",
-    "@types/jest": "^29.5.14",
-    "@types/node": "^25.0.2",
-    "@types/supertest": "^6.0.3",
-    "jest": "^29.7.0",
-    "supertest": "^7.1.4",
-    "ts-jest": "^29.2.5",
-    "tsx": "^4.21.0"
+    "next": "^16.1.1"
   }
 }
