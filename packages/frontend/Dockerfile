@@ -28,8 +28,6 @@ WORKDIR /app
 
 # Copy dependencies from deps stage
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
-COPY --from=deps /app/packages/frontend/node_modules ./packages/frontend/node_modules
 
 # Copy package files
 COPY package.json package-lock.json ./
