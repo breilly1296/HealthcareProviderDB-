@@ -1,0 +1,347 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Healthcare providers from NPI registry
+model Provider {
+  id                    String   @id @default(cuid())
+  npi                   String   @unique @db.VarChar(10)
+  entityType            EntityType
+
+  // Individual provider fields
+  firstName             String?  @db.VarChar(100)
+  lastName              String?  @db.VarChar(100)
+  middleName            String?  @db.VarChar(100)
+  credential            String?  @db.VarChar(50)
+
+  // Organization fields
+  organizationName      String?  @db.VarChar(300)
+
+  // Primary practice address
+  addressLine1          String   @db.VarChar(200)
+  addressLine2          String?  @db.VarChar(200)
+  city                  String   @db.VarChar(100)
+  state                 String   @db.VarChar(2)
+  zip                   String   @db.VarChar(10)
+  country               String   @default("US") @db.VarChar(2)
+
+  // Contact
+  phone                 String?  @db.VarChar(20)
+  fax                   String?  @db.VarChar(20)
+
+  // Taxonomy/Specialty (primary)
+  taxonomyCode          String?  @db.VarChar(20)
+  taxonomyDescription   String?  @db.VarChar(200)
+  specialtyCategory     SpecialtyCategory?
+
+  // Secondary taxonomies stored as JSON array
+  secondaryTaxonomies   Json?
+
+  // NPI metadata
+  enumerationDate       DateTime?
+  lastUpdateDate        DateTime?
+  deactivationDate      DateTime?
+  reactivationDate      DateTime?
+  npiStatus             NpiStatus @default(ACTIVE)
+
+  // Internal tracking
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // Relations
+  planAcceptances       ProviderPlanAcceptance[]
+  verificationLogs      VerificationLog[]
+
+  @@index([state])
+  @@index([taxonomyCode])
+  @@index([specialtyCategory])
+  @@index([lastName])
+  @@index([organizationName])
+  @@index([state, specialtyCategory])
+
+  @@map("providers")
+}
+
+// Insurance plans from CMS and user uploads
+model InsurancePlan {
+  id                    String   @id @default(cuid())
+
+  // Plan identification
+  planId                String   @unique @db.VarChar(50)
+  planName              String   @db.VarChar(300)
+
+  // Carrier/Issuer info
+  carrierId             String?  @db.VarChar(50)
+  carrierName           String   @db.VarChar(200)
+
+  // Plan details
+  planType              PlanType
+  metalLevel            MetalLevel?
+  marketType            MarketType
+
+  // Coverage area
+  statesCovered         String[]
+  serviceArea           String?  @db.VarChar(500)
+
+  // Plan year
+  planYear              Int
+  effectiveDate         DateTime?
+  terminationDate       DateTime?
+
+  // Data source
+  dataSource            DataSource
+  sourceFileId          String?
+
+  // Status
+  isActive              Boolean  @default(true)
+
+  // Internal tracking
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // Relations
+  providerAcceptances   ProviderPlanAcceptance[]
+  verificationLogs      VerificationLog[]
+
+  @@index([carrierName])
+  @@index([planType])
+  @@index([statesCovered])
+  @@index([planYear])
+  @@index([isActive])
+
+  @@map("insurance_plans")
+}
+
+// Provider-Plan acceptance matching table
+model ProviderPlanAcceptance {
+  id                    String   @id @default(cuid())
+
+  providerId            String
+  provider              Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  planId                String
+  plan                  InsurancePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  // Acceptance status
+  acceptanceStatus      AcceptanceStatus @default(UNKNOWN)
+  acceptsNewPatients    Boolean?
+
+  // Confidence scoring
+  confidenceScore       Float    @default(0)
+  confidenceFactors     Json?
+
+  // Verification
+  lastVerifiedAt        DateTime?
+  verificationSource    VerificationSource?
+  verificationCount     Int      @default(0)
+
+  // Effective dates
+  effectiveDate         DateTime?
+  terminationDate       DateTime?
+
+  // Internal tracking
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([providerId, planId])
+  @@index([acceptanceStatus])
+  @@index([confidenceScore])
+  @@index([lastVerifiedAt])
+
+  @@map("provider_plan_acceptance")
+}
+
+// Verification audit trail
+model VerificationLog {
+  id                    String   @id @default(cuid())
+
+  // What was verified
+  providerId            String?
+  provider              Provider? @relation(fields: [providerId], references: [id], onDelete: SetNull)
+
+  planId                String?
+  plan                  InsurancePlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
+
+  acceptanceId          String?
+
+  // Verification details
+  verificationType      VerificationType
+  verificationSource    VerificationSource
+
+  // Before/after state
+  previousValue         Json?
+  newValue              Json?
+
+  // Source information
+  sourceIp              String?  @db.VarChar(50)
+  userAgent             String?  @db.VarChar(500)
+  submittedBy           String?  @db.VarChar(200)
+
+  // Crowdsource specific
+  upvotes               Int      @default(0)
+  downvotes             Int      @default(0)
+  isApproved            Boolean?
+  reviewedAt            DateTime?
+  reviewedBy            String?
+
+  // Additional context
+  notes                 String?
+  evidenceUrl           String?  @db.VarChar(500)
+
+  createdAt             DateTime @default(now())
+
+  @@index([providerId])
+  @@index([planId])
+  @@index([verificationType])
+  @@index([createdAt])
+  @@index([isApproved])
+
+  @@map("verification_logs")
+}
+
+// Sync/Import log for tracking data imports
+model SyncLog {
+  id                    String   @id @default(cuid())
+
+  // Sync identification
+  syncType              SyncType
+  dataSource            DataSource
+
+  // File information
+  sourceFileName        String?  @db.VarChar(500)
+  sourceFileHash        String?  @db.VarChar(64)
+  sourceFileSize        BigInt?
+  sourceFileDate        DateTime?
+
+  // Sync status
+  status                SyncStatus
+  startedAt             DateTime @default(now())
+  completedAt           DateTime?
+
+  // Statistics
+  totalRecords          Int      @default(0)
+  processedRecords      Int      @default(0)
+  insertedRecords       Int      @default(0)
+  updatedRecords        Int      @default(0)
+  skippedRecords        Int      @default(0)
+  errorRecords          Int      @default(0)
+
+  // Error tracking
+  errorLog              Json?
+  lastError             String?
+
+  // Filter criteria used
+  filterCriteria        Json?
+
+  // Metadata
+  triggeredBy           String?  @db.VarChar(200)
+  notes                 String?
+
+  @@index([syncType])
+  @@index([dataSource])
+  @@index([status])
+  @@index([startedAt])
+
+  @@map("sync_logs")
+}
+
+// Enums
+
+enum EntityType {
+  INDIVIDUAL
+  ORGANIZATION
+}
+
+enum SpecialtyCategory {
+  ENDOCRINOLOGY
+  RHEUMATOLOGY
+  ORTHOPEDICS
+  INTERNAL_MEDICINE
+  FAMILY_MEDICINE
+  GERIATRICS
+  OTHER
+}
+
+enum NpiStatus {
+  ACTIVE
+  DEACTIVATED
+}
+
+enum PlanType {
+  HMO
+  PPO
+  EPO
+  POS
+  HDHP
+  MEDICARE_ADVANTAGE
+  MEDICAID
+  OTHER
+}
+
+enum MetalLevel {
+  BRONZE
+  SILVER
+  GOLD
+  PLATINUM
+  CATASTROPHIC
+}
+
+enum MarketType {
+  INDIVIDUAL
+  SMALL_GROUP
+  LARGE_GROUP
+  MEDICARE
+  MEDICAID
+}
+
+enum DataSource {
+  CMS_NPPES
+  CMS_PLAN_FINDER
+  USER_UPLOAD
+  CARRIER_API
+  CROWDSOURCE
+}
+
+enum AcceptanceStatus {
+  ACCEPTED
+  NOT_ACCEPTED
+  PENDING
+  UNKNOWN
+}
+
+enum VerificationSource {
+  CMS_DATA
+  CARRIER_DATA
+  PROVIDER_PORTAL
+  PHONE_CALL
+  CROWDSOURCE
+  AUTOMATED
+}
+
+enum VerificationType {
+  PLAN_ACCEPTANCE
+  PROVIDER_INFO
+  CONTACT_INFO
+  STATUS_CHANGE
+  NEW_PLAN
+}
+
+enum SyncType {
+  NPI_FULL
+  NPI_WEEKLY
+  PLAN_IMPORT
+  PLAN_UPDATE
+}
+
+enum SyncStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  CANCELLED
+}
