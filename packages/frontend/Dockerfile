@@ -45,10 +45,10 @@ RUN cd packages/shared && npm run build
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 
-# Build Next.js app
-RUN ln -s /app/node_modules /app/packages/frontend/node_modules
+# Install dependencies in builder (to get .bin symlinks)
+RUN npm install --force
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN cd packages/frontend && /app/node_modules/.bin/next build
+RUN cd packages/frontend && npm run build
 
 # ================================
 # Production stage
