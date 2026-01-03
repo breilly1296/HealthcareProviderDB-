@@ -193,8 +193,12 @@ export default function ProviderDetailPage() {
                           </p>
                         )}
                       </div>
-                      <div className="flex items-center gap-4">
-                        <ConfidenceIndicator score={pa.confidenceScore} />
+                      <div className="flex flex-col items-end gap-2">
+                        <ConfidenceIndicator
+                          lastVerifiedAt={pa.lastVerifiedAt}
+                          verificationCount={pa.verificationCount}
+                          acceptanceStatus={pa.acceptanceStatus}
+                        />
                         <VerificationButton
                           npi={provider.npi}
                           providerName={provider.displayName}

@@ -69,8 +69,60 @@ export function ConfidenceBadge({
   );
 }
 
-// Compact version for lists
-export function ConfidenceIndicator({ score }: { score: number }) {
+// Compact version for lists - NEW FORMAT
+interface VerificationStatusProps {
+  lastVerifiedAt: string | null;
+  verificationCount: number;
+  acceptanceStatus: string;
+}
+
+export function ConfidenceIndicator({
+  lastVerifiedAt,
+  verificationCount,
+  acceptanceStatus,
+}: VerificationStatusProps) {
+  const isVerified = verificationCount > 0 && acceptanceStatus !== 'UNKNOWN';
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  };
+
+  if (!isVerified) {
+    return (
+      <div className="flex items-center gap-1.5 text-sm text-gray-500">
+        <span className="text-amber-500">⚠️</span>
+        <span>Unverified</span>
+        <span className="text-gray-300">·</span>
+        <span className="text-primary-600">Be the first to verify</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1.5 text-sm text-gray-600 flex-wrap">
+      <span className="text-green-600">✅</span>
+      <span className="text-green-700 font-medium">Verified</span>
+      {lastVerifiedAt && (
+        <>
+          <span className="text-gray-300">·</span>
+          <span>Last verified {formatDate(lastVerifiedAt)}</span>
+        </>
+      )}
+      <span className="text-gray-300">·</span>
+      <span>
+        {verificationCount} {verificationCount === 1 ? 'user' : 'users'} confirmed
+      </span>
+    </div>
+  );
+}
+
+// Legacy percentage-based indicator (for backwards compatibility)
+export function ConfidenceProgressBar({ score }: { score: number }) {
   const getColor = (score: number) => {
     if (score >= 70) return 'bg-green-500';
     if (score >= 40) return 'bg-yellow-500';

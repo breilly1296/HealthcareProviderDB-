@@ -47,6 +47,7 @@ export interface PlanAcceptance {
   confidenceLevel: string;
   confidenceDescription: string;
   lastVerifiedAt: string | null;
+  verificationCount: number;
   plan?: InsurancePlan;
 }
 
