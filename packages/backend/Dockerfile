@@ -24,13 +24,13 @@ COPY packages/shared ./packages/shared
 COPY packages/backend ./packages/backend
 
 # Build shared package first
-RUN npm run build -w @healthcareproviderdb/shared
+RUN cd packages/shared && npm run build
 
 # Generate Prisma client
-RUN npm run db:generate -w @healthcareproviderdb/backend
+RUN cd packages/backend && npx prisma generate
 
 # Build backend
-RUN npm run build -w @healthcareproviderdb/backend
+RUN cd packages/backend && npm run build
 
 # ================================
 # Production stage
