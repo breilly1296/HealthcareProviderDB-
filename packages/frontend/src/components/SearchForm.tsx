@@ -5,12 +5,67 @@ import { useRouter, useSearchParams } from 'next/navigation';
 
 const SPECIALTIES = [
   { value: '', label: 'All Specialties' },
-  { value: 'ENDOCRINOLOGY', label: 'Endocrinology' },
-  { value: 'RHEUMATOLOGY', label: 'Rheumatology' },
-  { value: 'ORTHOPEDICS', label: 'Orthopedics' },
-  { value: 'INTERNAL_MEDICINE', label: 'Internal Medicine' },
+  // Primary Care
   { value: 'FAMILY_MEDICINE', label: 'Family Medicine' },
+  { value: 'INTERNAL_MEDICINE', label: 'Internal Medicine' },
+  { value: 'PEDIATRICS', label: 'Pediatrics' },
   { value: 'GERIATRICS', label: 'Geriatrics' },
+  // Medical Specialties
+  { value: 'CARDIOLOGY', label: 'Cardiology' },
+  { value: 'DERMATOLOGY', label: 'Dermatology' },
+  { value: 'ENDOCRINOLOGY', label: 'Endocrinology' },
+  { value: 'GASTROENTEROLOGY', label: 'Gastroenterology' },
+  { value: 'NEPHROLOGY', label: 'Nephrology' },
+  { value: 'NEUROLOGY', label: 'Neurology' },
+  { value: 'ONCOLOGY', label: 'Oncology' },
+  { value: 'PULMONOLOGY', label: 'Pulmonology' },
+  { value: 'RHEUMATOLOGY', label: 'Rheumatology' },
+  { value: 'ALLERGY_IMMUNOLOGY', label: 'Allergy & Immunology' },
+  { value: 'INFECTIOUS_DISEASE', label: 'Infectious Disease' },
+  // Surgical Specialties
+  { value: 'SURGERY', label: 'Surgery' },
+  { value: 'ORTHOPEDICS', label: 'Orthopedics' },
+  { value: 'OB_GYN', label: 'OB/GYN' },
+  { value: 'UROLOGY', label: 'Urology' },
+  // Emergency & Hospital
+  { value: 'EMERGENCY_MEDICINE', label: 'Emergency Medicine' },
+  { value: 'ANESTHESIOLOGY', label: 'Anesthesiology' },
+  { value: 'RADIOLOGY', label: 'Radiology' },
+  { value: 'PATHOLOGY', label: 'Pathology' },
+  // Mental Health
+  { value: 'MENTAL_HEALTH', label: 'Mental Health' },
+  { value: 'PSYCHIATRY', label: 'Psychiatry' },
+  { value: 'PSYCHOLOGY', label: 'Psychology' },
+  { value: 'SOCIAL_WORK', label: 'Social Work' },
+  // Nursing & Advanced Practice
+  { value: 'NURSING', label: 'Nursing' },
+  { value: 'NURSE_PRACTITIONER', label: 'Nurse Practitioner' },
+  { value: 'PHYSICIAN_ASSISTANT', label: 'Physician Assistant' },
+  { value: 'MIDWIFERY', label: 'Midwifery' },
+  // Dental & Vision
+  { value: 'DENTISTRY', label: 'Dentistry' },
+  { value: 'OPTOMETRY', label: 'Optometry' },
+  // Pharmacy
+  { value: 'PHARMACY', label: 'Pharmacy' },
+  // Therapy & Rehabilitation
+  { value: 'PHYSICAL_THERAPY', label: 'Physical Therapy' },
+  { value: 'OCCUPATIONAL_THERAPY', label: 'Occupational Therapy' },
+  { value: 'SPEECH_THERAPY', label: 'Speech Therapy' },
+  { value: 'RESPIRATORY_THERAPY', label: 'Respiratory Therapy' },
+  { value: 'CHIROPRACTIC', label: 'Chiropractic' },
+  { value: 'ACUPUNCTURE', label: 'Acupuncture' },
+  // Support Services
+  { value: 'DIETETICS', label: 'Dietetics' },
+  { value: 'LAB_PATHOLOGY', label: 'Lab & Pathology' },
+  { value: 'DME_PROSTHETICS', label: 'DME & Prosthetics' },
+  { value: 'COMMUNITY_HEALTH', label: 'Community Health' },
+  { value: 'HOME_HEALTH', label: 'Home Health' },
+  { value: 'HOSPICE_PALLIATIVE', label: 'Hospice & Palliative' },
+  // Facilities
+  { value: 'CLINIC_FACILITY', label: 'Clinic/Facility' },
+  { value: 'HOSPITAL', label: 'Hospital' },
+  // Other
+  { value: 'OTHER', label: 'Other' },
 ];
 
 const STATES = [
