@@ -38,6 +38,9 @@ prisma/*.db-journal
 data/
 *.csv
 
+# Allow frontend public data (for static JSON files)
+!packages/frontend/public/data/
+
 # Coverage
 coverage/
 

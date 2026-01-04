@@ -2,7 +2,24 @@
 
 import { useState, useEffect, useRef, FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { providerApi } from '@/lib/api';
+
+// Cache for cities data (loaded once, shared across all instances)
+let citiesCache: Record<string, string[]> | null = null;
+let citiesCachePromise: Promise<Record<string, string[]>> | null = null;
+
+async function loadCitiesData(): Promise<Record<string, string[]>> {
+  if (citiesCache) return citiesCache;
+  if (citiesCachePromise) return citiesCachePromise;
+
+  citiesCachePromise = fetch('/data/cities.json')
+    .then((res) => res.json())
+    .then((data) => {
+      citiesCache = data;
+      return data;
+    });
+
+  return citiesCachePromise;
+}
 
 const SPECIALTIES = [
   { value: '', label: 'All Specialties' },
@@ -136,7 +153,7 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
   const cityInputRef = useRef<HTMLInputElement>(null);
   const cityDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Fetch cities when state changes
+  // Load cities from static JSON (cached)
   useEffect(() => {
     if (!state) {
       setCities([]);
@@ -145,20 +162,20 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
       return;
     }
 
-    const fetchCities = async () => {
+    const loadCities = async () => {
       setCitiesLoading(true);
       try {
-        const result = await providerApi.getCities(state);
-        setCities(result.cities);
+        const allCities = await loadCitiesData();
+        setCities(allCities[state] || []);
       } catch (error) {
-        console.error('Failed to fetch cities:', error);
+        console.error('Failed to load cities:', error);
         setCities([]);
       } finally {
         setCitiesLoading(false);
       }
     };
 
-    fetchCities();
+    loadCities();
   }, [state]);
 
   // Handle click outside to close dropdown
