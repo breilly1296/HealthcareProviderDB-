@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, useRef, FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { providerApi } from '@/lib/api';
 
 const SPECIALTIES = [
   { value: '', label: 'All Specialties' },
@@ -127,6 +128,79 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
   const [name, setName] = useState(searchParams.get('name') || '');
   const [showMore, setShowMore] = useState(false);
 
+  // City dropdown state
+  const [cities, setCities] = useState<string[]>([]);
+  const [citiesLoading, setCitiesLoading] = useState(false);
+  const [cityInput, setCityInput] = useState(searchParams.get('city') || '');
+  const [showCityDropdown, setShowCityDropdown] = useState(false);
+  const cityInputRef = useRef<HTMLInputElement>(null);
+  const cityDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Fetch cities when state changes
+  useEffect(() => {
+    if (!state) {
+      setCities([]);
+      setCity('');
+      setCityInput('');
+      return;
+    }
+
+    const fetchCities = async () => {
+      setCitiesLoading(true);
+      try {
+        const result = await providerApi.getCities(state);
+        setCities(result.cities);
+      } catch (error) {
+        console.error('Failed to fetch cities:', error);
+        setCities([]);
+      } finally {
+        setCitiesLoading(false);
+      }
+    };
+
+    fetchCities();
+  }, [state]);
+
+  // Handle click outside to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        cityDropdownRef.current &&
+        !cityDropdownRef.current.contains(event.target as Node) &&
+        cityInputRef.current &&
+        !cityInputRef.current.contains(event.target as Node)
+      ) {
+        setShowCityDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Filter cities based on input (case-insensitive)
+  const filteredCities = cities.filter((c) =>
+    c.toLowerCase().includes(cityInput.toLowerCase())
+  );
+
+  const handleCitySelect = (selectedCity: string) => {
+    setCity(selectedCity);
+    setCityInput(selectedCity);
+    setShowCityDropdown(false);
+  };
+
+  const handleCityInputChange = (value: string) => {
+    setCityInput(value);
+    setCity(value);
+    setShowCityDropdown(true);
+  };
+
+  const handleStateChange = (newState: string) => {
+    setState(newState);
+    setCity('');
+    setCityInput('');
+  };
+
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
 
@@ -144,8 +218,10 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
     setSpecialty('');
     setState('');
     setCity('');
+    setCityInput('');
     setZip('');
     setName('');
+    setCities([]);
     router.push('/search');
   };
 
@@ -179,7 +255,7 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
           <select
             id="state"
             value={state}
-            onChange={(e) => setState(e.target.value)}
+            onChange={(e) => handleStateChange(e.target.value)}
             className="input"
           >
             {STATES.map((s) => (
@@ -190,19 +266,89 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
           </select>
         </div>
 
-        {/* City */}
-        <div>
+        {/* City - Searchable Dropdown */}
+        <div className="relative">
           <label htmlFor="city" className="label">
             City
           </label>
-          <input
-            type="text"
-            id="city"
-            value={city}
-            onChange={(e) => setCity(e.target.value)}
-            placeholder="Enter city name"
-            className="input"
-          />
+          <div className="relative">
+            <input
+              ref={cityInputRef}
+              type="text"
+              id="city"
+              value={cityInput}
+              onChange={(e) => handleCityInputChange(e.target.value)}
+              onFocus={() => state && setShowCityDropdown(true)}
+              placeholder={!state ? 'Select a state first' : citiesLoading ? 'Loading cities...' : 'Type to search cities'}
+              className="input pr-8"
+              disabled={!state}
+              autoComplete="off"
+            />
+            {citiesLoading && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <div className="animate-spin h-4 w-4 border-2 border-primary-200 border-t-primary-600 rounded-full" />
+              </div>
+            )}
+            {!citiesLoading && state && (
+              <button
+                type="button"
+                onClick={() => setShowCityDropdown(!showCityDropdown)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded"
+              >
+                <svg
+                  className={`w-4 h-4 text-gray-400 transition-transform ${showCityDropdown ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            )}
+          </div>
+
+          {/* City Dropdown */}
+          {showCityDropdown && state && !citiesLoading && (
+            <div
+              ref={cityDropdownRef}
+              className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto"
+            >
+              {filteredCities.length === 0 ? (
+                <div className="px-4 py-3 text-sm text-gray-500">
+                  {cityInput ? 'No cities match your search' : 'No cities available'}
+                </div>
+              ) : (
+                <>
+                  {cityInput && (
+                    <button
+                      type="button"
+                      onClick={() => handleCitySelect('')}
+                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 text-gray-500"
+                    >
+                      All Cities
+                    </button>
+                  )}
+                  {filteredCities.slice(0, 100).map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => handleCitySelect(c)}
+                      className={`w-full px-4 py-2 text-left text-sm hover:bg-primary-50 ${
+                        city === c ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-700'
+                      }`}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                  {filteredCities.length > 100 && (
+                    <div className="px-4 py-2 text-xs text-gray-400 border-t">
+                      Showing first 100 of {filteredCities.length} cities. Type to filter.
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         {/* ZIP */}

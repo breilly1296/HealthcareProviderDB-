@@ -189,6 +189,14 @@ export const providerApi = {
       pagination: Pagination;
     }>(`/providers/${npi}/plans?${searchParams.toString()}`);
   },
+
+  getCities: async (state: string) => {
+    return fetchApi<{
+      state: string;
+      cities: string[];
+      count: number;
+    }>(`/providers/cities?state=${encodeURIComponent(state)}`);
+  },
 };
 
 // Plan API

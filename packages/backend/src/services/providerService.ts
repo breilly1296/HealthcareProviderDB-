@@ -177,6 +177,41 @@ export async function getProviderAcceptedPlans(
 }
 
 /**
+ * Get unique cities for a state (sorted alphabetically)
+ */
+export async function getCitiesByState(state: string): Promise<string[]> {
+  const result = await prisma.provider.findMany({
+    where: {
+      state: state.toUpperCase(),
+      npiStatus: NpiStatus.ACTIVE,
+    },
+    select: {
+      city: true,
+    },
+    distinct: ['city'],
+    orderBy: {
+      city: 'asc',
+    },
+  });
+
+  // Return unique cities, properly cased (title case)
+  const cities = result
+    .map((r) => r.city)
+    .filter((city): city is string => city !== null && city.length > 0)
+    .map((city) => {
+      // Convert to title case for display
+      return city
+        .toLowerCase()
+        .split(' ')
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+    });
+
+  // Remove duplicates that might arise from case differences
+  return [...new Set(cities)].sort();
+}
+
+/**
  * Get provider display name
  */
 export function getProviderDisplayName(provider: {

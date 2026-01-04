@@ -8,6 +8,7 @@ import {
   getProviderByNpi,
   getProviderAcceptedPlans,
   getProviderDisplayName,
+  getCitiesByState,
 } from '../services/providerService';
 import { getConfidenceLevel, getConfidenceLevelDescription } from '../services/confidenceService';
 
@@ -73,6 +74,31 @@ router.get(
           totalPages: result.totalPages,
           hasMore: result.page < result.totalPages,
         },
+      },
+    });
+  })
+);
+
+/**
+ * GET /api/v1/providers/cities
+ * Get unique cities for a state
+ */
+router.get(
+  '/cities',
+  asyncHandler(async (req, res) => {
+    const stateSchema = z.object({
+      state: z.string().length(2).toUpperCase(),
+    });
+
+    const { state } = stateSchema.parse(req.query);
+    const cities = await getCitiesByState(state);
+
+    res.json({
+      success: true,
+      data: {
+        state,
+        cities,
+        count: cities.length,
       },
     });
   })
