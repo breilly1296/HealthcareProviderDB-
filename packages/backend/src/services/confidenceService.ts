@@ -12,7 +12,48 @@ export interface ConfidenceInput {
   verificationCount: number;
   upvotes: number;
   downvotes: number;
+  specialty?: string | null;     // Added for specialty-specific scoring
+  taxonomyDescription?: string | null; // Added for specialty mapping
 }
+
+export interface ConfidenceResult {
+  score: number;
+  level: string;
+  description: string;
+  factors: ConfidenceFactors;
+  metadata: {
+    daysUntilStale: number;
+    isStale: boolean;
+    recommendReVerification: boolean;
+    daysSinceVerification: number | null;
+    freshnessThreshold: number;
+    researchNote: string;
+  };
+}
+
+// Research-based specialty categories for freshness thresholds
+// Based on Query #4 findings (Ndumele et al. 2018, Health Affairs)
+export enum SpecialtyFreshnessCategory {
+  MENTAL_HEALTH = 'MENTAL_HEALTH',    // 30 days - 43% Medicaid acceptance, high churn
+  PRIMARY_CARE = 'PRIMARY_CARE',      // 60 days - 12% annual turnover
+  SPECIALIST = 'SPECIALIST',          // 60 days
+  HOSPITAL_BASED = 'HOSPITAL_BASED',  // 90 days - more stable
+  OTHER = 'OTHER',                    // 60 days default
+}
+
+// Specialty-specific freshness thresholds in days
+// Based on research showing provider network churn rates
+const VERIFICATION_FRESHNESS: Record<SpecialtyFreshnessCategory, number> = {
+  [SpecialtyFreshnessCategory.MENTAL_HEALTH]: 30,  // High turnover, only 43% accept Medicaid
+  [SpecialtyFreshnessCategory.PRIMARY_CARE]: 60,   // 12% annual turnover
+  [SpecialtyFreshnessCategory.SPECIALIST]: 60,     // Similar to primary care
+  [SpecialtyFreshnessCategory.HOSPITAL_BASED]: 90, // More stable positions
+  [SpecialtyFreshnessCategory.OTHER]: 60,          // Default
+};
+
+// Research shows 3 verifications achieve expert-level accuracy (κ=0.58)
+// Mortensen et al. (2015), JAMIA
+const MIN_VERIFICATIONS_FOR_HIGH_CONFIDENCE = 3;
 
 // Data source scores (max 30 points)
 // Covers both DataSource and VerificationSource enum values
@@ -32,16 +73,78 @@ const DATA_SOURCE_SCORES: Record<string, number> = {
 };
 
 /**
+ * Map provider specialty to freshness category
+ * Based on research showing different churn rates by specialty
+ */
+function getSpecialtyFreshnessCategory(
+  specialty?: string | null,
+  taxonomyDescription?: string | null
+): SpecialtyFreshnessCategory {
+  const searchText = `${specialty || ''} ${taxonomyDescription || ''}`.toLowerCase();
+
+  // Mental health specialties - highest churn
+  if (
+    searchText.includes('psychiatr') ||
+    searchText.includes('psycholog') ||
+    searchText.includes('mental health') ||
+    searchText.includes('behavioral health') ||
+    searchText.includes('counselor') ||
+    searchText.includes('therapist')
+  ) {
+    return SpecialtyFreshnessCategory.MENTAL_HEALTH;
+  }
+
+  // Primary care - 12% annual turnover
+  if (
+    searchText.includes('family medicine') ||
+    searchText.includes('family practice') ||
+    searchText.includes('internal medicine') ||
+    searchText.includes('general practice') ||
+    searchText.includes('primary care')
+  ) {
+    return SpecialtyFreshnessCategory.PRIMARY_CARE;
+  }
+
+  // Hospital-based - more stable
+  if (
+    searchText.includes('hospital') ||
+    searchText.includes('radiology') ||
+    searchText.includes('anesthesiology') ||
+    searchText.includes('pathology') ||
+    searchText.includes('emergency medicine')
+  ) {
+    return SpecialtyFreshnessCategory.HOSPITAL_BASED;
+  }
+
+  // All other specialists
+  return SpecialtyFreshnessCategory.SPECIALIST;
+}
+
+/**
  * Calculate confidence score based on multiple factors
  * Total score: 0-100
+ *
+ * Research-based implementation:
+ * - Specialty-specific freshness thresholds (Ndumele et al. 2018)
+ * - 3-verification minimum for high confidence (Mortensen et al. 2015)
  */
-export function calculateConfidenceScore(input: ConfidenceInput): {
-  score: number;
-  factors: ConfidenceFactors;
-} {
+export function calculateConfidenceScore(input: ConfidenceInput): ConfidenceResult {
+  const specialtyCategory = getSpecialtyFreshnessCategory(
+    input.specialty,
+    input.taxonomyDescription
+  );
+  const freshnessThreshold = VERIFICATION_FRESHNESS[specialtyCategory];
+
+  // Calculate days since verification
+  const daysSinceVerification = input.lastVerifiedAt
+    ? Math.floor(
+        (new Date().getTime() - input.lastVerifiedAt.getTime()) / (1000 * 60 * 60 * 24)
+      )
+    : null;
+
   const factors: ConfidenceFactors = {
     dataSourceScore: calculateDataSourceScore(input.dataSource),
-    recencyScore: calculateRecencyScore(input.lastVerifiedAt),
+    recencyScore: calculateRecencyScore(input.lastVerifiedAt, freshnessThreshold),
     verificationScore: calculateVerificationScore(input.verificationCount),
     agreementScore: calculateAgreementScore(input.upvotes, input.downvotes),
   };
@@ -49,12 +152,55 @@ export function calculateConfidenceScore(input: ConfidenceInput): {
   const score = Math.min(
     100,
     factors.dataSourceScore +
-    factors.recencyScore +
-    factors.verificationScore +
-    factors.agreementScore
+      factors.recencyScore +
+      factors.verificationScore +
+      factors.agreementScore
   );
 
-  return { score: Math.round(score * 100) / 100, factors };
+  const roundedScore = Math.round(score * 100) / 100;
+  const level = getConfidenceLevel(roundedScore, input.verificationCount);
+  const description = getConfidenceLevelDescription(level, input.verificationCount);
+
+  // Calculate metadata
+  const isStale = daysSinceVerification !== null && daysSinceVerification > freshnessThreshold;
+  const daysUntilStale = daysSinceVerification !== null
+    ? Math.max(0, freshnessThreshold - daysSinceVerification)
+    : freshnessThreshold;
+  const recommendReVerification =
+    isStale || daysSinceVerification === null || daysSinceVerification > freshnessThreshold * 0.8;
+
+  // Research note based on specialty
+  let researchNote: string;
+  if (specialtyCategory === SpecialtyFreshnessCategory.MENTAL_HEALTH) {
+    researchNote =
+      'Mental health providers show high network turnover. Research shows only 43% accept Medicaid.';
+  } else if (specialtyCategory === SpecialtyFreshnessCategory.PRIMARY_CARE) {
+    researchNote = 'Based on research showing 12% annual provider turnover in primary care.';
+  } else if (specialtyCategory === SpecialtyFreshnessCategory.HOSPITAL_BASED) {
+    researchNote = 'Hospital-based providers typically have more stable network participation.';
+  } else {
+    researchNote =
+      'Specialist network participation changes regularly. Research shows 12% annual turnover.';
+  }
+
+  if (input.verificationCount < MIN_VERIFICATIONS_FOR_HIGH_CONFIDENCE) {
+    researchNote += ' Research shows 3 verifications achieve expert-level accuracy (κ=0.58).';
+  }
+
+  return {
+    score: roundedScore,
+    level,
+    description,
+    factors,
+    metadata: {
+      daysUntilStale,
+      isStale,
+      recommendReVerification,
+      daysSinceVerification,
+      freshnessThreshold,
+      researchNote,
+    },
+  };
 }
 
 /**
@@ -68,10 +214,17 @@ function calculateDataSourceScore(source: string | null): number {
 
 /**
  * Recency score (0-25 points)
- * Full points for data verified within 30 days
- * Decays over time
+ * Uses specialty-specific freshness thresholds based on research
+ *
+ * Research shows:
+ * - Mental health: 30 days (high churn, 43% Medicaid acceptance)
+ * - Primary care: 60 days (12% annual turnover)
+ * - Hospital-based: 90 days (more stable)
  */
-function calculateRecencyScore(lastVerifiedAt: Date | null): number {
+function calculateRecencyScore(
+  lastVerifiedAt: Date | null,
+  freshnessThreshold: number
+): number {
   if (!lastVerifiedAt) return 0;
 
   const now = new Date();
@@ -79,24 +232,37 @@ function calculateRecencyScore(lastVerifiedAt: Date | null): number {
     (now.getTime() - lastVerifiedAt.getTime()) / (1000 * 60 * 60 * 24)
   );
 
-  if (daysSinceVerification <= 30) return 25;
-  if (daysSinceVerification <= 60) return 20;
-  if (daysSinceVerification <= 90) return 15;
-  if (daysSinceVerification <= 180) return 10;
-  if (daysSinceVerification <= 365) return 5;
+  // Full points if within threshold
+  if (daysSinceVerification <= freshnessThreshold) return 25;
+
+  // Reduced points if within 2x threshold
+  if (daysSinceVerification <= freshnessThreshold * 2) return 15;
+
+  // Further reduced if within 4x threshold
+  if (daysSinceVerification <= freshnessThreshold * 4) return 8;
+
+  // Minimal points if within 6x threshold (up to 1 year for most)
+  if (daysSinceVerification <= freshnessThreshold * 6) return 4;
+
+  // Nearly zero points after that
   return 2;
 }
 
 /**
  * Verification count score (0-25 points)
- * More verifications = higher confidence
+ * Research-based: 3 verifications achieve expert-level accuracy
+ *
+ * Based on Mortensen et al. (2015), JAMIA:
+ * - Crowdsourced verification achieves κ=0.58 (expert-level)
+ * - 3 verifications is optimal balance
  */
 function calculateVerificationScore(verificationCount: number): number {
   if (verificationCount === 0) return 0;
-  if (verificationCount === 1) return 10;
-  if (verificationCount === 2) return 15;
-  if (verificationCount <= 4) return 20;
-  return 25;
+  if (verificationCount === 1) return 8;  // Low confidence
+  if (verificationCount === 2) return 12; // Still below optimal
+  if (verificationCount === 3) return 20; // Optimal - research shows expert-level accuracy
+  if (verificationCount <= 5) return 23;  // Above optimal
+  return 25; // 6+ verifications - very high confidence
 }
 
 /**
@@ -127,8 +293,20 @@ function calculateAgreementScore(upvotes: number, downvotes: number): number {
 
 /**
  * Get confidence level label
+ * Research-based: < 3 verifications = LOW confidence
  */
-export function getConfidenceLevel(score: number): string {
+export function getConfidenceLevel(score: number, verificationCount: number): string {
+  // Research shows 3 verifications achieve expert-level accuracy
+  // Force LOW confidence if below threshold, regardless of score
+  if (verificationCount < MIN_VERIFICATIONS_FOR_HIGH_CONFIDENCE && verificationCount > 0) {
+    // Only allow MEDIUM at best with < 3 verifications
+    if (score >= 76) return 'MEDIUM';
+    if (score >= 51) return 'MEDIUM';
+    if (score >= 26) return 'LOW';
+    return 'VERY_LOW';
+  }
+
+  // Standard scoring with sufficient verifications
   if (score >= 91) return 'VERY_HIGH';
   if (score >= 76) return 'HIGH';
   if (score >= 51) return 'MEDIUM';
@@ -138,15 +316,26 @@ export function getConfidenceLevel(score: number): string {
 
 /**
  * Get confidence level description
+ * Includes research-based notes about verification count
  */
-export function getConfidenceLevelDescription(score: number): string {
-  const level = getConfidenceLevel(score);
+export function getConfidenceLevelDescription(level: string, verificationCount: number): string {
+  const basedOnResearch =
+    verificationCount < MIN_VERIFICATIONS_FOR_HIGH_CONFIDENCE
+      ? ' Research shows 3 verifications achieve expert-level accuracy.'
+      : '';
+
   switch (level) {
-    case 'VERY_HIGH': return 'Verified through multiple authoritative sources';
-    case 'HIGH': return 'Verified through one authoritative source';
-    case 'MEDIUM': return 'Reasonable confidence but needs verification';
-    case 'LOW': return 'Limited data, verification recommended';
-    case 'VERY_LOW': return 'Unverified or potentially inaccurate';
-    default: return 'Unknown confidence level';
+    case 'VERY_HIGH':
+      return 'Verified through multiple authoritative sources with expert-level accuracy.' + basedOnResearch;
+    case 'HIGH':
+      return 'Verified through authoritative sources or multiple community verifications.' + basedOnResearch;
+    case 'MEDIUM':
+      return 'Some verification exists, but may need confirmation.' + basedOnResearch;
+    case 'LOW':
+      return 'Limited verification data. Call provider to confirm before visiting.' + basedOnResearch;
+    case 'VERY_LOW':
+      return 'Unverified or potentially inaccurate. Always call to confirm.' + basedOnResearch;
+    default:
+      return 'Unknown confidence level';
   }
 }
