@@ -220,6 +220,11 @@ function calculateDataSourceScore(source: string | null): number {
  * - Mental health: 30 days (high churn, 43% Medicaid acceptance)
  * - Primary care: 60 days (12% annual turnover)
  * - Hospital-based: 90 days (more stable)
+ *
+ * Decay strategy:
+ * - Full points if < threshold (fresh data)
+ * - Linear decay from threshold to 2x threshold (stale but usable)
+ * - Zero points if > 2x threshold (too stale, needs re-verification)
  */
 function calculateRecencyScore(
   lastVerifiedAt: Date | null,
@@ -232,20 +237,22 @@ function calculateRecencyScore(
     (now.getTime() - lastVerifiedAt.getTime()) / (1000 * 60 * 60 * 24)
   );
 
-  // Full points if within threshold
+  // Full points if within threshold (fresh)
   if (daysSinceVerification <= freshnessThreshold) return 25;
 
-  // Reduced points if within 2x threshold
-  if (daysSinceVerification <= freshnessThreshold * 2) return 15;
+  // Zero points if past 2x threshold (too stale)
+  if (daysSinceVerification > freshnessThreshold * 2) return 0;
 
-  // Further reduced if within 4x threshold
-  if (daysSinceVerification <= freshnessThreshold * 4) return 8;
+  // Linear decay between threshold and 2x threshold
+  // Example: If threshold is 60 days
+  //   - At 60 days: 25 points
+  //   - At 90 days: 12.5 points
+  //   - At 120 days: 0 points
+  const daysIntoDecay = daysSinceVerification - freshnessThreshold;
+  const decayRange = freshnessThreshold; // threshold to 2x threshold range
+  const decayRatio = 1 - (daysIntoDecay / decayRange);
 
-  // Minimal points if within 6x threshold (up to 1 year for most)
-  if (daysSinceVerification <= freshnessThreshold * 6) return 4;
-
-  // Nearly zero points after that
-  return 2;
+  return Math.round(25 * decayRatio);
 }
 
 /**
