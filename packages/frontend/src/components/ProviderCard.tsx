@@ -3,17 +3,24 @@
 import Link from 'next/link';
 import { Provider } from '@/lib/api';
 import { ConfidenceBadge, ConfidenceIndicator } from './ConfidenceBadge';
+import FreshnessWarning from './FreshnessWarning';
 
 interface ProviderCardProps {
   provider: Provider & { displayName: string };
   confidenceScore?: number;
   showConfidence?: boolean;
+  lastVerifiedAt?: Date | null;
+  planId?: string;
+  planName?: string;
 }
 
 export function ProviderCard({
   provider,
   confidenceScore,
   showConfidence = false,
+  lastVerifiedAt,
+  planId,
+  planName,
 }: ProviderCardProps) {
   const specialtyLabels: Record<string, string> = {
     ENDOCRINOLOGY: 'Endocrinology',
@@ -76,6 +83,23 @@ export function ProviderCard({
             </span>
           </div>
         </div>
+
+        {/* Freshness Warning - Compact Card Variant */}
+        {lastVerifiedAt !== undefined && (
+          <div className="mt-4">
+            <FreshnessWarning
+              lastVerifiedAt={lastVerifiedAt}
+              specialty={provider.specialtyCategory}
+              taxonomyDescription={provider.taxonomyDescription}
+              providerNpi={provider.npi}
+              providerName={provider.displayName}
+              planId={planId}
+              planName={planName}
+              variant="card"
+              showVerifyButton={true}
+            />
+          </div>
+        )}
 
         {/* View Details Link */}
         <div className="mt-4 pt-4 border-t border-gray-100 flex justify-end">
