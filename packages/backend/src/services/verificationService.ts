@@ -2,11 +2,24 @@ import { Prisma, VerificationType, VerificationSource, AcceptanceStatus } from '
 import prisma from '../lib/prisma';
 import { calculateConfidenceScore } from './confidenceService';
 
+/**
+ * Research-based verification input
+ * Based on Mortensen et al. (2015), JAMIA: Simple binary questions achieve highest accuracy
+ */
 export interface SubmitVerificationInput {
   npi: string;
   planId: string;
+
+  // Insurance acceptance
   acceptsInsurance: boolean;
   acceptsNewPatients?: boolean;
+
+  // Contact verification (36% of errors are contact information)
+  phoneReached?: boolean;
+  phoneCorrect?: boolean;
+  scheduledAppointment?: boolean;
+
+  // Evidence
   notes?: string;
   evidenceUrl?: string;
   submittedBy?: string;
@@ -24,9 +37,23 @@ export interface VerificationStats {
 
 /**
  * Submit a new verification
+ * Research-based: Captures binary verification data for expert-level accuracy
  */
 export async function submitVerification(input: SubmitVerificationInput) {
-  const { npi, planId, acceptsInsurance, acceptsNewPatients, notes, evidenceUrl, submittedBy, sourceIp, userAgent } = input;
+  const {
+    npi,
+    planId,
+    acceptsInsurance,
+    acceptsNewPatients,
+    phoneReached,
+    phoneCorrect,
+    scheduledAppointment,
+    notes,
+    evidenceUrl,
+    submittedBy,
+    sourceIp,
+    userAgent,
+  } = input;
 
   // Find provider
   const provider = await prisma.provider.findUnique({
@@ -78,6 +105,10 @@ export async function submitVerification(input: SubmitVerificationInput) {
       newValue: {
         acceptanceStatus: newStatus,
         acceptsNewPatients,
+        // Research-based contact verification
+        phoneReached,
+        phoneCorrect,
+        scheduledAppointment,
       } as Prisma.InputJsonValue,
       notes,
       evidenceUrl,

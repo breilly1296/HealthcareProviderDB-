@@ -36,6 +36,7 @@ export interface VerificationLog {
 }
 
 // Verification submission input (for crowdsource)
+// Research-based: Simple binary questions (Mortensen et al. 2015, JAMIA)
 export interface SubmitVerificationInput {
   providerId?: string;
   planId?: string;
@@ -45,6 +46,11 @@ export interface SubmitVerificationInput {
   // For plan acceptance verification
   acceptsInsurance?: boolean;
   acceptsNewPatients?: boolean;
+
+  // Research-based contact verification (36% of errors are contact info)
+  phoneReached?: boolean;
+  phoneCorrect?: boolean;
+  scheduledAppointment?: boolean;
 
   // Evidence
   notes?: string;
