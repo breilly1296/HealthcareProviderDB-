@@ -127,8 +127,11 @@ router.get(
           displayName: getProviderDisplayName(provider),
           planAcceptances: provider.planAcceptances.map((pa) => ({
             ...pa,
-            confidenceLevel: getConfidenceLevel(pa.confidenceScore),
-            confidenceDescription: getConfidenceLevelDescription(pa.confidenceScore),
+            confidenceLevel: getConfidenceLevel(pa.confidenceScore, pa.verificationCount),
+            confidenceDescription: getConfidenceLevelDescription(
+              getConfidenceLevel(pa.confidenceScore, pa.verificationCount),
+              pa.verificationCount
+            ),
           })),
         },
       },
@@ -163,8 +166,11 @@ router.get(
         npi,
         acceptances: result.acceptances.map((a) => ({
           ...a,
-          confidenceLevel: getConfidenceLevel(a.confidenceScore),
-          confidenceDescription: getConfidenceLevelDescription(a.confidenceScore),
+          confidenceLevel: getConfidenceLevel(a.confidenceScore, a.verificationCount),
+          confidenceDescription: getConfidenceLevelDescription(
+            getConfidenceLevel(a.confidenceScore, a.verificationCount),
+            a.verificationCount
+          ),
         })),
         pagination: {
           total: result.total,

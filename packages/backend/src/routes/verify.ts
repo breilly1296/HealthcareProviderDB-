@@ -65,8 +65,17 @@ router.post(
         verification: result.verification,
         acceptance: {
           ...result.acceptance,
-          confidenceLevel: getConfidenceLevel(result.acceptance.confidenceScore),
-          confidenceDescription: getConfidenceLevelDescription(result.acceptance.confidenceScore),
+          confidenceLevel: getConfidenceLevel(
+            result.acceptance.confidenceScore,
+            result.acceptance.verificationCount
+          ),
+          confidenceDescription: getConfidenceLevelDescription(
+            getConfidenceLevel(
+              result.acceptance.confidenceScore,
+              result.acceptance.verificationCount
+            ),
+            result.acceptance.verificationCount
+          ),
         },
         message: 'Verification submitted successfully',
       },
@@ -167,8 +176,11 @@ router.get(
         acceptance: result.acceptance
           ? {
               ...result.acceptance,
-              confidenceLevel: getConfidenceLevel(result.acceptance.confidenceScore),
-              confidenceDescription: getConfidenceLevelDescription(result.acceptance.confidenceScore),
+              confidenceLevel: getConfidenceLevel(result.acceptance.confidenceScore, result.acceptance.verificationCount),
+              confidenceDescription: getConfidenceLevelDescription(
+                getConfidenceLevel(result.acceptance.confidenceScore, result.acceptance.verificationCount),
+                result.acceptance.verificationCount
+              ),
             }
           : null,
         verifications: result.verifications,
