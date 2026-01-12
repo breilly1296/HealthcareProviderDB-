@@ -6,36 +6,53 @@ export default function HomePage() {
       {/* Hero Section */}
       <section className="bg-gradient-to-b from-primary-50 to-white py-16 md:py-24">
         <div className="container-wide text-center">
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
-            Find Providers Who Accept
-            <span className="text-primary-600"> Your Insurance</span>
-          </h1>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-8">
-            Search thousands of healthcare providers and get community-verified
-            information about which insurance plans they accept. No more surprise bills.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/search" className="btn-primary text-lg px-8 py-4">
-              Search Providers
-            </Link>
-            <Link href="#how-it-works" className="btn-outline text-lg px-8 py-4">
-              Learn How It Works
+          {/* Research Badge */}
+          <div className="inline-flex items-center gap-2 bg-white px-4 py-2 rounded-full shadow-sm border border-primary-200 mb-6">
+            <span className="text-2xl">📚</span>
+            <span className="text-sm font-medium text-gray-700">
+              Backed by peer-reviewed research
+            </span>
+            <Link
+              href="/research"
+              className="text-sm font-medium text-primary-600 hover:text-primary-700"
+            >
+              Learn more →
             </Link>
           </div>
 
-          {/* Stats */}
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
+            Insurance Directories Are Wrong
+            <span className="text-primary-600"> 46% of the Time</span>
+          </h1>
+          <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-8">
+            <strong className="text-gray-900">Patients face 4x more surprise bills</strong> when directories are inaccurate.
+            We fix that with crowdsourced verification backed by peer-reviewed research.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link href="/search" className="btn-primary text-lg px-8 py-4">
+              Find Verified Providers
+            </Link>
+            <Link href="/research" className="btn-outline text-lg px-8 py-4">
+              See the research →
+            </Link>
+          </div>
+
+          {/* Research-Backed Stats */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-16 max-w-4xl mx-auto">
             <div className="text-center">
-              <div className="text-4xl font-bold text-primary-600">500K+</div>
-              <div className="text-gray-600 mt-2">Healthcare Providers</div>
+              <div className="text-4xl font-bold text-primary-600">46%</div>
+              <div className="text-gray-600 mt-2">Directory Inaccuracy Rate</div>
+              <div className="text-xs text-gray-500 mt-1">Haeder et al., 2024</div>
             </div>
             <div className="text-center">
-              <div className="text-4xl font-bold text-primary-600">1,000+</div>
-              <div className="text-gray-600 mt-2">Insurance Plans</div>
+              <div className="text-4xl font-bold text-primary-600">4x</div>
+              <div className="text-gray-600 mt-2">More Surprise Bills</div>
+              <div className="text-xs text-gray-500 mt-1">Health Affairs Scholar</div>
             </div>
             <div className="text-center">
-              <div className="text-4xl font-bold text-primary-600">10K+</div>
-              <div className="text-gray-600 mt-2">Community Verifications</div>
+              <div className="text-4xl font-bold text-primary-600">κ=0.58</div>
+              <div className="text-gray-600 mt-2">Expert-Level Accuracy</div>
+              <div className="text-xs text-gray-500 mt-1">Mortensen et al., 2015</div>
             </div>
           </div>
         </div>
@@ -47,8 +64,14 @@ export default function HomePage() {
           <h2 className="text-3xl md:text-4xl font-bold text-center text-gray-900 mb-4">
             How It Works
           </h2>
-          <p className="text-xl text-gray-600 text-center max-w-2xl mx-auto mb-12">
+          <p className="text-xl text-gray-600 text-center max-w-2xl mx-auto mb-4">
             Finding the right provider for your insurance is simple
+          </p>
+          <p className="text-sm text-gray-500 text-center max-w-2xl mx-auto mb-12">
+            Our approach achieves <strong>expert-level accuracy (κ=0.58 vs 0.59)</strong> with
+            <strong> real-time updates vs 540-day industry lag</strong>
+            <br />
+            <span className="text-xs">Based on research from Health Affairs Scholar, JAMIA</span>
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -103,8 +126,12 @@ export default function HomePage() {
           <h2 className="text-3xl md:text-4xl font-bold text-center text-gray-900 mb-4">
             Understanding Confidence Scores
           </h2>
-          <p className="text-xl text-gray-600 text-center max-w-2xl mx-auto mb-12">
+          <p className="text-xl text-gray-600 text-center max-w-2xl mx-auto mb-4">
             Our scoring system helps you understand how reliable our information is
+          </p>
+          <p className="text-sm text-gray-500 text-center max-w-2xl mx-auto mb-12">
+            Research shows crowdsourced verification achieves <strong>expert-level accuracy</strong> while being
+            <strong> 5-150x faster</strong> and <strong>75% cheaper</strong> than traditional methods
           </p>
 
           <div className="max-w-4xl mx-auto">
@@ -180,13 +207,14 @@ export default function HomePage() {
                 <div>
                   <h4 className="font-medium text-gray-900 mb-2">Recency (25 points)</h4>
                   <p className="text-gray-600 text-sm">
-                    Recent verifications score higher. Data older than a year gets reduced points.
+                    Recent verifications score higher. Research shows 12% annual provider turnover,
+                    so fresh data is critical.
                   </p>
                 </div>
                 <div>
                   <h4 className="font-medium text-gray-900 mb-2">Verification Count (25 points)</h4>
                   <p className="text-gray-600 text-sm">
-                    More verifications from different users increase confidence in the data.
+                    Research shows 3 verifications are optimal. More verifications from different users increase confidence in the data.
                   </p>
                 </div>
                 <div>
@@ -208,7 +236,8 @@ export default function HomePage() {
             Ready to Find Your Provider?
           </h2>
           <p className="text-xl text-primary-100 max-w-2xl mx-auto mb-8">
-            Search now and stop worrying about whether your insurance will be accepted.
+            Don't be part of the 46% affected by inaccurate directories.
+            Search now with research-backed verification.
           </p>
           <Link
             href="/search"
