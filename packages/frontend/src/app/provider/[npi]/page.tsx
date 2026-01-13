@@ -336,34 +336,35 @@ export default function ProviderDetailPage() {
                                   </div>
                                 </div>
 
-                                {pa.upvotes + pa.downvotes > 0 && (
-                                  <div className="flex gap-3">
-                                    <div className="flex flex-col items-center">
-                                      <div className="w-2 h-2 bg-primary-500 rounded-full" />
-                                      <div className="w-0.5 h-full bg-gray-300" />
-                                    </div>
-                                    <div className="flex-1 pb-3">
-                                      <p className="text-sm font-medium text-gray-900">
-                                        Community votes
-                                      </p>
-                                      <p className="text-xs text-gray-600">
-                                        {pa.upvotes} helpful, {pa.downvotes} not helpful
-                                        ({Math.round((pa.upvotes / (pa.upvotes + pa.downvotes)) * 100)}% agreement)
-                                      </p>
-                                    </div>
+                                <div className="flex gap-3">
+                                  <div className="flex flex-col items-center">
+                                    <div className="w-2 h-2 bg-primary-500 rounded-full" />
+                                    <div className="w-0.5 h-full bg-gray-300" />
                                   </div>
-                                )}
+                                  <div className="flex-1 pb-3">
+                                    <p className="text-sm font-medium text-gray-900">
+                                      Confidence level
+                                    </p>
+                                    <p className="text-xs text-gray-600">
+                                      {pa.confidenceLevel?.replace('_', ' ') || 'MEDIUM'} ({pa.confidenceScore}%)
+                                    </p>
+                                  </div>
+                                </div>
 
                                 <div className="flex gap-3">
                                   <div className="w-2 h-2 bg-gray-400 rounded-full flex-shrink-0 mt-1" />
                                   <div className="flex-1">
                                     <p className="text-sm font-medium text-gray-900">
-                                      Data source
+                                      Acceptance status
                                     </p>
                                     <p className="text-xs text-gray-600">
-                                      {pa.dataSource === 'CMS_NPPES' ? 'CMS National Provider Registry + Community' :
-                                       pa.dataSource === 'CROWDSOURCE' ? 'Community-verified' :
-                                       'Mixed sources'}
+                                      {pa.acceptanceStatus === 'ACCEPTED' ? 'Accepts this plan' :
+                                       pa.acceptanceStatus === 'NOT_ACCEPTED' ? 'Does not accept' :
+                                       pa.acceptanceStatus === 'PENDING' ? 'Status pending verification' :
+                                       'Unknown'}
+                                      {pa.acceptsNewPatients !== null && (
+                                        <> • {pa.acceptsNewPatients ? 'Accepting new patients' : 'Not accepting new patients'}</>
+                                      )}
                                     </p>
                                   </div>
                                 </div>
