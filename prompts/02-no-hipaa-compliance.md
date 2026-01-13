@@ -1,0 +1,105 @@
+---
+tags:
+  - security
+  - compliance
+  - critical
+type: prompt
+priority: 1
+---
+
+# No HIPAA Compliance Review
+
+## Files to Review
+- `packages/backend/prisma/schema.prisma` (verify no PHI fields)
+- `packages/backend/src/api/routes.ts` (verify what data is collected)
+- `packages/backend/src/services/*` (verify no PHI processing)
+
+## VerifyMyProvider Compliance Architecture
+- **HIPAA Required:** NO
+- **Data Stored:** Public provider data only (NPI, addresses, specialties)
+- **User Data:** Anonymous verifications (no patient identity)
+- **Differentiator:** Can move 3x faster than OwnMyHealth (no HIPAA overhead)
+
+## Checklist
+
+### 1. What VerifyMyProvider Stores (ALL PUBLIC DATA)
+- [ ] Provider names - from public NPI Registry
+- [ ] Provider addresses - from public NPI Registry
+- [ ] Provider specialties - from public taxonomy codes
+- [ ] Insurance plan names - from public marketplace data
+- [ ] Acceptance verifications - anonymous "yes/no" answers
+- [ ] Verification dates - when verification occurred
+- [ ] IP addresses - for rate limiting only
+
+### 2. What VerifyMyProvider Does NOT Store (NO PHI)
+- [ ] Patient names - NEVER collected
+- [ ] Patient addresses - NEVER collected
+- [ ] User health conditions - NEVER collected
+- [ ] Visit reasons - NEVER collected
+- [ ] Treatment details - NEVER collected
+- [ ] User insurance selections - NOT linked to identity
+- [ ] Individual medical records - NEVER collected
+
+### 3. Safe vs Unsafe Patterns
+
+**SAFE (What We Do):**
+```
+Verification record:
+{
+  npi: "1234567890",
+  planId: "BCBS_FL_PPO",
+  accepted: true,
+  verificationDate: "2026-01-11",
+  ipAddress: "73.33.120.171" // rate limiting only
+}
+```
+
+**UNSAFE (Would Trigger HIPAA):**
+```
+Verification record:
+{
+  userId: "user-123",
+  userName: "John Smith",
+  userPlan: "BCBS PPO",
+  visitReason: "Back pain",
+  visitDate: "2026-01-11"
+}
+```
+
+### 4. Comparison to Similar Services
+- [ ] Zocdoc - NOT HIPAA-covered (business reviews)
+- [ ] Healthgrades - NOT HIPAA-covered (provider ratings)
+- [ ] Google Reviews for doctors - NOT HIPAA-covered
+- [ ] **VerifyMyProvider** - NOT HIPAA-covered (acceptance verification)
+
+### 5. Compliance We DO Need
+- [ ] Terms of Service (user-generated content)
+- [ ] Privacy Policy (what data we collect, how we use it)
+- [ ] Data accuracy disclaimers (crowdsourced data may be wrong)
+- [ ] CMS Terms of Use (NPI Registry data usage)
+- [ ] Basic security (HTTPS, rate limiting, CSRF)
+
+### 6. Benefits of No HIPAA
+- [ ] Faster iteration (no compliance review per change)
+- [ ] Lower costs (~30-40% cheaper than OwnMyHealth)
+- [ ] Simpler deployment (no encryption at rest required)
+- [ ] Public API possible (no PHI exposure concerns)
+- [ ] B2B licensing easier (no BAA negotiations)
+- [ ] Can expose data freely (search engines, partners)
+
+### 7. Boundary with OwnMyHealth
+- [ ] OwnMyHealth calls VerifyMyProvider API for provider search
+- [ ] OwnMyHealth sends only: specialty, zip code, plan ID
+- [ ] OwnMyHealth receives only: public provider information
+- [ ] NO PHI crosses the API boundary
+- [ ] NO user identity shared between products
+
+## Questions to Ask
+1. Have any users, advisors, or partners questioned HIPAA compliance?
+2. Are there any planned features that might introduce PHI?
+   - Uploading appointment confirmations?
+   - Uploading EOB (Explanation of Benefits)?
+   - Linking verifications to user accounts with health data?
+3. Should we add a disclaimer on the frontend clarifying no PHI is collected?
+4. Has a lawyer reviewed this compliance position?
+5. Any recent regulatory changes we should be aware of?

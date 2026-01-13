@@ -278,7 +278,7 @@ async function importNPIData(filePath: string, databaseUrl: string): Promise<Imp
     })
   );
 
-  const batchSize = 100;
+  const batchSize = 5000;
   let batch: any[] = [];
 
   async function processBatch(retryCount = 0): Promise<void> {
