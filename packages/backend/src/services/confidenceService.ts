@@ -1,8 +1,8 @@
 export interface ConfidenceFactors {
-  dataSourceScore: number;      // 0-30
-  recencyScore: number;         // 0-25
-  verificationScore: number;    // 0-25
-  agreementScore: number;       // 0-20
+  dataSourceScore: number;      // 0-25 (authoritative sources)
+  recencyScore: number;         // 0-30 (time-based decay)
+  verificationScore: number;    // 0-25 (optimal at 3)
+  agreementScore: number;       // 0-20 (community consensus)
   [key: string]: number;        // Index signature for JSON compatibility
 }
 
@@ -28,6 +28,7 @@ export interface ConfidenceResult {
     daysSinceVerification: number | null;
     freshnessThreshold: number;
     researchNote: string;
+    explanation: string; // Human-readable explanation of why this score
   };
 }
 
@@ -55,21 +56,21 @@ const VERIFICATION_FRESHNESS: Record<SpecialtyFreshnessCategory, number> = {
 // Mortensen et al. (2015), JAMIA
 const MIN_VERIFICATIONS_FOR_HIGH_CONFIDENCE = 3;
 
-// Data source scores (max 30 points)
+// Data source scores (max 25 points)
 // Covers both DataSource and VerificationSource enum values
 const DATA_SOURCE_SCORES: Record<string, number> = {
   // DataSource enum values
-  CMS_NPPES: 30,
-  CMS_PLAN_FINDER: 28,
-  CARRIER_API: 26,
-  USER_UPLOAD: 20,
-  CROWDSOURCE: 10,
-  // VerificationSource enum values (unique ones)
-  CMS_DATA: 30,
-  CARRIER_DATA: 28,
-  PROVIDER_PORTAL: 25,
-  PHONE_CALL: 22,
-  AUTOMATED: 15,
+  CMS_NPPES: 25,           // Official CMS data
+  CMS_PLAN_FINDER: 25,     // Official CMS data
+  CARRIER_API: 20,         // Insurance carrier data
+  PROVIDER_PORTAL: 20,     // Provider-verified
+  USER_UPLOAD: 15,         // User-provided
+  PHONE_CALL: 15,          // Community verified
+  CROWDSOURCE: 15,         // Community only
+  AUTOMATED: 10,           // Automated checks
+  // Legacy VerificationSource enum values
+  CMS_DATA: 25,
+  CARRIER_DATA: 20,
 };
 
 /**
@@ -187,6 +188,16 @@ export function calculateConfidenceScore(input: ConfidenceInput): ConfidenceResu
     researchNote += ' Research shows 3 verifications achieve expert-level accuracy (κ=0.58).';
   }
 
+  // Generate explanation of score
+  const explanation = generateScoreExplanation(
+    roundedScore,
+    factors,
+    input.verificationCount,
+    daysSinceVerification,
+    freshnessThreshold,
+    specialtyCategory
+  );
+
   return {
     score: roundedScore,
     level,
@@ -199,13 +210,17 @@ export function calculateConfidenceScore(input: ConfidenceInput): ConfidenceResu
       daysSinceVerification,
       freshnessThreshold,
       researchNote,
+      explanation,
     },
   };
 }
 
 /**
- * Data source score (0-30 points)
+ * Data source score (0-25 points)
  * Higher scores for more authoritative sources
+ *
+ * Research shows official data (CMS) is most reliable
+ * Community verification achieves expert-level accuracy with sufficient volume
  */
 function calculateDataSourceScore(source: string | null): number {
   if (!source) return 10;
@@ -213,18 +228,23 @@ function calculateDataSourceScore(source: string | null): number {
 }
 
 /**
- * Recency score (0-25 points)
- * Uses specialty-specific freshness thresholds based on research
+ * Recency score (0-30 points)
+ * Tiered scoring system based on research showing provider network changes
  *
- * Research shows:
- * - Mental health: 30 days (high churn, 43% Medicaid acceptance)
- * - Primary care: 60 days (12% annual turnover)
- * - Hospital-based: 90 days (more stable)
+ * Research shows 12% annual provider turnover (Ndumele et al. 2018)
+ * Recent data is critical - providers change networks frequently
  *
- * Decay strategy:
- * - Full points if < threshold (fresh data)
- * - Linear decay from threshold to 2x threshold (stale but usable)
- * - Zero points if > 2x threshold (too stale, needs re-verification)
+ * Tiered scoring (adjusted for specialty-specific thresholds):
+ * - 0-30 days: 30 points (very fresh)
+ * - 31-60 days: 20 points (recent)
+ * - 61-90 days: 10 points (aging)
+ * - 91-180 days: 5 points (stale)
+ * - 180+ days: 0 points (too old)
+ *
+ * Specialty adjustments:
+ * - Mental health (30-day threshold): More aggressive decay
+ * - Primary care (60-day threshold): Standard decay
+ * - Hospital-based (90-day threshold): More lenient decay
  */
 function calculateRecencyScore(
   lastVerifiedAt: Date | null,
@@ -237,22 +257,21 @@ function calculateRecencyScore(
     (now.getTime() - lastVerifiedAt.getTime()) / (1000 * 60 * 60 * 24)
   );
 
-  // Full points if within threshold (fresh)
-  if (daysSinceVerification <= freshnessThreshold) return 25;
+  // Tiered scoring with specialty-based adjustments
+  // Base tiers (for 60-day threshold specialty):
+  // 0-30: 30pts, 31-60: 20pts, 61-90: 10pts, 91-180: 5pts, 180+: 0pts
 
-  // Zero points if past 2x threshold (too stale)
-  if (daysSinceVerification > freshnessThreshold * 2) return 0;
+  // Adjust tiers based on specialty threshold
+  const tier1 = Math.min(30, freshnessThreshold * 0.5);  // 50% of threshold
+  const tier2 = freshnessThreshold;                       // 100% of threshold
+  const tier3 = freshnessThreshold * 1.5;                 // 150% of threshold
+  const tier4 = 180;                                      // Fixed at 180 days
 
-  // Linear decay between threshold and 2x threshold
-  // Example: If threshold is 60 days
-  //   - At 60 days: 25 points
-  //   - At 90 days: 12.5 points
-  //   - At 120 days: 0 points
-  const daysIntoDecay = daysSinceVerification - freshnessThreshold;
-  const decayRange = freshnessThreshold; // threshold to 2x threshold range
-  const decayRatio = 1 - (daysIntoDecay / decayRange);
-
-  return Math.round(25 * decayRatio);
+  if (daysSinceVerification <= tier1) return 30;
+  if (daysSinceVerification <= tier2) return 20;
+  if (daysSinceVerification <= tier3) return 10;
+  if (daysSinceVerification <= tier4) return 5;
+  return 0; // 180+ days is always 0
 }
 
 /**
@@ -260,42 +279,136 @@ function calculateRecencyScore(
  * Research-based: 3 verifications achieve expert-level accuracy
  *
  * Based on Mortensen et al. (2015), JAMIA:
- * - Crowdsourced verification achieves κ=0.58 (expert-level)
- * - 3 verifications is optimal balance
+ * - Crowdsourced verification achieves κ=0.58 (expert-level accuracy)
+ * - Expert validation achieves κ=0.59
+ * - 3 verifications is optimal threshold for accuracy
+ * - Additional verifications beyond 3 show no significant accuracy improvement
+ *
+ * Scoring emphasizes the 3-verification threshold:
+ * - 0 verifications: 0 points (no data)
+ * - 1 verification: 10 points (not enough - could be outlier)
+ * - 2 verifications: 15 points (getting there, but not optimal)
+ * - 3+ verifications: 25 points (expert-level accuracy achieved!)
  */
 function calculateVerificationScore(verificationCount: number): number {
-  if (verificationCount === 0) return 0;
-  if (verificationCount === 1) return 8;  // Low confidence
-  if (verificationCount === 2) return 12; // Still below optimal
-  if (verificationCount === 3) return 20; // Optimal - research shows expert-level accuracy
-  if (verificationCount <= 5) return 23;  // Above optimal
-  return 25; // 6+ verifications - very high confidence
+  if (verificationCount === 0) return 0;  // No data
+  if (verificationCount === 1) return 10; // Single verification - not enough
+  if (verificationCount === 2) return 15; // Two verifications - close but not optimal
+  return 25; // 3+ verifications - expert-level accuracy achieved!
 }
 
 /**
  * Agreement score (0-20 points)
- * Based on upvote/downvote ratio from crowdsource verifications
+ * Measures community consensus through upvote/downvote ratio
+ *
+ * Research shows crowdsourced verification works best when there's consensus
+ * Conflicting data suggests the information may be outdated or incorrect
+ *
+ * Scoring based on agreement percentage:
+ * - 100% agreement: 20 points (complete consensus)
+ * - 80-99% agreement: 15 points (strong consensus)
+ * - 60-79% agreement: 10 points (moderate consensus)
+ * - 40-59% agreement: 5 points (weak consensus)
+ * - <40% agreement: 0 points (conflicting data - unreliable)
  */
 function calculateAgreementScore(upvotes: number, downvotes: number): number {
   const totalVotes = upvotes + downvotes;
 
-  if (totalVotes === 0) return 0;
+  if (totalVotes === 0) return 0; // No votes yet
 
-  const ratio = upvotes / totalVotes;
+  const agreementRatio = upvotes / totalVotes;
 
-  // Require minimum votes for full score
-  const engagementMultiplier = Math.min(1, totalVotes / 5);
+  // Score based on agreement percentage
+  if (agreementRatio === 1.0) return 20; // 100% agreement
+  if (agreementRatio >= 0.8) return 15;  // 80-99% agreement
+  if (agreementRatio >= 0.6) return 10;  // 60-79% agreement
+  if (agreementRatio >= 0.4) return 5;   // 40-59% agreement
+  return 0; // <40% agreement - conflicting data
+}
 
-  // Score based on ratio
-  let baseScore: number;
-  if (ratio >= 0.9) baseScore = 20;
-  else if (ratio >= 0.8) baseScore = 16;
-  else if (ratio >= 0.7) baseScore = 12;
-  else if (ratio >= 0.6) baseScore = 8;
-  else if (ratio >= 0.5) baseScore = 4;
-  else baseScore = 0;
+/**
+ * Generate human-readable explanation of confidence score
+ * References research to explain why score is what it is
+ */
+function generateScoreExplanation(
+  score: number,
+  factors: ConfidenceFactors,
+  verificationCount: number,
+  daysSinceVerification: number | null,
+  freshnessThreshold: number,
+  specialtyCategory: SpecialtyFreshnessCategory
+): string {
+  const parts: string[] = [];
 
-  return Math.round(baseScore * engagementMultiplier);
+  // Data source explanation
+  if (factors.dataSourceScore >= 25) {
+    parts.push('verified through official CMS data');
+  } else if (factors.dataSourceScore >= 20) {
+    parts.push('verified through insurance carrier data');
+  } else if (factors.dataSourceScore >= 15) {
+    parts.push('verified through community submissions');
+  } else {
+    parts.push('limited authoritative data');
+  }
+
+  // Recency explanation
+  if (daysSinceVerification !== null) {
+    if (factors.recencyScore === 30) {
+      parts.push('very recent verification (within 30 days)');
+    } else if (factors.recencyScore === 20) {
+      parts.push(`recent verification (${daysSinceVerification} days ago)`);
+    } else if (factors.recencyScore === 10) {
+      parts.push(`aging data (${daysSinceVerification} days old)`);
+    } else if (factors.recencyScore === 5) {
+      parts.push(`stale data (${daysSinceVerification} days old) - research shows 12% annual provider turnover`);
+    } else {
+      parts.push(`very stale data (${daysSinceVerification}+ days old) - needs re-verification`);
+    }
+  } else {
+    parts.push('never verified - needs community verification');
+  }
+
+  // Verification count explanation
+  if (verificationCount === 0) {
+    parts.push('no patient verifications yet');
+  } else if (verificationCount === 1) {
+    parts.push('only 1 verification (research shows 3 achieve expert-level accuracy)');
+  } else if (verificationCount === 2) {
+    parts.push('2 verifications (1 more needed for expert-level accuracy)');
+  } else if (verificationCount === 3) {
+    parts.push('3 verifications (expert-level accuracy achieved!)');
+  } else {
+    parts.push(`${verificationCount} verifications (exceeds expert-level threshold)`);
+  }
+
+  // Agreement explanation
+  if (factors.agreementScore === 20) {
+    parts.push('complete community consensus');
+  } else if (factors.agreementScore === 15) {
+    parts.push('strong community consensus');
+  } else if (factors.agreementScore === 10) {
+    parts.push('moderate community consensus');
+  } else if (factors.agreementScore === 5) {
+    parts.push('weak community consensus');
+  } else if (factors.agreementScore === 0 && verificationCount > 0) {
+    parts.push('conflicting community data (unreliable)');
+  }
+
+  // Combine into readable sentence
+  const baseExplanation = `This ${score}% confidence score is based on: ${parts.join(', ')}.`;
+
+  // Add specialty-specific note
+  let specialtyNote = '';
+  if (specialtyCategory === SpecialtyFreshnessCategory.MENTAL_HEALTH) {
+    specialtyNote =
+      ' Mental health providers show high network turnover (only 43% accept Medicaid).';
+  } else if (specialtyCategory === SpecialtyFreshnessCategory.PRIMARY_CARE) {
+    specialtyNote = ' Research shows primary care providers have 12% annual network turnover.';
+  } else if (specialtyCategory === SpecialtyFreshnessCategory.HOSPITAL_BASED) {
+    specialtyNote = ' Hospital-based providers typically maintain more stable network participation.';
+  }
+
+  return baseExplanation + specialtyNote;
 }
 
 /**
