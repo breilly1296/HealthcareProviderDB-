@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { providerApi, Provider, PlanAcceptance } from '@/lib/api';
 import { ConfidenceBadge, ConfidenceIndicator } from '@/components/ConfidenceBadge';
 import { VerificationButton } from '@/components/VerificationButton';
+import FreshnessWarning from '@/components/FreshnessWarning';
 
 interface ProviderWithPlans extends Provider {
   displayName: string;
@@ -170,42 +171,54 @@ export default function ProviderDetailPage() {
               </h2>
 
               {acceptedPlans.length > 0 ? (
-                <div className="space-y-4">
+                <div className="space-y-6">
                   {acceptedPlans.map((pa) => (
-                    <div
-                      key={pa.id}
-                      className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-gray-50 rounded-lg gap-4"
-                    >
-                      <div className="flex-1">
-                        <h3 className="font-medium text-gray-900">
-                          {pa.plan?.planName || 'Unknown Plan'}
-                        </h3>
-                        <p className="text-sm text-gray-600">
-                          {pa.plan?.carrierName} • {pa.plan?.planType}
-                        </p>
-                        {pa.acceptsNewPatients !== null && (
-                          <p className="text-sm mt-1">
-                            {pa.acceptsNewPatients ? (
-                              <span className="text-green-600">✓ Accepting new patients</span>
-                            ) : (
-                              <span className="text-red-600">✗ Not accepting new patients</span>
-                            )}
+                    <div key={pa.id} className="space-y-4">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-gray-50 rounded-lg gap-4">
+                        <div className="flex-1">
+                          <h3 className="font-medium text-gray-900">
+                            {pa.plan?.planName || 'Unknown Plan'}
+                          </h3>
+                          <p className="text-sm text-gray-600">
+                            {pa.plan?.carrierName} • {pa.plan?.planType}
                           </p>
-                        )}
+                          {pa.acceptsNewPatients !== null && (
+                            <p className="text-sm mt-1">
+                              {pa.acceptsNewPatients ? (
+                                <span className="text-green-600">✓ Accepting new patients</span>
+                              ) : (
+                                <span className="text-red-600">✗ Not accepting new patients</span>
+                              )}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex flex-col items-end gap-2">
+                          <ConfidenceIndicator
+                            lastVerifiedAt={pa.lastVerifiedAt}
+                            verificationCount={pa.verificationCount}
+                            acceptanceStatus={pa.acceptanceStatus}
+                          />
+                          <VerificationButton
+                            npi={provider.npi}
+                            providerName={provider.displayName}
+                            planId={pa.plan?.planId}
+                            planName={pa.plan?.planName}
+                          />
+                        </div>
                       </div>
-                      <div className="flex flex-col items-end gap-2">
-                        <ConfidenceIndicator
-                          lastVerifiedAt={pa.lastVerifiedAt}
-                          verificationCount={pa.verificationCount}
-                          acceptanceStatus={pa.acceptanceStatus}
-                        />
-                        <VerificationButton
-                          npi={provider.npi}
-                          providerName={provider.displayName}
-                          planId={pa.plan?.planId}
-                          planName={pa.plan?.planName}
-                        />
-                      </div>
+
+                      {/* Freshness Warning - Prominent Detail Variant */}
+                      <FreshnessWarning
+                        lastVerifiedAt={pa.lastVerifiedAt ? new Date(pa.lastVerifiedAt) : null}
+                        specialty={provider.specialtyCategory}
+                        taxonomyDescription={provider.taxonomyDescription}
+                        providerNpi={provider.npi}
+                        providerName={provider.displayName}
+                        planId={pa.plan?.planId}
+                        planName={pa.plan?.planName}
+                        variant="detail"
+                        showVerifyButton={true}
+                      />
                     </div>
                   ))}
                 </div>
