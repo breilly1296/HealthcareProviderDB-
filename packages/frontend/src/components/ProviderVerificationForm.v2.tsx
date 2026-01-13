@@ -569,7 +569,7 @@ export default function ProviderVerificationFormV2({
             disabled={isSubmitting}
             className="w-full btn-outline text-lg py-4"
           >
-            {isSubmitting ? 'Submitting...' : 'No - they don't accept it'}
+            {isSubmitting ? 'Submitting...' : "No - they don't accept it"}
           </button>
           <button
             onClick={() => {
