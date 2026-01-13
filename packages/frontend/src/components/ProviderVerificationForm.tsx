@@ -2,6 +2,9 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import toast from 'react-hot-toast';
+import { ButtonSpinner } from '@/components/LoadingSpinner';
+import { InlineError } from '@/components/ErrorMessage';
 
 /**
  * Research-based Provider Verification Form
@@ -50,6 +53,7 @@ export default function ProviderVerificationForm({
     notes: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [showTooltip, setShowTooltip] = useState<string | null>(null);
 
   const totalSteps = 5; // Main questions (excluding intro and success)
@@ -73,6 +77,7 @@ export default function ProviderVerificationForm({
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
+    setSubmitError(null);
 
     try {
       const response = await fetch('/api/verifications', {
@@ -91,13 +96,19 @@ export default function ProviderVerificationForm({
       });
 
       if (!response.ok) {
-        throw new Error('Verification submission failed');
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error || 'Failed to submit verification. Please try again.');
       }
 
+      // Success!
+      toast.success('Verification submitted successfully! Thank you for helping the community.');
       setCurrentStep('success');
+      setSubmitError(null);
     } catch (error) {
       console.error('Error submitting verification:', error);
-      alert('Failed to submit verification. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to submit verification. Please try again.';
+      setSubmitError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -514,6 +525,11 @@ export default function ProviderVerificationForm({
             Optional - this helps us verify acceptance
           </p>
 
+          {/* Error message */}
+          {submitError && (
+            <InlineError message={submitError} className="mb-4" />
+          )}
+
           <div className="space-y-3">
             <button
               onClick={() => {
@@ -521,9 +537,9 @@ export default function ProviderVerificationForm({
                 handleSubmit();
               }}
               disabled={isSubmitting}
-              className="w-full btn-primary text-lg py-4"
+              className="w-full btn-primary text-lg py-4 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? 'Submitting...' : 'Yes, I scheduled'}
+              {isSubmitting ? <ButtonSpinner text="Submitting..." /> : 'Yes, I scheduled'}
             </button>
             <button
               onClick={() => {
@@ -531,11 +547,23 @@ export default function ProviderVerificationForm({
                 handleSubmit();
               }}
               disabled={isSubmitting}
-              className="w-full btn-outline text-lg py-4"
+              className="w-full btn-outline text-lg py-4 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? 'Submitting...' : 'No appointment yet'}
+              {isSubmitting ? <ButtonSpinner text="Submitting..." variant="primary" /> : 'No appointment yet'}
             </button>
           </div>
+
+          {/* Retry button on error */}
+          {submitError && !isSubmitting && (
+            <div className="mt-4 text-center">
+              <button
+                onClick={handleSubmit}
+                className="text-primary-600 hover:text-primary-700 text-sm font-medium"
+              >
+                Try submitting again
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

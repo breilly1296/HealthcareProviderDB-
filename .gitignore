@@ -47,3 +47,4 @@ coverage/
 # Cache
 .cache/
 *.tsbuildinfo
+tmpclaude-*-cwd

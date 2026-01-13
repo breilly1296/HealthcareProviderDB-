@@ -7,32 +7,32 @@ export default function HomePage() {
       <section className="bg-gradient-to-b from-primary-50 to-white py-16 md:py-24">
         <div className="container-wide text-center">
           {/* Research Badge */}
-          <div className="inline-flex items-center gap-2 bg-white px-4 py-2 rounded-full shadow-sm border border-primary-200 mb-6">
-            <span className="text-2xl">📚</span>
-            <span className="text-sm font-medium text-gray-700">
+          <div className="inline-flex flex-wrap items-center justify-center gap-2 bg-white px-3 sm:px-4 py-2 rounded-full shadow-sm border border-primary-200 mb-6">
+            <span className="text-xl sm:text-2xl">📚</span>
+            <span className="text-xs sm:text-sm font-medium text-gray-700">
               Backed by peer-reviewed research
             </span>
             <Link
               href="/research"
-              className="text-sm font-medium text-primary-600 hover:text-primary-700"
+              className="text-xs sm:text-sm font-medium text-primary-600 hover:text-primary-700 whitespace-nowrap"
             >
               Learn more →
             </Link>
           </div>
 
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-6 px-4">
             Insurance Directories Are Wrong
             <span className="text-primary-600"> 46% of the Time</span>
           </h1>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-8">
+          <p className="text-lg sm:text-xl text-gray-600 max-w-3xl mx-auto mb-8 px-4">
             <strong className="text-gray-900">Patients face 4x more surprise bills</strong> when directories are inaccurate.
             We fix that with crowdsourced verification backed by peer-reviewed research.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/search" className="btn-primary text-lg px-8 py-4">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center px-4">
+            <Link href="/search" className="btn-primary text-base sm:text-lg px-6 sm:px-8 py-3 sm:py-4">
               Find Verified Providers
             </Link>
-            <Link href="/research" className="btn-outline text-lg px-8 py-4">
+            <Link href="/research" className="btn-outline text-base sm:text-lg px-6 sm:px-8 py-3 sm:py-4">
               See the research →
             </Link>
           </div>

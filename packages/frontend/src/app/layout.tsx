@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import Link from 'next/link';
 import './globals.css';
+import ToastProvider from '@/components/ToastProvider';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -17,10 +18,10 @@ function Header() {
         <nav className="flex items-center justify-between h-16">
           <Link
             href="/"
-            className="flex items-center gap-2 text-xl font-bold text-primary-600 hover:text-primary-700"
+            className="flex items-center gap-2 text-lg sm:text-xl font-bold text-primary-600 hover:text-primary-700"
           >
             <svg
-              className="w-8 h-8"
+              className="w-7 h-7 sm:w-8 sm:h-8 flex-shrink-0"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -33,21 +34,23 @@ function Header() {
                 d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
               />
             </svg>
-            <span>HealthcareProviderDB</span>
+            <span className="hidden sm:inline">HealthcareProviderDB</span>
+            <span className="sm:hidden">HCPDB</span>
           </Link>
 
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2 sm:gap-4">
             <Link
               href="/search"
-              className="text-base font-medium text-gray-600 hover:text-primary-600 transition-colors"
+              className="hidden md:inline text-base font-medium text-gray-600 hover:text-primary-600 transition-colors"
             >
               Find Providers
             </Link>
             <Link
               href="/search"
-              className="btn-primary text-base"
+              className="btn-primary text-sm sm:text-base px-3 py-2 sm:px-4 sm:py-2"
             >
-              Search Now
+              <span className="hidden sm:inline">Search Now</span>
+              <span className="sm:hidden">Search</span>
             </Link>
           </div>
         </nav>
@@ -134,6 +137,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.className} flex flex-col min-h-screen`}>
+        <ToastProvider />
         <Header />
         <main className="flex-1">
           {children}
