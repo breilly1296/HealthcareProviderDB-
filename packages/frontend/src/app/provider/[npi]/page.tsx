@@ -120,13 +120,28 @@ export default function ProviderDetailPage() {
             {/* Provider Header */}
             <div className="card">
               <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                    {provider.displayName}
-                  </h1>
-                  <p className="text-xl text-primary-600 font-medium mb-4">
-                    {specialty}
-                  </p>
+                <div className="flex-1">
+                  <div className="flex items-start gap-3 mb-4">
+                    <div className="flex-1">
+                      <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                        {provider.displayName}
+                      </h1>
+                      <p className="text-xl text-primary-600 font-medium mb-2">
+                        {specialty}
+                      </p>
+
+                      {/* Research Badge */}
+                      <Link
+                        href="/research"
+                        className="inline-flex items-center gap-1.5 text-xs font-medium text-primary-700 hover:text-primary-800 bg-primary-50 px-3 py-1.5 rounded-full border border-primary-200 transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Research-Backed Verification
+                      </Link>
+                    </div>
+                  </div>
 
                   {/* Contact Info */}
                   <div className="space-y-2 text-gray-600">
@@ -219,6 +234,144 @@ export default function ProviderDetailPage() {
                         variant="detail"
                         showVerifyButton={true}
                       />
+
+                      {/* Confidence Score Explainer */}
+                      {pa.confidenceScore !== undefined && (
+                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                          <div className="flex items-start gap-3">
+                            <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
+                              <svg className="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                              </svg>
+                            </div>
+                            <div className="flex-1">
+                              <h4 className="font-semibold text-gray-900 mb-2">
+                                Understanding Confidence Scores
+                              </h4>
+                              <div className="text-sm text-gray-700 space-y-2">
+                                <p>
+                                  This plan has a <strong>{pa.confidenceLevel?.replace('_', ' ') || 'MEDIUM'}</strong> confidence
+                                  score ({pa.confidenceScore}%) based on:
+                                </p>
+                                <ul className="list-disc list-inside space-y-1 ml-2">
+                                  <li><strong>{pa.verificationCount || 0}</strong> patient verifications</li>
+                                  <li>Data freshness (last verified {pa.lastVerifiedAt ? new Date(pa.lastVerifiedAt).toLocaleDateString() : 'never'})</li>
+                                  <li>Source reliability (crowdsourced + authoritative data)</li>
+                                  <li>Community agreement rate</li>
+                                </ul>
+                                <div className="bg-white border border-primary-200 rounded p-3 mt-3">
+                                  <p className="text-xs text-primary-900">
+                                    <strong>Research shows:</strong> 3 patient verifications achieve expert-level accuracy
+                                    (κ=0.58 vs 0.59 expert agreement). Traditional insurance directories are wrong 46-77% of the time.
+                                    <br />
+                                    <span className="text-primary-700 italic">Source: Mortensen et al. (2015), JAMIA; Haeder et al. (2024)</span>
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Verification History Timeline */}
+                      {pa.verificationCount > 0 && (
+                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                          <div className="flex items-start gap-3">
+                            <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                              <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                            </div>
+                            <div className="flex-1">
+                              <h4 className="font-semibold text-gray-900 mb-3">
+                                Verification Activity
+                              </h4>
+
+                              {/* Progress to 3 verifications */}
+                              <div className="mb-4">
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="text-sm font-medium text-gray-700">
+                                    Community verifications
+                                  </span>
+                                  <span className="text-sm text-gray-600">
+                                    {pa.verificationCount} of 3 needed
+                                  </span>
+                                </div>
+                                <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full transition-all ${
+                                      pa.verificationCount >= 3 ? 'bg-green-500' : 'bg-primary-500'
+                                    }`}
+                                    style={{ width: `${Math.min(100, (pa.verificationCount / 3) * 100)}%` }}
+                                  />
+                                </div>
+                                {pa.verificationCount >= 3 ? (
+                                  <p className="text-xs text-green-700 mt-2 flex items-center gap-1">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    Expert-level accuracy achieved (κ=0.58)
+                                  </p>
+                                ) : (
+                                  <p className="text-xs text-gray-600 mt-2">
+                                    {3 - pa.verificationCount} more {3 - pa.verificationCount === 1 ? 'verification' : 'verifications'} needed for high confidence
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* Timeline */}
+                              <div className="space-y-3">
+                                <div className="flex gap-3">
+                                  <div className="flex flex-col items-center">
+                                    <div className="w-2 h-2 bg-green-500 rounded-full" />
+                                    <div className="w-0.5 h-full bg-gray-300" />
+                                  </div>
+                                  <div className="flex-1 pb-3">
+                                    <p className="text-sm font-medium text-gray-900">
+                                      {pa.verificationCount} patient{pa.verificationCount !== 1 ? 's' : ''} verified
+                                    </p>
+                                    <p className="text-xs text-gray-600">
+                                      Most recent: {pa.lastVerifiedAt ? new Date(pa.lastVerifiedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'Unknown'}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {pa.upvotes + pa.downvotes > 0 && (
+                                  <div className="flex gap-3">
+                                    <div className="flex flex-col items-center">
+                                      <div className="w-2 h-2 bg-primary-500 rounded-full" />
+                                      <div className="w-0.5 h-full bg-gray-300" />
+                                    </div>
+                                    <div className="flex-1 pb-3">
+                                      <p className="text-sm font-medium text-gray-900">
+                                        Community votes
+                                      </p>
+                                      <p className="text-xs text-gray-600">
+                                        {pa.upvotes} helpful, {pa.downvotes} not helpful
+                                        ({Math.round((pa.upvotes / (pa.upvotes + pa.downvotes)) * 100)}% agreement)
+                                      </p>
+                                    </div>
+                                  </div>
+                                )}
+
+                                <div className="flex gap-3">
+                                  <div className="w-2 h-2 bg-gray-400 rounded-full flex-shrink-0 mt-1" />
+                                  <div className="flex-1">
+                                    <p className="text-sm font-medium text-gray-900">
+                                      Data source
+                                    </p>
+                                    <p className="text-xs text-gray-600">
+                                      {pa.dataSource === 'CMS_NPPES' ? 'CMS National Provider Registry + Community' :
+                                       pa.dataSource === 'CROWDSOURCE' ? 'Community-verified' :
+                                       'Mixed sources'}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -238,6 +391,94 @@ export default function ProviderDetailPage() {
 
           {/* Sidebar */}
           <div className="space-y-6">
+            {/* Verify This Provider CTA */}
+            <div className="card bg-gradient-to-br from-primary-50 to-primary-100 border-primary-300 shadow-md">
+              <div className="flex items-start gap-3 mb-4">
+                <div className="w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-primary-900 mb-1">
+                    Verify This Provider
+                  </h3>
+                  <p className="text-sm text-primary-800">
+                    Your 2-minute verification helps prevent surprise bills
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg p-3 mb-4">
+                <div className="flex items-center gap-2 text-xs text-gray-700 mb-2">
+                  <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  5 simple yes/no questions
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-700 mb-2">
+                  <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Under 2 minutes, no typing
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-700">
+                  <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                  3 verifications = expert accuracy
+                </div>
+              </div>
+
+              <VerificationButton
+                npi={provider.npi}
+                providerName={provider.displayName}
+              />
+
+              <p className="text-xs text-primary-700 mt-3 text-center">
+                Research shows patients face 4x more surprise bills when directories are wrong
+              </p>
+            </div>
+
+            {/* Research Explainer */}
+            <div className="card bg-gray-50 border-gray-200">
+              <div className="flex items-start gap-3 mb-3">
+                <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center flex-shrink-0">
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-1">
+                    Why Verification Matters
+                  </h3>
+                  <div className="text-xs text-gray-700 space-y-2">
+                    <p>
+                      <strong>46-77%</strong> of insurance directories are wrong, causing:
+                    </p>
+                    <ul className="list-disc list-inside ml-2 space-y-1">
+                      <li><strong>4x more surprise bills</strong></li>
+                      <li>28% delay needed care</li>
+                      <li>540 days to fix errors</li>
+                    </ul>
+                    <p className="pt-2">
+                      Our crowdsourced verification achieves <strong>expert-level accuracy</strong> (κ=0.58) with just 3 patients.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <Link
+                href="/research"
+                className="text-xs font-medium text-primary-700 hover:text-primary-800 flex items-center gap-1 mt-3"
+              >
+                Read the research
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+            </div>
+
             {/* Provider Details */}
             <div className="card">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">
@@ -273,20 +514,6 @@ export default function ProviderDetailPage() {
                   </dd>
                 </div>
               </dl>
-            </div>
-
-            {/* Help Box */}
-            <div className="card bg-primary-50 border-primary-200">
-              <h3 className="text-lg font-semibold text-primary-900 mb-2">
-                Help Improve This Data
-              </h3>
-              <p className="text-primary-800 text-sm mb-4">
-                Have you visited this provider? Share your experience to help others know if their insurance is accepted.
-              </p>
-              <VerificationButton
-                npi={provider.npi}
-                providerName={provider.displayName}
-              />
             </div>
 
             {/* Disclaimer */}
