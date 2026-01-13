@@ -125,24 +125,45 @@ export default function ProviderVerificationForm({
     </div>
   );
 
-  const ProgressBar = () => (
-    <div className="mb-8">
-      <div className="flex justify-between items-center mb-2">
-        <span className="text-sm font-medium text-gray-700">
-          Question {currentStepNumber} of {totalSteps}
-        </span>
-        <span className="text-sm text-gray-500">
-          ~{Math.max(1, totalSteps - currentStepNumber)} min remaining
-        </span>
+  const ProgressBar = () => {
+    const newTotal = existingVerificationCount + 1;
+    const verificationsStillNeeded = Math.max(0, 3 - newTotal);
+
+    return (
+      <div className="mb-8">
+        <div className="flex justify-between items-center mb-2">
+          <span className="text-sm font-medium text-gray-700">
+            Question {currentStepNumber} of {totalSteps}
+          </span>
+          <span className="text-sm text-gray-500">
+            ~{Math.max(1, totalSteps - currentStepNumber)} min remaining
+          </span>
+        </div>
+        <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-primary-600 transition-all duration-300 ease-in-out"
+            style={{ width: `${(currentStepNumber / totalSteps) * 100}%` }}
+          />
+        </div>
+        {/* Verification count progress */}
+        <div className="mt-4 text-center">
+          <div className="inline-flex items-center gap-2 bg-primary-50 text-primary-900 px-4 py-2 rounded-full">
+            <svg className="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="text-sm font-semibold">
+              Verification {newTotal} of 3 needed for expert-level accuracy
+            </span>
+          </div>
+          {verificationsStillNeeded > 0 && (
+            <p className="text-xs text-gray-500 mt-2">
+              {verificationsStillNeeded} more {verificationsStillNeeded === 1 ? 'verification' : 'verifications'} after this to reach high confidence
+            </p>
+          )}
+        </div>
       </div>
-      <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-        <div
-          className="h-full bg-primary-600 transition-all duration-300 ease-in-out"
-          style={{ width: `${(currentStepNumber / totalSteps) * 100}%` }}
-        />
-      </div>
-    </div>
-  );
+    );
+  };
 
   if (currentStep === 'intro') {
     return (
@@ -200,8 +221,8 @@ export default function ProviderVerificationForm({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
             <div>
-              <strong className="text-gray-900">Simple yes/no questions</strong>
-              <p className="text-sm text-gray-600">Research shows binary choices achieve highest accuracy</p>
+              <strong className="text-gray-900">5 simple yes/no questions</strong>
+              <p className="text-sm text-gray-600">Research shows binary questions achieve highest accuracy</p>
             </div>
           </div>
           <div className="flex items-start gap-3">
@@ -209,17 +230,17 @@ export default function ProviderVerificationForm({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <div>
-              <strong className="text-gray-900">Under 2 minutes</strong>
-              <p className="text-sm text-gray-600">5 quick questions, one at a time</p>
+              <strong className="text-gray-900">Under 2 minutes total</strong>
+              <p className="text-sm text-gray-600">One question at a time, no typing required</p>
             </div>
           </div>
           <div className="flex items-start gap-3">
             <svg className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
             <div>
-              <strong className="text-gray-900">Help other patients</strong>
-              <p className="text-sm text-gray-600">Your verification helps build accurate provider data</p>
+              <strong className="text-gray-900">Prevent surprise bills</strong>
+              <p className="text-sm text-gray-600">Research shows wrong directories cause 4x more surprise bills</p>
             </div>
           </div>
         </div>
@@ -337,8 +358,11 @@ export default function ProviderVerificationForm({
           <div className="flex items-center text-sm text-gray-500 mb-8">
             Why we ask this
             <Tooltip id="phone-reached">
-              <strong>36% of directory errors are contact information issues.</strong>
-              <br />Verifying phone numbers helps patients reach providers.
+              <strong>Research shows 36% of directory errors are contact information.</strong>
+              <br />
+              <br />Wrong phone numbers waste time and delay care. When directories are wrong, 28% of patients delay care and 10% skip it entirely.
+              <br />
+              <br /><em className="text-xs">Source: Health Affairs</em>
             </Tooltip>
           </div>
 
@@ -408,8 +432,11 @@ export default function ProviderVerificationForm({
           <div className="flex items-center text-sm text-gray-500 mb-8">
             Why we ask this
             <Tooltip id="insurance">
-              <strong>Providers change insurance networks 12% annually.</strong>
-              <br />Regular verification prevents surprise bills.
+              <strong>Research shows providers change insurance networks 12% annually.</strong>
+              <br />
+              <br />When directories are wrong, patients face 4x more surprise medical bills (16% vs 4%). Mental health providers change networks even more frequently - only 43% accept Medicaid.
+              <br />
+              <br /><em className="text-xs">Sources: Health Affairs, Ndumele et al. 2018</em>
             </Tooltip>
           </div>
 
