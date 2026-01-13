@@ -196,33 +196,50 @@ export default function HomePage() {
               <h3 className="text-xl font-semibold text-gray-900 mb-6">
                 How We Calculate Scores
               </h3>
+              <p className="text-sm text-gray-600 mb-6">
+                Our research-backed scoring system emphasizes recent data and optimal verification thresholds
+              </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Data Source (30 points)</h4>
+                  <h4 className="font-medium text-gray-900 mb-2">
+                    Recency (30 points)
+                    <span className="ml-2 text-xs text-primary-600 font-normal">↑ Most Important</span>
+                  </h4>
+                  <p className="text-gray-600 text-sm">
+                    <strong>Research shows 12% annual provider turnover</strong> — recent data is critical.
+                    Verifications within 30 days score highest, with specialty-specific decay rates.
+                  </p>
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">Data Source (25 points)</h4>
                   <p className="text-gray-600 text-sm">
                     Official CMS data scores highest, followed by insurance carrier data,
-                    then community verifications.
+                    then community verifications. All sources combined create reliability.
                   </p>
                 </div>
                 <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Recency (25 points)</h4>
+                  <h4 className="font-medium text-gray-900 mb-2">
+                    Verification Count (25 points)
+                    <span className="ml-2 text-xs text-green-600 font-normal">✓ Expert-Level</span>
+                  </h4>
                   <p className="text-gray-600 text-sm">
-                    Recent verifications score higher. Research shows 12% annual provider turnover,
-                    so fresh data is critical.
-                  </p>
-                </div>
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Verification Count (25 points)</h4>
-                  <p className="text-gray-600 text-sm">
-                    Research shows 3 verifications are optimal. More verifications from different users increase confidence in the data.
+                    <strong>Research shows 3 verifications achieve expert-level accuracy (κ=0.58)</strong> —
+                    matching professional validation. Additional verifications beyond 3 provide no significant benefit.
                   </p>
                 </div>
                 <div>
                   <h4 className="font-medium text-gray-900 mb-2">Agreement (20 points)</h4>
                   <p className="text-gray-600 text-sm">
-                    When multiple verifications agree, confidence increases. Conflicting reports lower the score.
+                    Community consensus matters. High agreement (80%+) indicates reliable data,
+                    while conflicting reports (&lt;40%) suggest outdated information.
                   </p>
                 </div>
+              </div>
+              <div className="mt-6 p-4 bg-primary-50 rounded-lg border border-primary-200">
+                <p className="text-xs text-primary-900">
+                  <strong>Total: 100 points</strong> (25 + 30 + 25 + 20) • Updated scoring emphasizes time-sensitivity
+                  based on Ndumele et al. (2018) and optimal verification threshold from Mortensen et al. (2015)
+                </p>
               </div>
             </div>
           </div>
