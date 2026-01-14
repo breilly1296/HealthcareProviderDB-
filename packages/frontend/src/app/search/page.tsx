@@ -23,6 +23,7 @@ function SearchResults() {
   const state = searchParams.get('state') || '';
   const cities = searchParams.get('cities') || '';
   const zip = searchParams.get('zip') || '';
+  const healthSystem = searchParams.get('healthSystem') || '';
   const name = searchParams.get('name') || '';
   const locationName = searchParams.get('locationName') || '';
   const page = parseInt(searchParams.get('page') || '1', 10);
@@ -38,6 +39,7 @@ function SearchResults() {
         state: state || undefined,
         cities: cities || undefined,
         zip: zip || undefined,
+        healthSystem: healthSystem || undefined,
         name: name || undefined,
         page,
         limit: 20,
@@ -75,6 +77,7 @@ function SearchResults() {
         state: state || undefined,
         cities: cities || undefined,
         zipCode: zip || undefined,
+        healthSystem: healthSystem || undefined,
         page,
         limit: 20,
       });
@@ -102,8 +105,8 @@ function SearchResults() {
 
   useEffect(() => {
     const hasFilters = mode === 'providers'
-      ? (specialty || state || cities || zip || name)
-      : (locationName || state || cities || zip);
+      ? (specialty || state || cities || zip || healthSystem || name)
+      : (locationName || state || cities || zip || healthSystem);
 
     if (!hasFilters) {
       setProviders([]);
@@ -119,7 +122,7 @@ function SearchResults() {
     } else {
       fetchLocations();
     }
-  }, [mode, specialty, state, cities, zip, name, locationName, page]);
+  }, [mode, specialty, state, cities, zip, healthSystem, name, locationName, page]);
 
   return (
     <div>
@@ -206,6 +209,7 @@ function SearchResults() {
                           ...(state && { state }),
                           ...(cities && { cities }),
                           ...(zip && { zip }),
+                          ...(healthSystem && { healthSystem }),
                           ...(name && { name }),
                           ...(locationName && { locationName }),
                           page: String(p),

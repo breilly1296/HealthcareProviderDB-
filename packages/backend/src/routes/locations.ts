@@ -6,6 +6,7 @@ import {
   searchLocations,
   getLocationById,
   getLocationStatsByState,
+  getHealthSystems,
 } from '../services/locationService';
 import { getProviderDisplayName } from '../services/providerService';
 
@@ -18,6 +19,7 @@ const searchQuerySchema = z.object({
   city: z.string().min(1).max(100).optional(),
   cities: z.string().min(1).max(500).optional(), // Comma-separated cities
   zipCode: z.string().min(3).max(10).optional(),
+  healthSystem: z.string().min(1).max(200).optional(),
   minProviders: z.coerce.number().int().min(1).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -52,6 +54,7 @@ router.get(
       city: query.city,
       cities: query.cities,
       zipCode: query.zipCode,
+      healthSystem: query.healthSystem,
       minProviders: query.minProviders,
       page: query.page,
       limit: query.limit,
@@ -68,6 +71,25 @@ router.get(
           totalPages: result.totalPages,
           hasMore: result.page < result.totalPages,
         },
+      },
+    });
+  })
+);
+
+/**
+ * GET /api/v1/locations/health-systems
+ * Get list of distinct health systems
+ */
+router.get(
+  '/health-systems',
+  asyncHandler(async (req, res) => {
+    const healthSystems = await getHealthSystems();
+
+    res.json({
+      success: true,
+      data: {
+        healthSystems,
+        count: healthSystems.length,
       },
     });
   })

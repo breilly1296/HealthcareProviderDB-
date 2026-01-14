@@ -6,6 +6,7 @@ export interface ProviderSearchParams {
   city?: string;
   cities?: string; // Comma-separated cities
   zipCode?: string;
+  healthSystem?: string;
   specialty?: string;
   name?: string;
   npi?: string;
@@ -31,6 +32,7 @@ export async function searchProviders(params: ProviderSearchParams): Promise<Pro
     city,
     cities,
     zipCode,
+    healthSystem,
     specialty,
     name,
     npi,
@@ -66,6 +68,12 @@ export async function searchProviders(params: ProviderSearchParams): Promise<Pro
 
   if (zipCode) {
     where.zipCode = { startsWith: zipCode };
+  }
+
+  if (healthSystem) {
+    where.location = {
+      healthSystem: healthSystem,
+    };
   }
 
   if (specialty) {

@@ -156,6 +156,7 @@ export const providerApi = {
     city?: string;
     cities?: string;
     zip?: string;
+    healthSystem?: string;
     specialty?: string;
     name?: string;
     page?: number;
@@ -244,6 +245,7 @@ export const locationApi = {
     city?: string;
     cities?: string;
     zipCode?: string;
+    healthSystem?: string;
     minProviders?: number;
     page?: number;
     limit?: number;
@@ -284,6 +286,13 @@ export const locationApi = {
       avgProvidersPerLocation: number;
       maxProvidersAtLocation: number;
     }>(`/locations/stats/${encodeURIComponent(state)}`);
+  },
+
+  getHealthSystems: async () => {
+    return fetchApi<{
+      healthSystems: string[];
+      count: number;
+    }>('/locations/health-systems');
   },
 };
 

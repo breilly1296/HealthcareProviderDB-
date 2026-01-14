@@ -20,6 +20,7 @@ const searchQuerySchema = z.object({
   city: z.string().min(1).max(100).optional(),
   cities: z.string().min(1).max(500).optional(), // Comma-separated cities
   zipCode: z.string().min(3).max(10).optional(),
+  healthSystem: z.string().min(1).max(200).optional(),
   specialty: z.string().min(1).max(200).optional(),
   name: z.string().min(1).max(200).optional(),
   npi: z.string().length(10).regex(/^\d+$/).optional(),
@@ -54,6 +55,7 @@ router.get(
       city: query.city,
       cities: query.cities,
       zipCode: query.zipCode,
+      healthSystem: query.healthSystem,
       specialty: query.specialty,
       name: query.name,
       npi: query.npi,

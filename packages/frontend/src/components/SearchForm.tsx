@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-import { providerApi } from '@/lib/api';
+import { providerApi, locationApi } from '@/lib/api';
 
 const SPECIALTIES = [
   { value: '', label: 'All Specialties' },
@@ -131,9 +131,14 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
     searchParams.get('cities')?.split(',').filter(Boolean) || []
   );
   const [zip, setZip] = useState(searchParams.get('zip') || '');
+  const [healthSystem, setHealthSystem] = useState(searchParams.get('healthSystem') || '');
   const [name, setName] = useState(searchParams.get('name') || '');
   const [locationName, setLocationName] = useState(searchParams.get('locationName') || '');
   const [showMore, setShowMore] = useState(false);
+
+  // Health Systems dropdown state
+  const [healthSystems, setHealthSystems] = useState<string[]>([]);
+  const [healthSystemsLoading, setHealthSystemsLoading] = useState(false);
 
   // City dropdown state
   const [cities, setCities] = useState<string[]>([]);
@@ -144,6 +149,24 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
 
   // NYC All Boroughs preset
   const NYC_BOROUGHS = ['New York', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island'];
+
+  // Load health systems from API on mount
+  useEffect(() => {
+    const loadHealthSystems = async () => {
+      setHealthSystemsLoading(true);
+      try {
+        const result = await locationApi.getHealthSystems();
+        setHealthSystems(result.healthSystems || []);
+      } catch (error) {
+        console.error('Failed to load health systems:', error);
+        setHealthSystems([]);
+      } finally {
+        setHealthSystemsLoading(false);
+      }
+    };
+
+    loadHealthSystems();
+  }, []);
 
   // Load cities from API
   useEffect(() => {
@@ -229,6 +252,7 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
     if (state) params.set('state', state);
     if (selectedCities.length > 0) params.set('cities', selectedCities.join(','));
     if (zip) params.set('zip', zip);
+    if (healthSystem) params.set('healthSystem', healthSystem);
 
     if (searchMode === 'providers') {
       if (specialty) params.set('specialty', specialty);
@@ -245,6 +269,7 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
     setState('');
     setSelectedCities([]);
     setZip('');
+    setHealthSystem('');
     setName('');
     setLocationName('');
     setCities([]);
@@ -339,6 +364,27 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
             {STATES.map((s) => (
               <option key={s.value} value={s.value}>
                 {s.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Health System */}
+        <div>
+          <label htmlFor="healthSystem" className="label">
+            Health System
+          </label>
+          <select
+            id="healthSystem"
+            value={healthSystem}
+            onChange={(e) => setHealthSystem(e.target.value)}
+            className="input"
+            disabled={healthSystemsLoading}
+          >
+            <option value="">All Health Systems</option>
+            {healthSystems.map((hs) => (
+              <option key={hs} value={hs}>
+                {hs}
               </option>
             ))}
           </select>

@@ -7,6 +7,7 @@ export interface LocationSearchParams {
   city?: string;
   cities?: string; // Comma-separated cities
   zipCode?: string;
+  healthSystem?: string;
   minProviders?: number;
   page?: number;
   limit?: number;
@@ -30,6 +31,7 @@ export async function searchLocations(params: LocationSearchParams): Promise<Loc
     city,
     cities,
     zipCode,
+    healthSystem,
     minProviders,
     page = 1,
     limit = 20,
@@ -73,6 +75,10 @@ export async function searchLocations(params: LocationSearchParams): Promise<Loc
 
   if (zipCode) {
     where.zipCode = { startsWith: zipCode };
+  }
+
+  if (healthSystem) {
+    where.healthSystem = healthSystem;
   }
 
   if (minProviders !== undefined) {
@@ -247,4 +253,28 @@ export async function getLocationStatsByState(state: string) {
     avgProvidersPerLocation: stats._avg.providerCount || 0,
     maxProvidersAtLocation: stats._max.providerCount || 0,
   };
+}
+
+/**
+ * Get distinct health systems (sorted by provider count)
+ */
+export async function getHealthSystems(): Promise<string[]> {
+  const result = await prisma.location.groupBy({
+    by: ['healthSystem'],
+    where: {
+      healthSystem: { not: null },
+    },
+    _sum: {
+      providerCount: true,
+    },
+    orderBy: {
+      _sum: {
+        providerCount: 'desc',
+      },
+    },
+  });
+
+  return result
+    .map((r) => r.healthSystem)
+    .filter((hs): hs is string => hs !== null);
 }
