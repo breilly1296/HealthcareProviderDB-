@@ -13,6 +13,7 @@ const router = Router();
 
 // Validation schemas
 const searchQuerySchema = z.object({
+  search: z.string().min(1).max(200).optional(),
   state: z.string().length(2).toUpperCase().optional(),
   city: z.string().min(1).max(100).optional(),
   zipCode: z.string().min(3).max(10).optional(),
@@ -45,6 +46,7 @@ router.get(
     const query = searchQuerySchema.parse(req.query);
 
     const result = await searchLocations({
+      search: query.search,
       state: query.state,
       city: query.city,
       zipCode: query.zipCode,

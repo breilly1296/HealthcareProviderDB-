@@ -235,6 +235,7 @@ export const providerApi = {
 // Location API
 export const locationApi = {
   search: async (params: {
+    search?: string;
     state?: string;
     city?: string;
     zipCode?: string;

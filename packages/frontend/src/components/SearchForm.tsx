@@ -146,7 +146,7 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
   const [city, setCity] = useState(searchParams.get('city') || '');
   const [zip, setZip] = useState(searchParams.get('zip') || '');
   const [name, setName] = useState(searchParams.get('name') || '');
-  const [minProviders, setMinProviders] = useState(searchParams.get('minProviders') || '');
+  const [locationName, setLocationName] = useState(searchParams.get('locationName') || '');
   const [showMore, setShowMore] = useState(false);
 
   // City dropdown state
@@ -235,7 +235,7 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
       if (specialty) params.set('specialty', specialty);
       if (name) params.set('name', name);
     } else {
-      if (minProviders) params.set('minProviders', minProviders);
+      if (locationName) params.set('locationName', locationName);
     }
 
     router.push(`/search?${params.toString()}`);
@@ -248,7 +248,7 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
     setCityInput('');
     setZip('');
     setName('');
-    setMinProviders('');
+    setLocationName('');
     setCities([]);
     router.push('/search');
   };
@@ -309,20 +309,19 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
           </div>
         )}
 
-        {/* Min Providers - Only for location search */}
+        {/* Location Name - Only for location search */}
         {searchMode === 'locations' && (
           <div>
-            <label htmlFor="minProviders" className="label">
-              Minimum Providers
+            <label htmlFor="locationName" className="label">
+              Location/Organization Name
             </label>
             <input
-              type="number"
-              id="minProviders"
-              value={minProviders}
-              onChange={(e) => setMinProviders(e.target.value)}
-              placeholder="e.g., 5"
+              type="text"
+              id="locationName"
+              value={locationName}
+              onChange={(e) => setLocationName(e.target.value)}
+              placeholder="e.g., Kings Highway, Mount Sinai"
               className="input"
-              min="1"
             />
           </div>
         )}

@@ -24,7 +24,7 @@ function SearchResults() {
   const city = searchParams.get('city') || '';
   const zip = searchParams.get('zip') || '';
   const name = searchParams.get('name') || '';
-  const minProviders = searchParams.get('minProviders') || '';
+  const locationName = searchParams.get('locationName') || '';
   const page = parseInt(searchParams.get('page') || '1', 10);
 
   const fetchProviders = async () => {
@@ -71,10 +71,10 @@ function SearchResults() {
 
     try {
       const result = await locationApi.search({
+        search: locationName || undefined,
         state: state || undefined,
         city: city || undefined,
         zipCode: zip || undefined,
-        minProviders: minProviders ? parseInt(minProviders) : undefined,
         page,
         limit: 20,
       });
@@ -103,7 +103,7 @@ function SearchResults() {
   useEffect(() => {
     const hasFilters = mode === 'providers'
       ? (specialty || state || city || zip || name)
-      : (state || city || zip || minProviders);
+      : (locationName || state || city || zip);
 
     if (!hasFilters) {
       setProviders([]);
@@ -119,7 +119,7 @@ function SearchResults() {
     } else {
       fetchLocations();
     }
-  }, [mode, specialty, state, city, zip, name, minProviders, page]);
+  }, [mode, specialty, state, city, zip, name, locationName, page]);
 
   return (
     <div>
@@ -207,7 +207,7 @@ function SearchResults() {
                           ...(city && { city }),
                           ...(zip && { zip }),
                           ...(name && { name }),
-                          ...(minProviders && { minProviders }),
+                          ...(locationName && { locationName }),
                           page: String(p),
                         }).toString()}`}
                         className={`px-4 py-2 rounded-lg font-medium ${

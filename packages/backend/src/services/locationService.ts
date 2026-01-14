@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 
 export interface LocationSearchParams {
+  search?: string;
   state?: string;
   city?: string;
   zipCode?: string;
@@ -23,6 +24,7 @@ export interface LocationSearchResult {
  */
 export async function searchLocations(params: LocationSearchParams): Promise<LocationSearchResult> {
   const {
+    search,
     state,
     city,
     zipCode,
@@ -35,6 +37,15 @@ export async function searchLocations(params: LocationSearchParams): Promise<Loc
   const skip = (page - 1) * take;
 
   const where: Prisma.LocationWhereInput = {};
+
+  // Text search across address fields
+  if (search) {
+    where.OR = [
+      { addressLine1: { contains: search, mode: 'insensitive' } },
+      { addressLine2: { contains: search, mode: 'insensitive' } },
+      { city: { contains: search, mode: 'insensitive' } },
+    ];
+  }
 
   if (state) {
     where.state = state.toUpperCase();
