@@ -1,4 +1,4 @@
-import { Prisma, AcceptanceStatus } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 
 export interface ProviderSearchParams {
@@ -124,7 +124,7 @@ export async function getProviderByNpi(npi: string) {
 export async function getProviderAcceptedPlans(
   npi: string,
   options: {
-    status?: AcceptanceStatus;
+    status?: 'ACCEPTED' | 'NOT_ACCEPTED' | 'PENDING' | 'UNKNOWN';
     minConfidence?: number;
     page?: number;
     limit?: number;

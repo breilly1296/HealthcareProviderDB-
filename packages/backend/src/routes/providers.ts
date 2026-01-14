@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { AcceptanceStatus } from '@prisma/client';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { searchRateLimiter } from '../middleware/rateLimiter';
 import {
@@ -32,7 +31,7 @@ const npiParamSchema = z.object({
 });
 
 const plansQuerySchema = z.object({
-  status: z.nativeEnum(AcceptanceStatus).optional(),
+  status: z.enum(['ACCEPTED', 'NOT_ACCEPTED', 'PENDING', 'UNKNOWN']).optional(),
   minConfidence: z.coerce.number().min(0).max(100).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),

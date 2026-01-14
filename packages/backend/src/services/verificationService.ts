@@ -1,4 +1,4 @@
-import { Prisma, VerificationType, VerificationSource, AcceptanceStatus } from '@prisma/client';
+import { Prisma, VerificationType, VerificationSource } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { calculateConfidenceScore } from './confidenceService';
 
@@ -87,18 +87,17 @@ export async function submitVerification(input: SubmitVerificationInput) {
 
   const previousValue = acceptance ? {
     acceptanceStatus: acceptance.acceptanceStatus,
-    acceptsNewPatients: acceptance.acceptsNewPatients,
     confidenceScore: acceptance.confidenceScore,
   } : null;
 
-  const newStatus = acceptsInsurance ? AcceptanceStatus.ACCEPTED : AcceptanceStatus.NOT_ACCEPTED;
+  const newStatus = acceptsInsurance ? 'ACCEPTED' : 'NOT_ACCEPTED';
 
   // Create verification log
   const verification = await prisma.verificationLog.create({
     data: {
       providerNpi: provider.npi,
       planId: plan.id,
-      acceptanceId: acceptance?.id,
+      acceptanceId: acceptance?.id.toString(),
       verificationType: VerificationType.PLAN_ACCEPTANCE,
       verificationSource: VerificationSource.CROWDSOURCE,
       previousValue: previousValue as Prisma.InputJsonValue,
@@ -164,12 +163,9 @@ export async function submitVerification(input: SubmitVerificationInput) {
       where: { id: acceptance.id },
       data: {
         acceptanceStatus: newStatus,
-        acceptsNewPatients: acceptsNewPatients ?? acceptance.acceptsNewPatients,
-        lastVerifiedAt: new Date(),
-        verificationSource: VerificationSource.CROWDSOURCE,
+        lastVerified: new Date(),
         verificationCount,
         confidenceScore: score,
-        confidenceFactors: factors as Prisma.InputJsonValue,
       },
     });
   } else {
@@ -186,19 +182,16 @@ export async function submitVerification(input: SubmitVerificationInput) {
         providerNpi: provider.npi,
         planId: plan.id,
         acceptanceStatus: newStatus,
-        acceptsNewPatients,
-        lastVerifiedAt: new Date(),
-        verificationSource: VerificationSource.CROWDSOURCE,
+        lastVerified: new Date(),
         verificationCount: 1,
         confidenceScore: score,
-        confidenceFactors: factors as Prisma.InputJsonValue,
       },
     });
 
     // Update verification with acceptance ID
     await prisma.verificationLog.update({
       where: { id: verification.id },
-      data: { acceptanceId: acceptance.id },
+      data: { acceptanceId: acceptance.id.toString() },
     });
   }
 
@@ -225,24 +218,23 @@ export async function voteOnVerification(
 
   // Update confidence score on the acceptance
   if (verification.acceptanceId) {
-    const acceptance = await prisma.providerPlanAcceptance.findUnique({
-      where: { id: verification.acceptanceId },
+    const acceptanceRecord = await prisma.providerPlanAcceptance.findUnique({
+      where: { id: parseInt(verification.acceptanceId) },
     });
 
-    if (acceptance) {
+    if (acceptanceRecord) {
       const { score, factors } = calculateConfidenceScore({
-        dataSource: acceptance.verificationSource || VerificationSource.CROWDSOURCE,
-        lastVerifiedAt: acceptance.lastVerifiedAt,
-        verificationCount: acceptance.verificationCount,
+        dataSource: VerificationSource.CROWDSOURCE,
+        lastVerifiedAt: acceptanceRecord.lastVerified,
+        verificationCount: acceptanceRecord.verificationCount,
         upvotes: verification.upvotes,
         downvotes: verification.downvotes,
       });
 
       await prisma.providerPlanAcceptance.update({
-        where: { id: acceptance.id },
+        where: { id: acceptanceRecord.id },
         data: {
           confidenceScore: score,
-          confidenceFactors: factors as Prisma.InputJsonValue,
         },
       });
     }

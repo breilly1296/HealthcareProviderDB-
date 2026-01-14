@@ -115,30 +115,23 @@ model InsurancePlan {
 
 // Provider-Plan acceptance matching table
 model ProviderPlanAcceptance {
-  id                    String   @id @default(cuid())
+  id                    Int      @id @default(autoincrement())
 
-  providerNpi           String   @map("provider_npi")
+  providerNpi           String   @db.VarChar(10) @map("npi")
   provider              Provider @relation(fields: [providerNpi], references: [npi], onDelete: Cascade)
 
-  planId                String   @map("plan_id")
+  planId                String   @db.VarChar(50) @map("plan_id")
   plan                  InsurancePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
 
   // Acceptance status
-  acceptanceStatus      AcceptanceStatus @default(UNKNOWN)
-  acceptsNewPatients    Boolean?
+  acceptanceStatus      String   @default("UNKNOWN") @db.VarChar(20) @map("acceptance_status")
 
   // Confidence scoring
-  confidenceScore       Float    @default(0) // 0-100 scale
-  confidenceFactors     Json?    // Breakdown of scoring factors
+  confidenceScore       Int      @default(0) @map("confidence_score")
 
   // Verification
-  lastVerifiedAt        DateTime?
-  verificationSource    VerificationSource?
-  verificationCount     Int      @default(0)
-
-  // Effective dates
-  effectiveDate         DateTime?
-  terminationDate       DateTime?
+  lastVerified          DateTime? @map("last_verified")
+  verificationCount     Int      @default(0) @map("verification_count")
 
   // Internal tracking
   createdAt             DateTime @default(now()) @map("created_at")
@@ -147,7 +140,7 @@ model ProviderPlanAcceptance {
   @@unique([providerNpi, planId])
   @@index([acceptanceStatus])
   @@index([confidenceScore])
-  @@index([lastVerifiedAt])
+  @@index([lastVerified])
 
   @@map("provider_plan_acceptance")
 }
