@@ -10,6 +10,7 @@ import {
   getCitiesByState,
 } from '../services/providerService';
 import { getConfidenceLevel, getConfidenceLevelDescription } from '../services/confidenceService';
+import { getColocatedProviders } from '../services/locationService';
 
 const router = Router();
 
@@ -170,6 +171,45 @@ router.get(
             getConfidenceLevel(a.confidenceScore, a.verificationCount),
             a.verificationCount
           ),
+        })),
+        pagination: {
+          total: result.total,
+          page: result.page,
+          limit: result.limit,
+          totalPages: result.totalPages,
+          hasMore: result.page < result.totalPages,
+        },
+      },
+    });
+  })
+);
+
+/**
+ * GET /api/v1/providers/:npi/colocated
+ * Get other providers at the same location as this provider
+ */
+router.get(
+  '/:npi/colocated',
+  asyncHandler(async (req, res) => {
+    const { npi } = npiParamSchema.parse(req.params);
+    const query = plansQuerySchema.parse(req.query);
+
+    const result = await getColocatedProviders(npi, {
+      page: query.page,
+      limit: query.limit,
+    });
+
+    if (!result) {
+      throw AppError.notFound(`Provider with NPI ${npi} not found or has no location`);
+    }
+
+    res.json({
+      success: true,
+      data: {
+        location: result.location,
+        providers: result.providers.map((p) => ({
+          ...p,
+          displayName: getProviderDisplayName(p),
         })),
         pagination: {
           total: result.total,

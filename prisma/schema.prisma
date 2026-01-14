@@ -8,6 +8,34 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Physical locations (hospitals, offices, clinics)
+// Groups providers by shared address
+model Location {
+  id                    Int       @id @default(autoincrement())
+
+  // Address components
+  addressLine1          String    @db.VarChar(200) @map("address_line1")
+  addressLine2          String?   @db.VarChar(200) @map("address_line2")
+  city                  String    @db.VarChar(100)
+  state                 String    @db.VarChar(2)
+  zipCode               String    @db.VarChar(10) @map("zip_code")
+
+  // Metadata
+  providerCount         Int       @default(0) @map("provider_count")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  providers             Provider[]
+
+  @@unique([addressLine1, city, state, zipCode])
+  @@index([state])
+  @@index([city, state])
+  @@index([zipCode])
+
+  @@map("locations")
+}
+
 // Healthcare providers from NPI registry
 model Provider {
   // Primary Key
@@ -50,6 +78,10 @@ model Provider {
   // Internal tracking
   createdAt             DateTime  @default(now()) @map("created_at")
 
+  // Location relationship
+  locationId            Int?      @map("location_id")
+  location              Location? @relation(fields: [locationId], references: [id])
+
   // Relations
   planAcceptances       ProviderPlanAcceptance[]
   verificationLogs      VerificationLog[]
@@ -59,6 +91,7 @@ model Provider {
   @@index([lastName])
   @@index([organizationName])
   @@index([state, specialtyCode])
+  @@index([locationId])
 
   @@map("providers")
 }

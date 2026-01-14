@@ -107,6 +107,7 @@ export async function getProviderByNpi(npi: string) {
   return prisma.provider.findUnique({
     where: { npi },
     include: {
+      location: true,
       planAcceptances: {
         take: 10,
         orderBy: { confidenceScore: 'desc' },
