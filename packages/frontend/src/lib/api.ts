@@ -76,6 +76,18 @@ export interface Verification {
   };
 }
 
+export interface Location {
+  id: number;
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string;
+  state: string;
+  zipCode: string;
+  providerCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Pagination {
   total: number;
   page: number;
@@ -196,6 +208,27 @@ export const providerApi = {
       cities: string[];
       count: number;
     }>(`/providers/cities?state=${encodeURIComponent(state)}`);
+  },
+
+  getColocated: async (
+    npi: string,
+    params: {
+      page?: number;
+      limit?: number;
+    } = {}
+  ) => {
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined) {
+        searchParams.set(key, String(value));
+      }
+    });
+
+    return fetchApi<{
+      location: Location;
+      providers: (Provider & { displayName: string })[];
+      pagination: Pagination;
+    }>(`/providers/${npi}/colocated?${searchParams.toString()}`);
   },
 };
 
