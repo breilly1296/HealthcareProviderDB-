@@ -16,6 +16,7 @@ const searchQuerySchema = z.object({
   search: z.string().min(1).max(200).optional(),
   state: z.string().length(2).toUpperCase().optional(),
   city: z.string().min(1).max(100).optional(),
+  cities: z.string().min(1).max(500).optional(), // Comma-separated cities
   zipCode: z.string().min(3).max(10).optional(),
   minProviders: z.coerce.number().int().min(1).optional(),
   page: z.coerce.number().int().min(1).default(1),
@@ -49,6 +50,7 @@ router.get(
       search: query.search,
       state: query.state,
       city: query.city,
+      cities: query.cities,
       zipCode: query.zipCode,
       minProviders: query.minProviders,
       page: query.page,

@@ -18,6 +18,7 @@ const router = Router();
 const searchQuerySchema = z.object({
   state: z.string().length(2).toUpperCase().optional(),
   city: z.string().min(1).max(100).optional(),
+  cities: z.string().min(1).max(500).optional(), // Comma-separated cities
   zipCode: z.string().min(3).max(10).optional(),
   specialty: z.string().min(1).max(200).optional(),
   name: z.string().min(1).max(200).optional(),
@@ -51,6 +52,7 @@ router.get(
     const result = await searchProviders({
       state: query.state,
       city: query.city,
+      cities: query.cities,
       zipCode: query.zipCode,
       specialty: query.specialty,
       name: query.name,

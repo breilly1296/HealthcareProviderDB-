@@ -3,23 +3,7 @@
 import { useState, useEffect, useRef, FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-// Cache for cities data (loaded once, shared across all instances)
-let citiesCache: Record<string, string[]> | null = null;
-let citiesCachePromise: Promise<Record<string, string[]>> | null = null;
-
-async function loadCitiesData(): Promise<Record<string, string[]>> {
-  if (citiesCache) return citiesCache;
-  if (citiesCachePromise) return citiesCachePromise;
-
-  citiesCachePromise = fetch('/data/cities.json')
-    .then((res) => res.json())
-    .then((data) => {
-      citiesCache = data;
-      return data;
-    });
-
-  return citiesCachePromise;
-}
+import { providerApi } from '@/lib/api';
 
 const SPECIALTIES = [
   { value: '', label: 'All Specialties' },
@@ -143,7 +127,9 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
   );
   const [specialty, setSpecialty] = useState(searchParams.get('specialty') || '');
   const [state, setState] = useState(searchParams.get('state') || '');
-  const [city, setCity] = useState(searchParams.get('city') || '');
+  const [selectedCities, setSelectedCities] = useState<string[]>(
+    searchParams.get('cities')?.split(',').filter(Boolean) || []
+  );
   const [zip, setZip] = useState(searchParams.get('zip') || '');
   const [name, setName] = useState(searchParams.get('name') || '');
   const [locationName, setLocationName] = useState(searchParams.get('locationName') || '');
@@ -152,25 +138,26 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
   // City dropdown state
   const [cities, setCities] = useState<string[]>([]);
   const [citiesLoading, setCitiesLoading] = useState(false);
-  const [cityInput, setCityInput] = useState(searchParams.get('city') || '');
   const [showCityDropdown, setShowCityDropdown] = useState(false);
-  const cityInputRef = useRef<HTMLInputElement>(null);
+  const [citySearchInput, setCitySearchInput] = useState('');
   const cityDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Load cities from static JSON (cached)
+  // NYC All Boroughs preset
+  const NYC_BOROUGHS = ['New York', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island'];
+
+  // Load cities from API
   useEffect(() => {
     if (!state) {
       setCities([]);
-      setCity('');
-      setCityInput('');
+      setSelectedCities([]);
       return;
     }
 
     const loadCities = async () => {
       setCitiesLoading(true);
       try {
-        const allCities = await loadCitiesData();
-        setCities(allCities[state] || []);
+        const result = await providerApi.getCities(state);
+        setCities(result.cities || []);
       } catch (error) {
         console.error('Failed to load cities:', error);
         setCities([]);
@@ -187,9 +174,7 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
     const handleClickOutside = (event: MouseEvent) => {
       if (
         cityDropdownRef.current &&
-        !cityDropdownRef.current.contains(event.target as Node) &&
-        cityInputRef.current &&
-        !cityInputRef.current.contains(event.target as Node)
+        !cityDropdownRef.current.contains(event.target as Node)
       ) {
         setShowCityDropdown(false);
       }
@@ -199,27 +184,41 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Filter cities based on input (case-insensitive)
+  // Filter cities based on search input
   const filteredCities = cities.filter((c) =>
-    c.toLowerCase().includes(cityInput.toLowerCase())
+    c.toLowerCase().includes(citySearchInput.toLowerCase())
   );
 
-  const handleCitySelect = (selectedCity: string) => {
-    setCity(selectedCity);
-    setCityInput(selectedCity);
-    setShowCityDropdown(false);
+  const toggleCity = (cityName: string) => {
+    setSelectedCities(prev =>
+      prev.includes(cityName)
+        ? prev.filter(c => c !== cityName)
+        : [...prev, cityName]
+    );
   };
 
-  const handleCityInputChange = (value: string) => {
-    setCityInput(value);
-    setCity(value);
-    setShowCityDropdown(true);
+  const toggleNYCBoroughs = () => {
+    const allBoroughsSelected = NYC_BOROUGHS.every(b => selectedCities.includes(b));
+    if (allBoroughsSelected) {
+      // Deselect all boroughs
+      setSelectedCities(selectedCities.filter(c => !NYC_BOROUGHS.includes(c)));
+    } else {
+      // Select all boroughs
+      const newSelection = [...new Set([...selectedCities, ...NYC_BOROUGHS])];
+      setSelectedCities(newSelection);
+    }
   };
+
+  const isNYCBoroughsSelected = state === 'NY' && NYC_BOROUGHS.every(borough => selectedCities.includes(borough));
 
   const handleStateChange = (newState: string) => {
     setState(newState);
-    setCity('');
-    setCityInput('');
+    setSelectedCities([]);
+    setCitySearchInput('');
+  };
+
+  const removeCity = (cityToRemove: string) => {
+    setSelectedCities(prev => prev.filter(c => c !== cityToRemove));
   };
 
   const handleSubmit = (e: FormEvent) => {
@@ -228,7 +227,7 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
     const params = new URLSearchParams();
     params.set('mode', searchMode);
     if (state) params.set('state', state);
-    if (city) params.set('city', city);
+    if (selectedCities.length > 0) params.set('cities', selectedCities.join(','));
     if (zip) params.set('zip', zip);
 
     if (searchMode === 'providers') {
@@ -244,12 +243,12 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
   const handleClear = () => {
     setSpecialty('');
     setState('');
-    setCity('');
-    setCityInput('');
+    setSelectedCities([]);
     setZip('');
     setName('');
     setLocationName('');
     setCities([]);
+    setCitySearchInput('');
     router.push('/search');
   };
 
@@ -345,20 +344,19 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
           </select>
         </div>
 
-        {/* City - Searchable Dropdown */}
+        {/* City - Multi-select */}
         <div className="relative">
           <label htmlFor="city" className="label">
-            City
+            City (Select Multiple)
           </label>
           <div className="relative">
             <input
-              ref={cityInputRef}
               type="text"
               id="city"
-              value={cityInput}
-              onChange={(e) => handleCityInputChange(e.target.value)}
+              value={citySearchInput}
+              onChange={(e) => setCitySearchInput(e.target.value)}
               onFocus={() => state && setShowCityDropdown(true)}
-              placeholder={!state ? 'Select a state first' : citiesLoading ? 'Loading cities...' : 'Type to search cities'}
+              placeholder={!state ? 'Select a state first' : citiesLoading ? 'Loading cities...' : 'Search cities...'}
               className="input pr-8"
               disabled={!state}
               autoComplete="off"
@@ -386,46 +384,87 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
             )}
           </div>
 
+          {/* Selected Cities Pills */}
+          {selectedCities.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-2">
+              {selectedCities.map((city) => (
+                <span
+                  key={city}
+                  className="inline-flex items-center gap-1 px-2 py-1 bg-primary-100 text-primary-700 rounded-md text-sm"
+                >
+                  {city}
+                  <button
+                    type="button"
+                    onClick={() => removeCity(city)}
+                    className="hover:text-primary-900"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
           {/* City Dropdown */}
           {showCityDropdown && state && !citiesLoading && (
             <div
               ref={cityDropdownRef}
-              className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto"
+              className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-hidden flex flex-col"
             >
-              {filteredCities.length === 0 ? (
-                <div className="px-4 py-3 text-sm text-gray-500">
-                  {cityInput ? 'No cities match your search' : 'No cities available'}
-                </div>
-              ) : (
-                <>
-                  {cityInput && (
-                    <button
-                      type="button"
-                      onClick={() => handleCitySelect('')}
-                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 text-gray-500"
-                    >
-                      All Cities
-                    </button>
-                  )}
-                  {filteredCities.slice(0, 100).map((c) => (
-                    <button
+              {/* NYC All Boroughs Button */}
+              {state === 'NY' && (
+                <button
+                  type="button"
+                  onClick={toggleNYCBoroughs}
+                  className={`w-full px-4 py-2.5 text-left text-sm font-medium border-b hover:bg-primary-50 ${
+                    isNYCBoroughsSelected ? 'bg-primary-50 text-primary-700' : 'text-gray-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={isNYCBoroughsSelected}
+                      onChange={toggleNYCBoroughs}
+                      className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <span>New York City (All Boroughs)</span>
+                  </div>
+                </button>
+              )}
+
+              {/* City Checkboxes */}
+              <div className="overflow-y-auto max-h-60">
+                {filteredCities.length === 0 ? (
+                  <div className="px-4 py-3 text-sm text-gray-500">
+                    {citySearchInput ? 'No cities match your search' : 'No cities available'}
+                  </div>
+                ) : (
+                  filteredCities.slice(0, 100).map((c) => (
+                    <label
                       key={c}
-                      type="button"
-                      onClick={() => handleCitySelect(c)}
-                      className={`w-full px-4 py-2 text-left text-sm hover:bg-primary-50 ${
-                        city === c ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-700'
+                      className={`flex items-center gap-2 px-4 py-2 cursor-pointer hover:bg-primary-50 ${
+                        selectedCities.includes(c) ? 'bg-primary-50 text-primary-700' : 'text-gray-700'
                       }`}
                     >
-                      {c}
-                    </button>
-                  ))}
-                  {filteredCities.length > 100 && (
-                    <div className="px-4 py-2 text-xs text-gray-400 border-t">
-                      Showing first 100 of {filteredCities.length} cities. Type to filter.
-                    </div>
-                  )}
-                </>
-              )}
+                      <input
+                        type="checkbox"
+                        checked={selectedCities.includes(c)}
+                        onChange={() => toggleCity(c)}
+                        className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                      />
+                      <span className="text-sm">{c}</span>
+                    </label>
+                  ))
+                )}
+                {filteredCities.length > 100 && (
+                  <div className="px-4 py-2 text-xs text-gray-400 border-t">
+                    Showing first 100 of {filteredCities.length} cities. Type to filter.
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

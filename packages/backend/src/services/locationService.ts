@@ -5,6 +5,7 @@ export interface LocationSearchParams {
   search?: string;
   state?: string;
   city?: string;
+  cities?: string; // Comma-separated cities
   zipCode?: string;
   minProviders?: number;
   page?: number;
@@ -27,6 +28,7 @@ export async function searchLocations(params: LocationSearchParams): Promise<Loc
     search,
     state,
     city,
+    cities,
     zipCode,
     minProviders,
     page = 1,
@@ -36,22 +38,36 @@ export async function searchLocations(params: LocationSearchParams): Promise<Loc
   const take = Math.min(limit, 100);
   const skip = (page - 1) * take;
 
-  const where: Prisma.LocationWhereInput = {};
+  const where: Prisma.LocationWhereInput = {
+    AND: [],
+  };
 
   // Text search across address fields
   if (search) {
-    where.OR = [
-      { addressLine1: { contains: search, mode: 'insensitive' } },
-      { addressLine2: { contains: search, mode: 'insensitive' } },
-      { city: { contains: search, mode: 'insensitive' } },
-    ];
+    (where.AND as Prisma.LocationWhereInput[]).push({
+      OR: [
+        { addressLine1: { contains: search, mode: 'insensitive' } },
+        { addressLine2: { contains: search, mode: 'insensitive' } },
+        { city: { contains: search, mode: 'insensitive' } },
+      ]
+    });
   }
 
   if (state) {
     where.state = state.toUpperCase();
   }
 
-  if (city) {
+  // Handle multiple cities or single city
+  if (cities) {
+    const cityArray = cities.split(',').map(c => c.trim()).filter(Boolean);
+    if (cityArray.length > 0) {
+      (where.AND as Prisma.LocationWhereInput[]).push({
+        OR: cityArray.map(cityName => ({
+          city: { equals: cityName, mode: 'insensitive' }
+        }))
+      });
+    }
+  } else if (city) {
     where.city = { contains: city, mode: 'insensitive' };
   }
 
@@ -61,6 +77,11 @@ export async function searchLocations(params: LocationSearchParams): Promise<Loc
 
   if (minProviders !== undefined) {
     where.providerCount = { gte: minProviders };
+  }
+
+  // Clean up empty AND array
+  if ((where.AND as Prisma.LocationWhereInput[]).length === 0) {
+    delete where.AND;
   }
 
   const [locations, total] = await Promise.all([

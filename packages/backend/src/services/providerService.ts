@@ -4,6 +4,7 @@ import prisma from '../lib/prisma';
 export interface ProviderSearchParams {
   state?: string;
   city?: string;
+  cities?: string; // Comma-separated cities
   zipCode?: string;
   specialty?: string;
   name?: string;
@@ -28,6 +29,7 @@ export async function searchProviders(params: ProviderSearchParams): Promise<Pro
   const {
     state,
     city,
+    cities,
     zipCode,
     specialty,
     name,
@@ -40,13 +42,25 @@ export async function searchProviders(params: ProviderSearchParams): Promise<Pro
   const take = Math.min(limit, 100);
   const skip = (page - 1) * take;
 
-  const where: Prisma.ProviderWhereInput = {};
+  const where: Prisma.ProviderWhereInput = {
+    AND: [],
+  };
 
   if (state) {
     where.state = state.toUpperCase();
   }
 
-  if (city) {
+  // Handle multiple cities or single city
+  if (cities) {
+    const cityArray = cities.split(',').map(c => c.trim()).filter(Boolean);
+    if (cityArray.length > 0) {
+      (where.AND as Prisma.ProviderWhereInput[]).push({
+        OR: cityArray.map(cityName => ({
+          city: { equals: cityName, mode: 'insensitive' }
+        }))
+      });
+    }
+  } else if (city) {
     where.city = { contains: city, mode: 'insensitive' };
   }
 
@@ -55,10 +69,12 @@ export async function searchProviders(params: ProviderSearchParams): Promise<Pro
   }
 
   if (specialty) {
-    where.OR = [
-      { specialty: { contains: specialty, mode: 'insensitive' } },
-      { specialtyCode: { contains: specialty, mode: 'insensitive' } },
-    ];
+    (where.AND as Prisma.ProviderWhereInput[]).push({
+      OR: [
+        { specialty: { contains: specialty, mode: 'insensitive' } },
+        { specialtyCode: { contains: specialty, mode: 'insensitive' } },
+      ]
+    });
   }
 
   if (npi) {
@@ -70,11 +86,18 @@ export async function searchProviders(params: ProviderSearchParams): Promise<Pro
   }
 
   if (name) {
-    where.OR = [
-      { firstName: { contains: name, mode: 'insensitive' } },
-      { lastName: { contains: name, mode: 'insensitive' } },
-      { organizationName: { contains: name, mode: 'insensitive' } },
-    ];
+    (where.AND as Prisma.ProviderWhereInput[]).push({
+      OR: [
+        { firstName: { contains: name, mode: 'insensitive' } },
+        { lastName: { contains: name, mode: 'insensitive' } },
+        { organizationName: { contains: name, mode: 'insensitive' } },
+      ]
+    });
+  }
+
+  // Clean up empty AND array
+  if ((where.AND as Prisma.ProviderWhereInput[]).length === 0) {
+    delete where.AND;
   }
 
   const [providers, total] = await Promise.all([

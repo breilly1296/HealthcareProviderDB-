@@ -151,6 +151,7 @@ export const providerApi = {
   search: async (params: {
     state?: string;
     city?: string;
+    cities?: string;
     zip?: string;
     specialty?: string;
     name?: string;
@@ -238,6 +239,7 @@ export const locationApi = {
     search?: string;
     state?: string;
     city?: string;
+    cities?: string;
     zipCode?: string;
     minProviders?: number;
     page?: number;

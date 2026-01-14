@@ -21,7 +21,7 @@ function SearchResults() {
   const mode = (searchParams.get('mode') as 'providers' | 'locations') || 'providers';
   const specialty = searchParams.get('specialty') || '';
   const state = searchParams.get('state') || '';
-  const city = searchParams.get('city') || '';
+  const cities = searchParams.get('cities') || '';
   const zip = searchParams.get('zip') || '';
   const name = searchParams.get('name') || '';
   const locationName = searchParams.get('locationName') || '';
@@ -36,7 +36,7 @@ function SearchResults() {
       const result = await providerApi.search({
         specialty: specialty || undefined,
         state: state || undefined,
-        city: city || undefined,
+        cities: cities || undefined,
         zip: zip || undefined,
         name: name || undefined,
         page,
@@ -73,7 +73,7 @@ function SearchResults() {
       const result = await locationApi.search({
         search: locationName || undefined,
         state: state || undefined,
-        city: city || undefined,
+        cities: cities || undefined,
         zipCode: zip || undefined,
         page,
         limit: 20,
@@ -102,8 +102,8 @@ function SearchResults() {
 
   useEffect(() => {
     const hasFilters = mode === 'providers'
-      ? (specialty || state || city || zip || name)
-      : (locationName || state || city || zip);
+      ? (specialty || state || cities || zip || name)
+      : (locationName || state || cities || zip);
 
     if (!hasFilters) {
       setProviders([]);
@@ -119,7 +119,7 @@ function SearchResults() {
     } else {
       fetchLocations();
     }
-  }, [mode, specialty, state, city, zip, name, locationName, page]);
+  }, [mode, specialty, state, cities, zip, name, locationName, page]);
 
   return (
     <div>
@@ -150,7 +150,7 @@ function SearchResults() {
             <p className="text-gray-600">
               Found <strong className="text-gray-900">{pagination?.total || 0}</strong> {mode === 'providers' ? 'providers' : 'locations'}
               {state && ` in ${state}`}
-              {city && ` near ${city}`}
+              {cities && ` in ${cities.split(',').join(', ')}`}
             </p>
           </div>
 
@@ -204,7 +204,7 @@ function SearchResults() {
                           mode,
                           ...(specialty && { specialty }),
                           ...(state && { state }),
-                          ...(city && { city }),
+                          ...(cities && { cities }),
                           ...(zip && { zip }),
                           ...(name && { name }),
                           ...(locationName && { locationName }),
