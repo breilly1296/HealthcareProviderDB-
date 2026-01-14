@@ -445,11 +445,17 @@ export default function ProviderDetailPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
                   <div className="text-sm text-gray-700">
+                    {location.name && (
+                      <p className="font-semibold text-base text-gray-900 mb-1">{location.name}</p>
+                    )}
+                    {location.healthSystem && (
+                      <p className="text-primary-600 mb-1">{location.healthSystem}</p>
+                    )}
                     <p className="font-medium">{location.addressLine1}</p>
                     {location.addressLine2 && <p>{location.addressLine2}</p>}
                     <p>{location.city}, {location.state} {location.zipCode}</p>
                     <p className="text-gray-500 mt-1">
-                      {colocatedTotal + 1} provider{colocatedTotal + 1 !== 1 ? 's' : ''} at this address
+                      {colocatedTotal + 1} provider{colocatedTotal + 1 !== 1 ? 's' : ''} at this {location.facilityType ? location.facilityType.toLowerCase() : 'address'}
                     </p>
                   </div>
                 </div>

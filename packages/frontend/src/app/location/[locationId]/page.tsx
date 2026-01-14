@@ -136,7 +136,7 @@ export default function LocationDetailPage() {
             </li>
             <li>/</li>
             <li className="text-gray-900 font-medium truncate max-w-[200px]">
-              {location.addressLine1}
+              {location.name || location.addressLine1}
             </li>
           </ol>
         </nav>
@@ -151,8 +151,17 @@ export default function LocationDetailPage() {
             </div>
             <div className="flex-1">
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">
-                {location.addressLine1}
+                {location.name || location.addressLine1}
               </h1>
+              {location.healthSystem && (
+                <p className="text-lg text-primary-600 mb-2 font-medium">{location.healthSystem}</p>
+              )}
+              {location.facilityType && (
+                <p className="text-sm text-gray-500 mb-2 uppercase tracking-wide">{location.facilityType}</p>
+              )}
+              {location.name && (
+                <p className="text-lg text-gray-700 mb-2 font-medium">{location.addressLine1}</p>
+              )}
               {location.addressLine2 && (
                 <p className="text-lg text-gray-700 mb-2">{location.addressLine2}</p>
               )}
