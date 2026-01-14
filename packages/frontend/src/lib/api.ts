@@ -83,6 +83,9 @@ export interface Location {
   city: string;
   state: string;
   zipCode: string;
+  name: string | null;
+  healthSystem: string | null;
+  facilityType: string | null;
   providerCount: number;
   createdAt: string;
   updatedAt: string;

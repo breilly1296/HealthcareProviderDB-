@@ -21,6 +21,11 @@ model Location {
   state                 String    @db.VarChar(2)
   zipCode               String    @db.VarChar(10) @map("zip_code")
 
+  // Location details
+  name                  String?   @db.VarChar(300)
+  healthSystem          String?   @db.VarChar(200) @map("health_system")
+  facilityType          String?   @db.VarChar(100) @map("facility_type")
+
   // Metadata
   providerCount         Int       @default(0) @map("provider_count")
   createdAt             DateTime  @default(now()) @map("created_at")
