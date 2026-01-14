@@ -278,7 +278,7 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
   };
 
   return (
-    <form onSubmit={handleSubmit} className={`space-y-4 ${className}`}>
+    <form onSubmit={handleSubmit} className={`space-y-6 ${className}`}>
       {/* Search Mode Toggle */}
       <div className="flex items-center gap-2 p-1 bg-gray-100 rounded-lg inline-flex">
         <button
@@ -311,7 +311,8 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Row 1: Primary Filters */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Specialty - Only for provider search */}
         {searchMode === 'providers' && (
           <div>
@@ -389,35 +390,31 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
             ))}
           </select>
         </div>
+      </div>
 
-        {/* City - Multi-select */}
-        <div className="relative">
+      {/* Row 2: Location & Actions */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+        {/* City - Multi-select - Compact */}
+        <div className="relative md:col-span-4">
           <label htmlFor="city" className="label">
-            City (Select Multiple)
+            City
           </label>
           <div className="relative">
-            <input
-              type="text"
-              id="city"
-              value={citySearchInput}
-              onChange={(e) => setCitySearchInput(e.target.value)}
-              onFocus={() => state && setShowCityDropdown(true)}
-              placeholder={!state ? 'Select a state first' : citiesLoading ? 'Loading cities...' : 'Search cities...'}
-              className="input pr-8"
+            <button
+              type="button"
+              onClick={() => state && setShowCityDropdown(!showCityDropdown)}
               disabled={!state}
-              autoComplete="off"
-            />
-            {citiesLoading && (
-              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+              className={`input w-full text-left flex items-center justify-between ${!state ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+            >
+              <span className={selectedCities.length > 0 ? 'text-gray-900' : 'text-gray-500'}>
+                {!state ? 'Select a state first' :
+                 citiesLoading ? 'Loading cities...' :
+                 selectedCities.length > 0 ? `${selectedCities.length} ${selectedCities.length === 1 ? 'city' : 'cities'} selected` :
+                 'Select cities...'}
+              </span>
+              {citiesLoading ? (
                 <div className="animate-spin h-4 w-4 border-2 border-primary-200 border-t-primary-600 rounded-full" />
-              </div>
-            )}
-            {!citiesLoading && state && (
-              <button
-                type="button"
-                onClick={() => setShowCityDropdown(!showCityDropdown)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded"
-              >
+              ) : (
                 <svg
                   className={`w-4 h-4 text-gray-400 transition-transform ${showCityDropdown ? 'rotate-180' : ''}`}
                   fill="none"
@@ -426,65 +423,78 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
-              </button>
-            )}
+              )}
+            </button>
           </div>
-
-          {/* Selected Cities Pills */}
-          {selectedCities.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-2">
-              {selectedCities.map((city) => (
-                <span
-                  key={city}
-                  className="inline-flex items-center gap-1 px-2 py-1 bg-primary-100 text-primary-700 rounded-md text-sm"
-                >
-                  {city}
-                  <button
-                    type="button"
-                    onClick={() => removeCity(city)}
-                    className="hover:text-primary-900"
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
 
           {/* City Dropdown */}
           {showCityDropdown && state && !citiesLoading && (
             <div
               ref={cityDropdownRef}
-              className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-hidden flex flex-col"
+              className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden flex flex-col"
+              style={{ maxHeight: '400px' }}
             >
+              {/* Search Bar */}
+              <div className="p-3 border-b bg-gray-50">
+                <input
+                  type="text"
+                  value={citySearchInput}
+                  onChange={(e) => setCitySearchInput(e.target.value)}
+                  placeholder="Search cities..."
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  autoFocus
+                />
+              </div>
+
+              {/* Selected Cities Display */}
+              {selectedCities.length > 0 && (
+                <div className="p-3 border-b bg-primary-50">
+                  <div className="text-xs font-medium text-primary-900 mb-2">
+                    {selectedCities.length} selected:
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedCities.map((city) => (
+                      <button
+                        key={city}
+                        type="button"
+                        onClick={() => removeCity(city)}
+                        className="inline-flex items-center gap-1 px-2 py-1 bg-white text-primary-700 rounded text-xs hover:bg-primary-100"
+                      >
+                        {city}
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* NYC All Boroughs Button */}
               {state === 'NY' && (
                 <button
                   type="button"
                   onClick={toggleNYCBoroughs}
                   className={`w-full px-4 py-2.5 text-left text-sm font-medium border-b hover:bg-primary-50 ${
-                    isNYCBoroughsSelected ? 'bg-primary-50 text-primary-700' : 'text-gray-700'
+                    isNYCBoroughsSelected ? 'bg-primary-100 text-primary-700' : 'text-gray-700'
                   }`}
                 >
                   <div className="flex items-center gap-2">
                     <input
                       type="checkbox"
                       checked={isNYCBoroughsSelected}
-                      onChange={toggleNYCBoroughs}
+                      readOnly
                       className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                      onClick={(e) => e.stopPropagation()}
                     />
-                    <span>New York City (All Boroughs)</span>
+                    <span>NYC (All 5 Boroughs)</span>
                   </div>
                 </button>
               )}
 
               {/* City Checkboxes */}
-              <div className="overflow-y-auto max-h-60">
+              <div className="overflow-y-auto" style={{ maxHeight: '250px' }}>
                 {filteredCities.length === 0 ? (
-                  <div className="px-4 py-3 text-sm text-gray-500">
+                  <div className="px-4 py-3 text-sm text-gray-500 text-center">
                     {citySearchInput ? 'No cities match your search' : 'No cities available'}
                   </div>
                 ) : (
@@ -492,7 +502,7 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
                     <label
                       key={c}
                       className={`flex items-center gap-2 px-4 py-2 cursor-pointer hover:bg-primary-50 ${
-                        selectedCities.includes(c) ? 'bg-primary-50 text-primary-700' : 'text-gray-700'
+                        selectedCities.includes(c) ? 'bg-primary-50' : ''
                       }`}
                     >
                       <input
@@ -501,13 +511,13 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
                         onChange={() => toggleCity(c)}
                         className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                       />
-                      <span className="text-sm">{c}</span>
+                      <span className={`text-sm ${selectedCities.includes(c) ? 'font-medium text-primary-700' : 'text-gray-700'}`}>{c}</span>
                     </label>
                   ))
                 )}
                 {filteredCities.length > 100 && (
-                  <div className="px-4 py-2 text-xs text-gray-400 border-t">
-                    Showing first 100 of {filteredCities.length} cities. Type to filter.
+                  <div className="px-4 py-2 text-xs text-gray-400 border-t bg-gray-50 text-center">
+                    Showing first 100 of {filteredCities.length} cities
                   </div>
                 )}
               </div>
@@ -516,7 +526,7 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
         </div>
 
         {/* ZIP */}
-        <div>
+        <div className="md:col-span-3">
           <label htmlFor="zip" className="label">
             ZIP Code
           </label>
@@ -525,22 +535,35 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
             id="zip"
             value={zip}
             onChange={(e) => setZip(e.target.value)}
-            placeholder="e.g., 33101"
+            placeholder="e.g., 10016"
             className="input"
             maxLength={10}
           />
         </div>
+
+        {/* Search & Clear Buttons */}
+        <div className="md:col-span-5 flex gap-3">
+          <button type="submit" className="btn-primary flex-1 flex items-center justify-center gap-2">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            Search
+          </button>
+          <button type="button" onClick={handleClear} className="btn-secondary">
+            Clear
+          </button>
+        </div>
       </div>
 
       {/* Advanced options */}
-      {showAdvanced && (
-        <>
+      {showAdvanced && searchMode === 'providers' && (
+        <div className="border-t pt-4">
           <button
             type="button"
             onClick={() => setShowMore(!showMore)}
             className="text-primary-600 hover:text-primary-700 font-medium text-sm flex items-center gap-1"
           >
-            {showMore ? 'Less options' : 'More options'}
+            {showMore ? 'Hide' : 'More'} options
             <svg
               className={`w-4 h-4 transition-transform ${showMore ? 'rotate-180' : ''}`}
               fill="none"
@@ -551,8 +574,8 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
             </svg>
           </button>
 
-          {showMore && searchMode === 'providers' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+          {showMore && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
               {/* Provider Name */}
               <div>
                 <label htmlFor="name" className="label">
@@ -569,21 +592,8 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
               </div>
             </div>
           )}
-        </>
+        </div>
       )}
-
-      {/* Actions */}
-      <div className="flex flex-col sm:flex-row gap-3 pt-2">
-        <button type="submit" className="btn-primary flex-1 sm:flex-none">
-          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          Search {searchMode === 'providers' ? 'Providers' : 'Locations'}
-        </button>
-        <button type="button" onClick={handleClear} className="btn-secondary">
-          Clear
-        </button>
-      </div>
     </form>
   );
 }
