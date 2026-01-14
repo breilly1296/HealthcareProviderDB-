@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { SpecialtyCategory, EntityType, AcceptanceStatus } from '@prisma/client';
+import { AcceptanceStatus } from '@prisma/client';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { searchRateLimiter } from '../middleware/rateLimiter';
 import {
@@ -18,11 +18,11 @@ const router = Router();
 const searchQuerySchema = z.object({
   state: z.string().length(2).toUpperCase().optional(),
   city: z.string().min(1).max(100).optional(),
-  zip: z.string().min(3).max(10).optional(),
-  specialty: z.nativeEnum(SpecialtyCategory).optional(),
+  zipCode: z.string().min(3).max(10).optional(),
+  specialty: z.string().min(1).max(200).optional(),
   name: z.string().min(1).max(200).optional(),
   npi: z.string().length(10).regex(/^\d+$/).optional(),
-  entityType: z.nativeEnum(EntityType).optional(),
+  entityType: z.enum(['INDIVIDUAL', 'ORGANIZATION']).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
@@ -51,7 +51,7 @@ router.get(
     const result = await searchProviders({
       state: query.state,
       city: query.city,
-      zip: query.zip,
+      zipCode: query.zipCode,
       specialty: query.specialty,
       name: query.name,
       npi: query.npi,

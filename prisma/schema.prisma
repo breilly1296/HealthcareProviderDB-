@@ -10,60 +10,51 @@ datasource db {
 
 // Healthcare providers from NPI registry
 model Provider {
-  id                    String   @id @default(cuid())
-  npi                   String   @unique @db.VarChar(10)
-  entityType            EntityType
+  // Primary Key
+  npi                   String    @id @db.VarChar(10)
+
+  // Auto-increment ID (exists in DB but not used as primary key)
+  id                    Int?      @unique @default(autoincrement())
+
+  // Entity type
+  entityType            String    @db.VarChar(20) @map("entity_type")
 
   // Individual provider fields
-  firstName             String?  @db.VarChar(100)
-  lastName              String?  @db.VarChar(100)
-  middleName            String?  @db.VarChar(100)
-  credential            String?  @db.VarChar(50)
+  firstName             String?   @db.VarChar(100) @map("first_name")
+  lastName              String?   @db.VarChar(100) @map("last_name")
+  credential            String?   @db.VarChar(50)
+  sex                   String?   @db.VarChar(10)
 
   // Organization fields
-  organizationName      String?  @db.VarChar(300)
+  organizationName      String?   @db.VarChar(200) @map("organization_name")
+
+  // Specialty/Taxonomy
+  specialty             String?   @db.VarChar(200)
+  specialtyCode         String?   @db.VarChar(20) @map("specialty_code")
 
   // Primary practice address
-  addressLine1          String   @db.VarChar(200)
-  addressLine2          String?  @db.VarChar(200)
-  city                  String   @db.VarChar(100)
-  state                 String   @db.VarChar(2)
-  zip                   String   @db.VarChar(10)
-  country               String   @default("US") @db.VarChar(2)
+  addressLine1          String    @db.VarChar(200) @map("address_line1")
+  addressLine2          String?   @db.VarChar(200) @map("address_line2")
+  city                  String    @db.VarChar(100)
+  state                 String    @db.VarChar(2)
+  zipCode               String    @db.VarChar(10) @map("zip_code")
 
   // Contact
-  phone                 String?  @db.VarChar(20)
-  fax                   String?  @db.VarChar(20)
-
-  // Taxonomy/Specialty (primary)
-  taxonomyCode          String?  @db.VarChar(20)
-  taxonomyDescription   String?  @db.VarChar(200)
-  specialtyCategory     String?  @db.VarChar(200)
-
-  // Secondary taxonomies stored as JSON array
-  secondaryTaxonomies   Json?
+  phone                 String?   @db.VarChar(20)
+  fax                   String?   @db.VarChar(20)
 
   // NPI metadata
-  enumerationDate       DateTime?
-  lastUpdateDate        DateTime?
-  deactivationDate      DateTime?
-  reactivationDate      DateTime?
-  npiStatus             NpiStatus @default(ACTIVE)
+  enumerationDate       DateTime? @db.Date @map("enumeration_date")
+  lastUpdated           DateTime? @db.Date @map("last_updated")
 
   // Internal tracking
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-
-  // Relations
-  planAcceptances       ProviderPlanAcceptance[]
-  verificationLogs      VerificationLog[]
+  createdAt             DateTime  @default(now()) @map("created_at")
 
   @@index([state])
-  @@index([taxonomyCode])
-  @@index([specialtyCategory])
+  @@index([specialtyCode])
   @@index([lastName])
   @@index([organizationName])
-  @@index([state, specialtyCategory])
+  @@index([state, specialtyCode])
 
   @@map("providers")
 }
@@ -122,10 +113,10 @@ model InsurancePlan {
 model ProviderPlanAcceptance {
   id                    String   @id @default(cuid())
 
-  providerId            String
-  provider              Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  providerNpi           String   @map("provider_npi")
+  provider              Provider @relation(fields: [providerNpi], references: [npi], onDelete: Cascade)
 
-  planId                String
+  planId                String   @map("plan_id")
   plan                  InsurancePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
 
   // Acceptance status
@@ -146,10 +137,10 @@ model ProviderPlanAcceptance {
   terminationDate       DateTime?
 
   // Internal tracking
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
 
-  @@unique([providerId, planId])
+  @@unique([providerNpi, planId])
   @@index([acceptanceStatus])
   @@index([confidenceScore])
   @@index([lastVerifiedAt])
@@ -162,10 +153,10 @@ model VerificationLog {
   id                    String   @id @default(cuid())
 
   // What was verified
-  providerId            String?
-  provider              Provider? @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  providerNpi           String?  @map("provider_npi")
+  provider              Provider? @relation(fields: [providerNpi], references: [npi], onDelete: SetNull)
 
-  planId                String?
+  planId                String?  @map("plan_id")
   plan                  InsurancePlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
 
   acceptanceId          String?
@@ -194,9 +185,9 @@ model VerificationLog {
   notes                 String?
   evidenceUrl           String?  @db.VarChar(500)
 
-  createdAt             DateTime @default(now())
+  createdAt             DateTime @default(now()) @map("created_at")
 
-  @@index([providerId])
+  @@index([providerNpi])
   @@index([planId])
   @@index([verificationType])
   @@index([createdAt])
@@ -210,37 +201,37 @@ model SyncLog {
   id                    String   @id @default(cuid())
 
   // Sync identification
-  syncType              SyncType
-  dataSource            DataSource
+  syncType              SyncType @map("sync_type")
+  dataSource            DataSource @map("data_source")
 
   // File information
-  sourceFileName        String?  @db.VarChar(500)
-  sourceFileHash        String?  @db.VarChar(64)  // SHA-256
-  sourceFileSize        BigInt?
-  sourceFileDate        DateTime?
+  sourceFileName        String?  @db.VarChar(500) @map("source_file_name")
+  sourceFileHash        String?  @db.VarChar(64) @map("source_file_hash")  // SHA-256
+  sourceFileSize        BigInt?  @map("source_file_size")
+  sourceFileDate        DateTime? @map("source_file_date")
 
   // Sync status
   status                SyncStatus
-  startedAt             DateTime @default(now())
-  completedAt           DateTime?
+  startedAt             DateTime @default(now()) @map("started_at")
+  completedAt           DateTime? @map("completed_at")
 
   // Statistics
-  totalRecords          Int      @default(0)
-  processedRecords      Int      @default(0)
-  insertedRecords       Int      @default(0)
-  updatedRecords        Int      @default(0)
-  skippedRecords        Int      @default(0)
-  errorRecords          Int      @default(0)
+  totalRecords          Int      @default(0) @map("total_records")
+  processedRecords      Int      @default(0) @map("processed_records")
+  insertedRecords       Int      @default(0) @map("inserted_records")
+  updatedRecords        Int      @default(0) @map("updated_records")
+  skippedRecords        Int      @default(0) @map("skipped_records")
+  errorRecords          Int      @default(0) @map("error_records")
 
   // Error tracking
-  errorLog              Json?    // Array of error details
-  lastError             String?
+  errorLog              Json?    @map("error_log") // Array of error details
+  lastError             String?  @map("last_error")
 
   // Filter criteria used
-  filterCriteria        Json?    // e.g., { states: ["FL"], specialties: ["rheumatology"] }
+  filterCriteria        Json?    @map("filter_criteria") // e.g., { states: ["FL"], specialties: ["rheumatology"] }
 
   // Metadata
-  triggeredBy           String?  @db.VarChar(200)
+  triggeredBy           String?  @db.VarChar(200) @map("triggered_by")
   notes                 String?
 
   @@index([syncType])
@@ -253,13 +244,16 @@ model SyncLog {
 
 // Enums
 
-enum EntityType {
-  INDIVIDUAL  // NPI-1
-  ORGANIZATION // NPI-2
-}
+// EntityType enum removed - using String instead since DB column is VARCHAR(20)
+// Values should be: "INDIVIDUAL" or "ORGANIZATION"
 
 // COMMENTED OUT - Changed to VARCHAR(200) for flexibility
 // Uncomment this enum to rollback the migration
+// enum EntityType {
+//   INDIVIDUAL  // NPI-1
+//   ORGANIZATION // NPI-2
+// }
+//
 // enum SpecialtyCategory {
 //   // Original categories
 //   ENDOCRINOLOGY
@@ -330,11 +324,11 @@ enum EntityType {
 //   // Catch-all
 //   OTHER
 // }
-
-enum NpiStatus {
-  ACTIVE
-  DEACTIVATED
-}
+//
+// enum NpiStatus {
+//   ACTIVE
+//   DEACTIVATED
+// }
 
 enum PlanType {
   HMO

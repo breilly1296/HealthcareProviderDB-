@@ -1,14 +1,14 @@
-import { Prisma, SpecialtyCategory, EntityType, NpiStatus, AcceptanceStatus } from '@prisma/client';
+import { Prisma, AcceptanceStatus } from '@prisma/client';
 import prisma from '../lib/prisma';
 
 export interface ProviderSearchParams {
   state?: string;
   city?: string;
-  zip?: string;
-  specialty?: SpecialtyCategory;
+  zipCode?: string;
+  specialty?: string;
   name?: string;
   npi?: string;
-  entityType?: EntityType;
+  entityType?: 'INDIVIDUAL' | 'ORGANIZATION';
   page?: number;
   limit?: number;
 }
@@ -28,7 +28,7 @@ export async function searchProviders(params: ProviderSearchParams): Promise<Pro
   const {
     state,
     city,
-    zip,
+    zipCode,
     specialty,
     name,
     npi,
@@ -40,9 +40,7 @@ export async function searchProviders(params: ProviderSearchParams): Promise<Pro
   const take = Math.min(limit, 100);
   const skip = (page - 1) * take;
 
-  const where: Prisma.ProviderWhereInput = {
-    npiStatus: NpiStatus.ACTIVE,
-  };
+  const where: Prisma.ProviderWhereInput = {};
 
   if (state) {
     where.state = state.toUpperCase();
@@ -52,12 +50,15 @@ export async function searchProviders(params: ProviderSearchParams): Promise<Pro
     where.city = { contains: city, mode: 'insensitive' };
   }
 
-  if (zip) {
-    where.zip = { startsWith: zip };
+  if (zipCode) {
+    where.zipCode = { startsWith: zipCode };
   }
 
   if (specialty) {
-    where.specialtyCategory = specialty;
+    where.OR = [
+      { specialty: { contains: specialty, mode: 'insensitive' } },
+      { specialtyCode: { contains: specialty, mode: 'insensitive' } },
+    ];
   }
 
   if (npi) {
@@ -135,7 +136,7 @@ export async function getProviderAcceptedPlans(
 
   const provider = await prisma.provider.findUnique({
     where: { npi },
-    select: { id: true },
+    select: { npi: true },
   });
 
   if (!provider) {
@@ -143,7 +144,7 @@ export async function getProviderAcceptedPlans(
   }
 
   const where: Prisma.ProviderPlanAcceptanceWhereInput = {
-    providerId: provider.id,
+    providerNpi: provider.npi,
   };
 
   if (status) {
@@ -183,7 +184,6 @@ export async function getCitiesByState(state: string): Promise<string[]> {
   const result = await prisma.provider.findMany({
     where: {
       state: state.toUpperCase(),
-      npiStatus: NpiStatus.ACTIVE,
     },
     select: {
       city: true,
@@ -218,7 +218,6 @@ export function getProviderDisplayName(provider: {
   entityType: string;
   firstName?: string | null;
   lastName?: string | null;
-  middleName?: string | null;
   credential?: string | null;
   organizationName?: string | null;
 }): string {
@@ -226,7 +225,7 @@ export function getProviderDisplayName(provider: {
     return provider.organizationName || 'Unknown Organization';
   }
 
-  const parts = [provider.firstName, provider.middleName, provider.lastName]
+  const parts = [provider.firstName, provider.lastName]
     .filter(Boolean)
     .join(' ');
 
