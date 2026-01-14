@@ -150,13 +150,27 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
   // NYC All Boroughs preset
   const NYC_BOROUGHS = ['New York', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island'];
 
-  // Load health systems from API on mount
+  // Load health systems from API - filtered by state and cities
   useEffect(() => {
     const loadHealthSystems = async () => {
       setHealthSystemsLoading(true);
       try {
-        const result = await locationApi.getHealthSystems();
-        setHealthSystems(result.healthSystems || []);
+        const params: { state?: string; cities?: string } = {};
+        if (state) {
+          params.state = state;
+        }
+        if (selectedCities.length > 0) {
+          params.cities = selectedCities.join(',');
+        }
+
+        const result = await locationApi.getHealthSystems(params);
+        const newHealthSystems = result.healthSystems || [];
+        setHealthSystems(newHealthSystems);
+
+        // Clear health system selection if it's no longer in the filtered list
+        if (healthSystem && !newHealthSystems.includes(healthSystem)) {
+          setHealthSystem('');
+        }
       } catch (error) {
         console.error('Failed to load health systems:', error);
         setHealthSystems([]);
@@ -166,7 +180,7 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
     };
 
     loadHealthSystems();
-  }, []);
+  }, [state, selectedCities]);
 
   // Load cities from API
   useEffect(() => {

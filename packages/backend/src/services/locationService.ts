@@ -257,13 +257,41 @@ export async function getLocationStatsByState(state: string) {
 
 /**
  * Get distinct health systems (sorted by provider count)
+ * Optionally filtered by state and/or cities
  */
-export async function getHealthSystems(): Promise<string[]> {
+export async function getHealthSystems(params?: {
+  state?: string;
+  cities?: string;
+}): Promise<string[]> {
+  const where: Prisma.LocationWhereInput = {
+    healthSystem: { not: null },
+    AND: [],
+  };
+
+  if (params?.state) {
+    where.state = params.state.toUpperCase();
+  }
+
+  // Handle multiple cities
+  if (params?.cities) {
+    const cityArray = params.cities.split(',').map(c => c.trim()).filter(Boolean);
+    if (cityArray.length > 0) {
+      (where.AND as Prisma.LocationWhereInput[]).push({
+        OR: cityArray.map(cityName => ({
+          city: { equals: cityName, mode: 'insensitive' }
+        }))
+      });
+    }
+  }
+
+  // Clean up empty AND array
+  if ((where.AND as Prisma.LocationWhereInput[]).length === 0) {
+    delete where.AND;
+  }
+
   const result = await prisma.location.groupBy({
     by: ['healthSystem'],
-    where: {
-      healthSystem: { not: null },
-    },
+    where,
     _sum: {
       providerCount: true,
     },

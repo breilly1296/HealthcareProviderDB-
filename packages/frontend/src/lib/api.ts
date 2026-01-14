@@ -288,11 +288,20 @@ export const locationApi = {
     }>(`/locations/stats/${encodeURIComponent(state)}`);
   },
 
-  getHealthSystems: async () => {
+  getHealthSystems: async (params?: { state?: string; cities?: string }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.state) {
+      searchParams.set('state', params.state);
+    }
+    if (params?.cities) {
+      searchParams.set('cities', params.cities);
+    }
+
+    const queryString = searchParams.toString();
     return fetchApi<{
       healthSystems: string[];
       count: number;
-    }>('/locations/health-systems');
+    }>(`/locations/health-systems${queryString ? `?${queryString}` : ''}`);
   },
 };
 

@@ -79,11 +79,22 @@ router.get(
 /**
  * GET /api/v1/locations/health-systems
  * Get list of distinct health systems
+ * Optionally filtered by state and/or cities
  */
 router.get(
   '/health-systems',
   asyncHandler(async (req, res) => {
-    const healthSystems = await getHealthSystems();
+    const querySchema = z.object({
+      state: z.string().length(2).toUpperCase().optional(),
+      cities: z.string().min(1).max(500).optional(), // Comma-separated cities
+    });
+
+    const query = querySchema.parse(req.query);
+
+    const healthSystems = await getHealthSystems({
+      state: query.state,
+      cities: query.cities,
+    });
 
     res.json({
       success: true,
