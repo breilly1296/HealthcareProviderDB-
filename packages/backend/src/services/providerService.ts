@@ -1,6 +1,147 @@
 import { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 
+/**
+ * Common medical prefixes and suffixes to strip from name searches
+ */
+const MEDICAL_TITLES = [
+  'dr.', 'dr', 'doctor',
+  'md', 'm.d.', 'do', 'd.o.',
+  'np', 'n.p.', 'pa', 'p.a.',
+  'rn', 'r.n.', 'lpn', 'l.p.n.',
+  'phd', 'ph.d.', 'dds', 'd.d.s.',
+  'dpm', 'd.p.m.', 'od', 'o.d.',
+  'pharmd', 'pharm.d.',
+  'mph', 'm.p.h.', 'msw', 'm.s.w.',
+  'lcsw', 'l.c.s.w.', 'lpc', 'l.p.c.',
+  'psyd', 'psy.d.',
+];
+
+/**
+ * Clean and parse a name search query
+ * Strips medical titles and handles various name formats
+ */
+function parseNameSearch(nameInput: string): {
+  searchTerms: string[];
+  firstName?: string;
+  lastName?: string;
+} {
+  // Normalize: trim, lowercase, remove extra spaces
+  let cleaned = nameInput.trim().toLowerCase().replace(/\s+/g, ' ');
+
+  // Remove medical titles
+  for (const title of MEDICAL_TITLES) {
+    // Remove from beginning
+    const startRegex = new RegExp(`^${title}\\s+`, 'i');
+    cleaned = cleaned.replace(startRegex, '');
+
+    // Remove from end
+    const endRegex = new RegExp(`\\s+${title}$`, 'i');
+    cleaned = cleaned.replace(endRegex, '');
+
+    // Remove with comma separator
+    const commaRegex = new RegExp(`[,\\s]+${title}[,\\s]*`, 'gi');
+    cleaned = cleaned.replace(commaRegex, ' ');
+  }
+
+  // Clean up any remaining punctuation and extra spaces
+  cleaned = cleaned.replace(/[,\.;]/g, ' ').replace(/\s+/g, ' ').trim();
+
+  if (!cleaned) {
+    return { searchTerms: [] };
+  }
+
+  // Split into terms
+  const terms = cleaned.split(/\s+/).filter(Boolean);
+
+  // Single term - could match first, last, or organization name
+  if (terms.length === 1) {
+    return { searchTerms: terms };
+  }
+
+  // Two terms - could be "First Last" or "Last First"
+  if (terms.length === 2) {
+    return {
+      searchTerms: terms,
+      firstName: terms[0],
+      lastName: terms[1],
+    };
+  }
+
+  // Three or more terms - treat first as firstName, last as lastName
+  if (terms.length >= 3) {
+    return {
+      searchTerms: terms,
+      firstName: terms[0],
+      lastName: terms[terms.length - 1],
+    };
+  }
+
+  return { searchTerms: terms };
+}
+
+/**
+ * Build name search conditions with fuzzy matching
+ */
+function buildNameSearchConditions(nameInput: string): Prisma.ProviderWhereInput[] {
+  const parsed = parseNameSearch(nameInput);
+  const conditions: Prisma.ProviderWhereInput[] = [];
+
+  if (parsed.searchTerms.length === 0) {
+    return conditions;
+  }
+
+  // Single term - search across all name fields
+  if (parsed.searchTerms.length === 1) {
+    const term = parsed.searchTerms[0];
+    conditions.push(
+      { firstName: { contains: term, mode: 'insensitive' } },
+      { lastName: { contains: term, mode: 'insensitive' } },
+      { organizationName: { contains: term, mode: 'insensitive' } },
+    );
+  }
+
+  // Multiple terms with identified first/last names
+  if (parsed.firstName && parsed.lastName) {
+    // Try "First Last" combination
+    conditions.push({
+      AND: [
+        { firstName: { contains: parsed.firstName, mode: 'insensitive' } },
+        { lastName: { contains: parsed.lastName, mode: 'insensitive' } },
+      ],
+    });
+
+    // Try "Last First" combination (reverse order)
+    conditions.push({
+      AND: [
+        { firstName: { contains: parsed.lastName, mode: 'insensitive' } },
+        { lastName: { contains: parsed.firstName, mode: 'insensitive' } },
+      ],
+    });
+  }
+
+  // Search for each term individually across all fields
+  for (const term of parsed.searchTerms) {
+    if (term.length >= 2) {
+      conditions.push(
+        { firstName: { contains: term, mode: 'insensitive' } },
+        { lastName: { contains: term, mode: 'insensitive' } },
+        { organizationName: { contains: term, mode: 'insensitive' } },
+      );
+    }
+  }
+
+  // For organization names, try matching all terms together
+  if (parsed.searchTerms.length > 1) {
+    const allTerms = parsed.searchTerms.join(' ');
+    conditions.push({
+      organizationName: { contains: allTerms, mode: 'insensitive' },
+    });
+  }
+
+  return conditions;
+}
+
 export interface ProviderSearchParams {
   state?: string;
   city?: string;
@@ -94,13 +235,12 @@ export async function searchProviders(params: ProviderSearchParams): Promise<Pro
   }
 
   if (name) {
-    (where.AND as Prisma.ProviderWhereInput[]).push({
-      OR: [
-        { firstName: { contains: name, mode: 'insensitive' } },
-        { lastName: { contains: name, mode: 'insensitive' } },
-        { organizationName: { contains: name, mode: 'insensitive' } },
-      ]
-    });
+    const nameConditions = buildNameSearchConditions(name);
+    if (nameConditions.length > 0) {
+      (where.AND as Prisma.ProviderWhereInput[]).push({
+        OR: nameConditions,
+      });
+    }
   }
 
   // Clean up empty AND array
