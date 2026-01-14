@@ -232,6 +232,55 @@ export const providerApi = {
   },
 };
 
+// Location API
+export const locationApi = {
+  search: async (params: {
+    state?: string;
+    city?: string;
+    zipCode?: string;
+    minProviders?: number;
+    page?: number;
+    limit?: number;
+  }) => {
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== '') {
+        searchParams.set(key, String(value));
+      }
+    });
+
+    return fetchApi<{
+      locations: Location[];
+      pagination: Pagination;
+    }>(`/locations/search?${searchParams.toString()}`);
+  },
+
+  getById: async (locationId: number, params: { page?: number; limit?: number } = {}) => {
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined) {
+        searchParams.set(key, String(value));
+      }
+    });
+
+    return fetchApi<{
+      location: Location;
+      providers: (Provider & { displayName: string })[];
+      pagination: Pagination;
+    }>(`/locations/${locationId}/providers?${searchParams.toString()}`);
+  },
+
+  getStats: async (state: string) => {
+    return fetchApi<{
+      state: string;
+      totalLocations: number;
+      totalProviders: number;
+      avgProvidersPerLocation: number;
+      maxProvidersAtLocation: number;
+    }>(`/locations/stats/${encodeURIComponent(state)}`);
+  },
+};
+
 // Plan API
 export const planApi = {
   search: async (params: {

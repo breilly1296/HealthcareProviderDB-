@@ -138,11 +138,15 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  const [searchMode, setSearchMode] = useState<'providers' | 'locations'>(
+    searchParams.get('mode') as 'providers' | 'locations' || 'providers'
+  );
   const [specialty, setSpecialty] = useState(searchParams.get('specialty') || '');
   const [state, setState] = useState(searchParams.get('state') || '');
   const [city, setCity] = useState(searchParams.get('city') || '');
   const [zip, setZip] = useState(searchParams.get('zip') || '');
   const [name, setName] = useState(searchParams.get('name') || '');
+  const [minProviders, setMinProviders] = useState(searchParams.get('minProviders') || '');
   const [showMore, setShowMore] = useState(false);
 
   // City dropdown state
@@ -222,11 +226,17 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
     e.preventDefault();
 
     const params = new URLSearchParams();
-    if (specialty) params.set('specialty', specialty);
+    params.set('mode', searchMode);
     if (state) params.set('state', state);
     if (city) params.set('city', city);
     if (zip) params.set('zip', zip);
-    if (name) params.set('name', name);
+
+    if (searchMode === 'providers') {
+      if (specialty) params.set('specialty', specialty);
+      if (name) params.set('name', name);
+    } else {
+      if (minProviders) params.set('minProviders', minProviders);
+    }
 
     router.push(`/search?${params.toString()}`);
   };
@@ -238,31 +248,84 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
     setCityInput('');
     setZip('');
     setName('');
+    setMinProviders('');
     setCities([]);
     router.push('/search');
   };
 
   return (
     <form onSubmit={handleSubmit} className={`space-y-4 ${className}`}>
+      {/* Search Mode Toggle */}
+      <div className="flex items-center gap-2 p-1 bg-gray-100 rounded-lg inline-flex">
+        <button
+          type="button"
+          onClick={() => setSearchMode('providers')}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+            searchMode === 'providers'
+              ? 'bg-white text-primary-600 shadow-sm'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          <svg className="w-4 h-4 inline-block mr-1.5 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+          Providers
+        </button>
+        <button
+          type="button"
+          onClick={() => setSearchMode('locations')}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+            searchMode === 'locations'
+              ? 'bg-white text-primary-600 shadow-sm'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          <svg className="w-4 h-4 inline-block mr-1.5 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+          </svg>
+          Organizations/Locations
+        </button>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Specialty */}
-        <div>
-          <label htmlFor="specialty" className="label">
-            Specialty
-          </label>
-          <select
-            id="specialty"
-            value={specialty}
-            onChange={(e) => setSpecialty(e.target.value)}
-            className="input"
-          >
-            {SPECIALTIES.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        {/* Specialty - Only for provider search */}
+        {searchMode === 'providers' && (
+          <div>
+            <label htmlFor="specialty" className="label">
+              Specialty
+            </label>
+            <select
+              id="specialty"
+              value={specialty}
+              onChange={(e) => setSpecialty(e.target.value)}
+              className="input"
+            >
+              {SPECIALTIES.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Min Providers - Only for location search */}
+        {searchMode === 'locations' && (
+          <div>
+            <label htmlFor="minProviders" className="label">
+              Minimum Providers
+            </label>
+            <input
+              type="number"
+              id="minProviders"
+              value={minProviders}
+              onChange={(e) => setMinProviders(e.target.value)}
+              placeholder="e.g., 5"
+              className="input"
+              min="1"
+            />
+          </div>
+        )}
 
         {/* State */}
         <div>
@@ -404,7 +467,7 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
             </svg>
           </button>
 
-          {showMore && (
+          {showMore && searchMode === 'providers' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
               {/* Provider Name */}
               <div>
@@ -431,7 +494,7 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
           <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
-          Search Providers
+          Search {searchMode === 'providers' ? 'Providers' : 'Locations'}
         </button>
         <button type="button" onClick={handleClear} className="btn-secondary">
           Clear

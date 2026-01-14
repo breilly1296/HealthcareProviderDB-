@@ -4,23 +4,27 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { SearchForm } from '@/components/SearchForm';
 import { ProviderCard } from '@/components/ProviderCard';
+import { LocationCard } from '@/components/LocationCard';
 import ProviderCardSkeleton from '@/components/ProviderCardSkeleton';
 import ErrorMessage from '@/components/ErrorMessage';
-import { providerApi, Provider, Pagination } from '@/lib/api';
+import { providerApi, locationApi, Provider, Location, Pagination } from '@/lib/api';
 
 function SearchResults() {
   const searchParams = useSearchParams();
   const [providers, setProviders] = useState<(Provider & { displayName: string })[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<{ message: string; type: 'network' | 'server' } | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
 
+  const mode = (searchParams.get('mode') as 'providers' | 'locations') || 'providers';
   const specialty = searchParams.get('specialty') || '';
   const state = searchParams.get('state') || '';
   const city = searchParams.get('city') || '';
   const zip = searchParams.get('zip') || '';
   const name = searchParams.get('name') || '';
+  const minProviders = searchParams.get('minProviders') || '';
   const page = parseInt(searchParams.get('page') || '1', 10);
 
   const fetchProviders = async () => {
@@ -40,6 +44,7 @@ function SearchResults() {
       });
 
       setProviders(result.providers);
+      setLocations([]);
       setPagination(result.pagination);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to search providers';
@@ -52,6 +57,43 @@ function SearchResults() {
         type: isNetworkError ? 'network' : 'server'
       });
       setProviders([]);
+      setLocations([]);
+      setPagination(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchLocations = async () => {
+    setLoading(true);
+    setError(null);
+    setHasSearched(true);
+
+    try {
+      const result = await locationApi.search({
+        state: state || undefined,
+        city: city || undefined,
+        zipCode: zip || undefined,
+        minProviders: minProviders ? parseInt(minProviders) : undefined,
+        page,
+        limit: 20,
+      });
+
+      setLocations(result.locations);
+      setProviders([]);
+      setPagination(result.pagination);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to search locations';
+      const isNetworkError = errorMessage.toLowerCase().includes('network') ||
+                            errorMessage.toLowerCase().includes('fetch') ||
+                            errorMessage.toLowerCase().includes('connection');
+
+      setError({
+        message: errorMessage,
+        type: isNetworkError ? 'network' : 'server'
+      });
+      setLocations([]);
+      setProviders([]);
       setPagination(null);
     } finally {
       setLoading(false);
@@ -59,18 +101,25 @@ function SearchResults() {
   };
 
   useEffect(() => {
-    const hasFilters = specialty || state || city || zip || name;
+    const hasFilters = mode === 'providers'
+      ? (specialty || state || city || zip || name)
+      : (state || city || zip || minProviders);
 
     if (!hasFilters) {
       setProviders([]);
+      setLocations([]);
       setPagination(null);
       setHasSearched(false);
       setError(null);
       return;
     }
 
-    fetchProviders();
-  }, [specialty, state, city, zip, name, page]);
+    if (mode === 'providers') {
+      fetchProviders();
+    } else {
+      fetchLocations();
+    }
+  }, [mode, specialty, state, city, zip, name, minProviders, page]);
 
   return (
     <div>
@@ -85,13 +134,13 @@ function SearchResults() {
           message={error.message}
           action={{
             label: 'Try Again',
-            onClick: fetchProviders
+            onClick: mode === 'providers' ? fetchProviders : fetchLocations
           }}
         />
-      ) : hasSearched && providers.length === 0 ? (
+      ) : hasSearched && providers.length === 0 && locations.length === 0 ? (
         <ErrorMessage
           variant="search"
-          title="No Providers Found"
+          title={mode === 'providers' ? 'No Providers Found' : 'No Locations Found'}
           message="Try adjusting your search criteria or expanding your location."
         />
       ) : hasSearched ? (
@@ -99,21 +148,35 @@ function SearchResults() {
           {/* Results count */}
           <div className="mb-6">
             <p className="text-gray-600">
-              Found <strong className="text-gray-900">{pagination?.total || 0}</strong> providers
+              Found <strong className="text-gray-900">{pagination?.total || 0}</strong> {mode === 'providers' ? 'providers' : 'locations'}
               {state && ` in ${state}`}
               {city && ` near ${city}`}
             </p>
           </div>
 
           {/* Provider list */}
-          <div className="space-y-4">
-            {providers.map((provider) => (
-              <ProviderCard
-                key={provider.id}
-                provider={provider}
-              />
-            ))}
-          </div>
+          {mode === 'providers' && (
+            <div className="space-y-4">
+              {providers.map((provider) => (
+                <ProviderCard
+                  key={provider.id}
+                  provider={provider}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Location list */}
+          {mode === 'locations' && (
+            <div className="space-y-4">
+              {locations.map((location) => (
+                <LocationCard
+                  key={location.id}
+                  location={location}
+                />
+              ))}
+            </div>
+          )}
 
           {/* Pagination */}
           {pagination && pagination.totalPages > 1 && (
@@ -138,11 +201,13 @@ function SearchResults() {
                       )}
                       <a
                         href={`/search?${new URLSearchParams({
+                          mode,
                           ...(specialty && { specialty }),
                           ...(state && { state }),
                           ...(city && { city }),
                           ...(zip && { zip }),
                           ...(name && { name }),
+                          ...(minProviders && { minProviders }),
                           page: String(p),
                         }).toString()}`}
                         className={`px-4 py-2 rounded-lg font-medium ${
