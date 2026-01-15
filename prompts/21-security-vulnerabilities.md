@@ -44,17 +44,19 @@ grep -r "TODO.*security\|FIXME.*security" packages/backend/src/
 
 ### ZeroPath Findings
 1. What did ZeroPath find?
-   - Expected: Medium severity (CVSS 7.1) - unauthenticated verification spam
+   - Medium severity (CVSS 7.1) - unauthenticated verification spam - **FIXED Jan 2026**
+   - Critical severity (CVSS 9.2) - verification threshold bypass - **FIXED Jan 2026**
 
-2. What file and lines?
-   - Expected: `packages/backend/src/api/routes.ts` (lines 348-515)
+2. What files were affected?
+   - Original: `packages/backend/src/api/routes.ts` (removed)
+   - Current routes: `packages/backend/src/routes/verify.ts`
+   - Rate limiter: `packages/backend/src/middleware/rateLimiter.ts`
 
-3. What's the specific vulnerability?
-   - No rate limiting on verification endpoints?
-
-4. What's the attack scenario?
-   - Spam verifications?
-   - Vote manipulation?
+3. What was fixed?
+   - Rate limiting added to verification/vote endpoints
+   - Verification threshold required before status changes
+   - PII excluded from public responses
+   - Legacy vulnerable endpoint removed
 
 ### Current Vulnerabilities
 
@@ -136,11 +138,10 @@ For each finding:
 [Full description]
 
 **Location:**
-- File: `packages/backend/src/api/routes.ts`
-- Lines: 348-515
+- File: `packages/backend/src/routes/verify.ts`
 - Endpoints:
-  - `POST /providers/:npi/verify`
-  - `POST /verifications/:id/vote`
+  - `POST /api/v1/verify`
+  - `POST /api/v1/verify/:id/vote`
 
 **Vulnerability:**
 ```typescript
@@ -185,10 +186,72 @@ For each finding:
 
 ## Fixed Vulnerabilities
 
-### [VMP-2026-XXX] Example Fixed Vulnerability
+### [VMP-2026-001] Unauthenticated Verification Spam
 
-**Fixed:** [Date]  
-**Severity:** [severity]  
+**Fixed:** January 2026
+**Severity:** Medium (CVSS 7.1)
+**Found:** ZeroPath scan
+
+**Description:** No rate limiting on verification endpoints allowed unlimited spam
+
+**Fix:** Added IP-based rate limiting (10/hour for verify, 10/hour for vote, 100/hour for search)
+
+**Files changed:**
+- Added: `packages/backend/src/middleware/rateLimiter.ts`
+- Modified: `packages/backend/src/routes/verify.ts`
+
+---
+
+### [VMP-2026-002] Verification Threshold Bypass
+
+**Fixed:** January 2026
+**Severity:** Critical (CVSS 9.2)
+**Found:** ZeroPath scan
+
+**Description:** Could change provider acceptance status without meeting verification threshold
+
+**Fix:** Added verification threshold check before allowing status changes
+
+**Files changed:**
+- `packages/backend/src/services/verificationService.ts`
+
+---
+
+### [VMP-2026-003] PII in Public Responses
+
+**Fixed:** January 2026
+**Severity:** Medium
+**Found:** Code review
+
+**Description:** Public verification responses included PII fields
+
+**Fix:** Excluded PII fields from public API responses
+
+**Files changed:**
+- `packages/backend/src/services/verificationService.ts`
+
+---
+
+### [VMP-2026-004] Legacy Vulnerable Endpoint
+
+**Fixed:** January 2026
+**Severity:** High
+**Found:** Code review
+
+**Description:** Legacy verification endpoint at `src/api/routes.ts` lacked security controls
+
+**Fix:** Removed legacy endpoint entirely
+
+**Files changed:**
+- Removed: `src/api/routes.ts`
+- Modified: `src/index.ts`
+
+---
+
+### [VMP-2026-XXX] Example Fixed Vulnerability Template
+
+**Fixed:** [Date]
+**Severity:** [severity]
 **Found:** [Date] by [tool/person]
 
 **Description:** [what it was]

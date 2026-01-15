@@ -1,5 +1,12 @@
 import { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
+import {
+  getPaginationValues,
+  buildPaginatedResult,
+  buildCityFilter,
+  cleanWhereClause,
+  addAndCondition,
+} from './utils';
 
 /**
  * Common medical prefixes and suffixes to strip from name searches
@@ -168,57 +175,25 @@ export interface ProviderSearchResult {
  * Search providers with filters and pagination
  */
 export async function searchProviders(params: ProviderSearchParams): Promise<ProviderSearchResult> {
-  const {
-    state,
-    city,
-    cities,
-    zipCode,
-    healthSystem,
-    specialty,
-    name,
-    npi,
-    entityType,
-    page = 1,
-    limit = 20,
-  } = params;
+  const { state, city, cities, zipCode, healthSystem, specialty, name, npi, entityType } = params;
+  const { take, skip, page } = getPaginationValues(params.page, params.limit);
 
-  const take = Math.min(limit, 100);
-  const skip = (page - 1) * take;
+  const where: Prisma.ProviderWhereInput = { AND: [] };
 
-  const where: Prisma.ProviderWhereInput = {
-    AND: [],
-  };
+  // Apply filters
+  if (state) where.state = state.toUpperCase();
+  if (zipCode) where.zipCode = { startsWith: zipCode };
+  if (healthSystem) where.location = { healthSystem };
+  if (npi) where.npi = npi;
+  if (entityType) where.entityType = entityType;
 
-  if (state) {
-    where.state = state.toUpperCase();
-  }
+  // City filter (single or multiple)
+  const cityFilter = buildCityFilter(cities, city);
+  if (cityFilter) addAndCondition(where, cityFilter);
 
-  // Handle multiple cities or single city
-  if (cities) {
-    const cityArray = cities.split(',').map(c => c.trim()).filter(Boolean);
-    if (cityArray.length > 0) {
-      (where.AND as Prisma.ProviderWhereInput[]).push({
-        OR: cityArray.map(cityName => ({
-          city: { equals: cityName, mode: 'insensitive' }
-        }))
-      });
-    }
-  } else if (city) {
-    where.city = { contains: city, mode: 'insensitive' };
-  }
-
-  if (zipCode) {
-    where.zipCode = { startsWith: zipCode };
-  }
-
-  if (healthSystem) {
-    where.location = {
-      healthSystem: healthSystem,
-    };
-  }
-
+  // Specialty filter (searches both fields)
   if (specialty) {
-    (where.AND as Prisma.ProviderWhereInput[]).push({
+    addAndCondition(where, {
       OR: [
         { specialty: { contains: specialty, mode: 'insensitive' } },
         { specialtyCode: { contains: specialty, mode: 'insensitive' } },
@@ -226,49 +201,27 @@ export async function searchProviders(params: ProviderSearchParams): Promise<Pro
     });
   }
 
-  if (npi) {
-    where.npi = npi;
-  }
-
-  if (entityType) {
-    where.entityType = entityType;
-  }
-
+  // Name search with fuzzy matching
   if (name) {
     const nameConditions = buildNameSearchConditions(name);
     if (nameConditions.length > 0) {
-      (where.AND as Prisma.ProviderWhereInput[]).push({
-        OR: nameConditions,
-      });
+      addAndCondition(where, { OR: nameConditions });
     }
   }
 
-  // Clean up empty AND array
-  if ((where.AND as Prisma.ProviderWhereInput[]).length === 0) {
-    delete where.AND;
-  }
+  cleanWhereClause(where);
 
   const [providers, total] = await Promise.all([
     prisma.provider.findMany({
       where,
       take,
       skip,
-      orderBy: [
-        { lastName: 'asc' },
-        { firstName: 'asc' },
-        { organizationName: 'asc' },
-      ],
+      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }, { organizationName: 'asc' }],
     }),
     prisma.provider.count({ where }),
   ]);
 
-  return {
-    providers,
-    total,
-    page,
-    limit: take,
-    totalPages: Math.ceil(total / take),
-  };
+  return { providers, total, page, limit: take, totalPages: Math.ceil(total / take) };
 }
 
 /**
@@ -302,30 +255,21 @@ export async function getProviderAcceptedPlans(
     limit?: number;
   } = {}
 ) {
-  const { status, minConfidence, page = 1, limit = 20 } = options;
-  const take = Math.min(limit, 100);
-  const skip = (page - 1) * take;
+  const { status, minConfidence } = options;
+  const { take, skip, page } = getPaginationValues(options.page, options.limit);
 
   const provider = await prisma.provider.findUnique({
     where: { npi },
     select: { npi: true },
   });
 
-  if (!provider) {
-    return null;
-  }
+  if (!provider) return null;
 
   const where: Prisma.ProviderPlanAcceptanceWhereInput = {
     providerNpi: provider.npi,
+    ...(status && { acceptanceStatus: status }),
+    ...(minConfidence !== undefined && { confidenceScore: { gte: minConfidence } }),
   };
-
-  if (status) {
-    where.acceptanceStatus = status;
-  }
-
-  if (minConfidence !== undefined) {
-    where.confidenceScore = { gte: minConfidence };
-  }
 
   const [acceptances, total] = await Promise.all([
     prisma.providerPlanAcceptance.findMany({
@@ -333,20 +277,12 @@ export async function getProviderAcceptedPlans(
       take,
       skip,
       orderBy: { confidenceScore: 'desc' },
-      include: {
-        plan: true,
-      },
+      include: { plan: true },
     }),
     prisma.providerPlanAcceptance.count({ where }),
   ]);
 
-  return {
-    acceptances,
-    total,
-    page,
-    limit: take,
-    totalPages: Math.ceil(total / take),
-  };
+  return { acceptances, total, page, limit: take, totalPages: Math.ceil(total / take) };
 }
 
 /**

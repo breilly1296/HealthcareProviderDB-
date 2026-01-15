@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
-import { verificationRateLimiter, voteRateLimiter } from '../middleware/rateLimiter';
+import { verificationRateLimiter, voteRateLimiter, defaultRateLimiter } from '../middleware/rateLimiter';
 import {
   submitVerification,
   voteOnVerification,
@@ -117,6 +117,7 @@ router.post(
  */
 router.get(
   '/stats',
+  defaultRateLimiter,
   asyncHandler(async (req, res) => {
     const stats = await getVerificationStats();
 
@@ -135,6 +136,7 @@ router.get(
  */
 router.get(
   '/recent',
+  defaultRateLimiter,
   asyncHandler(async (req, res) => {
     const query = recentQuerySchema.parse(req.query);
 
@@ -160,6 +162,7 @@ router.get(
  */
 router.get(
   '/:npi/:planId',
+  defaultRateLimiter,
   asyncHandler(async (req, res) => {
     const { npi, planId } = pairParamsSchema.parse(req.params);
 

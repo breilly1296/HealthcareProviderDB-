@@ -6,6 +6,7 @@ import prisma from './lib/prisma';
 import routes from './routes';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { defaultRateLimiter } from './middleware/rateLimiter';
+import { requestLogger } from './middleware/requestLogger';
 
 // Load environment variables
 dotenv.config();
@@ -27,6 +28,9 @@ app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
 // Default rate limiter (100 req/min)
 app.use(defaultRateLimiter);
+
+// Request logging (tracks usage without PII)
+app.use(requestLogger);
 
 // Health check endpoint (no rate limit)
 app.get('/health', async (req: Request, res: Response) => {

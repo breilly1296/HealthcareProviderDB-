@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
-import { searchRateLimiter } from '../middleware/rateLimiter';
+import { searchRateLimiter, defaultRateLimiter } from '../middleware/rateLimiter';
 import {
   searchLocations,
   getLocationById,
@@ -83,6 +83,7 @@ router.get(
  */
 router.get(
   '/health-systems',
+  defaultRateLimiter,
   asyncHandler(async (req, res) => {
     const querySchema = z.object({
       state: z.string().length(2).toUpperCase().optional(),
@@ -112,6 +113,7 @@ router.get(
  */
 router.get(
   '/stats/:state',
+  defaultRateLimiter,
   asyncHandler(async (req, res) => {
     const { state } = stateParamSchema.parse(req.params);
 
@@ -133,6 +135,7 @@ router.get(
  */
 router.get(
   '/:locationId',
+  defaultRateLimiter,
   asyncHandler(async (req, res) => {
     const { locationId } = locationIdSchema.parse(req.params);
 
@@ -157,6 +160,7 @@ router.get(
  */
 router.get(
   '/:locationId/providers',
+  defaultRateLimiter,
   asyncHandler(async (req, res) => {
     const { locationId } = locationIdSchema.parse(req.params);
     const query = providersQuerySchema.parse(req.query);

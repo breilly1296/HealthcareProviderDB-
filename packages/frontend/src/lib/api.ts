@@ -1,4 +1,34 @@
+import toast from 'react-hot-toast';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+
+/**
+ * Format seconds into human-readable time
+ */
+function formatRetryTime(seconds: number): string {
+  if (seconds < 60) {
+    return `${seconds} second${seconds !== 1 ? 's' : ''}`;
+  }
+  const minutes = Math.ceil(seconds / 60);
+  if (minutes < 60) {
+    return `${minutes} minute${minutes !== 1 ? 's' : ''}`;
+  }
+  const hours = Math.ceil(minutes / 60);
+  return `${hours} hour${hours !== 1 ? 's' : ''}`;
+}
+
+/**
+ * Build URLSearchParams from object, filtering out undefined/empty values
+ */
+function buildQueryString(params: Record<string, unknown>): string {
+  const searchParams = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== '') {
+      searchParams.set(key, String(value));
+    }
+  });
+  return searchParams.toString();
+}
 
 // Types
 export interface Provider {
@@ -139,8 +169,17 @@ async function fetchApi<T>(
   const data = await response.json();
 
   if (!response.ok) {
+    // Handle rate limiting with toast notification
+    if (response.status === 429) {
+      const retryAfter = data.retryAfter || 60;
+      toast.error(`Rate limit exceeded. Try again in ${formatRetryTime(retryAfter)}.`, {
+        duration: 6000,
+        id: 'rate-limit', // Prevent duplicate toasts
+      });
+    }
+
     throw new ApiError(
-      data.error?.message || 'An error occurred',
+      data.error?.message || data.message || 'An error occurred',
       response.status,
       data.error?.code
     );
@@ -151,7 +190,7 @@ async function fetchApi<T>(
 
 // Provider API
 export const providerApi = {
-  search: async (params: {
+  search: (params: {
     state?: string;
     city?: string;
     cities?: string;
@@ -161,85 +200,33 @@ export const providerApi = {
     name?: string;
     page?: number;
     limit?: number;
-  }) => {
-    const searchParams = new URLSearchParams();
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== '') {
-        searchParams.set(key, String(value));
-      }
-    });
+  }) => fetchApi<{
+    providers: (Provider & { displayName: string })[];
+    pagination: Pagination;
+  }>(`/providers/search?${buildQueryString(params)}`),
 
-    return fetchApi<{
-      providers: (Provider & { displayName: string })[];
-      pagination: Pagination;
-    }>(`/providers/search?${searchParams.toString()}`);
-  },
+  getByNpi: (npi: string) => fetchApi<{
+    provider: Provider & { displayName: string; planAcceptances: PlanAcceptance[] };
+  }>(`/providers/${npi}`),
 
-  getByNpi: async (npi: string) => {
-    return fetchApi<{
-      provider: Provider & {
-        displayName: string;
-        planAcceptances: PlanAcceptance[];
-      };
-    }>(`/providers/${npi}`);
-  },
+  getPlans: (npi: string, params: { status?: string; minConfidence?: number; page?: number; limit?: number } = {}) =>
+    fetchApi<{ npi: string; acceptances: PlanAcceptance[]; pagination: Pagination }>(
+      `/providers/${npi}/plans?${buildQueryString(params)}`
+    ),
 
-  getPlans: async (
-    npi: string,
-    params: {
-      status?: string;
-      minConfidence?: number;
-      page?: number;
-      limit?: number;
-    } = {}
-  ) => {
-    const searchParams = new URLSearchParams();
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined) {
-        searchParams.set(key, String(value));
-      }
-    });
+  getCities: (state: string) => fetchApi<{ state: string; cities: string[]; count: number }>(
+    `/providers/cities?state=${encodeURIComponent(state)}`
+  ),
 
-    return fetchApi<{
-      npi: string;
-      acceptances: PlanAcceptance[];
-      pagination: Pagination;
-    }>(`/providers/${npi}/plans?${searchParams.toString()}`);
-  },
-
-  getCities: async (state: string) => {
-    return fetchApi<{
-      state: string;
-      cities: string[];
-      count: number;
-    }>(`/providers/cities?state=${encodeURIComponent(state)}`);
-  },
-
-  getColocated: async (
-    npi: string,
-    params: {
-      page?: number;
-      limit?: number;
-    } = {}
-  ) => {
-    const searchParams = new URLSearchParams();
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined) {
-        searchParams.set(key, String(value));
-      }
-    });
-
-    return fetchApi<{
-      location: Location;
-      providers: (Provider & { displayName: string })[];
-      pagination: Pagination;
-    }>(`/providers/${npi}/colocated?${searchParams.toString()}`);
-  },
+  getColocated: (npi: string, params: { page?: number; limit?: number } = {}) =>
+    fetchApi<{ location: Location; providers: (Provider & { displayName: string })[]; pagination: Pagination }>(
+      `/providers/${npi}/colocated?${buildQueryString(params)}`
+    ),
 };
 
 // Location API
 export const locationApi = {
-  search: async (params: {
+  search: (params: {
     search?: string;
     state?: string;
     city?: string;
@@ -249,177 +236,86 @@ export const locationApi = {
     minProviders?: number;
     page?: number;
     limit?: number;
-  }) => {
-    const searchParams = new URLSearchParams();
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== '') {
-        searchParams.set(key, String(value));
-      }
-    });
+  }) => fetchApi<{ locations: Location[]; pagination: Pagination }>(
+    `/locations/search?${buildQueryString(params)}`
+  ),
 
-    return fetchApi<{
-      locations: Location[];
-      pagination: Pagination;
-    }>(`/locations/search?${searchParams.toString()}`);
-  },
+  getById: (locationId: number, params: { page?: number; limit?: number } = {}) =>
+    fetchApi<{ location: Location; providers: (Provider & { displayName: string })[]; pagination: Pagination }>(
+      `/locations/${locationId}/providers?${buildQueryString(params)}`
+    ),
 
-  getById: async (locationId: number, params: { page?: number; limit?: number } = {}) => {
-    const searchParams = new URLSearchParams();
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined) {
-        searchParams.set(key, String(value));
-      }
-    });
+  getStats: (state: string) => fetchApi<{
+    state: string;
+    totalLocations: number;
+    totalProviders: number;
+    avgProvidersPerLocation: number;
+    maxProvidersAtLocation: number;
+  }>(`/locations/stats/${encodeURIComponent(state)}`),
 
-    return fetchApi<{
-      location: Location;
-      providers: (Provider & { displayName: string })[];
-      pagination: Pagination;
-    }>(`/locations/${locationId}/providers?${searchParams.toString()}`);
-  },
-
-  getStats: async (state: string) => {
-    return fetchApi<{
-      state: string;
-      totalLocations: number;
-      totalProviders: number;
-      avgProvidersPerLocation: number;
-      maxProvidersAtLocation: number;
-    }>(`/locations/stats/${encodeURIComponent(state)}`);
-  },
-
-  getHealthSystems: async (params?: { state?: string; cities?: string }) => {
-    const searchParams = new URLSearchParams();
-    if (params?.state) {
-      searchParams.set('state', params.state);
-    }
-    if (params?.cities) {
-      searchParams.set('cities', params.cities);
-    }
-
-    const queryString = searchParams.toString();
-    return fetchApi<{
-      healthSystems: string[];
-      count: number;
-    }>(`/locations/health-systems${queryString ? `?${queryString}` : ''}`);
+  getHealthSystems: (params?: { state?: string; cities?: string }) => {
+    const query = buildQueryString(params || {});
+    return fetchApi<{ healthSystems: string[]; count: number }>(
+      `/locations/health-systems${query ? `?${query}` : ''}`
+    );
   },
 };
 
 // Plan API
 export const planApi = {
-  search: async (params: {
+  search: (params: {
     carrierName?: string;
     planType?: string;
     state?: string;
     planYear?: number;
     page?: number;
     limit?: number;
-  }) => {
-    const searchParams = new URLSearchParams();
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== '') {
-        searchParams.set(key, String(value));
-      }
-    });
+  }) => fetchApi<{ plans: InsurancePlan[]; pagination: Pagination }>(
+    `/plans/search?${buildQueryString(params)}`
+  ),
 
-    return fetchApi<{
-      plans: InsurancePlan[];
-      pagination: Pagination;
-    }>(`/plans/search?${searchParams.toString()}`);
-  },
+  getByPlanId: (planId: string) => fetchApi<{ plan: InsurancePlan & { providerCount: number } }>(
+    `/plans/${encodeURIComponent(planId)}`
+  ),
 
-  getByPlanId: async (planId: string) => {
-    return fetchApi<{
-      plan: InsurancePlan & { providerCount: number };
-    }>(`/plans/${encodeURIComponent(planId)}`);
-  },
-
-  getIssuers: async (params: { state?: string; planYear?: number } = {}) => {
-    const searchParams = new URLSearchParams();
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined) {
-        searchParams.set(key, String(value));
-      }
-    });
-
-    return fetchApi<{
-      issuers: { carrierId: string | null; carrierName: string }[];
-      count: number;
-    }>(`/plans/meta/issuers?${searchParams.toString()}`);
-  },
+  getIssuers: (params: { state?: string; planYear?: number } = {}) =>
+    fetchApi<{ issuers: { carrierId: string | null; carrierName: string }[]; count: number }>(
+      `/plans/meta/issuers?${buildQueryString(params)}`
+    ),
 };
 
 // Verification API
 export const verificationApi = {
-  submit: async (data: {
+  submit: (data: {
     npi: string;
     planId: string;
     acceptsInsurance: boolean;
     acceptsNewPatients?: boolean;
     notes?: string;
     submittedBy?: string;
-  }) => {
-    return fetchApi<{
-      verification: Verification;
-      acceptance: PlanAcceptance;
-      message: string;
-    }>('/verify', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
+  }) => fetchApi<{ verification: Verification; acceptance: PlanAcceptance; message: string }>('/verify', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
 
-  vote: async (verificationId: string, vote: 'up' | 'down') => {
-    return fetchApi<{
-      verification: {
-        id: string;
-        upvotes: number;
-        downvotes: number;
-        netVotes: number;
-      };
-      message: string;
-    }>(`/verify/${verificationId}/vote`, {
-      method: 'POST',
-      body: JSON.stringify({ vote }),
-    });
-  },
+  vote: (verificationId: string, vote: 'up' | 'down') =>
+    fetchApi<{ verification: { id: string; upvotes: number; downvotes: number; netVotes: number }; message: string }>(
+      `/verify/${verificationId}/vote`,
+      { method: 'POST', body: JSON.stringify({ vote }) }
+    ),
 
-  getStats: async () => {
-    return fetchApi<{
-      stats: {
-        total: number;
-        approved: number;
-        pending: number;
-        recentCount: number;
-      };
-    }>('/verify/stats');
-  },
+  getStats: () => fetchApi<{ stats: { total: number; approved: number; pending: number; recentCount: number } }>(
+    '/verify/stats'
+  ),
 
-  getRecent: async (params: { limit?: number; npi?: string; planId?: string } = {}) => {
-    const searchParams = new URLSearchParams();
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined) {
-        searchParams.set(key, String(value));
-      }
-    });
+  getRecent: (params: { limit?: number; npi?: string; planId?: string } = {}) =>
+    fetchApi<{ verifications: Verification[]; count: number }>(`/verify/recent?${buildQueryString(params)}`),
 
-    return fetchApi<{
-      verifications: Verification[];
-      count: number;
-    }>(`/verify/recent?${searchParams.toString()}`);
-  },
-
-  getForPair: async (npi: string, planId: string) => {
-    return fetchApi<{
-      npi: string;
-      planId: string;
-      acceptance: PlanAcceptance | null;
-      verifications: Verification[];
-      summary: {
-        totalVerifications: number;
-        totalUpvotes: number;
-        totalDownvotes: number;
-      };
-    }>(`/verify/${npi}/${encodeURIComponent(planId)}`);
-  },
+  getForPair: (npi: string, planId: string) => fetchApi<{
+    npi: string;
+    planId: string;
+    acceptance: PlanAcceptance | null;
+    verifications: Verification[];
+    summary: { totalVerifications: number; totalUpvotes: number; totalDownvotes: number };
+  }>(`/verify/${npi}/${encodeURIComponent(planId)}`),
 };

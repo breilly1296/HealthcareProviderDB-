@@ -1,5 +1,6 @@
 import { Prisma, PlanType, MetalLevel, MarketType } from '@prisma/client';
 import prisma from '../lib/prisma';
+import { getPaginationValues } from './utils';
 
 export interface PlanSearchParams {
   carrierName?: string;
@@ -25,71 +26,30 @@ export interface PlanSearchResult {
  * Search insurance plans with filters and pagination
  */
 export async function searchPlans(params: PlanSearchParams): Promise<PlanSearchResult> {
-  const {
-    carrierName,
-    planType,
-    metalLevel,
-    marketType,
-    state,
-    planYear,
-    isActive = true,
-    page = 1,
-    limit = 20,
-  } = params;
+  const { carrierName, planType, metalLevel, marketType, state, planYear, isActive = true } = params;
+  const { take, skip, page } = getPaginationValues(params.page, params.limit);
 
-  const take = Math.min(limit, 100);
-  const skip = (page - 1) * take;
-
-  const where: Prisma.InsurancePlanWhereInput = {};
-
-  if (isActive !== undefined) {
-    where.isActive = isActive;
-  }
-
-  if (carrierName) {
-    where.carrierName = { contains: carrierName, mode: 'insensitive' };
-  }
-
-  if (planType) {
-    where.planType = planType;
-  }
-
-  if (metalLevel) {
-    where.metalLevel = metalLevel;
-  }
-
-  if (marketType) {
-    where.marketType = marketType;
-  }
-
-  if (state) {
-    where.statesCovered = { has: state.toUpperCase() };
-  }
-
-  if (planYear) {
-    where.planYear = planYear;
-  }
+  const where: Prisma.InsurancePlanWhereInput = {
+    ...(isActive !== undefined && { isActive }),
+    ...(carrierName && { carrierName: { contains: carrierName, mode: 'insensitive' as const } }),
+    ...(planType && { planType }),
+    ...(metalLevel && { metalLevel }),
+    ...(marketType && { marketType }),
+    ...(state && { statesCovered: { has: state.toUpperCase() } }),
+    ...(planYear && { planYear }),
+  };
 
   const [plans, total] = await Promise.all([
     prisma.insurancePlan.findMany({
       where,
       take,
       skip,
-      orderBy: [
-        { carrierName: 'asc' },
-        { planName: 'asc' },
-      ],
+      orderBy: [{ carrierName: 'asc' }, { planName: 'asc' }],
     }),
     prisma.insurancePlan.count({ where }),
   ]);
 
-  return {
-    plans,
-    total,
-    page,
-    limit: take,
-    totalPages: Math.ceil(total / take),
-  };
+  return { plans, total, page, limit: take, totalPages: Math.ceil(total / take) };
 }
 
 /**

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { PlanType, MetalLevel, MarketType } from '@prisma/client';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
-import { searchRateLimiter } from '../middleware/rateLimiter';
+import { searchRateLimiter, defaultRateLimiter } from '../middleware/rateLimiter';
 import {
   searchPlans,
   getPlanByPlanId,
@@ -80,6 +80,7 @@ router.get(
  */
 router.get(
   '/meta/issuers',
+  defaultRateLimiter,
   asyncHandler(async (req, res) => {
     const query = issuersQuerySchema.parse(req.query);
 
@@ -105,6 +106,7 @@ router.get(
  */
 router.get(
   '/meta/types',
+  defaultRateLimiter,
   asyncHandler(async (req, res) => {
     const query = issuersQuerySchema.parse(req.query);
 
@@ -129,6 +131,7 @@ router.get(
  */
 router.get(
   '/meta/years',
+  defaultRateLimiter,
   asyncHandler(async (req, res) => {
     const query = z.object({
       isActive: z.coerce.boolean().optional(),
@@ -154,6 +157,7 @@ router.get(
  */
 router.get(
   '/:planId',
+  defaultRateLimiter,
   asyncHandler(async (req, res) => {
     const { planId } = planIdParamSchema.parse(req.params);
 

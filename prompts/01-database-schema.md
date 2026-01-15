@@ -35,20 +35,24 @@ priority: 1
 - [ ] Public data accessible without RLS
 
 ### 3. Core Tables
-- [ ] `Provider` - NPI registry data (name, address, specialty)
+- [ ] `Provider` - NPI registry data (name, address, specialty, locationId)
+- [ ] `Location` - Physical locations (hospitals, offices, clinics) - **NEW Jan 2026**
 - [ ] `InsurancePlan` - Plan metadata (name, issuer, state)
 - [ ] `ProviderPlanAcceptance` - Acceptance status + confidence score
-- [ ] `Verification` - Anonymous user verifications
-- [ ] `VerificationVote` - Upvotes/downvotes on verifications
+- [ ] `VerificationLog` - Anonymous user verifications with upvotes/downvotes
 - [ ] `SyncLog` - Data import tracking
 
 ### 4. Indexes
 - [ ] Compound indexes exist for common query patterns:
   - `Provider(state, city, specialtyPrimary)` - geographic search
   - `Provider(specialtyPrimary, state)` - specialty search
+  - `Provider(locationId)` - location lookup - **NEW**
   - `ProviderPlanAcceptance(npi, planId)` - acceptance lookup
   - `ProviderPlanAcceptance(confidenceScore)` - quality filtering
-  - `Verification(npi, planId, createdAt)` - recent verifications
+  - `VerificationLog(providerNpi, createdAt)` - recent verifications
+  - `Location(state)` - state-based location search - **NEW**
+  - `Location(city, state)` - city-based location search - **NEW**
+  - `Location(zipCode)` - ZIP-based location search - **NEW**
 - [ ] No missing indexes on foreign keys
 
 ### 5. Data Quality Fields
@@ -56,6 +60,14 @@ priority: 1
 - [ ] Source tracking (CMS_DATA, USER_VERIFIED, INSURER_API)
 - [ ] Timestamp fields (createdAt, updatedAt, lastVerified)
 - [ ] Verification count tracking
+
+### 5b. Location Model Fields (NEW Jan 2026)
+- [ ] `Location` table groups providers by shared address
+- [ ] Address components: addressLine1, addressLine2, city, state, zipCode
+- [ ] Location details: name, healthSystem, facilityType
+- [ ] providerCount - denormalized count for performance
+- [ ] Unique constraint on (addressLine1, city, state, zipCode)
+- [ ] Provider → Location relationship via locationId
 
 ### 6. Migration Safety
 - [ ] No destructive migrations without data backup plan

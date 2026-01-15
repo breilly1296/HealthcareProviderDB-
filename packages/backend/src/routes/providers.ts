@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
-import { searchRateLimiter } from '../middleware/rateLimiter';
+import { searchRateLimiter, defaultRateLimiter } from '../middleware/rateLimiter';
 import {
   searchProviders,
   getProviderByNpi,
@@ -89,6 +89,7 @@ router.get(
  */
 router.get(
   '/cities',
+  defaultRateLimiter,
   asyncHandler(async (req, res) => {
     const stateSchema = z.object({
       state: z.string().length(2).toUpperCase(),
@@ -114,6 +115,7 @@ router.get(
  */
 router.get(
   '/:npi',
+  defaultRateLimiter,
   asyncHandler(async (req, res) => {
     const { npi } = npiParamSchema.parse(req.params);
 
@@ -149,6 +151,7 @@ router.get(
  */
 router.get(
   '/:npi/plans',
+  defaultRateLimiter,
   asyncHandler(async (req, res) => {
     const { npi } = npiParamSchema.parse(req.params);
     const query = plansQuerySchema.parse(req.query);
@@ -194,6 +197,7 @@ router.get(
  */
 router.get(
   '/:npi/colocated',
+  defaultRateLimiter,
   asyncHandler(async (req, res) => {
     const { npi } = npiParamSchema.parse(req.params);
     const query = plansQuerySchema.parse(req.query);

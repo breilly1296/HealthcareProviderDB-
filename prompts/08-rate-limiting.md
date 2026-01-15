@@ -2,39 +2,38 @@
 tags:
   - security
   - critical
-  - urgent
 type: prompt
 priority: 1
 ---
 
-# Rate Limiting Review (CRITICAL VULNERABILITY)
+# Rate Limiting Review
 
-## ⚠️ URGENT SECURITY ISSUE ⚠️
+## ✅ Tier 1 IMPLEMENTED (January 2026)
 
-**ZeroPath Security Scan Finding:**
+**ZeroPath Security Scan Finding (RESOLVED):**
 - **Severity:** Medium (CVSS 7.1)
-- **File:** `packages/backend/src/api/routes.ts` (lines 348-515)
+- **Original File:** `packages/backend/src/api/routes.ts` (removed)
 - **Issue:** Unauthenticated verification endpoints with NO rate limiting
 - **Risk:** Spam attacks can poison database, undermine crowdsource moat
-- **Status:** **BLOCKING BETA LAUNCH**
+- **Status:** **FIXED** - Tier 1 IP-based rate limiting deployed
 
 ## Files to Review
-- `packages/backend/src/api/routes.ts` (vulnerable endpoints)
-- `packages/backend/src/middleware/` (check if rate limiter exists)
-- `packages/backend/package.json` (check for express-rate-limit)
+- `packages/backend/src/routes/verify.ts` (verification endpoints)
+- `packages/backend/src/routes/providers.ts` (provider endpoints)
+- `packages/backend/src/middleware/rateLimiter.ts` (rate limiter implementation)
 
 ## VerifyMyProvider Rate Limiting Strategy
-- **Current:** NO rate limiting implemented
-- **Problem:** Attackers can spam unlimited verifications
-- **Solution:** Tiered rate limiting (IP → fingerprint → account-based)
+- **Current:** Tier 1 IP-based rate limiting IMPLEMENTED
+- **Implementation:** Custom middleware in `rateLimiter.ts`
+- **Next:** Tier 2 (fingerprinting, CAPTCHA) for additional protection
 
 ## Checklist
 
-### 1. Vulnerable Endpoints Identified
-- [ ] `POST /providers/:npi/verify` - Submit verification (UNLIMITED)
-- [ ] `POST /verifications/:id/vote` - Upvote/downvote (UNLIMITED)
-- [ ] `GET /providers/search` - Provider search (UNLIMITED, less critical)
-- [ ] `GET /providers/:npi` - Provider detail (UNLIMITED, less critical)
+### 1. Endpoints - Rate Limiting Status
+- [x] `POST /api/v1/verify` - Submit verification (10/hour via `verificationRateLimiter`)
+- [x] `POST /api/v1/verify/:id/vote` - Upvote/downvote (10/hour via `voteRateLimiter`)
+- [x] `GET /api/v1/providers/search` - Provider search (100/hour via `searchRateLimiter`)
+- [x] `GET /api/v1/providers/:npi` - Provider detail (200/hour via `defaultRateLimiter`)
 
 ### 2. Attack Scenarios
 - [ ] **Competitor sabotage:** Flood fake "doesn't accept" verifications
@@ -49,43 +48,50 @@ priority: 1
 - [ ] Destroys competitive moat (crowdsource verification becomes worthless)
 - [ ] Users lose trust in platform
 
-### 4. Tier 1 Implementation (IMMEDIATE - Before Launch)
+### 4. Tier 1 Implementation ✅ COMPLETE
 
-**Install Dependencies:**
-```bash
-cd packages/backend
-npm install express-rate-limit --save
-```
+**Implementation:** Custom rate limiter in `packages/backend/src/middleware/rateLimiter.ts`
 
-**Basic IP-Based Rate Limiting:**
+**Current Limits (as of January 2026):**
 ```typescript
-import rateLimit from 'express-rate-limit';
-
-// Strict limit for verifications
-const verifyLimiter = rateLimit({
+// From rateLimiter.ts - IMPLEMENTED
+export const verificationRateLimiter = createRateLimiter({
+  name: 'verification',
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 10, // 10 verifications per hour per IP
-  message: 'Too many verifications, please try again later',
-  standardHeaders: true,
-  legacyHeaders: false,
+  maxRequests: 10,
+  message: "You've submitted too many verifications. Please try again in 1 hour.",
 });
 
-// Moderate limit for votes
-const voteLimiter = rateLimit({
+export const voteRateLimiter = createRateLimiter({
+  name: 'vote',
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 20, // 20 votes per hour per IP
-  message: 'Too many votes, please try again later',
+  maxRequests: 10,
+  message: "You've submitted too many votes. Please try again in 1 hour.",
 });
 
-// Apply to vulnerable endpoints
-app.post('/providers/:npi/verify', verifyLimiter, verifyHandler);
-app.post('/verifications/:id/vote', voteLimiter, voteHandler);
+export const searchRateLimiter = createRateLimiter({
+  name: 'search',
+  windowMs: 60 * 60 * 1000, // 1 hour
+  maxRequests: 100,
+});
+
+export const defaultRateLimiter = createRateLimiter({
+  name: 'default',
+  windowMs: 60 * 60 * 1000, // 1 hour
+  maxRequests: 200,
+});
 ```
 
-**Questions:**
-- [ ] What's the timeline for implementing this? (URGENT)
-- [ ] Should we start more restrictive (5/hour) and loosen later?
-- [ ] Should search endpoints also be rate limited?
+**Applied in routes:**
+- `verify.ts`: Uses `verificationRateLimiter` and `voteRateLimiter`
+- `providers.ts`: Uses `searchRateLimiter` for search endpoints
+
+**Features implemented:**
+- [x] IP-based rate limiting
+- [x] Standard rate limit headers (X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset)
+- [x] Retry-After header on 429 responses
+- [x] Automatic cleanup of old entries (every 60 seconds)
+- [x] Skip function support for bypassing limits when needed
 
 ### 5. Tier 2 Implementation (Beta Launch)
 
@@ -154,12 +160,12 @@ const verifyLimiter = rateLimit({
 
 ### 7. Endpoint-Specific Limits
 
-| Endpoint | Current | Tier 1 Target | Tier 2 Target | Tier 3 Target |
-|----------|---------|---------------|---------------|---------------|
-| POST /providers/:npi/verify | ∞ | 10/hour | 5/hour + CAPTCHA | 5-20/hour (graduated) |
-| POST /verifications/:id/vote | ∞ | 20/hour | 10/hour | 10-30/hour (graduated) |
-| GET /providers/search | ∞ | 100/hour | 200/hour | Lenient |
-| GET /providers/:npi | ∞ | 200/hour | 500/hour | Lenient |
+| Endpoint | Tier 1 (Current) | Tier 2 Target | Tier 3 Target |
+|----------|------------------|---------------|---------------|
+| POST /api/v1/verify | ✅ 10/hour | 5/hour + CAPTCHA | 5-20/hour (graduated) |
+| POST /api/v1/verify/:id/vote | ✅ 10/hour | 10/hour + fingerprint | 10-30/hour (graduated) |
+| GET /api/v1/providers/search | ✅ 100/hour | 200/hour | Lenient |
+| GET /api/v1/providers/:npi | ✅ 200/hour | 500/hour | Lenient |
 
 ### 8. Monitoring & Alerts
 - [ ] Track rate limit hits in logs
@@ -203,26 +209,28 @@ const verifyLimiter = rateLimit({
 
 8. **How do we test this works without breaking production?**
 
-## Implementation Priority
+## Implementation Status
 
-**TODAY (2-4 hours):**
-- [ ] Install express-rate-limit
-- [ ] Add basic IP-based limits to verification endpoints
-- [ ] Test locally
-- [ ] Deploy to production
-- [ ] Verify rate limiting works
+**Tier 1 ✅ COMPLETE (January 2026):**
+- [x] Custom rate limiter middleware created
+- [x] IP-based limits on verification endpoints
+- [x] IP-based limits on vote endpoints
+- [x] IP-based limits on search endpoints
+- [x] Deployed to production
+- [x] Rate limiting verified working
 
-**THIS WEEK (1-2 days):**
-- [ ] Add fingerprinting
+**Tier 2 - NEXT PRIORITIES:**
+- [ ] Add fingerprinting (IP + User Agent)
 - [ ] Tighten limits based on observed traffic
-- [ ] Add monitoring dashboard
+- [ ] Add monitoring/logging for rate limit hits
 - [ ] Document rate limits in API docs
 
-**BEFORE BETA LAUNCH (1-2 weeks):**
+**Tier 3 - FUTURE (requires authentication):**
 - [ ] Add CAPTCHA integration
 - [ ] Implement allowlist for trusted IPs
 - [ ] Create admin panel to view blocked attempts
-- [ ] Run penetration test (try to spam yourself)
+- [ ] Run penetration test
+- [ ] User account-based limits
 
 ## Related Issues
 - [ ] Need authentication (03-authentication) for Tier 3
