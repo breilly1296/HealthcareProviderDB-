@@ -36,6 +36,15 @@ export interface VerificationStats {
 }
 
 /**
+ * Strip PII fields from verification object before returning in API responses
+ * Security: Prevents exposure of sourceIp, userAgent, submittedBy
+ */
+function stripVerificationPII<T extends Record<string, unknown>>(verification: T): Omit<T, 'sourceIp' | 'userAgent' | 'submittedBy'> {
+  const { sourceIp, userAgent, submittedBy, ...safe } = verification;
+  return safe;
+}
+
+/**
  * Submit a new verification
  * Research-based: Captures binary verification data for expert-level accuracy
  */
@@ -214,7 +223,7 @@ export async function submitVerification(input: SubmitVerificationInput) {
   }
 
   return {
-    verification,
+    verification: stripVerificationPII(verification),
     acceptance,
   };
 }
@@ -258,7 +267,7 @@ export async function voteOnVerification(
     }
   }
 
-  return verification;
+  return stripVerificationPII(verification);
 }
 
 /**
@@ -326,11 +335,27 @@ export async function getRecentVerifications(options: {
     }
   }
 
+  // Security: Exclude PII fields (sourceIp, userAgent, submittedBy)
   return prisma.verificationLog.findMany({
     where,
     take: Math.min(limit, 100),
     orderBy: { createdAt: 'desc' },
-    include: {
+    select: {
+      id: true,
+      providerNpi: true,
+      planId: true,
+      acceptanceId: true,
+      verificationType: true,
+      verificationSource: true,
+      previousValue: true,
+      newValue: true,
+      notes: true,
+      evidenceUrl: true,
+      isApproved: true,
+      createdAt: true,
+      upvotes: true,
+      downvotes: true,
+      // Exclude: sourceIp, userAgent, submittedBy
       provider: {
         select: {
           npi: true,
@@ -378,6 +403,7 @@ export async function getVerificationsForPair(npi: string, planId: string) {
         },
       },
     }),
+    // Security: Exclude PII fields (sourceIp, userAgent, submittedBy)
     prisma.verificationLog.findMany({
       where: {
         providerNpi: provider.npi,
@@ -385,6 +411,23 @@ export async function getVerificationsForPair(npi: string, planId: string) {
       },
       orderBy: { createdAt: 'desc' },
       take: 50,
+      select: {
+        id: true,
+        providerNpi: true,
+        planId: true,
+        acceptanceId: true,
+        verificationType: true,
+        verificationSource: true,
+        previousValue: true,
+        newValue: true,
+        notes: true,
+        evidenceUrl: true,
+        isApproved: true,
+        createdAt: true,
+          upvotes: true,
+        downvotes: true,
+        // Exclude: sourceIp, userAgent, submittedBy
+      },
     }),
   ]);
 
