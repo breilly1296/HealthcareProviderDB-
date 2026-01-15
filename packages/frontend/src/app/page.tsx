@@ -8,13 +8,13 @@ export default function HomePage() {
         <div className="container-wide text-center">
           {/* Research Badge */}
           <div className="inline-flex flex-wrap items-center justify-center gap-2 bg-white px-3 sm:px-4 py-2 rounded-full shadow-sm border border-primary-200 mb-6">
-            <span className="text-xl sm:text-2xl">📚</span>
+            <span className="text-xl sm:text-2xl leading-none">📚</span>
             <span className="text-xs sm:text-sm font-medium text-gray-700">
               Backed by peer-reviewed research
             </span>
             <Link
               href="/research"
-              className="text-xs sm:text-sm font-medium text-primary-600 hover:text-primary-700 whitespace-nowrap"
+              className="inline-flex items-center text-xs sm:text-sm font-medium text-primary-600 hover:text-primary-700 whitespace-nowrap"
             >
               Learn more →
             </Link>
