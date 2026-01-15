@@ -1,5 +1,4 @@
 import { Request, Response, NextFunction } from 'express';
-import { AppError } from './errorHandler';
 
 interface RateLimitEntry {
   count: number;
@@ -13,6 +12,7 @@ interface RateLimitStore {
 interface RateLimiterOptions {
   windowMs: number;
   maxRequests: number;
+  name?: string; // Unique name for this limiter's store
   message?: string;
   keyGenerator?: (req: Request) => string;
   skip?: (req: Request) => boolean;
@@ -43,12 +43,13 @@ export function createRateLimiter(options: RateLimiterOptions) {
   const {
     windowMs,
     maxRequests,
-    message = 'Too many requests, please try again later',
+    name,
+    message = 'Too many requests, please try again later.',
     keyGenerator = (req: Request) => req.ip || 'unknown',
     skip = () => false,
   } = options;
 
-  const storeName = `${windowMs}-${maxRequests}`;
+  const storeName = name || `${windowMs}-${maxRequests}`;
   if (!stores.has(storeName)) {
     stores.set(storeName, {});
   }
@@ -77,15 +78,20 @@ export function createRateLimiter(options: RateLimiterOptions) {
 
     // Set rate limit headers
     const remaining = Math.max(0, maxRequests - entry.count);
-    const resetSeconds = Math.ceil((entry.resetAt - now) / 1000);
+    const resetTimestamp = Math.ceil(entry.resetAt / 1000); // Unix timestamp
+    const retryAfterSeconds = Math.ceil((entry.resetAt - now) / 1000);
 
     res.setHeader('X-RateLimit-Limit', maxRequests);
     res.setHeader('X-RateLimit-Remaining', remaining);
-    res.setHeader('X-RateLimit-Reset', resetSeconds);
+    res.setHeader('X-RateLimit-Reset', resetTimestamp);
 
     if (entry.count > maxRequests) {
-      res.setHeader('Retry-After', resetSeconds);
-      next(AppError.tooManyRequests(message, 'RATE_LIMIT_EXCEEDED'));
+      res.setHeader('Retry-After', retryAfterSeconds);
+      res.status(429).json({
+        error: 'Too many requests',
+        message: message,
+        retryAfter: retryAfterSeconds,
+      });
       return;
     }
 
@@ -94,28 +100,41 @@ export function createRateLimiter(options: RateLimiterOptions) {
 }
 
 /**
- * Default rate limiter: 100 requests per minute
+ * Default rate limiter for general GET routes: 200 requests per hour
  */
 export const defaultRateLimiter = createRateLimiter({
-  windowMs: 60 * 1000, // 1 minute
-  maxRequests: 100,
-  message: 'Too many requests, please try again in a minute',
+  name: 'default',
+  windowMs: 60 * 60 * 1000, // 1 hour
+  maxRequests: 200,
+  message: 'Too many requests. Please try again in 1 hour.',
 });
 
 /**
  * Strict rate limiter for verification endpoints: 10 requests per hour
  */
 export const verificationRateLimiter = createRateLimiter({
+  name: 'verification',
   windowMs: 60 * 60 * 1000, // 1 hour
   maxRequests: 10,
-  message: 'Too many verification submissions, please try again in an hour',
+  message: "You've submitted too many verifications. Please try again in 1 hour.",
 });
 
 /**
- * Search rate limiter: 30 requests per minute
+ * Strict rate limiter for vote endpoints: 10 requests per hour
+ */
+export const voteRateLimiter = createRateLimiter({
+  name: 'vote',
+  windowMs: 60 * 60 * 1000, // 1 hour
+  maxRequests: 10,
+  message: "You've submitted too many votes. Please try again in 1 hour.",
+});
+
+/**
+ * Search rate limiter: 100 requests per hour
  */
 export const searchRateLimiter = createRateLimiter({
-  windowMs: 60 * 1000, // 1 minute
-  maxRequests: 30,
-  message: 'Too many search requests, please slow down',
+  name: 'search',
+  windowMs: 60 * 60 * 1000, // 1 hour
+  maxRequests: 100,
+  message: 'Too many search requests. Please try again in 1 hour.',
 });

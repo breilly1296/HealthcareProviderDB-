@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
-import { verificationRateLimiter } from '../middleware/rateLimiter';
+import { verificationRateLimiter, voteRateLimiter } from '../middleware/rateLimiter';
 import {
   submitVerification,
   voteOnVerification,
@@ -89,6 +89,7 @@ router.post(
  */
 router.post(
   '/:verificationId/vote',
+  voteRateLimiter,
   asyncHandler(async (req, res) => {
     const { verificationId } = verificationIdParamSchema.parse(req.params);
     const { vote } = voteSchema.parse(req.body);
