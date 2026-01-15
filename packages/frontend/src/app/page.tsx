@@ -4,7 +4,7 @@ export default function HomePage() {
   return (
     <div>
       {/* Hero Section */}
-      <section className="bg-gradient-to-b from-primary-50 to-white py-16 md:py-24">
+      <section className="bg-gradient-to-b from-primary-50 to-white py-10 md:py-24">
         <div className="container-wide text-center">
           {/* Research Badge */}
           <div className="inline-flex flex-wrap items-center justify-center gap-2 bg-white px-3 sm:px-4 py-2 rounded-full shadow-sm border border-primary-200 mb-6">
@@ -24,7 +24,7 @@ export default function HomePage() {
             Insurance Directories Are Wrong
             <span className="text-primary-600"> 46% of the Time</span>
           </h1>
-          <p className="text-lg sm:text-xl text-gray-600 max-w-3xl mx-auto mb-8 px-4">
+          <p className="text-lg sm:text-xl text-gray-600 max-w-3xl mx-auto mb-6 md:mb-8 px-4">
             <strong className="text-gray-900">Patients face 4x more surprise bills</strong> when directories are inaccurate.
             We fix that with crowdsourced verification backed by peer-reviewed research.
           </p>
@@ -38,7 +38,7 @@ export default function HomePage() {
           </div>
 
           {/* Research-Backed Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-16 max-w-4xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 mt-10 md:mt-16 max-w-4xl mx-auto">
             <div className="text-center">
               <div className="text-4xl font-bold text-primary-600">46%</div>
               <div className="text-gray-600 mt-2">Directory Inaccuracy Rate</div>
