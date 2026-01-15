@@ -21,37 +21,47 @@ export default function HomePage() {
           </div>
 
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-6 px-4">
-            Insurance Directories Are Wrong
-            <span className="text-primary-600"> 46% of the Time</span>
+            Find Providers Who Actually
+            <span className="text-primary-600"> Accept Your Insurance</span>
           </h1>
           <p className="text-lg sm:text-xl text-gray-600 max-w-3xl mx-auto mb-6 md:mb-8 px-4">
-            <strong className="text-gray-900">Patients face 4x more surprise bills</strong> when directories are inaccurate.
-            We fix that with crowdsourced verification backed by peer-reviewed research.
+            Verified by real patients. Backed by peer-reviewed research.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center px-4">
             <Link href="/search" className="btn-primary text-base sm:text-lg px-6 sm:px-8 py-3 sm:py-4">
-              Find Verified Providers
+              Search Providers
             </Link>
-            <Link href="/research" className="btn-outline text-base sm:text-lg px-6 sm:px-8 py-3 sm:py-4">
-              See the research →
+            <Link href="#how-it-works" className="btn-outline text-base sm:text-lg px-6 sm:px-8 py-3 sm:py-4">
+              How it works →
             </Link>
           </div>
+        </div>
+      </section>
 
-          {/* Research-Backed Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 mt-10 md:mt-16 max-w-4xl mx-auto">
-            <div className="text-center">
-              <div className="text-4xl font-bold text-primary-600">46%</div>
-              <div className="text-gray-600 mt-2">Directory Inaccuracy Rate</div>
+      {/* The Problem Section */}
+      <section className="py-12 md:py-16 bg-white border-b border-gray-100">
+        <div className="container-wide">
+          <h2 className="text-2xl md:text-3xl font-bold text-center text-gray-900 mb-4">
+            Why This Matters
+          </h2>
+          <p className="text-lg text-gray-600 text-center max-w-2xl mx-auto mb-10">
+            Insurance directories are notoriously unreliable, leaving patients with unexpected bills
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 max-w-4xl mx-auto">
+            <div className="text-center p-6 rounded-xl bg-red-50 border border-red-100">
+              <div className="text-4xl font-bold text-red-600">46%</div>
+              <div className="text-gray-700 mt-2 font-medium">Directory Inaccuracy Rate</div>
               <div className="text-xs text-gray-500 mt-1">Haeder et al., 2024</div>
             </div>
-            <div className="text-center">
-              <div className="text-4xl font-bold text-primary-600">4x</div>
-              <div className="text-gray-600 mt-2">More Surprise Bills</div>
+            <div className="text-center p-6 rounded-xl bg-amber-50 border border-amber-100">
+              <div className="text-4xl font-bold text-amber-600">4x</div>
+              <div className="text-gray-700 mt-2 font-medium">More Surprise Bills</div>
               <div className="text-xs text-gray-500 mt-1">Health Affairs Scholar</div>
             </div>
-            <div className="text-center">
-              <div className="text-4xl font-bold text-primary-600">κ=0.58</div>
-              <div className="text-gray-600 mt-2">Expert-Level Accuracy</div>
+            <div className="text-center p-6 rounded-xl bg-green-50 border border-green-100">
+              <div className="text-4xl font-bold text-green-600">κ=0.58</div>
+              <div className="text-gray-700 mt-2 font-medium">Our Expert-Level Accuracy</div>
               <div className="text-xs text-gray-500 mt-1">Mortensen et al., 2015</div>
             </div>
           </div>
