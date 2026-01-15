@@ -49,7 +49,7 @@ export default function ProviderDetailPage() {
       // Track provider view
       trackProviderView({
         npi,
-        specialty: result.provider.specialtyCategory || result.provider.taxonomyDescription,
+        specialty: result.provider.specialtyCategory || result.provider.taxonomyDescription || undefined,
         providerName: result.provider.displayName,
       });
     } catch (err) {
