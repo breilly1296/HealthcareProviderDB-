@@ -114,6 +114,7 @@ jobs:
           docker build \
             -f packages/frontend/Dockerfile \
             --build-arg NEXT_PUBLIC_API_URL=${{ needs.deploy-backend.outputs.backend_url }}/api/v1 \
+            --build-arg NEXT_PUBLIC_POSTHOG_KEY=${{ secrets.NEXT_PUBLIC_POSTHOG_KEY }} \
             -t us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/verifymyprovider/${{ env.FRONTEND_SERVICE }}:${{ github.sha }} \
             -t us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/verifymyprovider/${{ env.FRONTEND_SERVICE }}:latest \
             .

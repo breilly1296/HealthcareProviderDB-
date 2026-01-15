@@ -45,6 +45,9 @@ RUN cd packages/shared && npm run build
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 
+ARG NEXT_PUBLIC_POSTHOG_KEY
+ENV NEXT_PUBLIC_POSTHOG_KEY=${NEXT_PUBLIC_POSTHOG_KEY}
+
 # Install dependencies in builder (to get .bin symlinks)
 RUN npm install --force
 ENV NEXT_TELEMETRY_DISABLED=1
