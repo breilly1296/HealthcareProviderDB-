@@ -159,10 +159,26 @@ export async function submitVerification(input: SubmitVerificationInput) {
       downvotes,
     });
 
+    // Security fix: Only change acceptanceStatus when consensus is reached
+    // Requires: verificationCount >= 3, score >= 60, and clear majority (2:1 ratio)
+    const hasClearMajority = upvotes > downvotes * 2 || downvotes > upvotes * 2;
+    const shouldUpdateStatus = verificationCount >= 3 && score >= 60 && hasClearMajority;
+
+    let finalStatus: string;
+    if (shouldUpdateStatus) {
+      // Consensus reached - update status based on majority
+      finalStatus = upvotes > downvotes ? 'ACCEPTED' : 'NOT_ACCEPTED';
+    } else {
+      // No consensus - keep existing status, or set to PENDING if currently UNKNOWN
+      finalStatus = acceptance.acceptanceStatus === 'UNKNOWN'
+        ? 'PENDING'
+        : acceptance.acceptanceStatus;
+    }
+
     acceptance = await prisma.providerPlanAcceptance.update({
       where: { id: acceptance.id },
       data: {
-        acceptanceStatus: newStatus,
+        acceptanceStatus: finalStatus,
         lastVerified: new Date(),
         verificationCount,
         confidenceScore: score,
@@ -177,11 +193,13 @@ export async function submitVerification(input: SubmitVerificationInput) {
       downvotes: 0,
     });
 
+    // Security fix: First verification cannot set ACCEPTED/NOT_ACCEPTED
+    // Status starts as PENDING until consensus threshold is reached
     acceptance = await prisma.providerPlanAcceptance.create({
       data: {
         providerNpi: provider.npi,
         planId: plan.id,
-        acceptanceStatus: newStatus,
+        acceptanceStatus: 'PENDING',
         lastVerified: new Date(),
         verificationCount: 1,
         confidenceScore: score,
