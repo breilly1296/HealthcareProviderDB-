@@ -108,7 +108,7 @@ app.listen(PORT, () => {
   Open in browser:  http://localhost:${PORT}
 
   Using mock data - no database required.
-  To use real database, set DATABASE_URL and switch to routes.ts
+  For production use, see packages/backend/
   `);
 });
 
