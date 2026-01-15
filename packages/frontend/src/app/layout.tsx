@@ -63,7 +63,7 @@ function Footer() {
   return (
     <footer className="bg-gray-50 border-t border-gray-200 mt-auto">
       <div className="container-wide py-12">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* About */}
           <div>
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
@@ -98,6 +98,25 @@ function Footer() {
             </ul>
           </div>
 
+          {/* Legal */}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Legal
+            </h3>
+            <ul className="space-y-2">
+              <li>
+                <Link href="/terms" className="text-gray-600 hover:text-primary-600">
+                  Terms of Service
+                </Link>
+              </li>
+              <li>
+                <Link href="/privacy" className="text-gray-600 hover:text-primary-600">
+                  Privacy Policy
+                </Link>
+              </li>
+            </ul>
+          </div>
+
           {/* OwnMyHealth */}
           <div>
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
@@ -122,6 +141,11 @@ function Footer() {
           <p className="mt-2 text-sm">
             Data sourced from CMS NPPES and community verifications.
             Always confirm with providers directly.
+          </p>
+          <p className="mt-2 text-sm">
+            <Link href="/terms" className="hover:text-primary-600">Terms</Link>
+            {' · '}
+            <Link href="/privacy" className="hover:text-primary-600">Privacy</Link>
           </p>
         </div>
       </div>

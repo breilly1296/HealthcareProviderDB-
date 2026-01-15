@@ -149,11 +149,18 @@ function SearchResults() {
       ) : hasSearched ? (
         <>
           {/* Results count */}
-          <div className="mb-6">
+          <div className="mb-4">
             <p className="text-gray-600">
               Found <strong className="text-gray-900">{pagination?.total || 0}</strong> {mode === 'providers' ? 'providers' : 'locations'}
               {state && ` in ${state}`}
               {cities && ` in ${cities.split(',').join(', ')}`}
+            </p>
+          </div>
+
+          {/* Disclaimer banner */}
+          <div className="mb-6 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p className="text-sm text-yellow-800">
+              <strong>Note:</strong> Provider information is crowdsourced and may not be current. Always verify insurance acceptance directly with the provider's office before scheduling.
             </p>
           </div>
 
