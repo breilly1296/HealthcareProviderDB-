@@ -2,6 +2,7 @@
 
 import { useState, FormEvent } from 'react';
 import { verificationApi } from '@/lib/api';
+import { trackVerificationSubmit } from '@/lib/analytics';
 
 interface VerificationButtonProps {
   npi: string;
@@ -52,6 +53,13 @@ export function VerificationButton({
         acceptsNewPatients: acceptsNewPatients ?? undefined,
         notes: notes.trim() || undefined,
         submittedBy: email.trim() || undefined,
+      });
+
+      // Track successful verification submission
+      trackVerificationSubmit({
+        npi,
+        planId: planId.trim(),
+        acceptsInsurance,
       });
 
       setStep('success');

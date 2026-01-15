@@ -9,6 +9,7 @@ import { VerificationButton } from '@/components/VerificationButton';
 import FreshnessWarning from '@/components/FreshnessWarning';
 import { ProviderDetailSkeleton } from '@/components/ProviderCardSkeleton';
 import ErrorMessage from '@/components/ErrorMessage';
+import { trackProviderView } from '@/lib/analytics';
 
 interface ProviderWithPlans extends Provider {
   displayName: string;
@@ -44,6 +45,13 @@ export default function ProviderDetailPage() {
     try {
       const result = await providerApi.getByNpi(npi);
       setProvider(result.provider);
+
+      // Track provider view
+      trackProviderView({
+        npi,
+        specialty: result.provider.specialtyCategory || result.provider.taxonomyDescription,
+        providerName: result.provider.displayName,
+      });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load provider';
       const isNetworkError = errorMessage.toLowerCase().includes('network') ||

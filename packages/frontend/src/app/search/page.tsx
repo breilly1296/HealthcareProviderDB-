@@ -8,6 +8,7 @@ import { LocationCard } from '@/components/LocationCard';
 import ProviderCardSkeleton from '@/components/ProviderCardSkeleton';
 import ErrorMessage from '@/components/ErrorMessage';
 import { providerApi, locationApi, Provider, Location, Pagination } from '@/lib/api';
+import { trackSearch } from '@/lib/analytics';
 
 function SearchResults() {
   const searchParams = useSearchParams();
@@ -48,6 +49,16 @@ function SearchResults() {
       setProviders(result.providers);
       setLocations([]);
       setPagination(result.pagination);
+
+      // Track search event
+      trackSearch({
+        specialty: specialty || undefined,
+        state: state || undefined,
+        cities: cities || undefined,
+        healthSystem: healthSystem || undefined,
+        resultsCount: result.pagination.total,
+        mode: 'providers',
+      });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to search providers';
       const isNetworkError = errorMessage.toLowerCase().includes('network') ||
@@ -85,6 +96,15 @@ function SearchResults() {
       setLocations(result.locations);
       setProviders([]);
       setPagination(result.pagination);
+
+      // Track search event
+      trackSearch({
+        state: state || undefined,
+        cities: cities || undefined,
+        healthSystem: healthSystem || undefined,
+        resultsCount: result.pagination.total,
+        mode: 'locations',
+      });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to search locations';
       const isNetworkError = errorMessage.toLowerCase().includes('network') ||
