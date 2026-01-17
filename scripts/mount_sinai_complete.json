@@ -1,0 +1,52 @@
+{
+  "organizations": [
+    {
+      "healthSystem": "Mount Sinai Health System",
+      "facilities": [
+        {"name": "Mount Sinai Brooklyn", "address": "3201 Kings Highway", "city": "Brooklyn", "state": "NY", "zipCode": "11234", "facilityType": "Hospital"},
+        {"name": "The Mount Sinai Hospital", "address": "1 Gustave L. Levy Place", "city": "New York", "state": "NY", "zipCode": "10029", "facilityType": "Hospital"},
+        {"name": "Mount Sinai Morningside", "address": "1111 Amsterdam Avenue", "city": "New York", "state": "NY", "zipCode": "10025", "facilityType": "Hospital"},
+        {"name": "Mount Sinai Queens", "address": "25-10 30th Avenue", "city": "Astoria", "state": "NY", "zipCode": "11102", "facilityType": "Hospital"},
+        {"name": "Mount Sinai South Nassau", "address": "One Healthy Way", "city": "Oceanside", "state": "NY", "zipCode": "11572", "facilityType": "Hospital"},
+        {"name": "New York Eye and Ear Infirmary of Mount Sinai", "address": "310 East 14th Street", "city": "New York", "state": "NY", "zipCode": "10003", "facilityType": "Hospital"},
+        {"name": "Mount Sinai West", "address": "1000 Tenth Avenue", "city": "New York", "state": "NY", "zipCode": "10019", "facilityType": "Hospital"},
+        {"name": "The Spine Hospital at Mount Sinai", "address": "5 East 98th Street", "city": "New York", "state": "NY", "zipCode": "10029", "facilityType": "Hospital"},
+        {"name": "Mount Sinai Kravis Children's Hospital", "address": "1184 Fifth Avenue", "city": "New York", "state": "NY", "zipCode": "10029", "facilityType": "Hospital"},
+        {"name": "Mount Sinai-Union Square", "address": "10 Union Square East", "city": "New York", "state": "NY", "zipCode": "10003", "facilityType": "Ambulatory Care"},
+        {"name": "Blavatnik Family Chelsea Medical Center", "address": "325 West 15th Street", "city": "New York", "state": "NY", "zipCode": "10011", "facilityType": "Medical Center"},
+        {"name": "Mount Sinai-Behavioral Health Center", "address": "45 Rivington Street", "city": "New York", "state": "NY", "zipCode": "10002", "facilityType": "Behavioral Health"},
+        
+        {"name": "Mount Sinai Doctors-1090 Amsterdam Avenue", "address": "1090 Amsterdam Avenue", "city": "New York", "state": "NY", "zipCode": "10025", "facilityType": "Ambulatory Care"},
+        {"name": "Mount Sinai Doctors-2875 Broadway", "address": "2875 Broadway", "city": "New York", "state": "NY", "zipCode": "10024", "facilityType": "Ambulatory Care"},
+        {"name": "Mount Sinai Doctors-Ansonia", "address": "2109 Broadway", "city": "New York", "state": "NY", "zipCode": "10023", "facilityType": "Ambulatory Care"},
+        {"name": "Mount Sinai Doctors-West 147th Street", "address": "2771 Frederick Douglass Boulevard", "city": "New York", "state": "NY", "zipCode": "10039", "facilityType": "Ambulatory Care"},
+        {"name": "Mount Sinai Doctors-638 Columbus Avenue", "address": "638 Columbus Avenue", "city": "New York", "state": "NY", "zipCode": "10024", "facilityType": "Ambulatory Care"},
+        
+        {"name": "May Center for Mount Sinai Doctors", "address": "5 East 98th Street", "city": "New York", "state": "NY", "zipCode": "10128", "facilityType": "Ambulatory Care"},
+        {"name": "Mount Sinai Doctors-East 85th Street", "address": "234 East 85th Street", "city": "New York", "state": "NY", "zipCode": "10028", "facilityType": "Ambulatory Care"},
+        {"name": "Kimberly and Eric J. Waldman Melanoma Center", "address": "5 East 98th Street", "city": "New York", "state": "NY", "zipCode": "10029", "facilityType": "Specialty Center"},
+        
+        {"name": "Mount Sinai Doctors-East 34th Street", "address": "55 East 34th Street", "city": "New York", "state": "NY", "zipCode": "10016", "facilityType": "Ambulatory Care"},
+        {"name": "Samuel J. Friedman Health Center for the Performing Arts", "address": "729 7th Avenue", "city": "New York", "state": "NY", "zipCode": "10019", "facilityType": "Ambulatory Care"},
+        {"name": "Mount Sinai Doctors-787 11th Avenue", "address": "787 11th Avenue", "city": "New York", "state": "NY", "zipCode": "10019", "facilityType": "Ambulatory Care"},
+        {"name": "Mount Sinai Doctors-West 59th Street", "address": "425 West 59th Street", "city": "New York", "state": "NY", "zipCode": "10019", "facilityType": "Ambulatory Care"},
+        {"name": "Mount Sinai Doctors-West 57th Street", "address": "200 West 57th Street", "city": "New York", "state": "NY", "zipCode": "10019", "facilityType": "Ambulatory Care"},
+        {"name": "Mount Sinai Doctors-36 West 60th Street", "address": "36 West 60th Street", "city": "New York", "state": "NY", "zipCode": "10019", "facilityType": "Ambulatory Care"},
+        {"name": "Mount Sinai Doctors-262 West 53rd Street", "address": "262 West 53rd Street", "city": "New York", "state": "NY", "zipCode": "10019", "facilityType": "Ambulatory Care"},
+        
+        {"name": "Mount Sinai Doctors-Centre Street", "address": "168 Centre Street", "city": "New York", "state": "NY", "zipCode": "10013", "facilityType": "Ambulatory Care"},
+        {"name": "Mount Sinai Doctors-NoHo", "address": "632 Broadway", "city": "New York", "state": "NY", "zipCode": "10012", "facilityType": "Ambulatory Care"},
+        {"name": "Mount Sinai Doctors-255 Greenwich Street", "address": "255 Greenwich Street", "city": "New York", "state": "NY", "zipCode": "10007", "facilityType": "Ambulatory Care"},
+        {"name": "Mount Sinai Doctors-Stuyvesant Town", "address": "518 East 20th Street", "city": "New York", "state": "NY", "zipCode": "10009", "facilityType": "Ambulatory Care"},
+        {"name": "Mount Sinai Doctors-West 14th Street", "address": "226 West 14th Street", "city": "New York", "state": "NY", "zipCode": "10011", "facilityType": "Ambulatory Care"},
+        {"name": "Mount Sinai Doctors-Japanese Medical Practice", "address": "55 East 34th Street", "city": "New York", "state": "NY", "zipCode": "10016", "facilityType": "Ambulatory Care"},
+        {"name": "Mount Sinai Doctors-West Eighth Street", "address": "52 West 8th Street", "city": "New York", "state": "NY", "zipCode": "10011", "facilityType": "Ambulatory Care"},
+        {"name": "Mount Sinai Doctors-104 Delancey Street", "address": "104 Delancey Street", "city": "New York", "state": "NY", "zipCode": "10002", "facilityType": "Ambulatory Care"},
+        {"name": "Mount Sinai Doctors-108 Delancey Street", "address": "108 Delancey Street", "city": "New York", "state": "NY", "zipCode": "10002", "facilityType": "Ambulatory Care"},
+        {"name": "Mount Sinai Doctors-West 23rd Street", "address": "309 West 23rd Street", "city": "New York", "state": "NY", "zipCode": "10011", "facilityType": "Ambulatory Care"},
+        {"name": "Mount Sinai Urgent Care-Union Square", "address": "10 Union Square East", "city": "New York", "state": "NY", "zipCode": "10003", "facilityType": "Urgent Care"},
+        {"name": "Institute for Advanced Medicine, Peter Krueger Clinic", "address": "275 8th Avenue", "city": "New York", "state": "NY", "zipCode": "10011", "facilityType": "Specialty Center"}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,1577 @@
+{
+  "organizations": [
+    {
+      "healthSystem": "NYU Langone Health",
+      "facilities": [
+        {
+          "name": "NYU Langone - Howard Beach",
+          "address": "02 Cross Bay Boulevard, 2nd Floor",
+          "city": "Howard Beach",
+          "state": "NY",
+          "zipCode": "11414",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Kew Gardens",
+          "address": "02 Kew Gardens Road, Suite 703",
+          "city": "Kew Gardens",
+          "state": "NY",
+          "zipCode": "11415",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Astoria",
+          "address": "02 Steinway Street",
+          "city": "Astoria",
+          "state": "NY",
+          "zipCode": "11105",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Astoria",
+          "address": "07 30th Avenue",
+          "city": "Astoria",
+          "state": "NY",
+          "zipCode": "11103",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Hempstead",
+          "address": "1 Fulton Avenue",
+          "city": "Hempstead",
+          "state": "NY",
+          "zipCode": "11550",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Patchogue",
+          "address": "100 Hospital Road, Suite 106",
+          "city": "Patchogue",
+          "state": "NY",
+          "zipCode": "11772",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Garden City",
+          "address": "1000 Franklin Avenue, Suite 100",
+          "city": "Garden City",
+          "state": "NY",
+          "zipCode": "11530",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Patchogue",
+          "address": "101 Hospital Road",
+          "city": "Patchogue",
+          "state": "NY",
+          "zipCode": "11772",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Woodbury",
+          "address": "105 Froehlich Farm Boulevard",
+          "city": "Woodbury",
+          "state": "NY",
+          "zipCode": "11797",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Patchogue",
+          "address": "105 West Main Street",
+          "city": "Patchogue",
+          "state": "NY",
+          "zipCode": "11772",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "109 West 27th Street, 9th Floor",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10001",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Patchogue",
+          "address": "109 West Main Street",
+          "city": "Patchogue",
+          "state": "NY",
+          "zipCode": "11772",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Atlantis",
+          "address": "110 JFK Drive, Suite 110",
+          "city": "Atlantis",
+          "state": "FL",
+          "zipCode": "33462",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "111 Broadway, 2nd Floor",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10006",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "111 Broadway",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10006",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Garden City",
+          "address": "1111 Franklin Avenue",
+          "city": "Garden City",
+          "state": "NY",
+          "zipCode": "11530",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Manhasset",
+          "address": "1155 Northern Boulevard, Suite 330",
+          "city": "Manhasset",
+          "state": "NY",
+          "zipCode": "11030",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Mattituck",
+          "address": "11700 Main Road",
+          "city": "Mattituck",
+          "state": "NY",
+          "zipCode": "11952",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Mineola",
+          "address": "120 Mineola Boulevard, Basement Floor",
+          "city": "Mineola",
+          "state": "NY",
+          "zipCode": "11501",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Mineola",
+          "address": "120 Mineola Boulevard",
+          "city": "Mineola",
+          "state": "NY",
+          "zipCode": "11501",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "1220 Avenue P",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11229",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Riverhead",
+          "address": "1279 East Main Street",
+          "city": "Riverhead",
+          "state": "NY",
+          "zipCode": "11901",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "1300 Avenue P",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11229",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Garden City",
+          "address": "1300 Franklin Avenue, Suite LL2",
+          "city": "Garden City",
+          "state": "NY",
+          "zipCode": "11530",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Westhampton",
+          "address": "131 Sunset Avenue",
+          "city": "Westhampton",
+          "state": "NY",
+          "zipCode": "11978",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Bronxville",
+          "address": "132 Parkway Road",
+          "city": "Bronxville",
+          "state": "NY",
+          "zipCode": "10708",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "135 East 31st Street, Second Floor",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Garden City",
+          "address": "1401 Franklin Avenue",
+          "city": "Garden City",
+          "state": "NY",
+          "zipCode": "11530",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Garden City",
+          "address": "1415 Kellum Place, Suite 120",
+          "city": "Garden City",
+          "state": "NY",
+          "zipCode": "11530",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "145 East 32nd Street, 2nd Floor",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "145 East 32nd Street",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "1465 Third Avenue",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10028",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "147 West 25th Street, 10th Floor",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10001",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Jamaica Estates",
+          "address": "15 164th Street",
+          "city": "Jamaica Estates",
+          "state": "NY",
+          "zipCode": "11432",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Forest Hills",
+          "address": "15 Austin Street",
+          "city": "Forest Hills",
+          "state": "NY",
+          "zipCode": "11375",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "150 55th Street",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11220",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "150 Amsterdam Avenue",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10023",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "150 East 32nd Street, 2nd Floor",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "150 East 32nd Street",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - West Palm Beach",
+          "address": "1515 North Flagler Drive, Suite 820",
+          "city": "West Palm Beach",
+          "state": "FL",
+          "zipCode": "33401",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "153 Bay 26th Street",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11214",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - East Meadow",
+          "address": "1530 Front Street",
+          "city": "East Meadow",
+          "state": "NY",
+          "zipCode": "11554",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "155 East 32nd Street, Suite 103",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "1559 York Avenue",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10028",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - East Patchogue",
+          "address": "157 East Woodside Avenue",
+          "city": "East Patchogue",
+          "state": "NY",
+          "zipCode": "11772",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "159 East 53rd Street, 6th Floor",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10022",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "159 East 53rd Street, Fourth Floor",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10022",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "159 East 53rd Street",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10022",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Bellport",
+          "address": "16 Station Road, Suite 5\u20136",
+          "city": "Bellport",
+          "state": "NY",
+          "zipCode": "11713",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "160 East 32nd Street, 2nd Floor",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "160 East 34th Street, 2nd and 3rd Floors",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "160 East 34th Street",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "160 West 26th Street, 2nd and 3rd Floors",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10001",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "1630 East 14th Street",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11229",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "168 Van Brunt Street",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11231",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Woodbury",
+          "address": "173 Froehlich Farm Boulevard",
+          "city": "Woodbury",
+          "state": "NY",
+          "zipCode": "11797",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Astoria",
+          "address": "18 31st Street",
+          "city": "Astoria",
+          "state": "NY",
+          "zipCode": "11105",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - East Setauket",
+          "address": "184 North Belle Mead Road",
+          "city": "East Setauket",
+          "state": "NY",
+          "zipCode": "11733",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Bethpage",
+          "address": "185 Central Avenue",
+          "city": "Bethpage",
+          "state": "NY",
+          "zipCode": "11714",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "186 Joralemon Street",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11201",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New Hyde Park",
+          "address": "1991 Marcus Avenue, Suite 104",
+          "city": "New Hyde Park",
+          "state": "NY",
+          "zipCode": "11042",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New Hyde Park",
+          "address": "1999 Marcus Avenue",
+          "city": "New Hyde Park",
+          "state": "NY",
+          "zipCode": "11042",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Mineola",
+          "address": "200 Old Country Road, Suite 370",
+          "city": "Mineola",
+          "state": "NY",
+          "zipCode": "11501",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Tarrytown",
+          "address": "200 White Plains Road, 4th Floor",
+          "city": "Tarrytown",
+          "state": "NY",
+          "zipCode": "10591",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Mineola",
+          "address": "211 Station Road",
+          "city": "Mineola",
+          "state": "NY",
+          "zipCode": "11501",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "219 54th Street",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11220",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Astoria",
+          "address": "22-02 Steinway Street",
+          "city": "Astoria",
+          "state": "NY",
+          "zipCode": "11105",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "220 13th Street",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11215",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "221 Lexington Avenue",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "222 East 41st Street, 11th and 12th Floors",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10017",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "222 East 41st Street, 12th Floor",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10017",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "222 East 41st Street, 16th Floor",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10017",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "222 East 41st Street, 18th and 19th Floors",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10017",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "222 East 41st Street, 20th Floor",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10017",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "222 East 41st Street, 21st Floor",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10017",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "222 East 41st Street, 25th Floor",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10017",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "222 East 41st Street, 5th Floor",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10017",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "222 East 41st Street, 8th Floor",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10017",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "222 East 41st Street, 9th Floor",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10017",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "222 East 41st Street, Floors 17 and 23",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10017",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "223 East 34th Street",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Astoria",
+          "address": "23-18 31st Street",
+          "city": "Astoria",
+          "state": "NY",
+          "zipCode": "11105",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "230 60th Street",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11220",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "2350 Ocean Avenue, Suite 1",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11229",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "240 East 18th Street",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10003",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "240 East 38th Street, 11th Floor",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "240 East 38th Street, 12th Floor",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "240 East 38th Street, 13th Floor",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "240 East 38th Street, 14th Floor",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "240 East 38th Street, 23rd Floor",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "240 East 38th Street",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Rockville Centre",
+          "address": "242 Merrick Road, Suite 402",
+          "city": "Rockville Centre",
+          "state": "NY",
+          "zipCode": "11570",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Stony Brook",
+          "address": "2500 Nesconset Highway, Building 20-A",
+          "city": "Stony Brook",
+          "state": "NY",
+          "zipCode": "11790",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Mineola",
+          "address": "259 First Street",
+          "city": "Mineola",
+          "state": "NY",
+          "zipCode": "11501",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Mineola",
+          "address": "264 Old Country Road",
+          "city": "Mineola",
+          "state": "NY",
+          "zipCode": "11501",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Smithtown",
+          "address": "267 East Main Street, B-3",
+          "city": "Smithtown",
+          "state": "NY",
+          "zipCode": "11787",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - East Patchogue",
+          "address": "285 Sills Road, Building 14",
+          "city": "East Patchogue",
+          "state": "NY",
+          "zipCode": "11772",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "2857 West 8th Street, 2nd Floor",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11224",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "2857 West 8th Street, Suite 200",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11224",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Great Neck",
+          "address": "295 Community Drive",
+          "city": "Great Neck",
+          "state": "NY",
+          "zipCode": "11042",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "301 East 17th Street, 3rd Floor",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10003",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "301 East 17th Street",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10003",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "305 East 33rd Street",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "305 East 47th Street, Suite 1A",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10017",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - White Plains",
+          "address": "311 North Street",
+          "city": "White Plains",
+          "state": "NY",
+          "zipCode": "10605",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "317 East 34th Street, 8th Floor",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "317 East 34th Street, Suite 1002",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "318 East 23rd Street",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10010",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "324 East 23rd Street",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10010",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Patchogue",
+          "address": "33 Medford Avenue, Suite D",
+          "city": "Patchogue",
+          "state": "NY",
+          "zipCode": "11772",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Huntington Station",
+          "address": "33 Walt Whitman Road, Suite 100B",
+          "city": "Huntington Station",
+          "state": "NY",
+          "zipCode": "11746",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "333 East 38th Street, 6th Floor",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "333 East 38th Street",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "339 East 38th Street",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "3414 Church Avenue",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11203",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "355 West 52nd Street, 8th Floor",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10019",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "355 West 52nd Street",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10019",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Staten Island",
+          "address": "360 Bard Avenue",
+          "city": "Staten Island",
+          "state": "NY",
+          "zipCode": "10310",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Hackensack",
+          "address": "360 Essex Street, Suite 402",
+          "city": "Hackensack",
+          "state": "NJ",
+          "zipCode": "07601",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "360 West 31st Street, 3rd Floor",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10001",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "380 Second Avenue, 6th Floor",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10010",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Staten Island",
+          "address": "3917 Richmond Avenue",
+          "city": "Staten Island",
+          "state": "NY",
+          "zipCode": "10312",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Flushing",
+          "address": "41-61 Kissena Boulevard",
+          "city": "Flushing",
+          "state": "NY",
+          "zipCode": "11355",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Hackensack",
+          "address": "411 Hackensack Avenue, 7th Floor",
+          "city": "Hackensack",
+          "state": "NJ",
+          "zipCode": "07601",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Astoria",
+          "address": "42-07 30th Avenue",
+          "city": "Astoria",
+          "state": "NY",
+          "zipCode": "11103",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "424 East 34th Street, 7th floor",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "424 East 34th Street",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "430 East 34th Street",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "441 77th Street",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11209",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Oakdale",
+          "address": "4568A Sunrise Highway",
+          "city": "Oakdale",
+          "state": "NY",
+          "zipCode": "11769",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "461 First Avenue",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10015",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "4766A Bedford Avenue",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11235",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Staten Island",
+          "address": "4849 Arthur Kill Road",
+          "city": "Staten Island",
+          "state": "NY",
+          "zipCode": "10309",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Great Neck",
+          "address": "488 Great Neck Road",
+          "city": "Great Neck",
+          "state": "NY",
+          "zipCode": "11021",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "5008 Seventh Avenue",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11220",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Staten Island",
+          "address": "5091 Amboy Road, 2nd Floor",
+          "city": "Staten Island",
+          "state": "NY",
+          "zipCode": "10312",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "514 49th Street",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11220",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Bellport",
+          "address": "515 Bellport Avenue",
+          "city": "Bellport",
+          "state": "NY",
+          "zipCode": "11713",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "530 First Avenue, 4th Floor",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "530 First Avenue, 5th Floor",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "530 First Avenue, 6th Floor",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "530 First Avenue",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Bethpage",
+          "address": "530 Hicksville Road",
+          "city": "Bethpage",
+          "state": "NY",
+          "zipCode": "11714",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Carle Place",
+          "address": "536 Mineola Avenue",
+          "city": "Carle Place",
+          "state": "NY",
+          "zipCode": "11514",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "540 Hudson Street",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10014",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "55 East 55th Street, 2nd Floor",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10022",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "55 East 55th Street",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10022",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "550 First Avenue",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Shirley",
+          "address": "550 Montauk Highway",
+          "city": "Shirley",
+          "state": "NY",
+          "zipCode": "11967",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "555 LaGuardia Place",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10012",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "560 First Avenue, HCC 14th Floor",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "560 First Avenue",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "5610 Second Avenue",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11220",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "5616 Sixth Avenue",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11220",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "570 First Avenue",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "5718 Second Avenue",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11220",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - West Babylon",
+          "address": "580 Sunrise Highway",
+          "city": "West Babylon",
+          "state": "NY",
+          "zipCode": "11704",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New Hyde Park",
+          "address": "6 Ohio Drive, Suite 101",
+          "city": "New Hyde Park",
+          "state": "NY",
+          "zipCode": "11042",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "60 Eighth Avenue",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11217",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Flushing",
+          "address": "61 Kissena Boulevard",
+          "city": "Flushing",
+          "state": "NY",
+          "zipCode": "11355",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "610 Second Avenue",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "63 Downing Street",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10014",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "6317 Fourth Avenue",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11220",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Staten Island",
+          "address": "65 Cromwell Avenue",
+          "city": "Staten Island",
+          "state": "NY",
+          "zipCode": "10304",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "660 First Avenue",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "6740 Fourth Avenue",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11220",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Forest Hills",
+          "address": "69-15 Austin Street",
+          "city": "Forest Hills",
+          "state": "NY",
+          "zipCode": "11375",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Staten Island",
+          "address": "7 Petrus Avenue",
+          "city": "Staten Island",
+          "state": "NY",
+          "zipCode": "10312",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "70 Atlantic Avenue, 4th Floor",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11201",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "70 Atlantic Avenue",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11201",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Valley Stream",
+          "address": "70 East Sunrise Highway, Suite 515E",
+          "city": "Valley Stream",
+          "state": "NY",
+          "zipCode": "11581",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Islip",
+          "address": "712 Main Street",
+          "city": "Islip",
+          "state": "NY",
+          "zipCode": "11751",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "724 Second Avenue",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10016",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "7316 13th Avenue",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11228",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "74 Kent Street, Lower Level",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11222",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "7517 Sixth Avenue",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11209",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "757 60th Street",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11220",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Garden City",
+          "address": "765 Stewart Avenue",
+          "city": "Garden City",
+          "state": "NY",
+          "zipCode": "11530",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Patchogue",
+          "address": "77 Medford Avenue",
+          "city": "Patchogue",
+          "state": "NY",
+          "zipCode": "11772",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Huntington",
+          "address": "789 Park Avenue",
+          "city": "Huntington",
+          "state": "NY",
+          "zipCode": "11743",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Jamaica Estates",
+          "address": "80-15 164th Street",
+          "city": "Jamaica Estates",
+          "state": "NY",
+          "zipCode": "11432",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "813 Quentin Road, Suite 200",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11223",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "829 57th Street, Second Floor",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11220",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Rego Park",
+          "address": "85 Queens Boulevard",
+          "city": "Rego Park",
+          "state": "NY",
+          "zipCode": "11374",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - New York",
+          "address": "862 Park Avenue",
+          "city": "New York",
+          "state": "NY",
+          "zipCode": "10075",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "8714 Fifth Avenue",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11209",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "8721 5th Avenue, 3rd Floor",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11209",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Riverhead",
+          "address": "889 East Main Street, Suite 308",
+          "city": "Riverhead",
+          "state": "NY",
+          "zipCode": "11901",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Patchogue",
+          "address": "9 Village Green Way",
+          "city": "Patchogue",
+          "state": "NY",
+          "zipCode": "11772",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "902 Quentin Road, 1st Floor",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11223",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "902 Quentin Road, First and Seventh Floors",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11223",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "934 Manhattan Avenue",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11222",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "9413 Flatlands Avenue",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11236",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Staten Island",
+          "address": "97 New Dorp Lane",
+          "city": "Staten Island",
+          "state": "NY",
+          "zipCode": "10306",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Rego Park",
+          "address": "97-85 Queens Boulevard",
+          "city": "Rego Park",
+          "state": "NY",
+          "zipCode": "11374",
+          "facilityType": "Ambulatory Care"
+        },
+        {
+          "name": "NYU Langone - Brooklyn",
+          "address": "9920 Fourth Avenue, Suite 310",
+          "city": "Brooklyn",
+          "state": "NY",
+          "zipCode": "11209",
+          "facilityType": "Ambulatory Care"
+        }
+      ]
+    }
+  ]
+}

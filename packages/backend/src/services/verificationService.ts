@@ -1,6 +1,7 @@
 import { Prisma, VerificationType, VerificationSource } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { calculateConfidenceScore } from './confidenceService';
+import { AppError } from '../middleware/errorHandler';
 
 /**
  * Research-based verification input
@@ -71,7 +72,7 @@ export async function submitVerification(input: SubmitVerificationInput) {
   });
 
   if (!provider) {
-    throw new Error(`Provider with NPI ${npi} not found`);
+    throw AppError.notFound(`Provider with NPI ${npi} not found`);
   }
 
   // Find plan
@@ -81,7 +82,7 @@ export async function submitVerification(input: SubmitVerificationInput) {
   });
 
   if (!plan) {
-    throw new Error(`Plan with ID ${planId} not found`);
+    throw AppError.notFound(`Plan with ID ${planId} not found`);
   }
 
   // Find or create acceptance record

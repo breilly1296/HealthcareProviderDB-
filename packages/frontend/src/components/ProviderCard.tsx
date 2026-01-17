@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Provider } from '@/lib/api';
 import { ConfidenceBadge, ConfidenceIndicator } from './ConfidenceBadge';
 import FreshnessWarning from './FreshnessWarning';
+import { getSpecialtyDisplay } from '@/lib/provider-utils';
 
 interface ProviderCardProps {
   provider: Provider & { displayName: string };
@@ -22,19 +23,7 @@ export function ProviderCard({
   planId,
   planName,
 }: ProviderCardProps) {
-  const specialtyLabels: Record<string, string> = {
-    ENDOCRINOLOGY: 'Endocrinology',
-    RHEUMATOLOGY: 'Rheumatology',
-    ORTHOPEDICS: 'Orthopedics',
-    INTERNAL_MEDICINE: 'Internal Medicine',
-    FAMILY_MEDICINE: 'Family Medicine',
-    GERIATRICS: 'Geriatrics',
-    OTHER: 'Other Specialty',
-  };
-
-  const specialty = provider.specialtyCategory
-    ? specialtyLabels[provider.specialtyCategory] || provider.specialtyCategory
-    : provider.taxonomyDescription || 'Healthcare Provider';
+  const specialty = getSpecialtyDisplay(provider.specialtyCategory, provider.taxonomyDescription);
 
   return (
     <Link href={`/provider/${provider.npi}`}>

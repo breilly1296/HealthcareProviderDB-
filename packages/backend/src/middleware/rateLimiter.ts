@@ -20,7 +20,17 @@ interface RateLimiterOptions {
 
 /**
  * In-memory rate limit store
- * In production, use Redis for distributed rate limiting
+ *
+ * IMPORTANT: This in-memory implementation only works for single-instance deployments.
+ * For multi-instance deployments (e.g., Cloud Run with multiple instances), you MUST
+ * replace this with Redis or another distributed store. Otherwise, each instance
+ * maintains separate counters and users can exceed limits by N× (where N = instance count).
+ *
+ * TODO: For production scaling beyond single instance:
+ * - Use Redis: `npm install rate-limit-redis`
+ * - Or use Cloud Run's built-in rate limiting via Cloud Armor
+ *
+ * For beta launch with single Cloud Run instance, this in-memory store is sufficient.
  */
 const stores: Map<string, RateLimitStore> = new Map();
 

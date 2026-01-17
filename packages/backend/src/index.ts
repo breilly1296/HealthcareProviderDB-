@@ -26,13 +26,7 @@ app.use(cors({
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
-// Default rate limiter (100 req/min)
-app.use(defaultRateLimiter);
-
-// Request logging (tracks usage without PII)
-app.use(requestLogger);
-
-// Health check endpoint (no rate limit)
+// Health check endpoint - BEFORE rate limiter so monitoring tools aren't blocked
 app.get('/health', async (req: Request, res: Response) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
@@ -54,6 +48,12 @@ app.get('/health', async (req: Request, res: Response) => {
     });
   }
 });
+
+// Default rate limiter (200 req/hour)
+app.use(defaultRateLimiter);
+
+// Request logging (tracks usage without PII)
+app.use(requestLogger);
 
 // API info endpoint
 app.get('/', (req: Request, res: Response) => {
@@ -96,18 +96,8 @@ app.use(notFoundHandler);
 // Global error handler
 app.use(errorHandler);
 
-// Graceful shutdown
-const shutdown = async () => {
-  console.log('\nShutting down gracefully...');
-  await prisma.$disconnect();
-  process.exit(0);
-};
-
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
-
 // Start server
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`
 ╔════════════════════════════════════════════════════════════╗
 ║           HealthcareProviderDB API v1.0.0                  ║
@@ -119,5 +109,43 @@ app.listen(PORT, () => {
 ╚════════════════════════════════════════════════════════════╝
   `);
 });
+
+// Graceful shutdown with timeout protection
+const SHUTDOWN_TIMEOUT_MS = 10000;
+
+const shutdown = async (signal: string) => {
+  console.log(`\n${signal} received. Shutting down gracefully...`);
+
+  // Set a timeout to force exit if graceful shutdown takes too long
+  const forceExitTimer = setTimeout(() => {
+    console.error('Graceful shutdown timed out, forcing exit');
+    process.exit(1);
+  }, SHUTDOWN_TIMEOUT_MS);
+
+  try {
+    // First, stop accepting new connections
+    await new Promise<void>((resolve, reject) => {
+      server.close((err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+    console.log('HTTP server closed');
+
+    // Then disconnect from database
+    await prisma.$disconnect();
+    console.log('Database disconnected');
+
+    clearTimeout(forceExitTimer);
+    process.exit(0);
+  } catch (error) {
+    console.error('Error during shutdown:', error);
+    clearTimeout(forceExitTimer);
+    process.exit(1);
+  }
+};
+
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 export default app;

@@ -246,6 +246,8 @@ function SearchResults() {
                             ? 'bg-primary-600 text-white'
                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                         }`}
+                        aria-label={`Page ${p}${p === pagination.page ? ', current page' : ''}`}
+                        aria-current={p === pagination.page ? 'page' : undefined}
                       >
                         {p}
                       </a>
