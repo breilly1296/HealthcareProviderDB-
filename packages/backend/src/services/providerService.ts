@@ -233,7 +233,6 @@ export async function getProviderByNpi(npi: string) {
     include: {
       location: true,
       planAcceptances: {
-        take: 10,
         orderBy: { confidenceScore: 'desc' },
         include: {
           plan: true,
