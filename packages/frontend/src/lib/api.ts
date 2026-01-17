@@ -65,12 +65,6 @@ export interface InsurancePlan {
   statesCovered: string[];
   planYear: number;
   isActive: boolean;
-  // New Gemini-scraped fields
-  carrier?: string | null;
-  planVariant?: string | null;
-  rawName?: string | null;
-  sourceHealthSystem?: string | null;
-  issuerName?: string | null;
 }
 
 export interface PlanAcceptance {
