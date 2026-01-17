@@ -291,201 +291,171 @@ export default function ProviderDetailPage() {
 
             {/* Accepted Plans */}
             <div className="card">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">
-                Accepted Insurance Plans
-              </h2>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">
+                  Accepted Insurance Plans
+                  {acceptedPlans.length > 0 && (
+                    <span className="ml-2 text-base font-normal text-gray-500">
+                      ({acceptedPlans.length} plan{acceptedPlans.length !== 1 ? 's' : ''})
+                    </span>
+                  )}
+                </h2>
+                {groupedPlans.length > 1 && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setExpandedCarriers(new Set(groupedPlans.map(([carrier]) => carrier)))}
+                      className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                    >
+                      Expand All
+                    </button>
+                    <span className="text-gray-300">|</span>
+                    <button
+                      onClick={() => setExpandedCarriers(new Set())}
+                      className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                    >
+                      Collapse All
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Search Input */}
+              {acceptedPlans.length > 5 && (
+                <div className="mb-6">
+                  <div className="relative">
+                    <svg
+                      className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                      />
+                    </svg>
+                    <input
+                      type="text"
+                      placeholder="Search plans or carriers..."
+                      value={planSearchQuery}
+                      onChange={(e) => setPlanSearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    />
+                    {planSearchQuery && (
+                      <button
+                        onClick={() => setPlanSearchQuery('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {acceptedPlans.length > 0 ? (
-                <div className="space-y-6">
-                  {acceptedPlans.map((pa) => (
-                    <div key={pa.id} className="space-y-4">
-                      <div className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-gray-50 rounded-lg gap-4">
-                        <div className="flex-1">
-                          <h3 className="font-medium text-gray-900">
-                            {pa.plan?.planName || 'Unknown Plan'}
-                          </h3>
-                          <p className="text-sm text-gray-600">
-                            {pa.plan?.carrier || pa.plan?.issuerName || 'Unknown Carrier'} • {pa.plan?.planType}
-                          </p>
-                          {pa.acceptsNewPatients !== null && (
-                            <p className="text-sm mt-1">
-                              {pa.acceptsNewPatients ? (
-                                <span className="text-green-600">✓ Accepting new patients</span>
-                              ) : (
-                                <span className="text-red-600">✗ Not accepting new patients</span>
-                              )}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex flex-col items-end gap-2">
-                          <ConfidenceIndicator
-                            lastVerifiedAt={pa.lastVerifiedAt}
-                            verificationCount={pa.verificationCount}
-                            acceptanceStatus={pa.acceptanceStatus}
-                          />
-                          <VerificationButton
-                            npi={provider.npi}
-                            providerName={provider.displayName}
-                            planId={pa.plan?.planId}
-                            planName={pa.plan?.planName ?? undefined}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Freshness Warning - Prominent Detail Variant */}
-                      <FreshnessWarning
-                        lastVerifiedAt={pa.lastVerifiedAt ? new Date(pa.lastVerifiedAt) : null}
-                        specialty={provider.specialtyCategory}
-                        taxonomyDescription={provider.taxonomyDescription}
-                        providerNpi={provider.npi}
-                        providerName={provider.displayName}
-                        planId={pa.plan?.planId}
-                        planName={pa.plan?.planName ?? undefined}
-                        variant="detail"
-                        showVerifyButton={true}
-                      />
-
-                      {/* Confidence Score Explainer */}
-                      {pa.confidenceScore !== undefined && (
-                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                          <div className="flex items-start gap-3">
-                            <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
-                              <svg className="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                groupedPlans.length > 0 ? (
+                  <div className="space-y-4">
+                    {groupedPlans.map(([carrier, plans]) => {
+                      const isExpanded = expandedCarriers.has(carrier);
+                      return (
+                        <div key={carrier} className="border border-gray-200 rounded-lg overflow-hidden">
+                          {/* Carrier Header */}
+                          <button
+                            onClick={() => toggleCarrier(carrier)}
+                            className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+                          >
+                            <div className="flex items-center gap-3">
+                              <svg
+                                className={`w-5 h-5 text-gray-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                               </svg>
+                              <span className="font-semibold text-gray-900">{carrier}</span>
                             </div>
-                            <div className="flex-1">
-                              <h4 className="font-semibold text-gray-900 mb-2">
-                                Understanding Confidence Scores
-                              </h4>
-                              <div className="text-sm text-gray-700 space-y-2">
-                                <p>
-                                  This plan has a <strong>{pa.confidenceLevel?.replace('_', ' ') || 'MEDIUM'}</strong> confidence
-                                  score ({pa.confidenceScore}%) based on:
-                                </p>
-                                <ul className="list-disc list-inside space-y-1 ml-2">
-                                  <li><strong>{pa.verificationCount || 0}</strong> patient verifications</li>
-                                  <li>Data freshness (last verified {pa.lastVerifiedAt ? new Date(pa.lastVerifiedAt).toLocaleDateString() : 'never'})</li>
-                                  <li>Source reliability (crowdsourced + authoritative data)</li>
-                                  <li>Community agreement rate</li>
-                                </ul>
-                                <div className="bg-white border border-primary-200 rounded p-3 mt-3">
-                                  <p className="text-xs text-primary-900">
-                                    <strong>Research shows:</strong> 3 patient verifications achieve expert-level accuracy
-                                    (κ=0.58 vs 0.59 expert agreement). Traditional insurance directories are wrong 46-77% of the time.
-                                    <br />
-                                    <span className="text-primary-700 italic">Source: Mortensen et al. (2015), JAMIA; Haeder et al. (2024)</span>
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
+                            <span className="text-sm text-gray-500 bg-gray-200 px-2 py-1 rounded-full">
+                              {plans.length} plan{plans.length !== 1 ? 's' : ''}
+                            </span>
+                          </button>
 
-                      {/* Verification History Timeline */}
-                      {pa.verificationCount > 0 && (
-                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                          <div className="flex items-start gap-3">
-                            <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                              <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                            </div>
-                            <div className="flex-1">
-                              <h4 className="font-semibold text-gray-900 mb-3">
-                                Verification Activity
-                              </h4>
+                          {/* Plans List */}
+                          {isExpanded && (
+                            <div className="divide-y divide-gray-100">
+                              {plans.map((pa) => (
+                                <div key={pa.id} className="p-4 space-y-4">
+                                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <div className="flex-1">
+                                      <h3 className="font-medium text-gray-900">
+                                        {pa.plan?.planName || 'Unknown Plan'}
+                                      </h3>
+                                      <p className="text-sm text-gray-600">
+                                        {pa.plan?.planType}
+                                      </p>
+                                      {pa.acceptsNewPatients !== null && (
+                                        <p className="text-sm mt-1">
+                                          {pa.acceptsNewPatients ? (
+                                            <span className="text-green-600">✓ Accepting new patients</span>
+                                          ) : (
+                                            <span className="text-red-600">✗ Not accepting new patients</span>
+                                          )}
+                                        </p>
+                                      )}
+                                    </div>
+                                    <div className="flex flex-col items-end gap-2">
+                                      <ConfidenceIndicator
+                                        lastVerifiedAt={pa.lastVerifiedAt}
+                                        verificationCount={pa.verificationCount}
+                                        acceptanceStatus={pa.acceptanceStatus}
+                                      />
+                                      <VerificationButton
+                                        npi={provider.npi}
+                                        providerName={provider.displayName}
+                                        planId={pa.plan?.planId}
+                                        planName={pa.plan?.planName ?? undefined}
+                                      />
+                                    </div>
+                                  </div>
 
-                              {/* Progress to 3 verifications */}
-                              <div className="mb-4">
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className="text-sm font-medium text-gray-700">
-                                    Community verifications
-                                  </span>
-                                  <span className="text-sm text-gray-600">
-                                    {pa.verificationCount} of 3 needed
-                                  </span>
-                                </div>
-                                <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                                  <div
-                                    className={`h-full transition-all ${
-                                      pa.verificationCount >= 3 ? 'bg-green-500' : 'bg-primary-500'
-                                    }`}
-                                    style={{ width: `${Math.min(100, (pa.verificationCount / 3) * 100)}%` }}
+                                  {/* Freshness Warning */}
+                                  <FreshnessWarning
+                                    lastVerifiedAt={pa.lastVerifiedAt ? new Date(pa.lastVerifiedAt) : null}
+                                    specialty={provider.specialtyCategory}
+                                    taxonomyDescription={provider.taxonomyDescription}
+                                    providerNpi={provider.npi}
+                                    providerName={provider.displayName}
+                                    planId={pa.plan?.planId}
+                                    planName={pa.plan?.planName ?? undefined}
+                                    variant="detail"
+                                    showVerifyButton={true}
                                   />
                                 </div>
-                                {pa.verificationCount >= 3 ? (
-                                  <p className="text-xs text-green-700 mt-2 flex items-center gap-1">
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                    </svg>
-                                    Expert-level accuracy achieved (κ=0.58)
-                                  </p>
-                                ) : (
-                                  <p className="text-xs text-gray-600 mt-2">
-                                    {3 - pa.verificationCount} more {3 - pa.verificationCount === 1 ? 'verification' : 'verifications'} needed for high confidence
-                                  </p>
-                                )}
-                              </div>
-
-                              {/* Timeline */}
-                              <div className="space-y-3">
-                                <div className="flex gap-3">
-                                  <div className="flex flex-col items-center">
-                                    <div className="w-2 h-2 bg-green-500 rounded-full" />
-                                    <div className="w-0.5 h-full bg-gray-300" />
-                                  </div>
-                                  <div className="flex-1 pb-3">
-                                    <p className="text-sm font-medium text-gray-900">
-                                      {pa.verificationCount} patient{pa.verificationCount !== 1 ? 's' : ''} verified
-                                    </p>
-                                    <p className="text-xs text-gray-600">
-                                      Most recent: {pa.lastVerifiedAt ? new Date(pa.lastVerifiedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'Unknown'}
-                                    </p>
-                                  </div>
-                                </div>
-
-                                <div className="flex gap-3">
-                                  <div className="flex flex-col items-center">
-                                    <div className="w-2 h-2 bg-primary-500 rounded-full" />
-                                    <div className="w-0.5 h-full bg-gray-300" />
-                                  </div>
-                                  <div className="flex-1 pb-3">
-                                    <p className="text-sm font-medium text-gray-900">
-                                      Confidence level
-                                    </p>
-                                    <p className="text-xs text-gray-600">
-                                      {pa.confidenceLevel?.replace('_', ' ') || 'MEDIUM'} ({pa.confidenceScore}%)
-                                    </p>
-                                  </div>
-                                </div>
-
-                                <div className="flex gap-3">
-                                  <div className="w-2 h-2 bg-gray-400 rounded-full flex-shrink-0 mt-1" />
-                                  <div className="flex-1">
-                                    <p className="text-sm font-medium text-gray-900">
-                                      Acceptance status
-                                    </p>
-                                    <p className="text-xs text-gray-600">
-                                      {pa.acceptanceStatus === 'ACCEPTED' ? 'Accepts this plan' :
-                                       pa.acceptanceStatus === 'NOT_ACCEPTED' ? 'Does not accept' :
-                                       pa.acceptanceStatus === 'PENDING' ? 'Status pending verification' :
-                                       'Unknown'}
-                                      {pa.acceptsNewPatients !== null && (
-                                        <> • {pa.acceptsNewPatients ? 'Accepting new patients' : 'Not accepting new patients'}</>
-                                      )}
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
+                              ))}
                             </div>
-                          </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 bg-gray-50 rounded-lg">
+                    <p className="text-gray-600">
+                      No plans match your search.
+                    </p>
+                    <button
+                      onClick={() => setPlanSearchQuery('')}
+                      className="mt-2 text-primary-600 hover:text-primary-700 font-medium"
+                    >
+                      Clear search
+                    </button>
+                  </div>
+                )
               ) : (
                 <div className="text-center py-8 bg-gray-50 rounded-lg">
                   <p className="text-gray-600 mb-4">
