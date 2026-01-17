@@ -48,6 +48,12 @@ function Header() {
               Find Providers
             </Link>
             <Link
+              href="/insurance"
+              className="hidden md:inline text-base font-medium text-gray-600 hover:text-primary-600 transition-colors"
+            >
+              Scan Card
+            </Link>
+            <Link
               href="/search"
               className="btn-primary text-sm sm:text-base px-3 py-2 sm:px-4 sm:py-2"
             >
@@ -85,6 +91,11 @@ function Footer() {
               <li>
                 <Link href="/search" className="text-gray-600 hover:text-primary-600">
                   Find Providers
+                </Link>
+              </li>
+              <li>
+                <Link href="/insurance" className="text-gray-600 hover:text-primary-600">
+                  Scan Insurance Card
                 </Link>
               </li>
               <li>
