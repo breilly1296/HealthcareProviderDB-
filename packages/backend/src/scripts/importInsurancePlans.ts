@@ -130,7 +130,7 @@ function extractPlanType(variant: string | null): string | null {
  * Upsert an insurance plan
  * Returns the planId (which is the primary key)
  */
-async function upsertPlan(parsed: ParsedInsurancePlan): Promise<string> {
+async function upsertPlan(parsed: ParsedInsurancePlan, healthSystem: string): Promise<{ planId: string; isNew: boolean }> {
   const planId = generatePlanId(parsed);
 
   const existing = await prisma.insurancePlan.findUnique({
@@ -138,10 +138,11 @@ async function upsertPlan(parsed: ParsedInsurancePlan): Promise<string> {
   });
 
   if (existing) {
-    return existing.planId;
+    // Update providerCount will happen separately
+    return { planId: existing.planId, isNew: false };
   }
 
-  // Truncate planName to fit in VarChar(200)
+  // Truncate fields to fit in their VarChar limits
   const planName = parsed.rawName.substring(0, 200);
 
   const plan = await prisma.insurancePlan.create({
@@ -150,11 +151,29 @@ async function upsertPlan(parsed: ParsedInsurancePlan): Promise<string> {
       planName,
       issuerName: parsed.carrier.substring(0, 200),
       planType: extractPlanType(parsed.planVariant)?.substring(0, 20) || null,
-      state: 'NY', // Default to NY for NYU Langone data
+      state: 'NY', // Default to NY for health system data
+      // New Gemini-scraped fields
+      carrier: parsed.carrier.substring(0, 100),
+      planVariant: parsed.planVariant?.substring(0, 50) || null,
+      rawName: parsed.rawName.substring(0, 500),
+      sourceHealthSystem: healthSystem.substring(0, 200),
+      providerCount: 0,
     },
   });
 
-  return plan.planId;
+  return { planId: plan.planId, isNew: true };
+}
+
+/**
+ * Increment provider count for a plan
+ */
+async function incrementProviderCount(planId: string): Promise<void> {
+  await prisma.insurancePlan.update({
+    where: { planId },
+    data: {
+      providerCount: { increment: 1 },
+    },
+  });
 }
 
 /**
@@ -269,22 +288,16 @@ async function importInsurancePlans(
       for (const parsed of parsedPlans) {
         const planIdKey = generatePlanId(parsed);
 
-        // Check if we've already processed this plan
+        // Check if we've already processed this plan in this import session
         let planInfo = planCounts.get(planIdKey);
 
         if (!planInfo) {
-          // Upsert the plan
-          const existingPlan = await prisma.insurancePlan.findUnique({
-            where: { planId: planIdKey },
-          });
-
-          const planId = await upsertPlan(parsed);
-          const isNew = !existingPlan;
-
-          planInfo = { planId, isNew };
+          // Upsert the plan with health system info
+          const result = await upsertPlan(parsed, healthSystem);
+          planInfo = { planId: result.planId, isNew: result.isNew };
           planCounts.set(planIdKey, planInfo);
 
-          if (isNew) {
+          if (result.isNew) {
             stats.newPlans++;
           } else {
             stats.updatedPlans++;
@@ -295,6 +308,8 @@ async function importInsurancePlans(
         const isNewAcceptance = await upsertAcceptance(npi, planInfo.planId);
         if (isNewAcceptance) {
           stats.newAcceptances++;
+          // Increment provider count on the plan
+          await incrementProviderCount(planInfo.planId);
         } else {
           stats.updatedAcceptances++;
         }

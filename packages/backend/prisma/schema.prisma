@@ -75,9 +75,19 @@ model InsurancePlan {
   planName            String?                  @map("plan_name") @db.VarChar(200)
   planType            String?                  @map("plan_type") @db.VarChar(20)
   state               String?                  @db.VarChar(2)
+
+  // Gemini-scraped insurance data fields
+  carrier             String?                  @db.VarChar(100)
+  planVariant         String?                  @map("plan_variant") @db.VarChar(50)
+  rawName             String?                  @map("raw_name") @db.VarChar(500)
+  sourceHealthSystem  String?                  @map("source_health_system") @db.VarChar(200)
+  providerCount       Int                      @default(0) @map("provider_count")
+
   providerAcceptances ProviderPlanAcceptance[]
   verificationLogs    VerificationLog[]
 
+  @@index([carrier])
+  @@index([planVariant])
   @@map("insurance_plans")
 }
 

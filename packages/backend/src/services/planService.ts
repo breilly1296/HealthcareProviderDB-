@@ -4,9 +4,12 @@ import { getPaginationValues } from './utils';
 
 export interface PlanSearchParams {
   issuerName?: string;
+  carrier?: string;
   planType?: string;
+  planVariant?: string;
   search?: string;
   state?: string;
+  sourceHealthSystem?: string;
   page?: number;
   limit?: number;
 }
@@ -25,23 +28,31 @@ export interface PlanSearchResult {
 export async function searchPlans(params: PlanSearchParams): Promise<PlanSearchResult> {
   const {
     issuerName,
+    carrier,
     planType,
+    planVariant,
     search,
     state,
+    sourceHealthSystem,
   } = params;
   const { take, skip, page } = getPaginationValues(params.page, params.limit);
 
   const where: Prisma.InsurancePlanWhereInput = {
     ...(issuerName && { issuerName: { contains: issuerName, mode: 'insensitive' as const } }),
+    ...(carrier && { carrier: { contains: carrier, mode: 'insensitive' as const } }),
     ...(planType && { planType: { contains: planType, mode: 'insensitive' as const } }),
+    ...(planVariant && { planVariant: { contains: planVariant, mode: 'insensitive' as const } }),
     ...(state && { state: state.toUpperCase() }),
+    ...(sourceHealthSystem && { sourceHealthSystem: { contains: sourceHealthSystem, mode: 'insensitive' as const } }),
   };
 
-  // Add search filter (searches across issuerName, planName)
+  // Add search filter (searches across carrier, issuerName, planName, rawName)
   if (search) {
     where.OR = [
+      { carrier: { contains: search, mode: 'insensitive' } },
       { issuerName: { contains: search, mode: 'insensitive' } },
       { planName: { contains: search, mode: 'insensitive' } },
+      { rawName: { contains: search, mode: 'insensitive' } },
       { planId: { contains: search, mode: 'insensitive' } },
     ];
   }
@@ -51,7 +62,7 @@ export async function searchPlans(params: PlanSearchParams): Promise<PlanSearchR
       where,
       take,
       skip,
-      orderBy: [{ issuerName: 'asc' }, { planName: 'asc' }],
+      orderBy: [{ carrier: 'asc' }, { planName: 'asc' }],
     }),
     prisma.insurancePlan.count({ where }),
   ]);
@@ -63,7 +74,7 @@ export async function searchPlans(params: PlanSearchParams): Promise<PlanSearchR
  * Get plan by planId
  */
 export async function getPlanByPlanId(planId: string) {
-  return prisma.insurancePlan.findUnique({
+  const plan = await prisma.insurancePlan.findUnique({
     where: { planId },
     include: {
       _count: {
@@ -73,6 +84,104 @@ export async function getPlanByPlanId(planId: string) {
       },
     },
   });
+
+  if (!plan) return null;
+
+  return {
+    ...plan,
+    // Use stored providerCount, fallback to _count if not set
+    providerCount: plan.providerCount || plan._count.providerAcceptances,
+  };
+}
+
+/**
+ * Get all unique carriers
+ */
+export async function getCarriers(options: {
+  state?: string;
+  sourceHealthSystem?: string;
+} = {}) {
+  const { state, sourceHealthSystem } = options;
+
+  const where: Prisma.InsurancePlanWhereInput = {
+    carrier: { not: null },
+  };
+
+  if (state) {
+    where.state = state.toUpperCase();
+  }
+
+  if (sourceHealthSystem) {
+    where.sourceHealthSystem = { contains: sourceHealthSystem, mode: 'insensitive' };
+  }
+
+  const plans = await prisma.insurancePlan.findMany({
+    where,
+    select: {
+      carrier: true,
+    },
+    distinct: ['carrier'],
+    orderBy: { carrier: 'asc' },
+  });
+
+  return plans
+    .filter(p => p.carrier)
+    .map(p => p.carrier!);
+}
+
+/**
+ * Get all unique plan variants
+ */
+export async function getPlanVariants(options: {
+  state?: string;
+  carrier?: string;
+} = {}) {
+  const { state, carrier } = options;
+
+  const where: Prisma.InsurancePlanWhereInput = {
+    planVariant: { not: null },
+  };
+
+  if (state) {
+    where.state = state.toUpperCase();
+  }
+
+  if (carrier) {
+    where.carrier = { contains: carrier, mode: 'insensitive' };
+  }
+
+  const plans = await prisma.insurancePlan.findMany({
+    where,
+    select: {
+      planVariant: true,
+    },
+    distinct: ['planVariant'],
+    orderBy: { planVariant: 'asc' },
+  });
+
+  return plans
+    .filter(p => p.planVariant)
+    .map(p => p.planVariant!);
+}
+
+/**
+ * Get all unique source health systems
+ */
+export async function getSourceHealthSystems() {
+  const plans = await prisma.insurancePlan.findMany({
+    where: {
+      sourceHealthSystem: { not: null },
+    },
+    select: {
+      sourceHealthSystem: true,
+    },
+    distinct: ['sourceHealthSystem'],
+    orderBy: { sourceHealthSystem: 'asc' },
+  });
+
+  return plans
+    .filter(p => p.sourceHealthSystem)
+    .map(p => p.sourceHealthSystem!);
 }
 
 /**
