@@ -33,6 +33,7 @@ model Location {
   @@index([state])
   @@index([city, state])
   @@index([zipCode])
+  @@index([providerCount])  // For sorting by provider count
 
   @@map("locations")
 }
@@ -90,6 +91,8 @@ model Provider {
   @@index([state])
   @@index([specialtyCode])
   @@index([lastName])
+  @@index([firstName])        // For name searches
+  @@index([city])             // For location filtering
   @@index([organizationName])
   @@index([state, specialtyCode])
   @@index([locationId])
@@ -148,14 +151,15 @@ model InsurancePlan {
 }
 
 // Provider-Plan acceptance matching table
+// Note: Using SetNull instead of Cascade to preserve audit trail when provider/plan is deleted
 model ProviderPlanAcceptance {
   id                    Int      @id @default(autoincrement())
 
-  providerNpi           String   @db.VarChar(10) @map("npi")
-  provider              Provider @relation(fields: [providerNpi], references: [npi], onDelete: Cascade)
+  providerNpi           String?  @db.VarChar(10) @map("npi")
+  provider              Provider? @relation(fields: [providerNpi], references: [npi], onDelete: SetNull)
 
-  planId                String   @db.VarChar(50) @map("plan_id")
-  plan                  InsurancePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  planId                String?  @db.VarChar(50) @map("plan_id")
+  plan                  InsurancePlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
 
   // Acceptance status
   acceptanceStatus      String   @default("UNKNOWN") @db.VarChar(20) @map("acceptance_status")

@@ -99,7 +99,7 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
     loadCities();
   }, [state]);
 
-  // Handle click outside to close dropdown
+  // Handle click outside and ESC key to close dropdown
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -110,9 +110,19 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
       }
     };
 
+    const handleEscKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && showCityDropdown) {
+        setShowCityDropdown(false);
+      }
+    };
+
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    document.addEventListener('keydown', handleEscKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscKey);
+    };
+  }, [showCityDropdown]);
 
   // Filter cities based on search input
   const filteredCities = cities.filter((c) =>
@@ -312,6 +322,9 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
               onClick={() => state && setShowCityDropdown(!showCityDropdown)}
               disabled={!state}
               className={`input w-full text-left flex items-center justify-between ${!state ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+              aria-haspopup="listbox"
+              aria-expanded={showCityDropdown}
+              aria-label={`Select cities${selectedCities.length > 0 ? `, ${selectedCities.length} selected` : ''}`}
             >
               <span className={selectedCities.length > 0 ? 'text-gray-900' : 'text-gray-500'}>
                 {!state ? 'Select a state first' :
@@ -340,6 +353,9 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
               ref={cityDropdownRef}
               className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden flex flex-col"
               style={{ maxHeight: '400px' }}
+              role="listbox"
+              aria-label="Available cities"
+              aria-multiselectable="true"
             >
               {/* Search Bar */}
               <div className="p-3 border-b bg-gray-50">

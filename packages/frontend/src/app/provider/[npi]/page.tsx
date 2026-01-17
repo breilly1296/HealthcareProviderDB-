@@ -26,7 +26,8 @@ export default function ProviderDetailPage() {
   const [colocatedProviders, setColocatedProviders] = useState<(Provider & { displayName: string })[]>([]);
   const [location, setLocation] = useState<Location | null>(null);
   const [colocatedTotal, setColocatedTotal] = useState(0);
-  const [loadingColocated, setLoadingColocated] = useState(false);
+  const [loadingColocated, setLoadingColocated] = useState(true);
+  const [colocatedError, setColocatedError] = useState<string | null>(null);
 
   const specialtyLabels: Record<string, string> = {
     ENDOCRINOLOGY: 'Endocrinology',
@@ -71,14 +72,15 @@ export default function ProviderDetailPage() {
 
   const fetchColocatedProviders = async () => {
     setLoadingColocated(true);
+    setColocatedError(null);
     try {
       const result = await providerApi.getColocated(npi, { limit: 10 });
       setColocatedProviders(result.providers);
       setLocation(result.location);
       setColocatedTotal(result.pagination.total);
     } catch (err) {
-      // Silently fail for colocated providers - not critical
       console.error('Failed to load colocated providers:', err);
+      setColocatedError('Unable to load other providers at this location');
     } finally {
       setLoadingColocated(false);
     }
@@ -428,7 +430,47 @@ export default function ProviderDetailPage() {
             </div>
 
             {/* Other Providers at This Location */}
-            {!loadingColocated && colocatedTotal > 0 && location && (
+            {loadingColocated && (
+              <div className="card">
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                  Other Providers at This Location
+                </h2>
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="animate-pulse p-4 border border-gray-200 rounded-lg">
+                      <div className="h-5 bg-gray-200 rounded w-2/3 mb-2"></div>
+                      <div className="h-4 bg-gray-100 rounded w-1/2"></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {!loadingColocated && colocatedError && (
+              <div className="card">
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                  Other Providers at This Location
+                </h2>
+                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <svg className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <div>
+                      <p className="text-sm text-yellow-800">{colocatedError}</p>
+                      <button
+                        onClick={fetchColocatedProviders}
+                        className="text-sm font-medium text-yellow-700 hover:text-yellow-800 mt-2"
+                      >
+                        Try again
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {!loadingColocated && !colocatedError && colocatedTotal > 0 && location && (
               <div className="card">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-2xl font-bold text-gray-900">
