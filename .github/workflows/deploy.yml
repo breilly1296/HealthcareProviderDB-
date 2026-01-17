@@ -141,6 +141,8 @@ jobs:
             --concurrency=80
           env_vars: |
             NODE_ENV=production
+          secrets: |
+            ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest
 
       - name: Show Frontend URL
         run: echo "Frontend deployed to ${{ steps.deploy.outputs.url }}"
