@@ -53,8 +53,10 @@ model Provider {
   createdAt        DateTime                 @default(now()) @map("created_at")
   id               Int?                     @unique @default(autoincrement())
   locationId       Int?                     @map("location_id")
+  healthSystemId   Int?                     @map("health_system_id")
   planAcceptances  ProviderPlanAcceptance[]
   location         Location?                @relation(fields: [locationId], references: [id])
+  healthSystem     HealthSystem?            @relation(fields: [healthSystemId], references: [id])
   verificationLogs VerificationLog[]
 
   @@index([state])
@@ -65,6 +67,7 @@ model Provider {
   @@index([locationId])
   @@index([city])
   @@index([firstName])
+  @@index([healthSystemId])
   @@map("providers")
 }
 
@@ -83,11 +86,20 @@ model InsurancePlan {
   sourceHealthSystem  String?                  @map("source_health_system") @db.VarChar(200)
   providerCount       Int                      @default(0) @map("provider_count")
 
+  // Foreign keys for normalized carrier/health system data
+  carrierId           Int?                     @map("carrier_id")
+  healthSystemId      Int?                     @map("health_system_id")
+
   providerAcceptances ProviderPlanAcceptance[]
   verificationLogs    VerificationLog[]
+  healthSystemPlans   HealthSystemPlan[]
+  carrierRef          Carrier?                 @relation(fields: [carrierId], references: [id])
+  healthSystem        HealthSystem?            @relation(fields: [healthSystemId], references: [id])
 
   @@index([carrier])
   @@index([planVariant])
+  @@index([carrierId])
+  @@index([healthSystemId])
   @@map("insurance_plans")
 }
 
@@ -153,6 +165,68 @@ model SyncLog {
   completedAt      DateTime? @map("completed_at")
 
   @@map("sync_logs")
+}
+
+// ============================================
+// Health System Insurance Pipeline Tables
+// ============================================
+
+model HealthSystem {
+  id               Int                @id @default(autoincrement())
+  name             String             @unique @db.VarChar(200)
+  website          String?            @db.VarChar(500)
+  insurancePageUrl String?            @map("insurance_page_url") @db.VarChar(500)
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+
+  healthSystemPlans HealthSystemPlan[]
+  insurancePlans    InsurancePlan[]
+  providers         Provider[]
+
+  @@map("health_systems")
+}
+
+model CarrierFamily {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique @db.VarChar(200)
+  aliases   String[]  @default([])
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  carriers Carrier[]
+
+  @@map("carrier_families")
+}
+
+model Carrier {
+  id        Int            @id @default(autoincrement())
+  familyId  Int?           @map("family_id")
+  name      String         @unique @db.VarChar(200)
+  states    String[]       @default([])
+  website   String?        @db.VarChar(500)
+  createdAt DateTime       @default(now()) @map("created_at")
+
+  family         CarrierFamily?  @relation(fields: [familyId], references: [id])
+  insurancePlans InsurancePlan[]
+
+  @@index([familyId])
+  @@map("carriers")
+}
+
+model HealthSystemPlan {
+  id             Int           @id @default(autoincrement())
+  healthSystemId Int           @map("health_system_id")
+  planId         String        @map("plan_id") @db.VarChar(50)
+  source         String        @default("SCRAPED") @db.VarChar(20) // SCRAPED, VERIFIED
+  scrapedAt      DateTime?     @map("scraped_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  healthSystem HealthSystem  @relation(fields: [healthSystemId], references: [id])
+  plan         InsurancePlan @relation(fields: [planId], references: [planId])
+
+  @@unique([healthSystemId, planId])
+  @@index([healthSystemId])
+  @@index([planId])
+  @@map("health_system_plans")
 }
 
 enum AcceptanceStatus {
