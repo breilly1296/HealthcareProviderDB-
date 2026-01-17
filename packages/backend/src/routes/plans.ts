@@ -9,6 +9,9 @@ import {
   getIssuers,
   getPlanTypes,
   getPlanYears,
+  getCarriers,
+  getPlanVariants,
+  getProvidersForPlan,
 } from '../services/planService';
 
 const router = Router();
@@ -16,6 +19,9 @@ const router = Router();
 // Validation schemas
 const searchQuerySchema = z.object({
   carrierName: z.string().min(1).max(200).optional(),
+  carrier: z.string().min(1).max(100).optional(),
+  planVariant: z.string().min(1).max(50).optional(),
+  search: z.string().min(1).max(200).optional(),
   planType: z.nativeEnum(PlanType).optional(),
   metalLevel: z.nativeEnum(MetalLevel).optional(),
   marketType: z.nativeEnum(MarketType).optional(),
@@ -48,6 +54,9 @@ router.get(
 
     const result = await searchPlans({
       carrierName: query.carrierName,
+      carrier: query.carrier,
+      planVariant: query.planVariant,
+      search: query.search,
       planType: query.planType,
       metalLevel: query.metalLevel,
       marketType: query.marketType,
@@ -146,6 +155,102 @@ router.get(
       data: {
         planYears: years,
         count: years.length,
+      },
+    });
+  })
+);
+
+/**
+ * GET /api/v1/plans/meta/carriers
+ * Get list of normalized carriers with provider counts
+ */
+router.get(
+  '/meta/carriers',
+  defaultRateLimiter,
+  asyncHandler(async (req, res) => {
+    const query = z.object({
+      state: z.string().length(2).toUpperCase().optional(),
+      isActive: z.coerce.boolean().optional(),
+    }).parse(req.query);
+
+    const carriers = await getCarriers({
+      state: query.state,
+      isActive: query.isActive,
+    });
+
+    res.json({
+      success: true,
+      data: {
+        carriers,
+        count: carriers.length,
+      },
+    });
+  })
+);
+
+/**
+ * GET /api/v1/plans/meta/variants
+ * Get list of plan variants (HMO, PPO, etc.)
+ */
+router.get(
+  '/meta/variants',
+  defaultRateLimiter,
+  asyncHandler(async (req, res) => {
+    const query = z.object({
+      carrier: z.string().min(1).max(100).optional(),
+      isActive: z.coerce.boolean().optional(),
+    }).parse(req.query);
+
+    const variants = await getPlanVariants({
+      carrier: query.carrier,
+      isActive: query.isActive,
+    });
+
+    res.json({
+      success: true,
+      data: {
+        variants,
+        count: variants.length,
+      },
+    });
+  })
+);
+
+/**
+ * GET /api/v1/plans/:planId/providers
+ * Get providers who accept a specific plan
+ * Note: This route must be defined BEFORE /:planId to avoid route conflicts
+ */
+router.get(
+  '/:planId/providers',
+  searchRateLimiter,
+  asyncHandler(async (req, res) => {
+    const { planId } = planIdParamSchema.parse(req.params);
+    const query = z.object({
+      page: z.coerce.number().int().min(1).default(1),
+      limit: z.coerce.number().int().min(1).max(100).default(20),
+    }).parse(req.query);
+
+    const result = await getProvidersForPlan(planId, {
+      page: query.page,
+      limit: query.limit,
+    });
+
+    if (!result) {
+      throw AppError.notFound(`Plan with ID ${planId} not found`);
+    }
+
+    res.json({
+      success: true,
+      data: {
+        providers: result.providers,
+        pagination: {
+          total: result.total,
+          page: result.page,
+          limit: result.limit,
+          totalPages: result.totalPages,
+          hasMore: result.page < result.totalPages,
+        },
       },
     });
   })
