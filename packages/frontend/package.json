@@ -11,6 +11,7 @@
   "keywords": [],
   "license": "ISC",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.71.2",
     "@healthcareproviderdb/shared": "*",
     "next": "^14.0.4",
     "posthog-js": "^1.321.2",
