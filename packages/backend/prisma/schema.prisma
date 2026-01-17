@@ -9,88 +9,53 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Physical locations (hospitals, offices, clinics)
-// Groups providers by shared address
 model Location {
-  id                    Int       @id @default(autoincrement())
-
-  // Address components
-  addressLine1          String    @db.VarChar(200) @map("address_line1")
-  addressLine2          String?   @db.VarChar(200) @map("address_line2")
-  city                  String    @db.VarChar(100)
-  state                 String    @db.VarChar(2)
-  zipCode               String    @db.VarChar(10) @map("zip_code")
-
-  // Location details
-  name                  String?   @db.VarChar(300)
-  healthSystem          String?   @db.VarChar(200) @map("health_system")
-  facilityType          String?   @db.VarChar(100) @map("facility_type")
-
-  // Metadata
-  providerCount         Int       @default(0) @map("provider_count")
-  createdAt             DateTime  @default(now()) @map("created_at")
-  updatedAt             DateTime  @updatedAt @map("updated_at")
-
-  // Relations
-  providers             Provider[]
+  id            Int        @id @default(autoincrement())
+  addressLine1  String     @map("address_line1") @db.VarChar(200)
+  addressLine2  String?    @map("address_line2") @db.VarChar(200)
+  city          String     @db.VarChar(100)
+  state         String     @db.VarChar(2)
+  zipCode       String     @map("zip_code") @db.VarChar(10)
+  providerCount Int?       @default(0) @map("provider_count")
+  createdAt     DateTime?  @default(now()) @map("created_at")
+  updatedAt     DateTime?  @default(now()) @updatedAt @map("updated_at")
+  name          String?    @db.VarChar(200)
+  healthSystem  String?    @map("health_system") @db.VarChar(100)
+  facilityType  String?    @map("facility_type") @db.VarChar(100)
+  providers     Provider[]
 
   @@unique([addressLine1, city, state, zipCode])
   @@index([state])
   @@index([city, state])
   @@index([zipCode])
-
   @@map("locations")
 }
 
-// Healthcare providers from NPI registry
 model Provider {
-  // Primary Key
-  npi                   String    @id @db.VarChar(10)
-
-  // Auto-increment ID (exists in DB but not used as primary key)
-  id                    Int?      @unique @default(autoincrement())
-
-  // Entity type
-  entityType            String    @db.VarChar(20) @map("entity_type")
-
-  // Individual provider fields
-  firstName             String?   @db.VarChar(100) @map("first_name")
-  lastName              String?   @db.VarChar(100) @map("last_name")
-  credential            String?   @db.VarChar(50)
-  sex                   String?   @db.VarChar(10)
-
-  // Organization fields
-  organizationName      String?   @db.VarChar(200) @map("organization_name")
-
-  // Specialty/Taxonomy
-  specialty             String?   @db.VarChar(200)
-  specialtyCode         String?   @db.VarChar(20) @map("specialty_code")
-
-  // Primary practice address
-  addressLine1          String    @db.VarChar(200) @map("address_line1")
-  addressLine2          String?   @db.VarChar(200) @map("address_line2")
-  city                  String    @db.VarChar(100)
-  state                 String    @db.VarChar(2)
-  zipCode               String    @db.VarChar(10) @map("zip_code")
-
-  // Contact
-  phone                 String?   @db.VarChar(20)
-  fax                   String?   @db.VarChar(20)
-
-  // NPI metadata
-  enumerationDate       DateTime? @db.Date @map("enumeration_date")
-  lastUpdated           DateTime? @db.Date @map("last_updated")
-
-  // Internal tracking
-  createdAt             DateTime  @default(now()) @map("created_at")
-
-  // Location relationship
-  locationId            Int?      @map("location_id")
-  location              Location? @relation(fields: [locationId], references: [id])
-
-  // Relations
-  planAcceptances       ProviderPlanAcceptance[]
-  verificationLogs      VerificationLog[]
+  npi              String                   @id @db.VarChar(10)
+  entityType       String                   @map("entity_type") @db.VarChar(20)
+  firstName        String?                  @map("first_name") @db.VarChar(100)
+  lastName         String?                  @map("last_name") @db.VarChar(100)
+  credential       String?                  @db.VarChar(50)
+  organizationName String?                  @map("organization_name") @db.VarChar(200)
+  specialty        String?                  @db.VarChar(200)
+  specialtyCode    String?                  @map("specialty_code") @db.VarChar(20)
+  addressLine1     String                   @map("address_line1") @db.VarChar(200)
+  addressLine2     String?                  @map("address_line2") @db.VarChar(200)
+  city             String                   @db.VarChar(100)
+  state            String                   @db.VarChar(2)
+  zipCode          String                   @map("zip_code") @db.VarChar(10)
+  phone            String?                  @db.VarChar(20)
+  fax              String?                  @db.VarChar(20)
+  sex              String?                  @db.VarChar(10)
+  enumerationDate  DateTime?                @map("enumeration_date") @db.Date
+  lastUpdated      DateTime?                @map("last_updated") @db.Date
+  createdAt        DateTime                 @default(now()) @map("created_at")
+  id               Int?                     @unique @default(autoincrement())
+  locationId       Int?                     @map("location_id")
+  planAcceptances  ProviderPlanAcceptance[]
+  location         Location?                @relation(fields: [locationId], references: [id])
+  verificationLogs VerificationLog[]
 
   @@index([state])
   @@index([specialtyCode])
@@ -98,344 +63,108 @@ model Provider {
   @@index([organizationName])
   @@index([state, specialtyCode])
   @@index([locationId])
-
+  @@index([city])
+  @@index([firstName])
   @@map("providers")
 }
 
-// Insurance plans from CMS and user uploads
 model InsurancePlan {
-  id                    String   @id @default(cuid())
-
-  // Plan identification
-  planId                String   @unique @db.VarChar(50)  // CMS plan ID or internal ID
-  planName              String   @db.VarChar(300)
-
-  // Carrier/Issuer info
-  carrierId             String?  @db.VarChar(50)
-  carrierName           String   @db.VarChar(200)
-
-  // Plan details
-  planType              PlanType
-  metalLevel            MetalLevel?
-  marketType            MarketType
-
-  // Coverage area
-  statesCovered         String[] // Array of state codes
-  serviceArea           String?  @db.VarChar(500)
-
-  // Plan year
-  planYear              Int
-  effectiveDate         DateTime?
-  terminationDate       DateTime?
-
-  // Data source
-  dataSource            DataSource
-  sourceFileId          String?
-
-  // Status
-  isActive              Boolean  @default(true)
-
-  // Internal tracking
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-
-  // Relations
-  providerAcceptances   ProviderPlanAcceptance[]
-  verificationLogs      VerificationLog[]
-
-  @@index([carrierName])
-  @@index([planType])
-  @@index([statesCovered])
-  @@index([planYear])
-  @@index([isActive])
+  createdAt           DateTime?                @default(now()) @map("created_at")
+  issuerName          String?                  @map("issuer_name") @db.VarChar(200)
+  planId              String                   @id @map("plan_id") @db.VarChar(50)
+  planName            String?                  @map("plan_name") @db.VarChar(200)
+  planType            String?                  @map("plan_type") @db.VarChar(20)
+  state               String?                  @db.VarChar(2)
+  providerAcceptances ProviderPlanAcceptance[]
+  verificationLogs    VerificationLog[]
 
   @@map("insurance_plans")
 }
 
-// Provider-Plan acceptance matching table
 model ProviderPlanAcceptance {
-  id                    Int      @id @default(autoincrement())
-
-  providerNpi           String   @db.VarChar(10) @map("npi")
-  provider              Provider @relation(fields: [providerNpi], references: [npi], onDelete: Cascade)
-
-  planId                String   @db.VarChar(50) @map("plan_id")
-  plan                  InsurancePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
-
-  // Acceptance status
-  acceptanceStatus      String   @default("UNKNOWN") @db.VarChar(20) @map("acceptance_status")
-
-  // Confidence scoring
-  confidenceScore       Int      @default(0) @map("confidence_score")
-
-  // Verification
-  lastVerified          DateTime? @map("last_verified")
-  verificationCount     Int      @default(0) @map("verification_count")
-
-  // Internal tracking
-  createdAt             DateTime @default(now()) @map("created_at")
-  updatedAt             DateTime @updatedAt @map("updated_at")
+  id                Int            @id @default(autoincrement())
+  providerNpi       String?        @map("npi") @db.VarChar(10)
+  planId            String?        @map("plan_id") @db.VarChar(50)
+  acceptanceStatus  String         @default("UNKNOWN") @map("acceptance_status") @db.VarChar(20)
+  confidenceScore   Int            @default(0) @map("confidence_score")
+  lastVerified      DateTime?      @map("last_verified")
+  verificationCount Int            @default(0) @map("verification_count")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+  provider          Provider?      @relation(fields: [providerNpi], references: [npi])
+  plan              InsurancePlan? @relation(fields: [planId], references: [planId])
 
   @@unique([providerNpi, planId])
   @@index([acceptanceStatus])
   @@index([confidenceScore])
   @@index([lastVerified])
-
   @@map("provider_plan_acceptance")
 }
 
-// Verification audit trail
 model VerificationLog {
-  id                    String   @id @default(cuid())
-
-  // What was verified
-  providerNpi           String?  @map("provider_npi")
-  provider              Provider? @relation(fields: [providerNpi], references: [npi], onDelete: SetNull)
-
-  planId                String?  @map("plan_id")
-  plan                  InsurancePlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
-
-  acceptanceId          String?
-
-  // Verification details
-  verificationType      VerificationType
-  verificationSource    VerificationSource
-
-  // Before/after state
-  previousValue         Json?
-  newValue              Json?
-
-  // Source information
-  sourceIp              String?  @db.VarChar(50)
-  userAgent             String?  @db.VarChar(500)
-  submittedBy           String?  @db.VarChar(200) // Email or anonymous ID
-
-  // Crowdsource specific
-  upvotes               Int      @default(0)
-  downvotes             Int      @default(0)
-  isApproved            Boolean?
-  reviewedAt            DateTime?
-  reviewedBy            String?
-
-  // Additional context
-  notes                 String?
-  evidenceUrl           String?  @db.VarChar(500)
-
-  createdAt             DateTime @default(now()) @map("created_at")
+  id                 String             @id @default(cuid())
+  providerNpi        String?            @map("provider_npi")
+  planId             String?            @map("plan_id")
+  acceptanceId       String?
+  verificationType   VerificationType
+  verificationSource VerificationSource
+  previousValue      Json?
+  newValue           Json?
+  sourceIp           String?            @db.VarChar(50)
+  userAgent          String?            @db.VarChar(500)
+  submittedBy        String?            @db.VarChar(200)
+  upvotes            Int                @default(0)
+  downvotes          Int                @default(0)
+  isApproved         Boolean?
+  reviewedAt         DateTime?
+  reviewedBy         String?
+  notes              String?
+  evidenceUrl        String?            @db.VarChar(500)
+  createdAt          DateTime           @default(now()) @map("created_at")
+  plan               InsurancePlan?     @relation(fields: [planId], references: [planId])
+  provider           Provider?          @relation(fields: [providerNpi], references: [npi])
 
   @@index([providerNpi])
   @@index([planId])
   @@index([verificationType])
   @@index([createdAt])
   @@index([isApproved])
-
   @@map("verification_logs")
 }
 
-// Sync/Import log for tracking data imports
 model SyncLog {
-  id                    String   @id @default(cuid())
-
-  // Sync identification
-  syncType              SyncType @map("sync_type")
-  dataSource            DataSource @map("data_source")
-
-  // File information
-  sourceFileName        String?  @db.VarChar(500) @map("source_file_name")
-  sourceFileHash        String?  @db.VarChar(64) @map("source_file_hash")  // SHA-256
-  sourceFileSize        BigInt?  @map("source_file_size")
-  sourceFileDate        DateTime? @map("source_file_date")
-
-  // Sync status
-  status                SyncStatus
-  startedAt             DateTime @default(now()) @map("started_at")
-  completedAt           DateTime? @map("completed_at")
-
-  // Statistics
-  totalRecords          Int      @default(0) @map("total_records")
-  processedRecords      Int      @default(0) @map("processed_records")
-  insertedRecords       Int      @default(0) @map("inserted_records")
-  updatedRecords        Int      @default(0) @map("updated_records")
-  skippedRecords        Int      @default(0) @map("skipped_records")
-  errorRecords          Int      @default(0) @map("error_records")
-
-  // Error tracking
-  errorLog              Json?    @map("error_log") // Array of error details
-  lastError             String?  @map("last_error")
-
-  // Filter criteria used
-  filterCriteria        Json?    @map("filter_criteria") // e.g., { states: ["FL"], specialties: ["rheumatology"] }
-
-  // Metadata
-  triggeredBy           String?  @db.VarChar(200) @map("triggered_by")
-  notes                 String?
-
-  @@index([syncType])
-  @@index([dataSource])
-  @@index([status])
-  @@index([startedAt])
+  id               Int       @id @default(autoincrement())
+  syncType         String?   @map("sync_type") @db.VarChar(50)
+  state            String?   @db.VarChar(2)
+  recordsProcessed Int?      @default(0) @map("records_processed")
+  status           String?   @db.VarChar(20)
+  errorMessage     String?   @map("error_message")
+  startedAt        DateTime? @default(now()) @map("started_at")
+  completedAt      DateTime? @map("completed_at")
 
   @@map("sync_logs")
 }
 
-// Enums
-
-// EntityType enum removed - using String instead since DB column is VARCHAR(20)
-// Values should be: "INDIVIDUAL" or "ORGANIZATION"
-
-// COMMENTED OUT - Changed to VARCHAR(200) for flexibility
-// Uncomment this enum to rollback the migration
-// enum EntityType {
-//   INDIVIDUAL  // NPI-1
-//   ORGANIZATION // NPI-2
-// }
-//
-// enum SpecialtyCategory {
-//   // Original categories
-//   ENDOCRINOLOGY
-//   RHEUMATOLOGY
-//   ORTHOPEDICS
-//   INTERNAL_MEDICINE
-//   FAMILY_MEDICINE
-//   GERIATRICS
-//
-//   // Mental Health & Behavioral
-//   MENTAL_HEALTH
-//   PSYCHIATRY
-//   PSYCHOLOGY
-//   SOCIAL_WORK
-//
-//   // Nursing & Advanced Practice
-//   NURSING
-//   NURSE_PRACTITIONER
-//   PHYSICIAN_ASSISTANT
-//   MIDWIFERY
-//
-//   // Dental & Vision
-//   DENTISTRY
-//   OPTOMETRY
-//
-//   // Pharmacy
-//   PHARMACY
-//
-//   // Therapy & Rehabilitation
-//   PHYSICAL_THERAPY
-//   OCCUPATIONAL_THERAPY
-//   SPEECH_THERAPY
-//   RESPIRATORY_THERAPY
-//   CHIROPRACTIC
-//   ACUPUNCTURE
-//
-//   // Medical Specialties
-//   EMERGENCY_MEDICINE
-//   PEDIATRICS
-//   ANESTHESIOLOGY
-//   SURGERY
-//   OB_GYN
-//   CARDIOLOGY
-//   RADIOLOGY
-//   DERMATOLOGY
-//   NEUROLOGY
-//   ONCOLOGY
-//   UROLOGY
-//   GASTROENTEROLOGY
-//   PULMONOLOGY
-//   NEPHROLOGY
-//   INFECTIOUS_DISEASE
-//   ALLERGY_IMMUNOLOGY
-//   PATHOLOGY
-//
-//   // Support Services
-//   DIETETICS
-//   LAB_PATHOLOGY
-//   DME_PROSTHETICS
-//   COMMUNITY_HEALTH
-//   HOME_HEALTH
-//   HOSPICE_PALLIATIVE
-//
-//   // Facilities
-//   CLINIC_FACILITY
-//   HOSPITAL
-//
-//   // Catch-all
-//   OTHER
-// }
-//
-// enum NpiStatus {
-//   ACTIVE
-//   DEACTIVATED
-// }
-
-enum PlanType {
-  HMO
-  PPO
-  EPO
-  POS
-  HDHP
-  MEDICARE_ADVANTAGE
-  MEDICAID
-  OTHER
-}
-
-enum MetalLevel {
-  BRONZE
-  SILVER
-  GOLD
-  PLATINUM
-  CATASTROPHIC
-}
-
-enum MarketType {
-  INDIVIDUAL
-  SMALL_GROUP
-  LARGE_GROUP
-  MEDICARE
-  MEDICAID
-}
-
-enum DataSource {
-  CMS_NPPES       // NPI registry
-  CMS_PLAN_FINDER // CMS plan data
-  USER_UPLOAD     // Manual upload
-  CARRIER_API     // Direct from insurance carrier
-  CROWDSOURCE     // User-submitted
-}
-
 enum AcceptanceStatus {
-  ACCEPTED        // Provider accepts this plan
-  NOT_ACCEPTED    // Provider does not accept
-  PENDING         // Awaiting verification
-  UNKNOWN         // No data
+  ACCEPTED
+  NOT_ACCEPTED
+  PENDING
+  UNKNOWN
 }
 
 enum VerificationSource {
-  CMS_DATA        // Official CMS data
-  CARRIER_DATA    // Insurance carrier data
-  PROVIDER_PORTAL // Provider's own website/portal
-  PHONE_CALL      // Phone verification
-  CROWDSOURCE     // User submission
-  AUTOMATED       // System-generated
+  CMS_DATA
+  CARRIER_DATA
+  PROVIDER_PORTAL
+  PHONE_CALL
+  CROWDSOURCE
+  AUTOMATED
 }
 
 enum VerificationType {
-  PLAN_ACCEPTANCE     // Verifying plan acceptance
-  PROVIDER_INFO       // Verifying provider details
-  CONTACT_INFO        // Verifying contact information
-  STATUS_CHANGE       // Provider status change
-  NEW_PLAN            // New plan added
-}
-
-enum SyncType {
-  NPI_FULL        // Full NPI data sync
-  NPI_WEEKLY      // Weekly NPI updates
-  PLAN_IMPORT     // Insurance plan import
-  PLAN_UPDATE     // Plan data update
-}
-
-enum SyncStatus {
-  PENDING
-  IN_PROGRESS
-  COMPLETED
-  FAILED
-  CANCELLED
+  PLAN_ACCEPTANCE
+  PROVIDER_INFO
+  CONTACT_INFO
+  STATUS_CHANGE
+  NEW_PLAN
 }
