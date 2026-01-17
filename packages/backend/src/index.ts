@@ -14,6 +14,10 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Trust proxy for Cloud Run (required for correct client IP in rate limiting)
+// Set to 1 to trust only the first proxy (Cloud Run's load balancer)
+app.set('trust proxy', 1);
+
 // Security middleware
 app.use(helmet());
 app.use(cors({

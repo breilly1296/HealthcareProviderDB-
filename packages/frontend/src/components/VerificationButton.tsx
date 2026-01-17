@@ -1,8 +1,14 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useEffect, useRef, useCallback } from 'react';
 import { verificationApi } from '@/lib/api';
 import { trackVerificationSubmit } from '@/lib/analytics';
+
+// Email validation regex (RFC 5322 simplified)
+const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+
+// Form submission timeout (10 seconds)
+const SUBMISSION_TIMEOUT_MS = 10000;
 
 interface VerificationButtonProps {
   npi: string;
@@ -29,6 +35,18 @@ export function VerificationButton({
   const [notes, setNotes] = useState('');
   const [email, setEmail] = useState('');
 
+  // Refs for focus trap
+  const modalRef = useRef<HTMLDivElement>(null);
+  const firstFocusableRef = useRef<HTMLButtonElement>(null);
+  const lastFocusableRef = useRef<HTMLButtonElement>(null);
+  const previousActiveElement = useRef<Element | null>(null);
+
+  // Validate email with regex
+  const validateEmail = (emailValue: string): boolean => {
+    if (!emailValue.trim()) return true; // Empty is valid (optional field)
+    return EMAIL_REGEX.test(emailValue.trim());
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
@@ -42,8 +60,20 @@ export function VerificationButton({
       return;
     }
 
+    // Validate email if provided
+    if (email.trim() && !validateEmail(email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
     setStep('submitting');
     setError('');
+
+    // Create abort controller for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, SUBMISSION_TIMEOUT_MS);
 
     try {
       await verificationApi.submit({
@@ -55,6 +85,8 @@ export function VerificationButton({
         submittedBy: email.trim() || undefined,
       });
 
+      clearTimeout(timeoutId);
+
       // Track successful verification submission
       trackVerificationSubmit({
         npi,
@@ -64,13 +96,23 @@ export function VerificationButton({
 
       setStep('success');
     } catch (err) {
+      clearTimeout(timeoutId);
       setStep('error');
-      setError(err instanceof Error ? err.message : 'Failed to submit verification');
+
+      if (err instanceof Error && err.name === 'AbortError') {
+        setError('Request timed out. Please check your connection and try again.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to submit verification');
+      }
     }
   };
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setIsOpen(false);
+    // Restore focus to the element that opened the modal
+    if (previousActiveElement.current instanceof HTMLElement) {
+      previousActiveElement.current.focus();
+    }
     // Reset form after animation
     setTimeout(() => {
       setStep('form');
@@ -82,12 +124,87 @@ export function VerificationButton({
       setNotes('');
       setEmail('');
     }, 200);
+  }, [initialPlanId, initialPlanName]);
+
+  const handleOpen = () => {
+    previousActiveElement.current = document.activeElement;
+    setIsOpen(true);
   };
+
+  // Handle ESC key to close modal
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, handleClose]);
+
+  // Focus trap: keep focus within modal
+  useEffect(() => {
+    if (!isOpen || !modalRef.current) return;
+
+    // Focus the first focusable element when modal opens
+    const focusableElements = modalRef.current.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    const firstFocusable = focusableElements[0];
+    const lastFocusable = focusableElements[focusableElements.length - 1];
+
+    // Store refs for tab trapping
+    if (firstFocusable instanceof HTMLButtonElement) {
+      firstFocusableRef.current = firstFocusable;
+    }
+    if (lastFocusable instanceof HTMLButtonElement) {
+      lastFocusableRef.current = lastFocusable;
+    }
+
+    // Focus first element
+    firstFocusable?.focus();
+
+    const handleTabKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+
+      if (e.shiftKey) {
+        // Shift + Tab
+        if (document.activeElement === firstFocusable) {
+          e.preventDefault();
+          lastFocusable?.focus();
+        }
+      } else {
+        // Tab
+        if (document.activeElement === lastFocusable) {
+          e.preventDefault();
+          firstFocusable?.focus();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleTabKey);
+    return () => document.removeEventListener('keydown', handleTabKey);
+  }, [isOpen, step]);
+
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
 
   return (
     <>
       <button
-        onClick={() => setIsOpen(true)}
+        onClick={handleOpen}
         className="btn-primary"
       >
         <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -98,20 +215,30 @@ export function VerificationButton({
 
       {/* Modal */}
       {isOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
+        <div
+          className="fixed inset-0 z-50 overflow-y-auto"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="verification-modal-title"
+        >
           <div className="flex min-h-full items-center justify-center p-4">
             {/* Backdrop */}
             <div
               className="fixed inset-0 bg-black/50 transition-opacity"
               onClick={handleClose}
+              aria-hidden="true"
             />
 
             {/* Modal content */}
-            <div className="relative bg-white rounded-xl shadow-xl max-w-lg w-full p-6">
+            <div
+              ref={modalRef}
+              className="relative bg-white rounded-xl shadow-xl max-w-lg w-full p-6"
+            >
               {/* Close button */}
               <button
                 onClick={handleClose}
                 className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+                aria-label="Close modal"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -120,7 +247,7 @@ export function VerificationButton({
 
               {step === 'form' && (
                 <>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                  <h2 id="verification-modal-title" className="text-2xl font-bold text-gray-900 mb-2">
                     Verify Insurance Acceptance
                   </h2>
                   <p className="text-gray-600 mb-6">
@@ -254,11 +381,12 @@ export function VerificationButton({
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="For follow-up if needed"
                         className="input"
+                        pattern="[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*"
                       />
                     </div>
 
                     {error && (
-                      <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700">
+                      <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700" role="alert">
                         {error}
                       </div>
                     )}

@@ -1,10 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
+import { randomUUID } from 'crypto';
 
 /**
  * Request log entry structure
  * Explicitly excludes PII (no IP, user agent, or identifying information)
  */
 interface RequestLogEntry {
+  requestId: string;
   timestamp: string;
   method: string;
   path: string;
@@ -18,17 +20,80 @@ interface RequestLogEntry {
 }
 
 /**
- * In-memory log buffer for aggregation
- * In production, this would write to a logging service
+ * Structured logger for production environments
+ * Outputs JSON logs that Cloud Run/Cloud Logging can parse automatically
+ */
+const logger = {
+  info: (entry: RequestLogEntry) => {
+    if (process.env.NODE_ENV === 'production') {
+      // Structured JSON for cloud logging (GCP Cloud Logging, etc.)
+      console.log(JSON.stringify({
+        severity: 'INFO',
+        ...entry,
+      }));
+    } else {
+      // Colored console output for development
+      const statusColor = entry.statusCode >= 400 ? '\x1b[31m' : '\x1b[32m';
+      const resetColor = '\x1b[0m';
+      const rateLimitTag = entry.rateLimited ? ' [RATE LIMITED]' : '';
+      console.log(
+        `[${entry.requestId.slice(0, 8)}] ${statusColor}${entry.method}${resetColor} ${entry.path} - ${statusColor}${entry.statusCode}${resetColor} (${entry.responseTimeMs}ms)${rateLimitTag}`
+      );
+    }
+  },
+  warn: (message: string, data?: Record<string, unknown>) => {
+    if (process.env.NODE_ENV === 'production') {
+      console.log(JSON.stringify({ severity: 'WARNING', message, ...data }));
+    } else {
+      console.warn(`\x1b[33m[WARN]\x1b[0m ${message}`, data || '');
+    }
+  },
+  error: (message: string, error?: unknown, data?: Record<string, unknown>) => {
+    const errorDetails = error instanceof Error
+      ? { errorMessage: error.message, stack: error.stack }
+      : { errorMessage: String(error) };
+
+    if (process.env.NODE_ENV === 'production') {
+      console.log(JSON.stringify({ severity: 'ERROR', message, ...errorDetails, ...data }));
+    } else {
+      console.error(`\x1b[31m[ERROR]\x1b[0m ${message}`, errorDetails, data || '');
+    }
+  },
+};
+
+// Export logger for use in other modules
+export { logger };
+
+/**
+ * In-memory log buffer for aggregation (development/debugging only)
+ * In production, logs go to Cloud Logging via stdout
  */
 const logBuffer: RequestLogEntry[] = [];
 const MAX_BUFFER_SIZE = 1000;
 
+// Extend Express Request to include requestId
+declare global {
+  namespace Express {
+    interface Request {
+      requestId: string;
+    }
+  }
+}
+
 /**
  * Request logging middleware
- * Tracks API usage without logging PII
+ * - Generates unique request ID for correlation
+ * - Tracks API usage without logging PII
+ * - Adds X-Request-ID header to responses
  */
 export function requestLogger(req: Request, res: Response, next: NextFunction): void {
+  // Generate unique request ID
+  const requestId = req.headers['x-request-id'] as string || randomUUID();
+  req.requestId = requestId;
+
+  // Add request ID to response headers for client-side correlation
+  res.setHeader('X-Request-ID', requestId);
+
   const startTime = Date.now();
 
   // Store original end function
@@ -44,6 +109,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
     const rateLimited = res.statusCode === 429;
 
     const logEntry: RequestLogEntry = {
+      requestId,
       timestamp: new Date().toISOString(),
       method: req.method,
       path: req.path,
@@ -60,8 +126,11 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
       };
     }
 
-    // Add to buffer
+    // Add to buffer (for stats endpoint)
     addLogEntry(logEntry);
+
+    // Log to stdout (picked up by Cloud Logging in production)
+    logger.info(logEntry);
 
     // Call original end
     return originalEnd.apply(this, args);
@@ -79,17 +148,6 @@ function addLogEntry(entry: RequestLogEntry): void {
   // Rotate buffer if too large
   if (logBuffer.length > MAX_BUFFER_SIZE) {
     logBuffer.shift();
-  }
-
-  // Log to console in development
-  if (process.env.NODE_ENV !== 'production') {
-    const statusColor = entry.statusCode >= 400 ? '\x1b[31m' : '\x1b[32m';
-    const resetColor = '\x1b[0m';
-    const rateLimitTag = entry.rateLimited ? ' [RATE LIMITED]' : '';
-
-    console.log(
-      `${statusColor}${entry.method}${resetColor} ${entry.path} - ${statusColor}${entry.statusCode}${resetColor} (${entry.responseTimeMs}ms)${rateLimitTag}`
-    );
   }
 }
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { locationApi, Provider, Location, Pagination } from '@/lib/api';
 import { ProviderCard } from '@/components/ProviderCard';
@@ -31,6 +31,7 @@ const SPECIALTIES = [
 export default function LocationDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const locationId = parseInt(params.locationId as string, 10);
   const page = parseInt(searchParams.get('page') || '1', 10);
   const specialtyFilter = searchParams.get('specialty') || '';
@@ -209,9 +210,9 @@ export default function LocationDetailPage() {
               id="specialty-filter"
               value={specialtyFilter}
               onChange={(e) => {
-                const params = new URLSearchParams();
-                if (e.target.value) params.set('specialty', e.target.value);
-                window.location.href = `/location/${locationId}?${params.toString()}`;
+                const newParams = new URLSearchParams();
+                if (e.target.value) newParams.set('specialty', e.target.value);
+                router.push(`/location/${locationId}?${newParams.toString()}`);
               }}
               className="input w-auto"
             >

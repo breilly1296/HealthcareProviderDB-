@@ -241,7 +241,7 @@ function SearchResults() {
                           ...(locationName && { locationName }),
                           page: String(p),
                         }).toString()}`}
-                        className={`px-4 py-2 rounded-lg font-medium ${
+                        className={`min-w-[44px] min-h-[44px] px-4 py-3 rounded-lg font-medium flex items-center justify-center ${
                           p === pagination.page
                             ? 'bg-primary-600 text-white'
                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
