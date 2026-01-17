@@ -147,12 +147,12 @@ export default function FreshnessWarning({
   // Don't show anything for GREEN in card variant (to avoid clutter)
   if (warningLevel === 'GREEN' && variant === 'card') {
     return (
-      <div className={`flex items-center gap-1 text-sm text-green-600 ${className}`}>
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <aside role="status" className={`flex items-center gap-1 text-sm text-green-600 ${className}`}>
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
         </svg>
         <span>Recently verified</span>
-      </div>
+      </aside>
     );
   }
 
@@ -169,7 +169,7 @@ export default function FreshnessWarning({
   if (variant === 'card') {
     if (warningLevel === 'YELLOW') {
       return (
-        <div className={`flex items-start gap-2 ${className}`}>
+        <aside role="status" className={`flex items-start gap-2 ${className}`}>
           <div className="flex-1">
             <div className="flex items-center gap-1 text-sm text-yellow-700">
               <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -208,13 +208,13 @@ export default function FreshnessWarning({
               Verify Now →
             </Link>
           )}
-        </div>
+        </aside>
       );
     }
 
     if (warningLevel === 'RED') {
       return (
-        <div className={`flex items-start gap-2 ${className}`}>
+        <aside role="status" className={`flex items-start gap-2 ${className}`}>
           <div className="flex-1">
             <div className="flex items-center gap-1 text-sm text-red-700 font-medium">
               <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -257,7 +257,7 @@ export default function FreshnessWarning({
               Verify Now →
             </Link>
           )}
-        </div>
+        </aside>
       );
     }
   }
@@ -266,7 +266,7 @@ export default function FreshnessWarning({
   if (variant === 'detail') {
     if (warningLevel === 'GREEN') {
       return (
-        <div className={`bg-green-50 border border-green-200 rounded-lg p-4 ${className}`}>
+        <aside role="status" className={`bg-green-50 border border-green-200 rounded-lg p-4 ${className}`}>
           <div className="flex items-start gap-3">
             <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
               <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -283,13 +283,13 @@ export default function FreshnessWarning({
               </p>
             </div>
           </div>
-        </div>
+        </aside>
       );
     }
 
     if (warningLevel === 'YELLOW') {
       return (
-        <div className={`bg-yellow-50 border border-yellow-200 rounded-lg p-4 ${className}`}>
+        <aside role="status" className={`bg-yellow-50 border border-yellow-200 rounded-lg p-4 ${className}`}>
           <div className="flex items-start gap-3">
             <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center flex-shrink-0">
               <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -312,13 +312,13 @@ export default function FreshnessWarning({
               )}
             </div>
           </div>
-        </div>
+        </aside>
       );
     }
 
     if (warningLevel === 'RED') {
       return (
-        <div className={`bg-red-50 border border-red-200 rounded-lg p-4 ${className}`}>
+        <aside role="status" className={`bg-red-50 border border-red-200 rounded-lg p-4 ${className}`}>
           <div className="flex items-start gap-3">
             <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
               <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -347,7 +347,7 @@ export default function FreshnessWarning({
               )}
             </div>
           </div>
-        </div>
+        </aside>
       );
     }
   }

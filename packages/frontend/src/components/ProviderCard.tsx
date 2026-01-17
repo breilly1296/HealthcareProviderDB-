@@ -27,7 +27,7 @@ export function ProviderCard({
 
   return (
     <Link href={`/provider/${provider.npi}`}>
-      <div className="card-hover cursor-pointer">
+      <article className="card-hover cursor-pointer">
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
           {/* Provider Info */}
           <div className="flex-1">
@@ -108,7 +108,7 @@ export function ProviderCard({
             </svg>
           </span>
         </div>
-      </div>
+      </article>
     </Link>
   );
 }

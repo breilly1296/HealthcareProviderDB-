@@ -69,15 +69,6 @@ export async function getPlanByPlanId(planId: string) {
 }
 
 /**
- * Get plan by internal ID
- */
-export async function getPlanById(id: string) {
-  return prisma.insurancePlan.findUnique({
-    where: { id },
-  });
-}
-
-/**
  * Get all unique issuers/carriers
  */
 export async function getIssuers(options: {

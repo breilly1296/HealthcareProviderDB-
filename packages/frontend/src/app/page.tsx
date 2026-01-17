@@ -6,17 +6,22 @@ export default function HomePage() {
       {/* Hero Section */}
       <section className="bg-gradient-to-b from-primary-50 to-white py-10 md:py-24">
         <div className="container-wide text-center">
-          {/* Research Badge */}
-          <div className="inline-flex flex-wrap items-center justify-center gap-2 bg-white px-3 sm:px-4 py-2 rounded-full shadow-sm border border-primary-200 mb-6">
-            <span className="text-xl sm:text-2xl leading-none">📚</span>
-            <span className="text-xs sm:text-sm font-medium text-gray-700">
-              Backed by peer-reviewed research
-            </span>
+          {/* Research Badge with Citation Summary */}
+          <div className="inline-flex flex-col items-center gap-2 bg-white px-4 sm:px-6 py-3 rounded-xl shadow-sm border border-primary-200 mb-6">
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <span className="text-xl sm:text-2xl leading-none">📚</span>
+              <span className="text-xs sm:text-sm font-medium text-gray-700">
+                Backed by peer-reviewed research
+              </span>
+            </div>
+            <p className="text-xs text-gray-600 text-center max-w-md">
+              Based on Mortensen et al. (2015) JAMIA, Haeder et al. (2024) Health Affairs Scholar
+            </p>
             <Link
               href="/research"
               className="inline-flex items-center text-xs sm:text-sm font-medium text-primary-600 hover:text-primary-700 whitespace-nowrap"
             >
-              Learn more →
+              View full research methodology →
             </Link>
           </div>
 

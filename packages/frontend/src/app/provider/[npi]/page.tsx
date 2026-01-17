@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { providerApi, Provider, PlanAcceptance, Location } from '@/lib/api';
@@ -25,9 +25,13 @@ export default function ProviderDetailPage() {
   const [error, setError] = useState<{ message: string; type: 'network' | 'server' | 'not-found' } | null>(null);
   const [colocatedProviders, setColocatedProviders] = useState<(Provider & { displayName: string })[]>([]);
   const [location, setLocation] = useState<Location | null>(null);
-  const [colocatedTotal, setColocatedTotal] = useState(0);
-  const [loadingColocated, setLoadingColocated] = useState(true);
+  const [colocatedTotal, setColocatedTotal] = useState<number | null>(null);
+  const [loadingColocated, setLoadingColocated] = useState(false);
   const [colocatedError, setColocatedError] = useState<string | null>(null);
+  const [colocatedFetched, setColocatedFetched] = useState(false);
+
+  // Ref for Intersection Observer (lazy loading colocated providers)
+  const colocatedSectionRef = useRef<HTMLDivElement>(null);
 
   const specialtyLabels: Record<string, string> = {
     ENDOCRINOLOGY: 'Endocrinology',
@@ -71,6 +75,7 @@ export default function ProviderDetailPage() {
   };
 
   const fetchColocatedProviders = async () => {
+    if (colocatedFetched) return; // Already fetched
     setLoadingColocated(true);
     setColocatedError(null);
     try {
@@ -78,6 +83,7 @@ export default function ProviderDetailPage() {
       setColocatedProviders(result.providers);
       setLocation(result.location);
       setColocatedTotal(result.pagination.total);
+      setColocatedFetched(true);
     } catch (err) {
       console.error('Failed to load colocated providers:', err);
       setColocatedError('Unable to load other providers at this location');
@@ -86,12 +92,30 @@ export default function ProviderDetailPage() {
     }
   };
 
+  // Fetch provider on mount
   useEffect(() => {
     if (npi) {
       fetchProvider();
-      fetchColocatedProviders();
     }
   }, [npi]);
+
+  // Lazy load colocated providers when section scrolls into view
+  useEffect(() => {
+    if (!colocatedSectionRef.current || colocatedFetched) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !colocatedFetched) {
+          fetchColocatedProviders();
+        }
+      },
+      { rootMargin: '100px' } // Start loading 100px before visible
+    );
+
+    observer.observe(colocatedSectionRef.current);
+
+    return () => observer.disconnect();
+  }, [npi, colocatedFetched]);
 
   if (loading) {
     return <ProviderDetailSkeleton />;
@@ -430,23 +454,26 @@ export default function ProviderDetailPage() {
             </div>
 
             {/* Other Providers at This Location */}
-            {loadingColocated && (
-              <div className="card">
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                  Other Providers at This Location
-                </h2>
-                <div className="space-y-3">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="animate-pulse p-4 border border-gray-200 rounded-lg">
-                      <div className="h-5 bg-gray-200 rounded w-2/3 mb-2"></div>
-                      <div className="h-4 bg-gray-100 rounded w-1/2"></div>
-                    </div>
-                  ))}
+            <div ref={colocatedSectionRef}>
+              {/* Loading state - show when fetching or not yet fetched */}
+              {(loadingColocated || (!colocatedFetched && !colocatedError)) && (
+                <div className="card">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                    Other Providers at This Location
+                  </h2>
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="animate-pulse p-4 border border-gray-200 rounded-lg">
+                        <div className="h-5 bg-gray-200 rounded w-2/3 mb-2"></div>
+                        <div className="h-4 bg-gray-100 rounded w-1/2"></div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {!loadingColocated && colocatedError && (
+              {/* Error state */}
+              {!loadingColocated && colocatedError && (
               <div className="card">
                 <h2 className="text-2xl font-bold text-gray-900 mb-4">
                   Other Providers at This Location
@@ -470,7 +497,26 @@ export default function ProviderDetailPage() {
               </div>
             )}
 
-            {!loadingColocated && !colocatedError && colocatedTotal > 0 && location && (
+              {/* Zero colocated providers */}
+              {!loadingColocated && !colocatedError && colocatedFetched && colocatedTotal === 0 && (
+                <div className="card">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                    Other Providers at This Location
+                  </h2>
+                  <div className="p-4 bg-gray-50 rounded-lg text-center">
+                    <svg className="w-10 h-10 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <p className="text-gray-600 font-medium">
+                      This is the only provider at this location
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Colocated providers list */}
+              {!loadingColocated && !colocatedError && colocatedFetched && colocatedTotal !== null && colocatedTotal > 0 && location && (
               <div className="card">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-2xl font-bold text-gray-900">
@@ -553,7 +599,8 @@ export default function ProviderDetailPage() {
                   </div>
                 )}
               </div>
-            )}
+              )}
+            </div>
           </div>
 
           {/* Sidebar */}
