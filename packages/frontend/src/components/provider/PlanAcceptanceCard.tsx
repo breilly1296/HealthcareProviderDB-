@@ -34,7 +34,7 @@ export function PlanAcceptanceCard({
             {pa.plan?.planName || 'Unknown Plan'}
           </h3>
           <p className="text-sm text-gray-600">
-            {pa.plan?.carrierName} • {pa.plan?.planType}
+            {pa.plan?.carrier || pa.plan?.issuerName || 'Unknown Carrier'} • {pa.plan?.planType}
           </p>
           {pa.acceptsNewPatients !== null && (
             <p className="text-sm mt-1">
@@ -56,7 +56,7 @@ export function PlanAcceptanceCard({
             npi={providerNpi}
             providerName={providerName}
             planId={pa.plan?.planId}
-            planName={pa.plan?.planName}
+            planName={pa.plan?.planName ?? undefined}
           />
         </div>
       </div>
@@ -69,7 +69,7 @@ export function PlanAcceptanceCard({
         providerNpi={providerNpi}
         providerName={providerName}
         planId={pa.plan?.planId}
-        planName={pa.plan?.planName}
+        planName={pa.plan?.planName ?? undefined}
         variant="detail"
         showVerifyButton={true}
       />

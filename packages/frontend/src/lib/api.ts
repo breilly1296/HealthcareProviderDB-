@@ -54,17 +54,16 @@ export interface Provider {
 }
 
 export interface InsurancePlan {
-  id: string;
   planId: string;
-  planName: string;
-  carrierId: string | null;
-  carrierName: string;
-  planType: string;
-  metalLevel: string | null;
-  marketType: string;
-  statesCovered: string[];
-  planYear: number;
-  isActive: boolean;
+  planName: string | null;
+  issuerName: string | null;
+  planType: string | null;
+  state: string | null;
+  carrier: string | null;
+  planVariant: string | null;
+  rawName: string | null;
+  sourceHealthSystem: string | null;
+  providerCount: number;
 }
 
 export interface PlanAcceptance {
@@ -102,7 +101,8 @@ export interface Verification {
   plan?: {
     planId: string;
     planName: string;
-    carrierName: string;
+    carrier: string | null;
+    issuerName: string | null;
   };
 }
 

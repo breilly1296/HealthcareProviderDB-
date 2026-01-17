@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { providerApi, Provider, PlanAcceptance, Location } from '@/lib/api';
@@ -32,6 +32,10 @@ export default function ProviderDetailPage() {
 
   // Ref for Intersection Observer (lazy loading colocated providers)
   const colocatedSectionRef = useRef<HTMLDivElement>(null);
+
+  // Insurance plan grouping state
+  const [planSearchQuery, setPlanSearchQuery] = useState('');
+  const [expandedCarriers, setExpandedCarriers] = useState<Set<string>>(new Set());
 
   const specialtyLabels: Record<string, string> = {
     ENDOCRINOLOGY: 'Endocrinology',
@@ -117,6 +121,52 @@ export default function ProviderDetailPage() {
     return () => observer.disconnect();
   }, [npi, colocatedFetched]);
 
+  // Memoized grouped plans - must be after provider state but uses safe access
+  const acceptedPlans = useMemo(() => {
+    if (!provider) return [];
+    return provider.planAcceptances.filter(pa => pa.acceptanceStatus === 'ACCEPTED');
+  }, [provider]);
+
+  const groupedPlans = useMemo(() => {
+    const groups: Record<string, PlanAcceptance[]> = {};
+
+    for (const pa of acceptedPlans) {
+      // Use carrier with fallback to issuerName for grouping
+      const carrier = pa.plan?.carrier || pa.plan?.issuerName || 'Other';
+
+      // Filter by search query if present
+      if (planSearchQuery) {
+        const query = planSearchQuery.toLowerCase();
+        const planName = (pa.plan?.planName || '').toLowerCase();
+        const carrierName = carrier.toLowerCase();
+        if (!planName.includes(query) && !carrierName.includes(query)) {
+          continue;
+        }
+      }
+
+      if (!groups[carrier]) {
+        groups[carrier] = [];
+      }
+      groups[carrier].push(pa);
+    }
+
+    // Sort carriers alphabetically
+    return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
+  }, [acceptedPlans, planSearchQuery]);
+
+  // Toggle carrier expansion
+  const toggleCarrier = (carrier: string) => {
+    setExpandedCarriers(prev => {
+      const next = new Set(prev);
+      if (next.has(carrier)) {
+        next.delete(carrier);
+      } else {
+        next.add(carrier);
+      }
+      return next;
+    });
+  };
+
   if (loading) {
     return <ProviderDetailSkeleton />;
   }
@@ -146,10 +196,6 @@ export default function ProviderDetailPage() {
   const specialty = provider.specialtyCategory
     ? specialtyLabels[provider.specialtyCategory] || provider.specialtyCategory
     : provider.taxonomyDescription || 'Healthcare Provider';
-
-  const acceptedPlans = provider.planAcceptances.filter(
-    (pa) => pa.acceptanceStatus === 'ACCEPTED'
-  );
 
   return (
     <div className="py-8 md:py-12">
@@ -259,7 +305,7 @@ export default function ProviderDetailPage() {
                             {pa.plan?.planName || 'Unknown Plan'}
                           </h3>
                           <p className="text-sm text-gray-600">
-                            {pa.plan?.carrierName} • {pa.plan?.planType}
+                            {pa.plan?.carrier || pa.plan?.issuerName || 'Unknown Carrier'} • {pa.plan?.planType}
                           </p>
                           {pa.acceptsNewPatients !== null && (
                             <p className="text-sm mt-1">
@@ -281,7 +327,7 @@ export default function ProviderDetailPage() {
                             npi={provider.npi}
                             providerName={provider.displayName}
                             planId={pa.plan?.planId}
-                            planName={pa.plan?.planName}
+                            planName={pa.plan?.planName ?? undefined}
                           />
                         </div>
                       </div>
@@ -294,7 +340,7 @@ export default function ProviderDetailPage() {
                         providerNpi={provider.npi}
                         providerName={provider.displayName}
                         planId={pa.plan?.planId}
-                        planName={pa.plan?.planName}
+                        planName={pa.plan?.planName ?? undefined}
                         variant="detail"
                         showVerifyButton={true}
                       />
