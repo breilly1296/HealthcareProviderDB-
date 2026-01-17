@@ -75,10 +75,10 @@ export async function submitVerification(input: SubmitVerificationInput) {
     throw AppError.notFound(`Provider with NPI ${npi} not found`);
   }
 
-  // Find plan
+  // Find plan (planId is now the primary key)
   const plan = await prisma.insurancePlan.findUnique({
     where: { planId },
-    select: { id: true },
+    select: { planId: true },
   });
 
   if (!plan) {
@@ -90,7 +90,7 @@ export async function submitVerification(input: SubmitVerificationInput) {
     where: {
       providerNpi_planId: {
         providerNpi: provider.npi,
-        planId: plan.id,
+        planId: plan.planId,
       },
     },
   });
@@ -106,7 +106,7 @@ export async function submitVerification(input: SubmitVerificationInput) {
   const verification = await prisma.verificationLog.create({
     data: {
       providerNpi: provider.npi,
-      planId: plan.id,
+      planId: plan.planId,
       acceptanceId: acceptance?.id.toString(),
       verificationType: VerificationType.PLAN_ACCEPTANCE,
       verificationSource: VerificationSource.CROWDSOURCE,
@@ -132,13 +132,13 @@ export async function submitVerification(input: SubmitVerificationInput) {
   // Update or create acceptance record
   if (acceptance) {
     // Get existing verification stats
-    const verificationCount = acceptance.verificationCount + 1;
+    const verificationCount = (acceptance.verificationCount || 0) + 1;
 
     // Query all past verifications for this provider-plan pair to count agreement
     const pastVerifications = await prisma.verificationLog.findMany({
       where: {
         providerNpi: provider.npi,
-        planId: plan.id,
+        planId: plan.planId,
         verificationType: VerificationType.PLAN_ACCEPTANCE,
       },
       select: {
@@ -182,7 +182,7 @@ export async function submitVerification(input: SubmitVerificationInput) {
       // No consensus - keep existing status, or set to PENDING if currently UNKNOWN
       finalStatus = acceptance.acceptanceStatus === 'UNKNOWN'
         ? 'PENDING'
-        : acceptance.acceptanceStatus;
+        : acceptance.acceptanceStatus || 'PENDING';
     }
 
     acceptance = await prisma.providerPlanAcceptance.update({
@@ -208,7 +208,7 @@ export async function submitVerification(input: SubmitVerificationInput) {
     acceptance = await prisma.providerPlanAcceptance.create({
       data: {
         providerNpi: provider.npi,
-        planId: plan.id,
+        planId: plan.planId,
         acceptanceStatus: 'PENDING',
         lastVerified: new Date(),
         verificationCount: 1,
@@ -254,7 +254,7 @@ export async function voteOnVerification(
       const { score, factors } = calculateConfidenceScore({
         dataSource: VerificationSource.CROWDSOURCE,
         lastVerifiedAt: acceptanceRecord.lastVerified,
-        verificationCount: acceptanceRecord.verificationCount,
+        verificationCount: acceptanceRecord.verificationCount || 0,
         upvotes: verification.upvotes,
         downvotes: verification.downvotes,
       });
@@ -329,10 +329,10 @@ export async function getRecentVerifications(options: {
   if (planId) {
     const plan = await prisma.insurancePlan.findUnique({
       where: { planId },
-      select: { id: true },
+      select: { planId: true },
     });
     if (plan) {
-      where.planId = plan.id;
+      where.planId = plan.planId;
     }
   }
 
@@ -370,7 +370,7 @@ export async function getRecentVerifications(options: {
         select: {
           planId: true,
           planName: true,
-          carrierName: true,
+          issuerName: true,
         },
       },
     },
@@ -388,7 +388,7 @@ export async function getVerificationsForPair(npi: string, planId: string) {
 
   const plan = await prisma.insurancePlan.findUnique({
     where: { planId },
-    select: { id: true },
+    select: { planId: true },
   });
 
   if (!provider || !plan) {
@@ -400,7 +400,7 @@ export async function getVerificationsForPair(npi: string, planId: string) {
       where: {
         providerNpi_planId: {
           providerNpi: provider.npi,
-          planId: plan.id,
+          planId: plan.planId,
         },
       },
     }),
@@ -408,7 +408,7 @@ export async function getVerificationsForPair(npi: string, planId: string) {
     prisma.verificationLog.findMany({
       where: {
         providerNpi: provider.npi,
-        planId: plan.id,
+        planId: plan.planId,
       },
       orderBy: { createdAt: 'desc' },
       take: 50,

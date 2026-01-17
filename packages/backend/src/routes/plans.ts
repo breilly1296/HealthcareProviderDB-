@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { PlanType, MetalLevel, MarketType } from '@prisma/client';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { searchRateLimiter, defaultRateLimiter } from '../middleware/rateLimiter';
 import {
@@ -8,9 +7,6 @@ import {
   getPlanByPlanId,
   getIssuers,
   getPlanTypes,
-  getPlanYears,
-  getCarriers,
-  getPlanVariants,
   getProvidersForPlan,
 } from '../services/planService';
 
@@ -18,16 +14,10 @@ const router = Router();
 
 // Validation schemas
 const searchQuerySchema = z.object({
-  carrierName: z.string().min(1).max(200).optional(),
-  carrier: z.string().min(1).max(100).optional(),
-  planVariant: z.string().min(1).max(50).optional(),
+  issuerName: z.string().min(1).max(200).optional(),
+  planType: z.string().min(1).max(20).optional(),
   search: z.string().min(1).max(200).optional(),
-  planType: z.nativeEnum(PlanType).optional(),
-  metalLevel: z.nativeEnum(MetalLevel).optional(),
-  marketType: z.nativeEnum(MarketType).optional(),
   state: z.string().length(2).toUpperCase().optional(),
-  planYear: z.coerce.number().int().min(2020).max(2030).optional(),
-  isActive: z.coerce.boolean().optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
@@ -38,8 +28,6 @@ const planIdParamSchema = z.object({
 
 const issuersQuerySchema = z.object({
   state: z.string().length(2).toUpperCase().optional(),
-  planYear: z.coerce.number().int().min(2020).max(2030).optional(),
-  isActive: z.coerce.boolean().optional(),
 });
 
 /**
@@ -53,16 +41,10 @@ router.get(
     const query = searchQuerySchema.parse(req.query);
 
     const result = await searchPlans({
-      carrierName: query.carrierName,
-      carrier: query.carrier,
-      planVariant: query.planVariant,
-      search: query.search,
+      issuerName: query.issuerName,
       planType: query.planType,
-      metalLevel: query.metalLevel,
-      marketType: query.marketType,
+      search: query.search,
       state: query.state,
-      planYear: query.planYear,
-      isActive: query.isActive,
       page: query.page,
       limit: query.limit,
     });
@@ -85,7 +67,7 @@ router.get(
 
 /**
  * GET /api/v1/plans/meta/issuers
- * Get list of unique insurance issuers/carriers
+ * Get list of unique insurance issuers
  */
 router.get(
   '/meta/issuers',
@@ -95,8 +77,6 @@ router.get(
 
     const issuers = await getIssuers({
       state: query.state,
-      planYear: query.planYear,
-      isActive: query.isActive,
     });
 
     res.json({
@@ -117,11 +97,14 @@ router.get(
   '/meta/types',
   defaultRateLimiter,
   asyncHandler(async (req, res) => {
-    const query = issuersQuerySchema.parse(req.query);
+    const query = z.object({
+      state: z.string().length(2).toUpperCase().optional(),
+      issuerName: z.string().min(1).max(200).optional(),
+    }).parse(req.query);
 
     const types = await getPlanTypes({
       state: query.state,
-      isActive: query.isActive,
+      issuerName: query.issuerName,
     });
 
     res.json({
@@ -129,88 +112,6 @@ router.get(
       data: {
         planTypes: types,
         count: types.length,
-      },
-    });
-  })
-);
-
-/**
- * GET /api/v1/plans/meta/years
- * Get list of available plan years
- */
-router.get(
-  '/meta/years',
-  defaultRateLimiter,
-  asyncHandler(async (req, res) => {
-    const query = z.object({
-      isActive: z.coerce.boolean().optional(),
-    }).parse(req.query);
-
-    const years = await getPlanYears({
-      isActive: query.isActive,
-    });
-
-    res.json({
-      success: true,
-      data: {
-        planYears: years,
-        count: years.length,
-      },
-    });
-  })
-);
-
-/**
- * GET /api/v1/plans/meta/carriers
- * Get list of normalized carriers with provider counts
- */
-router.get(
-  '/meta/carriers',
-  defaultRateLimiter,
-  asyncHandler(async (req, res) => {
-    const query = z.object({
-      state: z.string().length(2).toUpperCase().optional(),
-      isActive: z.coerce.boolean().optional(),
-    }).parse(req.query);
-
-    const carriers = await getCarriers({
-      state: query.state,
-      isActive: query.isActive,
-    });
-
-    res.json({
-      success: true,
-      data: {
-        carriers,
-        count: carriers.length,
-      },
-    });
-  })
-);
-
-/**
- * GET /api/v1/plans/meta/variants
- * Get list of plan variants (HMO, PPO, etc.)
- */
-router.get(
-  '/meta/variants',
-  defaultRateLimiter,
-  asyncHandler(async (req, res) => {
-    const query = z.object({
-      carrier: z.string().min(1).max(100).optional(),
-      isActive: z.coerce.boolean().optional(),
-    }).parse(req.query);
-
-    const variants = await getPlanVariants({
-      carrier: query.carrier,
-      isActive: query.isActive,
-    });
-
-    res.json({
-      success: true,
-      data: {
-        variants,
-        count: variants.length,
       },
     });
   })

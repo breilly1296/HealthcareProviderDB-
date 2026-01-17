@@ -1,18 +1,12 @@
-import { Prisma, PlanType, MetalLevel, MarketType } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { getPaginationValues } from './utils';
 
 export interface PlanSearchParams {
-  carrierName?: string;
-  carrier?: string;
-  planVariant?: string;
+  issuerName?: string;
+  planType?: string;
   search?: string;
-  planType?: PlanType;
-  metalLevel?: MetalLevel;
-  marketType?: MarketType;
   state?: string;
-  planYear?: number;
-  isActive?: boolean;
   page?: number;
   limit?: number;
 }
@@ -30,38 +24,25 @@ export interface PlanSearchResult {
  */
 export async function searchPlans(params: PlanSearchParams): Promise<PlanSearchResult> {
   const {
-    carrierName,
-    carrier,
-    planVariant,
-    search,
+    issuerName,
     planType,
-    metalLevel,
-    marketType,
+    search,
     state,
-    planYear,
-    isActive = true,
   } = params;
   const { take, skip, page } = getPaginationValues(params.page, params.limit);
 
   const where: Prisma.InsurancePlanWhereInput = {
-    ...(isActive !== undefined && { isActive }),
-    ...(carrierName && { carrierName: { contains: carrierName, mode: 'insensitive' as const } }),
-    ...(carrier && { carrier: { contains: carrier, mode: 'insensitive' as const } }),
-    ...(planVariant && { planVariant: { contains: planVariant, mode: 'insensitive' as const } }),
-    ...(planType && { planType }),
-    ...(metalLevel && { metalLevel }),
-    ...(marketType && { marketType }),
-    ...(state && { statesCovered: { has: state.toUpperCase() } }),
-    ...(planYear && { planYear }),
+    ...(issuerName && { issuerName: { contains: issuerName, mode: 'insensitive' as const } }),
+    ...(planType && { planType: { contains: planType, mode: 'insensitive' as const } }),
+    ...(state && { state: state.toUpperCase() }),
   };
 
-  // Add search filter (searches across carrier, planName, rawName)
+  // Add search filter (searches across issuerName, planName)
   if (search) {
     where.OR = [
-      { carrier: { contains: search, mode: 'insensitive' } },
-      { carrierName: { contains: search, mode: 'insensitive' } },
+      { issuerName: { contains: search, mode: 'insensitive' } },
       { planName: { contains: search, mode: 'insensitive' } },
-      { rawName: { contains: search, mode: 'insensitive' } },
+      { planId: { contains: search, mode: 'insensitive' } },
     ];
   }
 
@@ -70,7 +51,7 @@ export async function searchPlans(params: PlanSearchParams): Promise<PlanSearchR
       where,
       take,
       skip,
-      orderBy: [{ providerCount: 'desc' }, { carrierName: 'asc' }, { planName: 'asc' }],
+      orderBy: [{ issuerName: 'asc' }, { planName: 'asc' }],
     }),
     prisma.insurancePlan.count({ where }),
   ]);
@@ -95,43 +76,33 @@ export async function getPlanByPlanId(planId: string) {
 }
 
 /**
- * Get all unique issuers/carriers
+ * Get all unique issuers
  */
 export async function getIssuers(options: {
   state?: string;
-  planYear?: number;
-  isActive?: boolean;
 } = {}) {
-  const { state, planYear, isActive = true } = options;
+  const { state } = options;
 
-  const where: Prisma.InsurancePlanWhereInput = {};
-
-  if (isActive !== undefined) {
-    where.isActive = isActive;
-  }
+  const where: Prisma.InsurancePlanWhereInput = {
+    issuerName: { not: null },
+  };
 
   if (state) {
-    where.statesCovered = { has: state.toUpperCase() };
-  }
-
-  if (planYear) {
-    where.planYear = planYear;
+    where.state = state.toUpperCase();
   }
 
   const plans = await prisma.insurancePlan.findMany({
     where,
     select: {
-      carrierId: true,
-      carrierName: true,
+      issuerName: true,
     },
-    distinct: ['carrierName'],
-    orderBy: { carrierName: 'asc' },
+    distinct: ['issuerName'],
+    orderBy: { issuerName: 'asc' },
   });
 
-  return plans.map(p => ({
-    carrierId: p.carrierId,
-    carrierName: p.carrierName,
-  }));
+  return plans
+    .filter(p => p.issuerName)
+    .map(p => p.issuerName!);
 }
 
 /**
@@ -139,23 +110,20 @@ export async function getIssuers(options: {
  */
 export async function getPlanTypes(options: {
   state?: string;
-  carrierName?: string;
-  isActive?: boolean;
+  issuerName?: string;
 } = {}) {
-  const { state, carrierName, isActive = true } = options;
+  const { state, issuerName } = options;
 
-  const where: Prisma.InsurancePlanWhereInput = {};
-
-  if (isActive !== undefined) {
-    where.isActive = isActive;
-  }
+  const where: Prisma.InsurancePlanWhereInput = {
+    planType: { not: null },
+  };
 
   if (state) {
-    where.statesCovered = { has: state.toUpperCase() };
+    where.state = state.toUpperCase();
   }
 
-  if (carrierName) {
-    where.carrierName = { contains: carrierName, mode: 'insensitive' };
+  if (issuerName) {
+    where.issuerName = { contains: issuerName, mode: 'insensitive' };
   }
 
   const plans = await prisma.insurancePlan.findMany({
@@ -164,109 +132,12 @@ export async function getPlanTypes(options: {
       planType: true,
     },
     distinct: ['planType'],
-  });
-
-  return plans.map(p => p.planType);
-}
-
-/**
- * Get available plan years
- */
-export async function getPlanYears(options: { isActive?: boolean } = {}) {
-  const { isActive = true } = options;
-
-  const where: Prisma.InsurancePlanWhereInput = {};
-
-  if (isActive !== undefined) {
-    where.isActive = isActive;
-  }
-
-  const plans = await prisma.insurancePlan.findMany({
-    where,
-    select: {
-      planYear: true,
-    },
-    distinct: ['planYear'],
-    orderBy: { planYear: 'desc' },
-  });
-
-  return plans.map(p => p.planYear);
-}
-
-/**
- * Get unique carriers (normalized)
- */
-export async function getCarriers(options: {
-  state?: string;
-  isActive?: boolean;
-} = {}) {
-  const { state, isActive = true } = options;
-
-  const where: Prisma.InsurancePlanWhereInput = {
-    carrier: { not: null },
-  };
-
-  if (isActive !== undefined) {
-    where.isActive = isActive;
-  }
-
-  if (state) {
-    where.statesCovered = { has: state.toUpperCase() };
-  }
-
-  const plans = await prisma.insurancePlan.findMany({
-    where,
-    select: {
-      carrier: true,
-      _count: {
-        select: { providerAcceptances: true },
-      },
-    },
-    distinct: ['carrier'],
-    orderBy: { carrier: 'asc' },
+    orderBy: { planType: 'asc' },
   });
 
   return plans
-    .filter(p => p.carrier)
-    .map(p => ({
-      carrier: p.carrier!,
-      providerCount: p._count.providerAcceptances,
-    }));
-}
-
-/**
- * Get plan variants
- */
-export async function getPlanVariants(options: {
-  carrier?: string;
-  isActive?: boolean;
-} = {}) {
-  const { carrier, isActive = true } = options;
-
-  const where: Prisma.InsurancePlanWhereInput = {
-    planVariant: { not: null },
-  };
-
-  if (isActive !== undefined) {
-    where.isActive = isActive;
-  }
-
-  if (carrier) {
-    where.carrier = { contains: carrier, mode: 'insensitive' };
-  }
-
-  const plans = await prisma.insurancePlan.findMany({
-    where,
-    select: {
-      planVariant: true,
-    },
-    distinct: ['planVariant'],
-    orderBy: { planVariant: 'asc' },
-  });
-
-  return plans
-    .filter(p => p.planVariant)
-    .map(p => p.planVariant!);
+    .filter(p => p.planType)
+    .map(p => p.planType!);
 }
 
 /**
@@ -278,10 +149,10 @@ export async function getProvidersForPlan(
 ) {
   const { take, skip, page } = getPaginationValues(options.page, options.limit);
 
-  // First get the plan's internal ID
+  // Verify plan exists
   const plan = await prisma.insurancePlan.findUnique({
     where: { planId },
-    select: { id: true },
+    select: { planId: true },
   });
 
   if (!plan) {
@@ -289,7 +160,7 @@ export async function getProvidersForPlan(
   }
 
   const where: Prisma.ProviderPlanAcceptanceWhereInput = {
-    planId: plan.id,
+    planId: planId,
     acceptanceStatus: 'ACCEPTED',
     provider: { isNot: null },
   };
