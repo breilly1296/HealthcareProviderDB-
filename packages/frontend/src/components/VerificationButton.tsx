@@ -37,8 +37,6 @@ export function VerificationButton({
 
   // Refs for focus trap
   const modalRef = useRef<HTMLDivElement>(null);
-  const firstFocusableRef = useRef<HTMLButtonElement>(null);
-  const lastFocusableRef = useRef<HTMLButtonElement>(null);
   const previousActiveElement = useRef<Element | null>(null);
 
   // Validate email with regex
@@ -155,14 +153,6 @@ export function VerificationButton({
     );
     const firstFocusable = focusableElements[0];
     const lastFocusable = focusableElements[focusableElements.length - 1];
-
-    // Store refs for tab trapping
-    if (firstFocusable instanceof HTMLButtonElement) {
-      firstFocusableRef.current = firstFocusable;
-    }
-    if (lastFocusable instanceof HTMLButtonElement) {
-      lastFocusableRef.current = lastFocusable;
-    }
 
     // Focus first element
     firstFocusable?.focus();
