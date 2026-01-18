@@ -77,7 +77,6 @@ jobs:
             FRONTEND_URL=${{ secrets.FRONTEND_URL }}
           secrets: |
             DATABASE_URL=DATABASE_URL:latest
-            # ADMIN_SECRET=ADMIN_SECRET:latest  # TODO: Add after creating secret in GCP
 
       - name: Show Backend URL
         run: echo "Backend deployed to ${{ steps.deploy.outputs.url }}"
