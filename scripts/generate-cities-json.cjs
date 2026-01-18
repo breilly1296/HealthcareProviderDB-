@@ -7,7 +7,7 @@ const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
 
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://postgres:vMp%24db2026%21xKq9Tz@35.222.45.196:5432/providerdb';
+const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://postgres:vMp%24db2026%21xKq9Tz@35.223.46.51:5432/providerdb';
 
 async function main() {
   const pool = new Pool({
@@ -22,8 +22,7 @@ async function main() {
     const result = await pool.query(`
       SELECT DISTINCT state, city
       FROM providers
-      WHERE "npiStatus" = 'ACTIVE'
-        AND city IS NOT NULL
+      WHERE city IS NOT NULL
         AND city != ''
       ORDER BY state, city
     `);

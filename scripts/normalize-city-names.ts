@@ -493,7 +493,7 @@ async function analyzeCityData(pool: pg.Pool): Promise<NormalizationResult['befo
     ORDER BY count DESC
   `);
 
-  const cities: CityStats[] = result.rows.map(row => ({
+  const cities: CityStats[] = result.rows.map((row: { city: string; count: string }) => ({
     city: row.city,
     count: parseInt(row.count),
     normalizedTo: normalizeCity(row.city),
