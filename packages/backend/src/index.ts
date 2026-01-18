@@ -58,24 +58,36 @@ app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
 // Health check endpoint - BEFORE rate limiter so monitoring tools aren't blocked
 app.get('/health', async (req: Request, res: Response) => {
-  try {
-    await prisma.$queryRaw`SELECT 1`;
+  const health = {
+    status: 'ok' as 'ok' | 'degraded',
+    timestamp: new Date().toISOString(),
+    version: process.env.npm_package_version || '1.0.0',
+    uptime: process.uptime(),
+    memory: {
+      heapUsed: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+      heapTotal: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
+      unit: 'MB',
+    },
+    checks: {
+      database: 'unknown' as 'healthy' | 'unhealthy' | 'unknown',
+    },
+  };
 
-    res.json({
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      version: '1.0.0',
-      database: 'connected',
-      uptime: process.uptime(),
-    });
+  try {
+    const startTime = Date.now();
+    await prisma.$queryRaw`SELECT 1`;
+    const responseTime = Date.now() - startTime;
+
+    health.checks.database = 'healthy';
+    (health as Record<string, unknown>).databaseResponseTime = `${responseTime}ms`;
+
+    res.json(health);
   } catch (error) {
-    res.status(503).json({
-      status: 'unhealthy',
-      timestamp: new Date().toISOString(),
-      version: '1.0.0',
-      database: 'disconnected',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
+    health.status = 'degraded';
+    health.checks.database = 'unhealthy';
+    (health as Record<string, unknown>).error = error instanceof Error ? error.message : 'Database connection failed';
+
+    res.status(503).json(health);
   }
 });
 
