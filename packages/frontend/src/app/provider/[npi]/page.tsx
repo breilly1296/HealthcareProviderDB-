@@ -5,6 +5,11 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { providerApi, Provider, PlanAcceptance, Location } from '@/lib/api';
 import { ConfidenceBadge, ConfidenceIndicator } from '@/components/ConfidenceBadge';
+import {
+  ConfidenceScoreBreakdown,
+  ConfidenceScoreBadge,
+  type ConfidenceLevelType,
+} from '@/components/ConfidenceScoreBreakdown';
 import { VerificationButton } from '@/components/VerificationButton';
 import FreshnessWarning from '@/components/FreshnessWarning';
 import { ProviderDetailSkeleton } from '@/components/ProviderCardSkeleton';
@@ -388,55 +393,93 @@ export default function ProviderDetailPage() {
                           {/* Plans List */}
                           {isExpanded && (
                             <div className="divide-y divide-gray-100">
-                              {plans.map((pa) => (
-                                <div key={pa.id} className="p-4 space-y-4">
-                                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                    <div className="flex-1">
-                                      <h3 className="font-medium text-gray-900">
-                                        {pa.plan?.planName || 'Unknown Plan'}
-                                      </h3>
-                                      <p className="text-sm text-gray-600">
-                                        {pa.plan?.planType}
-                                      </p>
-                                      {pa.acceptsNewPatients !== null && (
-                                        <p className="text-sm mt-1">
-                                          {pa.acceptsNewPatients ? (
-                                            <span className="text-green-600">✓ Accepting new patients</span>
-                                          ) : (
-                                            <span className="text-red-600">✗ Not accepting new patients</span>
-                                          )}
-                                        </p>
-                                      )}
-                                    </div>
-                                    <div className="flex flex-col items-end gap-2">
-                                      <ConfidenceIndicator
-                                        lastVerifiedAt={pa.lastVerifiedAt}
-                                        verificationCount={pa.verificationCount}
-                                        acceptanceStatus={pa.acceptanceStatus}
-                                      />
-                                      <VerificationButton
-                                        npi={provider.npi}
-                                        providerName={provider.displayName}
-                                        planId={pa.plan?.planId}
-                                        planName={pa.plan?.planName ?? undefined}
-                                      />
-                                    </div>
-                                  </div>
+                              {plans.map((pa) => {
+                                // Get confidence level for display
+                                const confidenceLevel = (pa.confidence?.level ||
+                                  pa.confidenceLevel?.toUpperCase().replace(' ', '_') ||
+                                  'MEDIUM') as ConfidenceLevelType;
 
-                                  {/* Freshness Warning */}
-                                  <FreshnessWarning
-                                    lastVerifiedAt={pa.lastVerifiedAt ? new Date(pa.lastVerifiedAt) : null}
-                                    specialty={provider.specialtyCategory}
-                                    taxonomyDescription={provider.taxonomyDescription}
-                                    providerNpi={provider.npi}
-                                    providerName={provider.displayName}
-                                    planId={pa.plan?.planId}
-                                    planName={pa.plan?.planName ?? undefined}
-                                    variant="detail"
-                                    showVerifyButton={true}
-                                  />
-                                </div>
-                              ))}
+                                // Build factors - use API data if available, otherwise estimate from score
+                                const factors = pa.confidence?.factors || {
+                                  dataSourceScore: Math.round(pa.confidenceScore * 0.25),
+                                  recencyScore: Math.round(pa.confidenceScore * 0.30),
+                                  verificationScore: Math.min(25, pa.verificationCount * 8),
+                                  agreementScore: Math.round(pa.confidenceScore * 0.20),
+                                };
+
+                                // Build metadata
+                                const metadata = pa.confidence?.metadata || {
+                                  isStale: pa.lastVerifiedAt
+                                    ? (new Date().getTime() - new Date(pa.lastVerifiedAt).getTime()) > 60 * 24 * 60 * 60 * 1000
+                                    : false,
+                                  daysSinceVerification: pa.lastVerifiedAt
+                                    ? Math.floor((new Date().getTime() - new Date(pa.lastVerifiedAt).getTime()) / (24 * 60 * 60 * 1000))
+                                    : null,
+                                  researchNote: pa.verificationCount < 3
+                                    ? 'Research shows 3 verifications achieve expert-level accuracy (κ=0.58).'
+                                    : 'This verification meets the expert-level accuracy threshold.',
+                                };
+
+                                return (
+                                  <div key={pa.id} className="p-4 space-y-4">
+                                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                                      <div className="flex-1">
+                                        <h3 className="font-medium text-gray-900">
+                                          {pa.plan?.planName || 'Unknown Plan'}
+                                        </h3>
+                                        <p className="text-sm text-gray-600">
+                                          {pa.plan?.planType}
+                                        </p>
+                                        {pa.acceptsNewPatients !== null && (
+                                          <p className="text-sm mt-1">
+                                            {pa.acceptsNewPatients ? (
+                                              <span className="text-green-600">✓ Accepting new patients</span>
+                                            ) : (
+                                              <span className="text-red-600">✗ Not accepting new patients</span>
+                                            )}
+                                          </p>
+                                        )}
+                                      </div>
+                                      <div className="flex flex-col items-end gap-2">
+                                        {/* Compact badge for list view - clickable to expand breakdown */}
+                                        <ConfidenceScoreBadge
+                                          score={pa.confidenceScore}
+                                          level={confidenceLevel}
+                                          size="sm"
+                                          showScore={true}
+                                        />
+                                        <VerificationButton
+                                          npi={provider.npi}
+                                          providerName={provider.displayName}
+                                          planId={pa.plan?.planId}
+                                          planName={pa.plan?.planName ?? undefined}
+                                        />
+                                      </div>
+                                    </div>
+
+                                    {/* Full Confidence Score Breakdown */}
+                                    <ConfidenceScoreBreakdown
+                                      score={pa.confidenceScore}
+                                      level={confidenceLevel}
+                                      factors={factors}
+                                      metadata={metadata}
+                                    />
+
+                                    {/* Freshness Warning */}
+                                    <FreshnessWarning
+                                      lastVerifiedAt={pa.lastVerifiedAt ? new Date(pa.lastVerifiedAt) : null}
+                                      specialty={provider.specialtyCategory}
+                                      taxonomyDescription={provider.taxonomyDescription}
+                                      providerNpi={provider.npi}
+                                      providerName={provider.displayName}
+                                      planId={pa.plan?.planId}
+                                      planName={pa.plan?.planName ?? undefined}
+                                      variant="detail"
+                                      showVerifyButton={true}
+                                    />
+                                  </div>
+                                );
+                              })}
                             </div>
                           )}
                         </div>

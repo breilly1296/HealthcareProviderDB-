@@ -66,6 +66,31 @@ export interface InsurancePlan {
   providerCount: number;
 }
 
+export interface ConfidenceFactors {
+  dataSourceScore: number;
+  recencyScore: number;
+  verificationScore: number;
+  agreementScore: number;
+}
+
+export interface ConfidenceMetadata {
+  researchNote?: string;
+  isStale?: boolean;
+  daysSinceVerification?: number | null;
+  daysUntilStale?: number;
+  freshnessThreshold?: number;
+  recommendReVerification?: boolean;
+  explanation?: string;
+}
+
+export interface ConfidenceDetails {
+  score: number;
+  level: 'VERY_HIGH' | 'HIGH' | 'MEDIUM' | 'LOW' | 'VERY_LOW';
+  description?: string;
+  factors: ConfidenceFactors;
+  metadata?: ConfidenceMetadata;
+}
+
 export interface PlanAcceptance {
   id: string;
   providerId: string;
@@ -78,6 +103,8 @@ export interface PlanAcceptance {
   lastVerifiedAt: string | null;
   verificationCount: number;
   plan?: InsurancePlan;
+  confidence?: ConfidenceDetails;
+  expiresAt?: string | null;
 }
 
 export interface Verification {
