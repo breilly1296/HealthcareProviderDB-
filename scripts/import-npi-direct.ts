@@ -145,6 +145,7 @@ interface ImportStats {
   insertedRecords: number;
   updatedRecords: number;
   skippedRecords: number;
+  skippedDeactivated: number;
   errorRecords: number;
 }
 
@@ -262,12 +263,14 @@ async function importNPIData(filePath: string, databaseUrl: string): Promise<Imp
     insertedRecords: 0,
     updatedRecords: 0,
     skippedRecords: 0,
+    skippedDeactivated: 0,
     errorRecords: 0,
   };
 
   console.log(`\nStarting NPI import from: ${filePath}`);
   console.log(`File size: ${(fileStats.size / 1024 / 1024).toFixed(2)} MB`);
-  console.log(`Importing ALL providers (no specialty filter)\n`);
+  console.log(`Importing ALL providers (no specialty filter)`);
+  console.log(`Skipping deactivated providers (not reactivated)\n`);
 
   const parser = createReadStream(filePath).pipe(
     parse({
@@ -383,7 +386,7 @@ async function importNPIData(filePath: string, databaseUrl: string): Promise<Imp
 
     if (stats.totalRecords % 10000 === 0) {
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-      process.stdout.write(`\rProcessed: ${stats.totalRecords.toLocaleString()} | Imported: ${stats.insertedRecords.toLocaleString()} | Time: ${elapsed}s`);
+      process.stdout.write(`\rProcessed: ${stats.totalRecords.toLocaleString()} | Imported: ${stats.insertedRecords.toLocaleString()} | Skipped: ${stats.skippedDeactivated.toLocaleString()} | Time: ${elapsed}s`);
     }
 
     stats.processedRecords++;
@@ -391,6 +394,17 @@ async function importNPIData(filePath: string, databaseUrl: string): Promise<Imp
     const npi = record['NPI'];
     const entityTypeCode = record['Entity Type Code'];
     const primaryTaxonomy = record['Healthcare Provider Taxonomy Code_1'];
+
+    // Skip deactivated providers (deactivated and not reactivated)
+    const deactivationDate = record['NPI Deactivation Date'];
+    const reactivationDate = record['NPI Reactivation Date'];
+
+    if (deactivationDate && deactivationDate.trim() !== '' &&
+        (!reactivationDate || reactivationDate.trim() === '')) {
+      stats.skippedDeactivated++;
+      stats.skippedRecords++;
+      continue;
+    }
 
     const providerData = {
       npi,
@@ -430,7 +444,7 @@ async function importNPIData(filePath: string, databaseUrl: string): Promise<Imp
   await processBatch();
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-  process.stdout.write(`\rProcessed: ${stats.totalRecords.toLocaleString()} | Imported: ${stats.insertedRecords.toLocaleString()} | Time: ${elapsed}s\n`);
+  process.stdout.write(`\rProcessed: ${stats.totalRecords.toLocaleString()} | Imported: ${stats.insertedRecords.toLocaleString()} | Skipped: ${stats.skippedDeactivated.toLocaleString()} | Time: ${elapsed}s\n`);
 
   // Update sync log
   await pool.query(`
@@ -505,15 +519,16 @@ Options:
 
     const stats = await importNPIData(filePath, databaseUrl);
 
-    console.log('\n\n┌─────────────────────────────────────┐');
-    console.log('│         IMPORT COMPLETE             │');
-    console.log('├─────────────────────────────────────┤');
-    console.log(`│ Total records in file:  ${stats.totalRecords.toLocaleString().padStart(10)} │`);
-    console.log(`│ Records matched filter: ${stats.processedRecords.toLocaleString().padStart(10)} │`);
-    console.log(`│ Records imported:       ${stats.insertedRecords.toLocaleString().padStart(10)} │`);
-    console.log(`│ Records skipped:        ${stats.skippedRecords.toLocaleString().padStart(10)} │`);
-    console.log(`│ Records with errors:    ${stats.errorRecords.toLocaleString().padStart(10)} │`);
-    console.log('└─────────────────────────────────────┘');
+    console.log('\n\n┌───────────────────────────────────────────┐');
+    console.log('│            IMPORT COMPLETE                │');
+    console.log('├───────────────────────────────────────────┤');
+    console.log(`│ Total records in file:      ${stats.totalRecords.toLocaleString().padStart(10)} │`);
+    console.log(`│ Records processed:          ${stats.processedRecords.toLocaleString().padStart(10)} │`);
+    console.log(`│ Records imported:           ${stats.insertedRecords.toLocaleString().padStart(10)} │`);
+    console.log(`│ Skipped (deactivated):      ${stats.skippedDeactivated.toLocaleString().padStart(10)} │`);
+    console.log(`│ Skipped (other):            ${(stats.skippedRecords - stats.skippedDeactivated).toLocaleString().padStart(10)} │`);
+    console.log(`│ Records with errors:        ${stats.errorRecords.toLocaleString().padStart(10)} │`);
+    console.log('└───────────────────────────────────────────┘');
 
   } catch (error) {
     console.error('\nImport failed:', error);
