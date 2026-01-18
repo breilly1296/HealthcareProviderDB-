@@ -113,6 +113,7 @@ model ProviderPlanAcceptance {
   verificationCount Int            @default(0) @map("verification_count")
   createdAt         DateTime       @default(now()) @map("created_at")
   updatedAt         DateTime       @updatedAt @map("updated_at")
+  expiresAt         DateTime?      @map("expires_at") // TTL: 6 months from last_verified (12% annual provider turnover)
   provider          Provider?      @relation(fields: [providerNpi], references: [npi])
   plan              InsurancePlan? @relation(fields: [planId], references: [planId])
 
@@ -120,6 +121,7 @@ model ProviderPlanAcceptance {
   @@index([acceptanceStatus])
   @@index([confidenceScore])
   @@index([lastVerified])
+  @@index([expiresAt])
   @@map("provider_plan_acceptance")
 }
 
@@ -143,6 +145,7 @@ model VerificationLog {
   notes              String?
   evidenceUrl        String?            @db.VarChar(500)
   createdAt          DateTime           @default(now()) @map("created_at")
+  expiresAt          DateTime?          @map("expires_at") // TTL: 6 months from created_at (12% annual provider turnover)
   plan               InsurancePlan?     @relation(fields: [planId], references: [planId])
   provider           Provider?          @relation(fields: [providerNpi], references: [npi])
 
@@ -151,6 +154,8 @@ model VerificationLog {
   @@index([verificationType])
   @@index([createdAt])
   @@index([isApproved])
+  @@index([expiresAt])
+  @@index([providerNpi, createdAt])
   @@map("verification_logs")
 }
 

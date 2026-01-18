@@ -138,10 +138,14 @@ model ProviderPlanAcceptance {
   createdAt             DateTime @default(now()) @map("created_at")
   updatedAt             DateTime @updatedAt @map("updated_at")
 
+  // TTL: 6 months from last_verified (based on 12% annual provider turnover)
+  expiresAt             DateTime? @map("expires_at")
+
   @@unique([providerNpi, planId])
   @@index([acceptanceStatus])
   @@index([confidenceScore])
   @@index([lastVerified])
+  @@index([expiresAt])
 
   @@map("provider_plan_acceptance")
 }
@@ -185,11 +189,16 @@ model VerificationLog {
 
   createdAt             DateTime @default(now()) @map("created_at")
 
+  // TTL: 6 months from created_at (based on 12% annual provider turnover)
+  expiresAt             DateTime? @map("expires_at")
+
   @@index([providerNpi])
   @@index([planId])
   @@index([verificationType])
   @@index([createdAt])
   @@index([isApproved])
+  @@index([expiresAt])
+  @@index([providerNpi, createdAt])
 
   @@map("verification_logs")
 }
