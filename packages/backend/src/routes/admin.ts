@@ -7,13 +7,25 @@ const router = Router();
 /**
  * Admin secret authentication middleware
  * Validates X-Admin-Secret header against ADMIN_SECRET environment variable
+ *
+ * Returns 503 if ADMIN_SECRET is not configured (allows deployment without secret)
+ * Returns 401 if secret is configured but header is missing/invalid
  */
 function adminAuthMiddleware(req: Request, res: Response, next: NextFunction) {
   const adminSecret = process.env.ADMIN_SECRET;
 
+  // If ADMIN_SECRET is not configured, disable admin endpoints gracefully
   if (!adminSecret) {
-    console.error('ADMIN_SECRET environment variable not configured');
-    throw AppError.internal('Admin authentication not configured');
+    console.warn('[Admin] ADMIN_SECRET not configured - admin endpoints disabled');
+    res.status(503).json({
+      success: false,
+      error: {
+        message: 'Admin endpoints not configured. Set ADMIN_SECRET environment variable to enable.',
+        code: 'ADMIN_NOT_CONFIGURED',
+        statusCode: 503,
+      },
+    });
+    return;
   }
 
   const providedSecret = req.headers['x-admin-secret'];
