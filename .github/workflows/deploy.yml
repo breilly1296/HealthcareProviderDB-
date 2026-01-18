@@ -74,8 +74,10 @@ jobs:
             --add-cloudsql-instances=verifymyprovider-prod:us-central1:verifymyprovider-db
           env_vars: |
             NODE_ENV=production
+            FRONTEND_URL=${{ secrets.FRONTEND_URL }}
           secrets: |
             DATABASE_URL=DATABASE_URL:latest
+            ADMIN_SECRET=ADMIN_SECRET:latest
 
       - name: Show Backend URL
         run: echo "Backend deployed to ${{ steps.deploy.outputs.url }}"

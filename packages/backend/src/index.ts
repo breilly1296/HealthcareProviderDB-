@@ -14,6 +14,18 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Define allowed CORS origins
+const ALLOWED_ORIGINS: string[] = [
+  'https://verifymyprovider.com',
+  'https://www.verifymyprovider.com',
+  process.env.FRONTEND_URL,  // Cloud Run frontend URL
+].filter((origin): origin is string => Boolean(origin));
+
+// In development, also allow localhost
+if (process.env.NODE_ENV === 'development') {
+  ALLOWED_ORIGINS.push('http://localhost:3000', 'http://localhost:3001');
+}
+
 // Trust proxy for Cloud Run (required for correct client IP in rate limiting)
 // Set to 1 to trust only the first proxy (Cloud Run's load balancer)
 app.set('trust proxy', 1);
@@ -21,9 +33,23 @@ app.set('trust proxy', 1);
 // Security middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*',
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, Postman, etc.)
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    if (ALLOWED_ORIGINS.includes(origin)) {
+      callback(null, true);
+    } else {
+      // Log blocked CORS attempts for monitoring
+      console.warn(`[CORS] Blocked request from origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID', 'X-Admin-Secret'],
+  credentials: true,
 }));
 
 // Body parsing
