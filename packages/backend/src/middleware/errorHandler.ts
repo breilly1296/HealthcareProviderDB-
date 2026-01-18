@@ -86,6 +86,7 @@ export function errorHandler(
         message: err.message,
         code: err.code,
         statusCode: err.statusCode,
+        requestId: req.requestId,
       },
     });
     return;
@@ -99,6 +100,7 @@ export function errorHandler(
         message: 'Validation error',
         code: 'VALIDATION_ERROR',
         statusCode: 400,
+        requestId: req.requestId,
         details: zodError.errors.map((e) => ({
           field: e.path.join('.'),
           message: e.message,
@@ -118,6 +120,7 @@ export function errorHandler(
           message: 'A record with this value already exists',
           code: 'DUPLICATE_ENTRY',
           statusCode: 409,
+          requestId: req.requestId,
         },
       });
       return;
@@ -129,6 +132,7 @@ export function errorHandler(
           message: 'Record not found',
           code: 'NOT_FOUND',
           statusCode: 404,
+          requestId: req.requestId,
         },
       });
       return;
@@ -146,6 +150,7 @@ export function errorHandler(
       message,
       code: 'INTERNAL_ERROR',
       statusCode,
+      requestId: req.requestId,
     },
   });
 }
@@ -159,6 +164,7 @@ export function notFoundHandler(req: Request, res: Response): void {
       message: `Route ${req.method} ${req.path} not found`,
       code: 'ROUTE_NOT_FOUND',
       statusCode: 404,
+      requestId: req.requestId,
     },
   });
 }
