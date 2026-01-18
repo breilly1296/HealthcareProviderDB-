@@ -4,6 +4,33 @@ import { calculateConfidenceScore } from './confidenceService';
 import { AppError } from '../middleware/errorHandler';
 
 /**
+ * TTL (Time To Live) for verifications
+ * Based on research showing 12% annual provider turnover, verifications expire after 6 months.
+ * This ensures data freshness while balancing verification effort.
+ */
+export const VERIFICATION_TTL_MS = 6 * 30 * 24 * 60 * 60 * 1000; // 6 months in milliseconds
+
+/**
+ * Calculate expiration date for new verifications
+ */
+export function getExpirationDate(): Date {
+  return new Date(Date.now() + VERIFICATION_TTL_MS);
+}
+
+/**
+ * Build a WHERE clause that filters out expired records
+ * Includes legacy records (expiresAt: null) for backwards compatibility
+ */
+function notExpiredFilter(): Prisma.VerificationLogWhereInput {
+  return {
+    OR: [
+      { expiresAt: null },           // Legacy records without TTL
+      { expiresAt: { gt: new Date() } }, // Not yet expired
+    ],
+  };
+}
+
+/**
  * Research-based verification input
  * Based on Mortensen et al. (2015), JAMIA: Simple binary questions achieve highest accuracy
  */
@@ -102,7 +129,7 @@ export async function submitVerification(input: SubmitVerificationInput) {
 
   const newStatus = acceptsInsurance ? 'ACCEPTED' : 'NOT_ACCEPTED';
 
-  // Create verification log
+  // Create verification log with TTL
   const verification = await prisma.verificationLog.create({
     data: {
       providerNpi: provider.npi,
@@ -126,6 +153,7 @@ export async function submitVerification(input: SubmitVerificationInput) {
       userAgent,
       upvotes: 0,
       downvotes: 0,
+      expiresAt: getExpirationDate(), // TTL: expires after 6 months
     },
   });
 
@@ -134,12 +162,13 @@ export async function submitVerification(input: SubmitVerificationInput) {
     // Get existing verification stats
     const verificationCount = (acceptance.verificationCount || 0) + 1;
 
-    // Query all past verifications for this provider-plan pair to count agreement
+    // Query all non-expired verifications for this provider-plan pair to count agreement
     const pastVerifications = await prisma.verificationLog.findMany({
       where: {
         providerNpi: provider.npi,
         planId: plan.planId,
         verificationType: VerificationType.PLAN_ACCEPTANCE,
+        ...notExpiredFilter(), // Exclude expired verifications from consensus
       },
       select: {
         newValue: true,
@@ -192,6 +221,7 @@ export async function submitVerification(input: SubmitVerificationInput) {
         lastVerified: new Date(),
         verificationCount,
         confidenceScore: score,
+        expiresAt: getExpirationDate(), // Reset TTL on new verification
       },
     });
   } else {
@@ -213,6 +243,7 @@ export async function submitVerification(input: SubmitVerificationInput) {
         lastVerified: new Date(),
         verificationCount: 1,
         confidenceScore: score,
+        expiresAt: getExpirationDate(), // TTL: expires after 6 months
       },
     });
 
@@ -311,10 +342,16 @@ export async function getRecentVerifications(options: {
   limit?: number;
   npi?: string;
   planId?: string;
+  includeExpired?: boolean; // Default false - filter out expired
 } = {}) {
-  const { limit = 20, npi, planId } = options;
+  const { limit = 20, npi, planId, includeExpired = false } = options;
 
   const where: Prisma.VerificationLogWhereInput = {};
+
+  // Filter out expired verifications unless explicitly requested
+  if (!includeExpired) {
+    Object.assign(where, notExpiredFilter());
+  }
 
   if (npi) {
     const provider = await prisma.provider.findUnique({
@@ -354,6 +391,7 @@ export async function getRecentVerifications(options: {
       evidenceUrl: true,
       isApproved: true,
       createdAt: true,
+      expiresAt: true, // Include TTL for transparency
       upvotes: true,
       downvotes: true,
       // Exclude: sourceIp, userAgent, submittedBy
@@ -380,7 +418,13 @@ export async function getRecentVerifications(options: {
 /**
  * Get verifications for a specific provider-plan pair
  */
-export async function getVerificationsForPair(npi: string, planId: string) {
+export async function getVerificationsForPair(
+  npi: string,
+  planId: string,
+  options: { includeExpired?: boolean } = {}
+) {
+  const { includeExpired = false } = options;
+
   const provider = await prisma.provider.findUnique({
     where: { npi },
     select: { npi: true },
@@ -395,6 +439,16 @@ export async function getVerificationsForPair(npi: string, planId: string) {
     return null;
   }
 
+  // Build where clause with optional TTL filter
+  const verificationWhere: Prisma.VerificationLogWhereInput = {
+    providerNpi: provider.npi,
+    planId: plan.planId,
+  };
+
+  if (!includeExpired) {
+    Object.assign(verificationWhere, notExpiredFilter());
+  }
+
   const [acceptance, verifications] = await Promise.all([
     prisma.providerPlanAcceptance.findUnique({
       where: {
@@ -406,10 +460,7 @@ export async function getVerificationsForPair(npi: string, planId: string) {
     }),
     // Security: Exclude PII fields (sourceIp, userAgent, submittedBy)
     prisma.verificationLog.findMany({
-      where: {
-        providerNpi: provider.npi,
-        planId: plan.planId,
-      },
+      where: verificationWhere,
       orderBy: { createdAt: 'desc' },
       take: 50,
       select: {
@@ -425,20 +476,194 @@ export async function getVerificationsForPair(npi: string, planId: string) {
         evidenceUrl: true,
         isApproved: true,
         createdAt: true,
-          upvotes: true,
+        expiresAt: true, // Include TTL for transparency
+        upvotes: true,
         downvotes: true,
         // Exclude: sourceIp, userAgent, submittedBy
       },
     }),
   ]);
 
+  // Check if acceptance record is expired
+  const isAcceptanceExpired = acceptance?.expiresAt
+    ? new Date(acceptance.expiresAt) < new Date()
+    : false;
+
   return {
     acceptance,
+    isAcceptanceExpired,
     verifications,
     summary: {
       totalVerifications: verifications.length,
       totalUpvotes: verifications.reduce((sum, v) => sum + v.upvotes, 0),
       totalDownvotes: verifications.reduce((sum, v) => sum + v.downvotes, 0),
+    },
+  };
+}
+
+/**
+ * Cleanup expired verifications
+ *
+ * This function should be run as a scheduled job (e.g., daily cron)
+ * to remove verification records that have exceeded their TTL.
+ *
+ * Based on 12% annual provider turnover research, keeping expired
+ * verifications serves no purpose and wastes storage.
+ *
+ * @param options.dryRun - If true, returns counts without deleting
+ * @param options.batchSize - Number of records to delete per batch (default 1000)
+ * @returns Cleanup statistics
+ */
+export async function cleanupExpiredVerifications(options: {
+  dryRun?: boolean;
+  batchSize?: number;
+} = {}): Promise<{
+  dryRun: boolean;
+  expiredVerificationLogs: number;
+  expiredPlanAcceptances: number;
+  deletedVerificationLogs: number;
+  deletedPlanAcceptances: number;
+}> {
+  const { dryRun = false, batchSize = 1000 } = options;
+  const now = new Date();
+
+  // Count expired records
+  const [expiredLogsCount, expiredAcceptanceCount] = await Promise.all([
+    prisma.verificationLog.count({
+      where: {
+        expiresAt: {
+          lt: now,
+          not: null,
+        },
+      },
+    }),
+    prisma.providerPlanAcceptance.count({
+      where: {
+        expiresAt: {
+          lt: now,
+          not: null,
+        },
+      },
+    }),
+  ]);
+
+  const result = {
+    dryRun,
+    expiredVerificationLogs: expiredLogsCount,
+    expiredPlanAcceptances: expiredAcceptanceCount,
+    deletedVerificationLogs: 0,
+    deletedPlanAcceptances: 0,
+  };
+
+  if (dryRun) {
+    return result;
+  }
+
+  // Delete expired verification logs in batches
+  let deletedLogs = 0;
+  while (deletedLogs < expiredLogsCount) {
+    const deleteResult = await prisma.verificationLog.deleteMany({
+      where: {
+        expiresAt: {
+          lt: now,
+          not: null,
+        },
+      },
+    });
+
+    if (deleteResult.count === 0) break;
+    deletedLogs += deleteResult.count;
+
+    // Safety check to prevent infinite loops
+    if (deleteResult.count < batchSize) break;
+  }
+  result.deletedVerificationLogs = deletedLogs;
+
+  // Delete expired plan acceptances in batches
+  // Note: Only delete acceptances that have no non-expired verifications
+  let deletedAcceptances = 0;
+  while (deletedAcceptances < expiredAcceptanceCount) {
+    const deleteResult = await prisma.providerPlanAcceptance.deleteMany({
+      where: {
+        expiresAt: {
+          lt: now,
+          not: null,
+        },
+      },
+    });
+
+    if (deleteResult.count === 0) break;
+    deletedAcceptances += deleteResult.count;
+
+    // Safety check to prevent infinite loops
+    if (deleteResult.count < batchSize) break;
+  }
+  result.deletedPlanAcceptances = deletedAcceptances;
+
+  return result;
+}
+
+/**
+ * Get expiration statistics for monitoring
+ */
+export async function getExpirationStats(): Promise<{
+  verificationLogs: {
+    total: number;
+    withTTL: number;
+    expired: number;
+    expiringWithin7Days: number;
+    expiringWithin30Days: number;
+  };
+  planAcceptances: {
+    total: number;
+    withTTL: number;
+    expired: number;
+    expiringWithin7Days: number;
+    expiringWithin30Days: number;
+  };
+}> {
+  const now = new Date();
+  const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+  const [
+    totalLogs,
+    logsWithTTL,
+    expiredLogs,
+    logsExpiring7Days,
+    logsExpiring30Days,
+    totalAcceptances,
+    acceptancesWithTTL,
+    expiredAcceptances,
+    acceptancesExpiring7Days,
+    acceptancesExpiring30Days,
+  ] = await Promise.all([
+    prisma.verificationLog.count(),
+    prisma.verificationLog.count({ where: { expiresAt: { not: null } } }),
+    prisma.verificationLog.count({ where: { expiresAt: { lt: now, not: null } } }),
+    prisma.verificationLog.count({ where: { expiresAt: { gte: now, lt: in7Days } } }),
+    prisma.verificationLog.count({ where: { expiresAt: { gte: now, lt: in30Days } } }),
+    prisma.providerPlanAcceptance.count(),
+    prisma.providerPlanAcceptance.count({ where: { expiresAt: { not: null } } }),
+    prisma.providerPlanAcceptance.count({ where: { expiresAt: { lt: now, not: null } } }),
+    prisma.providerPlanAcceptance.count({ where: { expiresAt: { gte: now, lt: in7Days } } }),
+    prisma.providerPlanAcceptance.count({ where: { expiresAt: { gte: now, lt: in30Days } } }),
+  ]);
+
+  return {
+    verificationLogs: {
+      total: totalLogs,
+      withTTL: logsWithTTL,
+      expired: expiredLogs,
+      expiringWithin7Days: logsExpiring7Days,
+      expiringWithin30Days: logsExpiring30Days,
+    },
+    planAcceptances: {
+      total: totalAcceptances,
+      withTTL: acceptancesWithTTL,
+      expired: expiredAcceptances,
+      expiringWithin7Days: acceptancesExpiring7Days,
+      expiringWithin30Days: acceptancesExpiring30Days,
     },
   };
 }
