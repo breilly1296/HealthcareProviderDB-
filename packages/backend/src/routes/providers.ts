@@ -9,7 +9,7 @@ import {
   getProviderDisplayName,
   getCitiesByState,
 } from '../services/providerService';
-import { getConfidenceLevel, getConfidenceLevelDescription } from '../services/confidenceService';
+import { getConfidenceLevel, getConfidenceLevelDescription, calculateConfidenceScore, ConfidenceResult } from '../services/confidenceService';
 import { getColocatedProviders } from '../services/locationService';
 
 const router = Router();
@@ -111,7 +111,7 @@ router.get(
 
 /**
  * GET /api/v1/providers/:npi
- * Get provider by NPI
+ * Get provider by NPI with full confidence breakdown
  */
 router.get(
   '/:npi',
@@ -131,14 +131,31 @@ router.get(
         provider: {
           ...provider,
           displayName: getProviderDisplayName(provider),
-          planAcceptances: provider.planAcceptances.map((pa) => ({
-            ...pa,
-            confidenceLevel: getConfidenceLevel(pa.confidenceScore, pa.verificationCount),
-            confidenceDescription: getConfidenceLevelDescription(
-              getConfidenceLevel(pa.confidenceScore, pa.verificationCount),
-              pa.verificationCount
-            ),
-          })),
+          planAcceptances: provider.planAcceptances.map((pa) => {
+            // Calculate full confidence breakdown using research-based scoring
+            const confidenceResult = calculateConfidenceScore({
+              dataSource: null, // Verification source tracked in VerificationLog
+              lastVerifiedAt: pa.lastVerified,
+              verificationCount: pa.verificationCount,
+              upvotes: 0, // Will be enhanced when we track votes per acceptance
+              downvotes: 0,
+              specialty: provider.specialty || null,
+              taxonomyDescription: null, // Not stored in Provider model
+            });
+
+            return {
+              ...pa,
+              confidenceLevel: confidenceResult.level,
+              confidenceDescription: confidenceResult.description,
+              confidence: {
+                score: confidenceResult.score,
+                level: confidenceResult.level,
+                description: confidenceResult.description,
+                factors: confidenceResult.factors,
+                metadata: confidenceResult.metadata,
+              },
+            };
+          }),
         },
       },
     });
@@ -147,7 +164,7 @@ router.get(
 
 /**
  * GET /api/v1/providers/:npi/plans
- * Get accepted plans for a provider
+ * Get accepted plans for a provider with full confidence breakdown
  */
 router.get(
   '/:npi/plans',
@@ -171,14 +188,31 @@ router.get(
       success: true,
       data: {
         npi,
-        acceptances: result.acceptances.map((a) => ({
-          ...a,
-          confidenceLevel: getConfidenceLevel(a.confidenceScore, a.verificationCount),
-          confidenceDescription: getConfidenceLevelDescription(
-            getConfidenceLevel(a.confidenceScore, a.verificationCount),
-            a.verificationCount
-          ),
-        })),
+        acceptances: result.acceptances.map((a) => {
+          // Calculate full confidence breakdown using research-based scoring
+          const confidenceResult = calculateConfidenceScore({
+            dataSource: null, // Verification source tracked in VerificationLog
+            lastVerifiedAt: a.lastVerified,
+            verificationCount: a.verificationCount,
+            upvotes: 0, // Will be enhanced when we track votes per acceptance
+            downvotes: 0,
+            specialty: a.plan?.planType || null,
+            taxonomyDescription: null,
+          });
+
+          return {
+            ...a,
+            confidenceLevel: confidenceResult.level,
+            confidenceDescription: confidenceResult.description,
+            confidence: {
+              score: confidenceResult.score,
+              level: confidenceResult.level,
+              description: confidenceResult.description,
+              factors: confidenceResult.factors,
+              metadata: confidenceResult.metadata,
+            },
+          };
+        }),
         pagination: {
           total: result.total,
           page: result.page,

@@ -9,7 +9,7 @@ import {
   getRecentVerifications,
   getVerificationsForPair,
 } from '../services/verificationService';
-import { getConfidenceLevel, getConfidenceLevelDescription } from '../services/confidenceService';
+import { getConfidenceLevel, getConfidenceLevelDescription, calculateConfidenceScore } from '../services/confidenceService';
 
 const router = Router();
 
@@ -45,7 +45,7 @@ const recentQuerySchema = z.object({
 
 /**
  * POST /api/v1/verify
- * Submit a new verification
+ * Submit a new verification with full confidence breakdown
  */
 router.post(
   '/',
@@ -59,23 +59,32 @@ router.post(
       userAgent: req.get('User-Agent'),
     });
 
+    // Calculate full confidence breakdown using research-based scoring
+    const confidenceResult = calculateConfidenceScore({
+      dataSource: null, // Verification source tracked in VerificationLog
+      lastVerifiedAt: result.acceptance.lastVerified,
+      verificationCount: result.acceptance.verificationCount,
+      upvotes: 0,
+      downvotes: 0,
+      specialty: null,
+      taxonomyDescription: null,
+    });
+
     res.status(201).json({
       success: true,
       data: {
         verification: result.verification,
         acceptance: {
           ...result.acceptance,
-          confidenceLevel: getConfidenceLevel(
-            result.acceptance.confidenceScore,
-            result.acceptance.verificationCount
-          ),
-          confidenceDescription: getConfidenceLevelDescription(
-            getConfidenceLevel(
-              result.acceptance.confidenceScore,
-              result.acceptance.verificationCount
-            ),
-            result.acceptance.verificationCount
-          ),
+          confidenceLevel: confidenceResult.level,
+          confidenceDescription: confidenceResult.description,
+          confidence: {
+            score: confidenceResult.score,
+            level: confidenceResult.level,
+            description: confidenceResult.description,
+            factors: confidenceResult.factors,
+            metadata: confidenceResult.metadata,
+          },
         },
         message: 'Verification submitted successfully',
       },
@@ -158,7 +167,7 @@ router.get(
 
 /**
  * GET /api/v1/verify/:npi/:planId
- * Get verifications for a specific provider-plan pair
+ * Get verifications for a specific provider-plan pair with full confidence breakdown
  */
 router.get(
   '/:npi/:planId',
@@ -172,21 +181,39 @@ router.get(
       throw AppError.notFound('Provider or plan not found');
     }
 
+    let acceptanceWithConfidence = null;
+    if (result.acceptance) {
+      // Calculate full confidence breakdown using research-based scoring
+      const confidenceResult = calculateConfidenceScore({
+        dataSource: null, // Verification source tracked in VerificationLog
+        lastVerifiedAt: result.acceptance.lastVerified,
+        verificationCount: result.acceptance.verificationCount,
+        upvotes: result.summary.totalUpvotes,
+        downvotes: result.summary.totalDownvotes,
+        specialty: null,
+        taxonomyDescription: null,
+      });
+
+      acceptanceWithConfidence = {
+        ...result.acceptance,
+        confidenceLevel: confidenceResult.level,
+        confidenceDescription: confidenceResult.description,
+        confidence: {
+          score: confidenceResult.score,
+          level: confidenceResult.level,
+          description: confidenceResult.description,
+          factors: confidenceResult.factors,
+          metadata: confidenceResult.metadata,
+        },
+      };
+    }
+
     res.json({
       success: true,
       data: {
         npi,
         planId,
-        acceptance: result.acceptance
-          ? {
-              ...result.acceptance,
-              confidenceLevel: getConfidenceLevel(result.acceptance.confidenceScore, result.acceptance.verificationCount),
-              confidenceDescription: getConfidenceLevelDescription(
-                getConfidenceLevel(result.acceptance.confidenceScore, result.acceptance.verificationCount),
-                result.acceptance.verificationCount
-              ),
-            }
-          : null,
+        acceptance: acceptanceWithConfidence,
         verifications: result.verifications,
         summary: result.summary,
       },
