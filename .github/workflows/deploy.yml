@@ -72,6 +72,7 @@ jobs:
             --max-instances=10
             --concurrency=80
             --add-cloudsql-instances=verifymyprovider-prod:us-central1:verifymyprovider-db
+            --remove-secrets=ADMIN_SECRET
           env_vars: |
             NODE_ENV=production
             FRONTEND_URL=${{ secrets.FRONTEND_URL }}
