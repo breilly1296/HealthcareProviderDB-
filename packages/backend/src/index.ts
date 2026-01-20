@@ -18,7 +18,8 @@ const PORT = process.env.PORT || 3001;
 const ALLOWED_ORIGINS: string[] = [
   'https://verifymyprovider.com',
   'https://www.verifymyprovider.com',
-  process.env.FRONTEND_URL,  // Cloud Run frontend URL
+  'https://verifymyprovider-frontend-741434145252.us-central1.run.app',
+  process.env.FRONTEND_URL,  // Additional Cloud Run frontend URL from env
 ].filter((origin): origin is string => Boolean(origin));
 
 // In development, also allow localhost
@@ -47,7 +48,7 @@ app.use(cors({
       callback(new Error('Not allowed by CORS'));
     }
   },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID', 'X-Admin-Secret'],
   credentials: true,
 }));
