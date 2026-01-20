@@ -25,6 +25,7 @@ const searchQuerySchema = z.object({
   name: z.string().min(1).max(200).optional(),
   npi: z.string().length(10).regex(/^\d+$/).optional(),
   entityType: z.enum(['INDIVIDUAL', 'ORGANIZATION']).optional(),
+  insurancePlanId: z.string().min(1).max(100).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
@@ -60,6 +61,7 @@ router.get(
       name: query.name,
       npi: query.npi,
       entityType: query.entityType,
+      insurancePlanId: query.insurancePlanId,
       page: query.page,
       limit: query.limit,
     });

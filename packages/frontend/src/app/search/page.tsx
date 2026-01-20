@@ -7,6 +7,7 @@ import { ProviderCard } from '@/components/ProviderCard';
 import { LocationCard } from '@/components/LocationCard';
 import ProviderCardSkeleton from '@/components/ProviderCardSkeleton';
 import ErrorMessage from '@/components/ErrorMessage';
+import { SaveProfileButton } from '@/components/SaveProfileButton';
 import { providerApi, locationApi, Provider, Location, Pagination } from '@/lib/api';
 import { trackSearch } from '@/lib/analytics';
 
@@ -62,8 +63,8 @@ function SearchResults() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to search providers';
       const isNetworkError = errorMessage.toLowerCase().includes('network') ||
-                            errorMessage.toLowerCase().includes('fetch') ||
-                            errorMessage.toLowerCase().includes('connection');
+        errorMessage.toLowerCase().includes('fetch') ||
+        errorMessage.toLowerCase().includes('connection');
 
       setError({
         message: errorMessage,
@@ -108,8 +109,8 @@ function SearchResults() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to search locations';
       const isNetworkError = errorMessage.toLowerCase().includes('network') ||
-                            errorMessage.toLowerCase().includes('fetch') ||
-                            errorMessage.toLowerCase().includes('connection');
+        errorMessage.toLowerCase().includes('fetch') ||
+        errorMessage.toLowerCase().includes('connection');
 
       setError({
         message: errorMessage,
@@ -143,6 +144,19 @@ function SearchResults() {
       fetchLocations();
     }
   }, [mode, specialty, state, cities, zip, healthSystem, name, locationName, page]);
+
+  // Auto-save current URL to localStorage
+  useEffect(() => {
+    const hasFilters = mode === 'providers'
+      ? (specialty || state || cities || zip || healthSystem || name)
+      : (locationName || state || cities || zip || healthSystem);
+
+    if (hasFilters) {
+      const currentUrl = window.location.href;
+      localStorage.setItem('vmp_last_profile', currentUrl);
+    }
+  }, [mode, specialty, state, cities, zip, healthSystem, name, locationName, page]);
+
 
   return (
     <div>
@@ -241,11 +255,10 @@ function SearchResults() {
                           ...(locationName && { locationName }),
                           page: String(p),
                         }).toString()}`}
-                        className={`min-w-[44px] min-h-[44px] px-4 py-3 rounded-lg font-medium flex items-center justify-center ${
-                          p === pagination.page
-                            ? 'bg-primary-600 text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
+                        className={`min-w-[44px] min-h-[44px] px-4 py-3 rounded-lg font-medium flex items-center justify-center ${p === pagination.page
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
                         aria-label={`Page ${p}${p === pagination.page ? ', current page' : ''}`}
                         aria-current={p === pagination.page ? 'page' : undefined}
                       >
@@ -280,12 +293,19 @@ export default function SearchPage() {
       <div className="container-wide">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-            Find Healthcare Providers
-          </h1>
-          <p className="text-xl text-gray-600">
-            Search for providers by specialty, location, and more.
-          </p>
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div>
+              <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
+                Find Healthcare Providers
+              </h1>
+              <p className="text-xl text-gray-600">
+                Search for providers by specialty, location, and more.
+              </p>
+            </div>
+            <Suspense fallback={null}>
+              <SaveProfileButton />
+            </Suspense>
+          </div>
         </div>
 
         {/* Search Form */}

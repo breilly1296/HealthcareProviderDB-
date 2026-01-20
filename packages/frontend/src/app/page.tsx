@@ -1,4 +1,7 @@
+'use client';
+
 import Link from 'next/link';
+import { WelcomeBackBanner } from '@/components/WelcomeBackBanner';
 
 export default function HomePage() {
   return (
@@ -6,6 +9,8 @@ export default function HomePage() {
       {/* Hero Section */}
       <section className="bg-gradient-to-b from-primary-50 to-white py-10 md:py-24">
         <div className="container-wide text-center">
+          {/* Welcome Back Banner */}
+          <WelcomeBackBanner />
           {/* Research Badge with Citation Summary */}
           <div className="inline-flex flex-col items-center gap-2 bg-white px-4 sm:px-6 py-3 rounded-xl shadow-sm border border-primary-200 mb-6">
             <div className="flex flex-wrap items-center justify-center gap-2">

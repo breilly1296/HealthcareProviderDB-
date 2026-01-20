@@ -159,6 +159,7 @@ export interface ProviderSearchParams {
   name?: string;
   npi?: string;
   entityType?: 'INDIVIDUAL' | 'ORGANIZATION';
+  insurancePlanId?: string;
   page?: number;
   limit?: number;
 }
@@ -175,7 +176,7 @@ export interface ProviderSearchResult {
  * Search providers with filters and pagination
  */
 export async function searchProviders(params: ProviderSearchParams): Promise<ProviderSearchResult> {
-  const { state, city, cities, zipCode, healthSystem, specialty, name, npi, entityType } = params;
+  const { state, city, cities, zipCode, healthSystem, specialty, name, npi, entityType, insurancePlanId } = params;
   const { take, skip, page } = getPaginationValues(params.page, params.limit);
 
   const where: Prisma.ProviderWhereInput = { AND: [] };
@@ -207,6 +208,18 @@ export async function searchProviders(params: ProviderSearchParams): Promise<Pro
     if (nameConditions.length > 0) {
       addAndCondition(where, { OR: nameConditions });
     }
+  }
+
+  // Insurance plan filter - only show providers who accept the specified plan
+  if (insurancePlanId) {
+    addAndCondition(where, {
+      planAcceptances: {
+        some: {
+          planId: insurancePlanId,
+          acceptanceStatus: 'ACCEPTED',
+        },
+      },
+    });
   }
 
   cleanWhereClause(where);

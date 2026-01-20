@@ -156,6 +156,15 @@ export interface Pagination {
   hasMore: boolean;
 }
 
+export interface CarrierGroup {
+  carrier: string;
+  plans: {
+    planId: string;
+    planName: string | null;
+    planType: string | null;
+  }[];
+}
+
 export interface ApiResponse<T> {
   success: boolean;
   data: T;
@@ -225,6 +234,7 @@ export const providerApi = {
     healthSystem?: string;
     specialty?: string;
     name?: string;
+    insurancePlanId?: string;
     page?: number;
     limit?: number;
   }) => fetchApi<{
@@ -309,6 +319,13 @@ export const planApi = {
     fetchApi<{ issuers: { carrierId: string | null; carrierName: string }[]; count: number }>(
       `/plans/meta/issuers?${buildQueryString(params)}`
     ),
+
+  getGroupedPlans: (params?: { search?: string; state?: string }) => {
+    const query = buildQueryString(params || {});
+    return fetchApi<{ carriers: CarrierGroup[]; totalPlans: number }>(
+      `/plans/grouped${query ? `?${query}` : ''}`
+    );
+  },
 };
 
 // Verification API

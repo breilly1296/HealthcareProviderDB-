@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-import { providerApi, locationApi } from '@/lib/api';
+import { providerApi, locationApi, planApi, CarrierGroup } from '@/lib/api';
 import { SPECIALTY_OPTIONS, STATE_OPTIONS } from '@/lib/provider-utils';
 
 interface SearchFormProps {
@@ -39,6 +39,15 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
   const [showCityDropdown, setShowCityDropdown] = useState(false);
   const [citySearchInput, setCitySearchInput] = useState('');
   const cityDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Insurance plan dropdown state
+  const [carrierGroups, setCarrierGroups] = useState<CarrierGroup[]>([]);
+  const [insurancePlansLoading, setInsurancePlansLoading] = useState(false);
+  const [selectedInsurancePlan, setSelectedInsurancePlan] = useState(searchParams.get('insurancePlanId') || '');
+  const [selectedInsurancePlanName, setSelectedInsurancePlanName] = useState('');
+  const [showInsuranceDropdown, setShowInsuranceDropdown] = useState(false);
+  const [insuranceSearchInput, setInsuranceSearchInput] = useState('');
+  const insuranceDropdownRef = useRef<HTMLDivElement>(null);
 
   // NYC All Boroughs preset
   const NYC_BOROUGHS = ['New York', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island'];
@@ -99,7 +108,36 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
     loadCities();
   }, [state]);
 
-  // Handle click outside and ESC key to close dropdown
+  // Load insurance plans from API
+  useEffect(() => {
+    const loadInsurancePlans = async () => {
+      setInsurancePlansLoading(true);
+      try {
+        const result = await planApi.getGroupedPlans();
+        setCarrierGroups(result.carriers || []);
+
+        // If there's a selected plan ID from URL, find and set its name
+        if (selectedInsurancePlan) {
+          for (const group of result.carriers || []) {
+            const plan = group.plans.find(p => p.planId === selectedInsurancePlan);
+            if (plan) {
+              setSelectedInsurancePlanName(plan.planName || plan.planId);
+              break;
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load insurance plans:', error);
+        setCarrierGroups([]);
+      } finally {
+        setInsurancePlansLoading(false);
+      }
+    };
+
+    loadInsurancePlans();
+  }, []);
+
+  // Handle click outside and ESC key to close dropdowns
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -108,11 +146,18 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
       ) {
         setShowCityDropdown(false);
       }
+      if (
+        insuranceDropdownRef.current &&
+        !insuranceDropdownRef.current.contains(event.target as Node)
+      ) {
+        setShowInsuranceDropdown(false);
+      }
     };
 
     const handleEscKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && showCityDropdown) {
-        setShowCityDropdown(false);
+      if (event.key === 'Escape') {
+        if (showCityDropdown) setShowCityDropdown(false);
+        if (showInsuranceDropdown) setShowInsuranceDropdown(false);
       }
     };
 
@@ -122,12 +167,36 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscKey);
     };
-  }, [showCityDropdown]);
+  }, [showCityDropdown, showInsuranceDropdown]);
 
   // Filter cities based on search input
   const filteredCities = cities.filter((c) =>
     c.toLowerCase().includes(citySearchInput.toLowerCase())
   );
+
+  // Filter insurance plans based on search input
+  const filteredCarrierGroups = carrierGroups
+    .map((group) => ({
+      ...group,
+      plans: group.plans.filter(
+        (p) =>
+          (p.planName?.toLowerCase() || '').includes(insuranceSearchInput.toLowerCase()) ||
+          group.carrier.toLowerCase().includes(insuranceSearchInput.toLowerCase())
+      ),
+    }))
+    .filter((group) => group.plans.length > 0);
+
+  const selectInsurancePlan = (planId: string, planName: string) => {
+    setSelectedInsurancePlan(planId);
+    setSelectedInsurancePlanName(planName);
+    setShowInsuranceDropdown(false);
+    setInsuranceSearchInput('');
+  };
+
+  const clearInsurancePlan = () => {
+    setSelectedInsurancePlan('');
+    setSelectedInsurancePlanName('');
+  };
 
   const toggleCity = (cityName: string) => {
     setSelectedCities(prev =>
@@ -174,6 +243,7 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
     if (searchMode === 'providers') {
       if (specialty) params.set('specialty', specialty);
       if (name) params.set('name', name);
+      if (selectedInsurancePlan) params.set('insurancePlanId', selectedInsurancePlan);
     } else {
       if (locationName) params.set('locationName', locationName);
     }
@@ -191,6 +261,9 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
     setLocationName('');
     setCities([]);
     setCitySearchInput('');
+    setSelectedInsurancePlan('');
+    setSelectedInsurancePlanName('');
+    setInsuranceSearchInput('');
     router.push('/search');
   };
 
@@ -308,6 +381,122 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
           </select>
         </div>
       </div>
+
+      {/* Insurance Plan Filter - Only for provider search */}
+      {searchMode === 'providers' && (
+        <div className="relative">
+          <label htmlFor="insurancePlan" className="label">
+            Insurance Plan
+          </label>
+          <div className="relative" ref={insuranceDropdownRef}>
+            <button
+              type="button"
+              onClick={() => setShowInsuranceDropdown(!showInsuranceDropdown)}
+              className="input w-full text-left flex items-center justify-between cursor-pointer"
+              aria-haspopup="listbox"
+              aria-expanded={showInsuranceDropdown}
+              aria-label={`Select insurance plan${selectedInsurancePlan ? `, ${selectedInsurancePlanName} selected` : ''}`}
+            >
+              <span className={selectedInsurancePlan ? 'text-gray-900 truncate' : 'text-gray-500'}>
+                {insurancePlansLoading ? 'Loading plans...' :
+                 selectedInsurancePlan ? selectedInsurancePlanName :
+                 'All Insurance Plans'}
+              </span>
+              <div className="flex items-center gap-2">
+                {selectedInsurancePlan && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      clearInsurancePlan();
+                    }}
+                    className="text-gray-400 hover:text-gray-600"
+                    aria-label="Clear insurance plan"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+                {insurancePlansLoading ? (
+                  <div className="animate-spin h-4 w-4 border-2 border-primary-200 border-t-primary-600 rounded-full" />
+                ) : (
+                  <svg
+                    className={`w-4 h-4 text-gray-400 transition-transform ${showInsuranceDropdown ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                )}
+              </div>
+            </button>
+
+            {/* Insurance Plan Dropdown */}
+            {showInsuranceDropdown && !insurancePlansLoading && (
+              <div
+                className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden flex flex-col"
+                style={{ maxHeight: '400px' }}
+                role="listbox"
+                aria-label="Available insurance plans"
+              >
+                {/* Search Bar */}
+                <div className="p-3 border-b bg-gray-50">
+                  <input
+                    type="text"
+                    value={insuranceSearchInput}
+                    onChange={(e) => setInsuranceSearchInput(e.target.value)}
+                    placeholder="Search plans or carriers..."
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    autoFocus
+                  />
+                </div>
+
+                {/* Plans List grouped by Carrier */}
+                <div className="overflow-y-auto" style={{ maxHeight: '320px' }}>
+                  {filteredCarrierGroups.length === 0 ? (
+                    <div className="px-4 py-3 text-sm text-gray-500 text-center">
+                      {insuranceSearchInput ? 'No plans match your search' : 'No insurance plans available'}
+                    </div>
+                  ) : (
+                    filteredCarrierGroups.map((group) => (
+                      <div key={group.carrier}>
+                        {/* Carrier Header */}
+                        <div className="px-4 py-2 bg-gray-100 text-xs font-semibold text-gray-700 uppercase tracking-wide sticky top-0">
+                          {group.carrier}
+                        </div>
+                        {/* Plans under this Carrier */}
+                        {group.plans.map((plan) => (
+                          <button
+                            key={plan.planId}
+                            type="button"
+                            onClick={() => selectInsurancePlan(plan.planId, plan.planName || plan.planId)}
+                            className={`w-full text-left px-4 py-2 text-sm hover:bg-primary-50 ${
+                              selectedInsurancePlan === plan.planId ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-700'
+                            }`}
+                            role="option"
+                            aria-selected={selectedInsurancePlan === plan.planId}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="truncate">{plan.planName || plan.planId}</span>
+                              {plan.planType && (
+                                <span className="ml-2 text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                                  {plan.planType}
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Row 2: Location & Actions */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4 items-end">

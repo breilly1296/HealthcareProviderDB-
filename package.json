@@ -50,6 +50,7 @@
     "prisma": "^5.22.0"
   },
   "devDependencies": {
-    "@types/pg": "^8.16.0"
+    "@types/pg": "^8.16.0",
+    "concurrently": "^9.2.1"
   }
 }

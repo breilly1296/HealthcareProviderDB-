@@ -8,6 +8,7 @@ import {
   getIssuers,
   getPlanTypes,
   getProvidersForPlan,
+  getGroupedPlans,
 } from '../services/planService';
 
 const router = Router();
@@ -61,6 +62,31 @@ router.get(
           hasMore: result.page < result.totalPages,
         },
       },
+    });
+  })
+);
+
+/**
+ * GET /api/v1/plans/grouped
+ * Get plans grouped by carrier for dropdown display
+ */
+router.get(
+  '/grouped',
+  defaultRateLimiter,
+  asyncHandler(async (req, res) => {
+    const query = z.object({
+      search: z.string().min(1).max(200).optional(),
+      state: z.string().length(2).toUpperCase().optional(),
+    }).parse(req.query);
+
+    const result = await getGroupedPlans({
+      search: query.search,
+      state: query.state,
+    });
+
+    res.json({
+      success: true,
+      data: result,
     });
   })
 );

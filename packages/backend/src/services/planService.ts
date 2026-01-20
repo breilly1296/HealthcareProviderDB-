@@ -250,6 +250,80 @@ export async function getPlanTypes(options: {
 }
 
 /**
+ * Get plans grouped by carrier for dropdown display
+ */
+export interface GroupedPlansResult {
+  carriers: {
+    carrier: string;
+    plans: {
+      planId: string;
+      planName: string | null;
+      planType: string | null;
+    }[];
+  }[];
+  totalPlans: number;
+}
+
+export async function getGroupedPlans(options: {
+  search?: string;
+  state?: string;
+} = {}): Promise<GroupedPlansResult> {
+  const { search, state } = options;
+
+  const where: Prisma.InsurancePlanWhereInput = {
+    carrier: { not: null },
+  };
+
+  if (state) {
+    where.state = state.toUpperCase();
+  }
+
+  if (search) {
+    where.OR = [
+      { carrier: { contains: search, mode: 'insensitive' } },
+      { planName: { contains: search, mode: 'insensitive' } },
+      { rawName: { contains: search, mode: 'insensitive' } },
+    ];
+  }
+
+  const plans = await prisma.insurancePlan.findMany({
+    where,
+    select: {
+      planId: true,
+      planName: true,
+      planType: true,
+      carrier: true,
+    },
+    orderBy: [{ carrier: 'asc' }, { planName: 'asc' }],
+  });
+
+  // Group plans by carrier
+  const carrierMap = new Map<string, { planId: string; planName: string | null; planType: string | null }[]>();
+
+  for (const plan of plans) {
+    if (!plan.carrier) continue;
+
+    const existing = carrierMap.get(plan.carrier) || [];
+    existing.push({
+      planId: plan.planId,
+      planName: plan.planName,
+      planType: plan.planType,
+    });
+    carrierMap.set(plan.carrier, existing);
+  }
+
+  const carriers = Array.from(carrierMap.entries()).map(([carrier, carrierPlans]) => ({
+    carrier,
+    plans: carrierPlans,
+  }));
+
+  return {
+    carriers,
+    totalPlans: plans.length,
+  };
+}
+
+/**
  * Get providers who accept a specific plan
  */
 export async function getProvidersForPlan(
