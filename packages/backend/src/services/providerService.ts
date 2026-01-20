@@ -179,6 +179,11 @@ export async function searchProviders(params: ProviderSearchParams): Promise<Pro
   const { state, city, cities, zipCode, healthSystem, specialty, name, npi, entityType, insurancePlanId } = params;
   const { take, skip, page } = getPaginationValues(params.page, params.limit);
 
+  // Debug logging for insurance plan filter
+  if (insurancePlanId) {
+    console.log('[Provider Search] Insurance plan filter:', { insurancePlanId });
+  }
+
   const where: Prisma.ProviderWhereInput = { AND: [] };
 
   // Apply filters

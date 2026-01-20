@@ -28,6 +28,7 @@ function SearchResults() {
   const healthSystem = searchParams.get('healthSystem') || '';
   const name = searchParams.get('name') || '';
   const locationName = searchParams.get('locationName') || '';
+  const insurancePlanId = searchParams.get('insurancePlanId') || '';
   const page = parseInt(searchParams.get('page') || '1', 10);
 
   const fetchProviders = async () => {
@@ -43,6 +44,7 @@ function SearchResults() {
         zip: zip || undefined,
         healthSystem: healthSystem || undefined,
         name: name || undefined,
+        insurancePlanId: insurancePlanId || undefined,
         page,
         limit: 20,
       });
@@ -126,7 +128,7 @@ function SearchResults() {
 
   useEffect(() => {
     const hasFilters = mode === 'providers'
-      ? (specialty || state || cities || zip || healthSystem || name)
+      ? (specialty || state || cities || zip || healthSystem || name || insurancePlanId)
       : (locationName || state || cities || zip || healthSystem);
 
     if (!hasFilters) {
@@ -143,19 +145,19 @@ function SearchResults() {
     } else {
       fetchLocations();
     }
-  }, [mode, specialty, state, cities, zip, healthSystem, name, locationName, page]);
+  }, [mode, specialty, state, cities, zip, healthSystem, name, locationName, insurancePlanId, page]);
 
   // Auto-save current URL to localStorage
   useEffect(() => {
     const hasFilters = mode === 'providers'
-      ? (specialty || state || cities || zip || healthSystem || name)
+      ? (specialty || state || cities || zip || healthSystem || name || insurancePlanId)
       : (locationName || state || cities || zip || healthSystem);
 
     if (hasFilters) {
       const currentUrl = window.location.href;
       localStorage.setItem('vmp_last_profile', currentUrl);
     }
-  }, [mode, specialty, state, cities, zip, healthSystem, name, locationName, page]);
+  }, [mode, specialty, state, cities, zip, healthSystem, name, locationName, insurancePlanId, page]);
 
 
   return (
@@ -253,6 +255,7 @@ function SearchResults() {
                           ...(healthSystem && { healthSystem }),
                           ...(name && { name }),
                           ...(locationName && { locationName }),
+                          ...(insurancePlanId && { insurancePlanId }),
                           page: String(p),
                         }).toString()}`}
                         className={`min-w-[44px] min-h-[44px] px-4 py-3 rounded-lg font-medium flex items-center justify-center ${p === pagination.page
