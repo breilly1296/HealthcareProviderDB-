@@ -9,6 +9,8 @@ import { ScrollToTop } from '@/components/ScrollToTop';
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
 import { ThemeProvider } from '@/context/ThemeContext';
+import { CompareProvider } from '@/context/CompareContext';
+import { CompareBar } from '@/components/compare';
 
 // Script to prevent flash of wrong theme on page load
 const themeScript = `
@@ -142,14 +144,17 @@ export default function RootLayout({
         <Suspense fallback={null}>
           <PostHogProvider>
             <ThemeProvider>
-              <ToastProvider />
-              <Header />
-              <main className="flex-1 pb-20 md:pb-0">
-                {children}
-              </main>
-              <Footer />
-              <ScrollToTop />
-              <BottomNav />
+              <CompareProvider>
+                <ToastProvider />
+                <Header />
+                <main className="flex-1 pb-20 md:pb-0">
+                  {children}
+                </main>
+                <Footer />
+                <ScrollToTop />
+                <CompareBar />
+                <BottomNav />
+              </CompareProvider>
             </ThemeProvider>
           </PostHogProvider>
         </Suspense>

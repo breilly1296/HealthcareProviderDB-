@@ -5,6 +5,8 @@ import { Provider } from '@/lib/api';
 import { ConfidenceBadge, ConfidenceIndicator } from './ConfidenceBadge';
 import FreshnessWarning from './FreshnessWarning';
 import { getSpecialtyDisplay } from '@/lib/provider-utils';
+import { CompareCheckbox } from './compare';
+import { useCompare, CompareProvider } from '@/hooks/useCompare';
 
 interface ProviderCardProps {
   provider: Provider & { displayName: string };
@@ -24,10 +26,28 @@ export function ProviderCard({
   planName,
 }: ProviderCardProps) {
   const specialty = getSpecialtyDisplay(provider.specialtyCategory, provider.taxonomyDescription);
+  const { isSelected } = useCompare();
+  const selected = isSelected(provider.npi);
+
+  // Build CompareProvider object for the checkbox
+  const compareProvider: CompareProvider = {
+    npi: provider.npi,
+    name: provider.displayName,
+    specialty: specialty,
+    healthSystem: provider.organizationName || null,
+    address: provider.addressLine1 + (provider.addressLine2 ? ` ${provider.addressLine2}` : ''),
+    city: provider.city,
+    state: provider.state,
+    zip: provider.zip,
+    confidenceScore: confidenceScore,
+    phone: provider.phone || null,
+  };
 
   return (
     <Link href={`/provider/${provider.npi}`}>
-      <article className="card-hover cursor-pointer">
+      <article className={`card-hover cursor-pointer transition-all duration-200 ${
+        selected ? 'ring-2 ring-primary-500 dark:ring-primary-400' : ''
+      }`}>
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
           {/* Provider Info */}
           <div className="flex-1">
@@ -71,8 +91,9 @@ export function ProviderCard({
             </div>
           </div>
 
-          {/* Confidence & NPI */}
+          {/* Confidence, Compare & NPI */}
           <div className="flex flex-col items-end gap-2">
+            <CompareCheckbox provider={compareProvider} />
             {showConfidence && confidenceScore !== undefined && (
               <ConfidenceBadge score={confidenceScore} size="sm" />
             )}
