@@ -11,24 +11,6 @@ export default function HomePage() {
         <div className="container-wide text-center">
           {/* Welcome Back Banner */}
           <WelcomeBackBanner />
-          {/* Research Badge with Citation Summary */}
-          <div className="inline-flex flex-col items-center gap-2 bg-white dark:bg-gray-800 px-4 sm:px-6 py-3 rounded-xl shadow-sm border border-primary-200 dark:border-gray-700 mb-6">
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <span className="text-xl sm:text-2xl leading-none">📚</span>
-              <span className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
-                Backed by peer-reviewed research
-              </span>
-            </div>
-            <p className="text-xs text-gray-600 dark:text-gray-400 text-center max-w-md">
-              Based on Mortensen et al. (2015) JAMIA, Haeder et al. (2024) Health Affairs Scholar
-            </p>
-            <Link
-              href="/research"
-              className="inline-flex items-center text-xs sm:text-sm font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 whitespace-nowrap"
-            >
-              View full research methodology →
-            </Link>
-          </div>
 
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-6 px-4">
             Find Providers Who Actually
