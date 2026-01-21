@@ -48,19 +48,81 @@ function formatRelativeDate(dateString?: string | null): string {
   return `${Math.floor(diffDays / 365)} years ago`;
 }
 
-function findBestValue(providers: CompareProvider[], getValue: (p: CompareProvider) => number | undefined): string | null {
-  let bestNpi: string | null = null;
-  let bestValue = -Infinity;
+type ComparisonType = 'highest' | 'mostRecent' | 'status' | 'hasValue';
 
-  for (const provider of providers) {
-    const value = getValue(provider);
-    if (value !== undefined && value > bestValue) {
-      bestValue = value;
-      bestNpi = provider.npi;
-    }
+/**
+ * Returns indices of providers with the "best" value for a given comparison type.
+ * Returns empty array if all values are equal or all N/A (no highlighting needed).
+ */
+function getBestIndices(
+  providers: CompareProvider[],
+  getValue: (p: CompareProvider) => unknown,
+  type: ComparisonType
+): number[] {
+  const values = providers.map(getValue);
+
+  // Check if all values are effectively equal or all null/undefined
+  const validValues = values.filter((v) => v !== undefined && v !== null && v !== 'Never' && v !== 'UNKNOWN');
+  if (validValues.length === 0) return []; // All N/A
+
+  // For 'hasValue' type, just return indices that have a value
+  if (type === 'hasValue') {
+    const indices = values
+      .map((v, i) => (v && v !== 'Not affiliated' ? i : -1))
+      .filter((i) => i !== -1);
+    // If all have values or none have values, don't highlight
+    const allHaveValue = indices.length === providers.length;
+    const noneHaveValue = indices.length === 0;
+    if (allHaveValue || noneHaveValue) return [];
+    return indices;
   }
 
-  return bestNpi;
+  if (type === 'highest') {
+    const numericValues = values.map((v) => (typeof v === 'number' ? v : -Infinity));
+    const maxValue = Math.max(...numericValues);
+    if (maxValue === -Infinity) return []; // All N/A
+
+    // Check if all valid values are the same
+    const validNumeric = numericValues.filter((v) => v !== -Infinity);
+    const allSame = validNumeric.every((v) => v === validNumeric[0]);
+    if (allSame && validNumeric.length === providers.length) return [];
+
+    return numericValues.map((v, i) => (v === maxValue ? i : -1)).filter((i) => i !== -1);
+  }
+
+  if (type === 'mostRecent') {
+    const dateValues = values.map((v) => {
+      if (!v || v === 'Never') return -Infinity;
+      return new Date(v as string).getTime();
+    });
+    const maxDate = Math.max(...dateValues);
+    if (maxDate === -Infinity) return []; // All N/A or Never
+
+    // Check if all valid dates are the same
+    const validDates = dateValues.filter((v) => v !== -Infinity);
+    const allSame = validDates.every((v) => v === validDates[0]);
+    if (allSame && validDates.length === providers.length) return [];
+
+    return dateValues.map((v, i) => (v === maxDate ? i : -1)).filter((i) => i !== -1);
+  }
+
+  if (type === 'status') {
+    const statusOrder: Record<string, number> = {
+      ACCEPTED: 3,
+      PENDING: 2,
+      UNKNOWN: 1,
+    };
+    const statusValues = values.map((v) => statusOrder[(v as string)?.toUpperCase() || 'UNKNOWN'] || 1);
+    const maxStatus = Math.max(...statusValues);
+
+    // Check if all statuses are the same
+    const allSame = statusValues.every((v) => v === statusValues[0]);
+    if (allSame) return [];
+
+    return statusValues.map((v, i) => (v === maxStatus ? i : -1)).filter((i) => i !== -1);
+  }
+
+  return [];
 }
 
 function ProviderInitial({ name }: { name: string }) {
@@ -77,12 +139,13 @@ interface ComparisonRowProps {
   icon: React.ReactNode;
   providers: CompareProvider[];
   renderValue: (provider: CompareProvider) => React.ReactNode;
-  highlightBest?: (providers: CompareProvider[]) => string | null;
+  getBestIndices?: (providers: CompareProvider[]) => number[];
   isAlternate?: boolean;
 }
 
-function ComparisonRow({ label, icon, providers, renderValue, highlightBest, isAlternate }: ComparisonRowProps) {
-  const bestNpi = highlightBest ? highlightBest(providers) : null;
+function ComparisonRow({ label, icon, providers, renderValue, getBestIndices: getBestIndicesFn, isAlternate }: ComparisonRowProps) {
+  const bestIndices = getBestIndicesFn ? getBestIndicesFn(providers) : [];
+  const highlightClass = 'bg-green-50 dark:bg-green-900/20';
 
   return (
     <tr className={isAlternate ? 'bg-gray-50 dark:bg-gray-800/50' : ''}>
@@ -92,14 +155,16 @@ function ComparisonRow({ label, icon, providers, renderValue, highlightBest, isA
           {label}
         </div>
       </td>
-      {providers.map((provider) => (
+      {providers.map((provider, index) => (
         <td
           key={provider.npi}
           className={`px-4 py-3 text-gray-900 dark:text-gray-100 ${
-            bestNpi === provider.npi ? 'bg-primary-50 dark:bg-primary-900/20' : ''
+            bestIndices.includes(index) ? highlightClass : ''
           }`}
         >
-          {renderValue(provider)}
+          <div className={bestIndices.includes(index) ? 'inline-block rounded px-2 py-1' : ''}>
+            {renderValue(provider)}
+          </div>
         </td>
       ))}
     </tr>
@@ -159,6 +224,7 @@ export function CompareModal({ isOpen, onClose }: CompareModalProps) {
         </svg>
       ),
       renderValue: (p: CompareProvider) => p.specialty || 'N/A',
+      // Don't highlight specialty (usually same)
     },
     {
       label: 'Health System',
@@ -168,6 +234,8 @@ export function CompareModal({ isOpen, onClose }: CompareModalProps) {
         </svg>
       ),
       renderValue: (p: CompareProvider) => p.healthSystem || 'Not affiliated',
+      getBestIndices: (providers: CompareProvider[]) =>
+        getBestIndices(providers, (p) => p.healthSystem, 'hasValue'),
     },
     {
       label: 'Location',
@@ -185,6 +253,7 @@ export function CompareModal({ isOpen, onClose }: CompareModalProps) {
           </div>
         </div>
       ),
+      // Don't highlight location (subjective)
     },
     {
       label: 'Confidence',
@@ -201,7 +270,8 @@ export function CompareModal({ isOpen, onClose }: CompareModalProps) {
           </span>
         );
       },
-      highlightBest: (providers: CompareProvider[]) => findBestValue(providers, (p) => p.confidenceScore),
+      getBestIndices: (providers: CompareProvider[]) =>
+        getBestIndices(providers, (p) => p.confidenceScore, 'highest'),
     },
     {
       label: 'Status',
@@ -219,6 +289,8 @@ export function CompareModal({ isOpen, onClose }: CompareModalProps) {
           </span>
         );
       },
+      getBestIndices: (providers: CompareProvider[]) =>
+        getBestIndices(providers, (p) => p.acceptanceStatus || 'UNKNOWN', 'status'),
     },
     {
       label: 'Verifications',
@@ -232,7 +304,8 @@ export function CompareModal({ isOpen, onClose }: CompareModalProps) {
           {p.verificationCount !== undefined ? `${p.verificationCount} user${p.verificationCount !== 1 ? 's' : ''}` : 'None'}
         </span>
       ),
-      highlightBest: (providers: CompareProvider[]) => findBestValue(providers, (p) => p.verificationCount),
+      getBestIndices: (providers: CompareProvider[]) =>
+        getBestIndices(providers, (p) => p.verificationCount, 'highest'),
     },
     {
       label: 'Last Verified',
@@ -242,6 +315,8 @@ export function CompareModal({ isOpen, onClose }: CompareModalProps) {
         </svg>
       ),
       renderValue: (p: CompareProvider) => formatRelativeDate(p.lastVerified),
+      getBestIndices: (providers: CompareProvider[]) =>
+        getBestIndices(providers, (p) => p.lastVerified, 'mostRecent'),
     },
     {
       label: 'Phone',
@@ -262,6 +337,7 @@ export function CompareModal({ isOpen, onClose }: CompareModalProps) {
         ) : (
           <span className="text-gray-400 dark:text-gray-500">Not available</span>
         ),
+      // Don't highlight phone
     },
   ];
 
@@ -346,7 +422,7 @@ export function CompareModal({ isOpen, onClose }: CompareModalProps) {
                   icon={row.icon}
                   providers={selectedProviders}
                   renderValue={row.renderValue}
-                  highlightBest={row.highlightBest}
+                  getBestIndices={row.getBestIndices}
                   isAlternate={index % 2 === 1}
                 />
               ))}
