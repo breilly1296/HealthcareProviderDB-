@@ -15,3 +15,6 @@ export { SearchForm } from './SearchForm';
 export { VerificationButton } from './VerificationButton';
 export { ScrollToTop } from './ScrollToTop';
 export { RecentSearches } from './RecentSearches';
+export { EmptyState } from './EmptyState';
+export type { EmptyStateType, SearchSuggestion } from './EmptyState';
+export { NoResultsIllustration, SearchLandingIllustration } from './illustrations';

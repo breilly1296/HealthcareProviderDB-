@@ -1,18 +1,20 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useState, useEffect, Suspense, useCallback } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { SearchForm } from '@/components/SearchForm';
 import { ProviderCard } from '@/components/ProviderCard';
 import { LocationCard } from '@/components/LocationCard';
 import ProviderCardSkeleton from '@/components/ProviderCardSkeleton';
 import ErrorMessage from '@/components/ErrorMessage';
+import { EmptyState, SearchSuggestion } from '@/components/EmptyState';
 import { SaveProfileButton } from '@/components/SaveProfileButton';
 import { providerApi, locationApi, Provider, Location, Pagination } from '@/lib/api';
 import { trackSearch } from '@/lib/analytics';
 
 function SearchResults() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [providers, setProviders] = useState<(Provider & { displayName: string })[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
@@ -159,6 +161,62 @@ function SearchResults() {
     }
   }, [mode, specialty, state, cities, zip, healthSystem, name, locationName, insurancePlanId, page]);
 
+  // Generate suggestions based on current search
+  const getNoResultsSuggestions = useCallback((): SearchSuggestion[] => {
+    const suggestions: SearchSuggestion[] = [];
+
+    if (specialty) {
+      suggestions.push({
+        label: 'Search all specialties',
+        action: 'clear-specialty',
+      });
+    }
+
+    if (cities) {
+      suggestions.push({
+        label: 'Search entire state',
+        action: 'clear-cities',
+      });
+    }
+
+    if (healthSystem) {
+      suggestions.push({
+        label: 'All health systems',
+        action: 'clear-health-system',
+      });
+    }
+
+    if (insurancePlanId) {
+      suggestions.push({
+        label: 'All insurance plans',
+        action: 'clear-insurance',
+      });
+    }
+
+    return suggestions.slice(0, 3); // Max 3 suggestions
+  }, [specialty, cities, healthSystem, insurancePlanId]);
+
+  // Handle suggestion clicks
+  const handleSuggestionClick = useCallback((action: string) => {
+    const params = new URLSearchParams();
+    params.set('mode', mode);
+
+    // Keep existing params except the one being cleared
+    if (state && action !== 'clear-state') params.set('state', state);
+    if (cities && action !== 'clear-cities') params.set('cities', cities);
+    if (zip && action !== 'clear-zip') params.set('zip', zip);
+    if (healthSystem && action !== 'clear-health-system') params.set('healthSystem', healthSystem);
+
+    if (mode === 'providers') {
+      if (specialty && action !== 'clear-specialty') params.set('specialty', specialty);
+      if (name && action !== 'clear-name') params.set('name', name);
+      if (insurancePlanId && action !== 'clear-insurance') params.set('insurancePlanId', insurancePlanId);
+    } else {
+      if (locationName && action !== 'clear-location-name') params.set('locationName', locationName);
+    }
+
+    router.push(`/search?${params.toString()}`);
+  }, [mode, state, cities, zip, healthSystem, specialty, name, insurancePlanId, locationName, router]);
 
   return (
     <div>
@@ -177,10 +235,10 @@ function SearchResults() {
           }}
         />
       ) : hasSearched && providers.length === 0 && locations.length === 0 ? (
-        <ErrorMessage
-          variant="search"
-          title={mode === 'providers' ? 'No Providers Found' : 'No Locations Found'}
-          message="Try adjusting your search criteria or expanding your location."
+        <EmptyState
+          type={mode === 'providers' ? 'no-results' : 'no-results-locations'}
+          suggestions={getNoResultsSuggestions()}
+          onSuggestionClick={handleSuggestionClick}
         />
       ) : hasSearched ? (
         <>
@@ -274,17 +332,7 @@ function SearchResults() {
           )}
         </>
       ) : (
-        <div className="text-center py-12">
-          <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </div>
-          <p className="text-gray-900 font-medium mb-2">Search for Providers</p>
-          <p className="text-gray-600">
-            Use the form above to find healthcare providers in your area.
-          </p>
-        </div>
+        <EmptyState type="landing" />
       )}
     </div>
   );
