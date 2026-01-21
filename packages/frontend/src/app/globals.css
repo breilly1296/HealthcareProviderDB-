@@ -103,3 +103,17 @@
 .confidence-low {
   @apply bg-red-100 text-red-800 border-red-200;
 }
+
+/* Safe area support for iOS notch and home indicator */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Mobile bottom nav spacing - prevents content from hiding behind nav */
+@media (max-width: 767px) {
+  .mobile-nav-padding {
+    padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+  }
+}

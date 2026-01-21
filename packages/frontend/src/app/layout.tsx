@@ -7,6 +7,7 @@ import ToastProvider from '@/components/ToastProvider';
 import { PostHogProvider } from '@/components/PostHogProvider';
 import { ScrollToTop } from '@/components/ScrollToTop';
 import { Header } from '@/components/Header';
+import { BottomNav } from '@/components/BottomNav';
 import { FontSizeProvider } from '@/context/FontSizeContext';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -128,11 +129,12 @@ export default function RootLayout({
             <PostHogProvider>
               <ToastProvider />
               <Header />
-              <main className="flex-1">
+              <main className="flex-1 pb-20 md:pb-0">
                 {children}
               </main>
               <Footer />
               <ScrollToTop />
+              <BottomNav />
             </PostHogProvider>
           </FontSizeProvider>
         </Suspense>
