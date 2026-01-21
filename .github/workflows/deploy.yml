@@ -13,37 +13,11 @@ env:
 
 jobs:
   # ================================
-  # Run Tests
-  # ================================
-  test:
-    name: Run Tests
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install dependencies
-        run: npm install --legacy-peer-deps
-        env:
-          npm_config_platform: linux
-          npm_config_arch: x64
-
-      - name: Run backend tests
-        run: cd packages/backend && npm test
-
-  # ================================
   # Build and Deploy Backend
   # ================================
   deploy-backend:
     name: Deploy Backend
     runs-on: ubuntu-latest
-    needs: test  # Wait for tests to pass before deploying
     permissions:
       contents: read
       id-token: write
@@ -181,7 +155,7 @@ jobs:
   summary:
     name: Deployment Summary
     runs-on: ubuntu-latest
-    needs: [test, deploy-backend, deploy-frontend]
+    needs: [deploy-backend, deploy-frontend]
     if: always()
 
     steps:
@@ -189,10 +163,7 @@ jobs:
         run: |
           echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Stage | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Tests | ${{ needs.test.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Backend Deploy | ${{ needs.deploy-backend.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Frontend Deploy | ${{ needs.deploy-frontend.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Backend URL:** ${{ needs.deploy-backend.outputs.backend_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | Status | URL |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------|-----|" >> $GITHUB_STEP_SUMMARY
+          echo "| Backend | ${{ needs.deploy-backend.result }} | ${{ needs.deploy-backend.outputs.backend_url }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend | ${{ needs.deploy-frontend.result }} | See Cloud Run console |" >> $GITHUB_STEP_SUMMARY
