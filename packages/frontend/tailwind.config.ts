@@ -36,6 +36,15 @@ const config: Config = {
         '3xl': ['2rem', { lineHeight: '2.5rem' }],
         '4xl': ['2.5rem', { lineHeight: '3rem' }],
       },
+      animation: {
+        shimmer: 'shimmer 1.5s ease-in-out infinite',
+      },
+      keyframes: {
+        shimmer: {
+          '0%': { backgroundPosition: '200% 0' },
+          '100%': { backgroundPosition: '-200% 0' },
+        },
+      },
     },
   },
   plugins: [],

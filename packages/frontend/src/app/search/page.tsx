@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { SearchForm } from '@/components/SearchForm';
 import { ProviderCard } from '@/components/ProviderCard';
 import { LocationCard } from '@/components/LocationCard';
-import ProviderCardSkeleton from '@/components/ProviderCardSkeleton';
+import { SearchResultsSkeleton } from '@/components/ProviderCardSkeleton';
 import ErrorMessage from '@/components/ErrorMessage';
 import { EmptyState, SearchSuggestion } from '@/components/EmptyState';
 import { SaveProfileButton } from '@/components/SaveProfileButton';
@@ -219,12 +219,10 @@ function SearchResults() {
   }, [mode, state, cities, zip, healthSystem, specialty, name, insurancePlanId, locationName, router]);
 
   return (
-    <div>
+    <div aria-live="polite" aria-busy={loading}>
       {/* Results */}
       {loading ? (
-        <div className="space-y-4">
-          <ProviderCardSkeleton count={3} />
-        </div>
+        <SearchResultsSkeleton count={5} />
       ) : error ? (
         <ErrorMessage
           variant={error.type}
@@ -367,11 +365,7 @@ export default function SearchPage() {
         </div>
 
         {/* Results */}
-        <Suspense fallback={
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary-200 border-t-primary-600 mx-auto" />
-          </div>
-        }>
+        <Suspense fallback={<SearchResultsSkeleton count={5} />}>
           <SearchResults />
         </Suspense>
       </div>
