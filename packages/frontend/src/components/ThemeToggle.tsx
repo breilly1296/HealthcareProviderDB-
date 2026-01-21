@@ -7,7 +7,7 @@ const THEME_OPTIONS: { value: ThemeMode; label: string; icon: React.ReactNode }[
     value: 'light',
     label: 'Light',
     icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -21,7 +21,7 @@ const THEME_OPTIONS: { value: ThemeMode; label: string; icon: React.ReactNode }[
     value: 'dark',
     label: 'Dark',
     icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -35,7 +35,7 @@ const THEME_OPTIONS: { value: ThemeMode; label: string; icon: React.ReactNode }[
     value: 'system',
     label: 'System',
     icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -52,7 +52,7 @@ export function ThemeToggle() {
 
   return (
     <div
-      className="flex items-center gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-lg"
+      className="flex items-center gap-0.5 p-0.5 bg-gray-100 dark:bg-gray-800 rounded-md"
       role="radiogroup"
       aria-label="Select color theme"
     >
@@ -61,14 +61,14 @@ export function ThemeToggle() {
           key={option.value}
           onClick={() => setTheme(option.value)}
           className={`
-            flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium
+            flex items-center gap-1 px-2 py-1 rounded text-xs font-medium
             transition-colors duration-150
-            focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2
+            focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1
             dark:focus-visible:ring-offset-gray-900
             ${
               theme === option.value
                 ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
             }
           `}
           role="radio"
