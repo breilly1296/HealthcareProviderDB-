@@ -42,7 +42,7 @@ export function RecentSearches({
         {searches.map((search) => (
           <div
             key={search.id}
-            className="group relative inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 rounded-full text-sm text-gray-700 dark:text-gray-300 transition-colors cursor-pointer"
+            className="group relative inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-full text-sm text-gray-700 dark:text-gray-200 transition-colors cursor-pointer"
           >
             <button
               type="button"

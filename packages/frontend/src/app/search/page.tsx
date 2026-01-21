@@ -242,16 +242,16 @@ function SearchResults() {
         <>
           {/* Results count */}
           <div className="mb-4">
-            <p className="text-gray-600">
-              Found <strong className="text-gray-900">{pagination?.total || 0}</strong> {mode === 'providers' ? 'providers' : 'locations'}
+            <p className="text-gray-600 dark:text-gray-300">
+              Found <strong className="text-gray-900 dark:text-white">{pagination?.total || 0}</strong> {mode === 'providers' ? 'providers' : 'locations'}
               {state && ` in ${state}`}
               {cities && ` in ${cities.split(',').join(', ')}`}
             </p>
           </div>
 
           {/* Disclaimer banner */}
-          <div className="mb-6 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <p className="text-sm text-yellow-800">
+          <div className="mb-6 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+            <p className="text-sm text-yellow-800 dark:text-yellow-200">
               <strong>Note:</strong> Provider information is crowdsourced and may not be current. Always verify insurance acceptance directly with the provider's office before scheduling.
             </p>
           </div>
@@ -299,7 +299,7 @@ function SearchResults() {
                   return (
                     <div key={p} className="flex items-center gap-2">
                       {showEllipsisBefore && (
-                        <span className="px-2 text-gray-400">...</span>
+                        <span className="px-2 text-gray-400 dark:text-gray-500">...</span>
                       )}
                       <a
                         href={`/search?${new URLSearchParams({
@@ -316,7 +316,7 @@ function SearchResults() {
                         }).toString()}`}
                         className={`min-w-[44px] min-h-[44px] px-4 py-3 rounded-lg font-medium flex items-center justify-center ${p === pagination.page
                           ? 'bg-primary-600 text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
                           }`}
                         aria-label={`Page ${p}${p === pagination.page ? ', current page' : ''}`}
                         aria-current={p === pagination.page ? 'page' : undefined}
@@ -344,10 +344,10 @@ export default function SearchPage() {
         <div className="mb-8">
           <div className="flex items-start justify-between gap-4 mb-4">
             <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
+              <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-2">
                 Find Healthcare Providers
               </h1>
-              <p className="text-xl text-gray-600">
+              <p className="text-xl text-gray-600 dark:text-gray-300">
                 Search for providers by specialty, location, and more.
               </p>
             </div>
@@ -359,7 +359,7 @@ export default function SearchPage() {
 
         {/* Search Form */}
         <div className="card mb-8">
-          <Suspense fallback={<div className="animate-pulse h-40 bg-gray-100 rounded" />}>
+          <Suspense fallback={<div className="animate-pulse h-40 bg-gray-100 dark:bg-gray-700 rounded" />}>
             <SearchForm />
           </Suspense>
         </div>
