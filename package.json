@@ -25,7 +25,9 @@
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
     "clean": "npm run clean --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present"
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test -w @healthcareproviderdb/backend",
+    "test:backend": "npm run test -w @healthcareproviderdb/backend"
   },
   "repository": {
     "type": "git",
