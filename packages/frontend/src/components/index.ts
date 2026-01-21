@@ -25,3 +25,5 @@ export {
   ProviderCardSkeletonCompact,
   DropdownLoadingSkeleton,
 } from './ProviderCardSkeleton';
+export { FontSizeToggle, FontSizeToggleCompact } from './FontSizeToggle';
+export { Header } from './Header';

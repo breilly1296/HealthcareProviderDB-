@@ -6,6 +6,8 @@ import './globals.css';
 import ToastProvider from '@/components/ToastProvider';
 import { PostHogProvider } from '@/components/PostHogProvider';
 import { ScrollToTop } from '@/components/ScrollToTop';
+import { Header } from '@/components/Header';
+import { FontSizeProvider } from '@/context/FontSizeContext';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -13,60 +15,6 @@ export const metadata: Metadata = {
   title: 'VerifyMyProvider - Find Providers Who Accept Your Insurance',
   description: 'Search for healthcare providers and verify insurance acceptance with community-verified data.',
 };
-
-function Header() {
-  return (
-    <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
-      <div className="container-wide">
-        <nav className="flex items-center justify-between h-16">
-          <Link
-            href="/"
-            className="flex items-center gap-2 text-lg sm:text-xl font-bold text-primary-600 hover:text-primary-700"
-          >
-            <svg
-              className="w-7 h-7 sm:w-8 sm:h-8 flex-shrink-0"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-              />
-            </svg>
-            <span className="hidden sm:inline">VerifyMyProvider</span>
-            <span className="sm:hidden">VMP</span>
-          </Link>
-
-          <div className="flex items-center gap-2 sm:gap-4">
-            <Link
-              href="/search"
-              className="hidden md:inline text-base font-medium text-gray-600 hover:text-primary-600 transition-colors"
-            >
-              Find Providers
-            </Link>
-            <Link
-              href="/insurance"
-              className="hidden md:inline text-base font-medium text-gray-600 hover:text-primary-600 transition-colors"
-            >
-              Scan Card
-            </Link>
-            <Link
-              href="/search"
-              className="btn-primary text-sm sm:text-base px-3 py-2 sm:px-4 sm:py-2"
-            >
-              <span className="hidden sm:inline">Search Now</span>
-              <span className="sm:hidden">Search</span>
-            </Link>
-          </div>
-        </nav>
-      </div>
-    </header>
-  );
-}
 
 function Footer() {
   return (
@@ -176,15 +124,17 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${inter.className} flex flex-col min-h-screen`}>
         <Suspense fallback={null}>
-          <PostHogProvider>
-            <ToastProvider />
-            <Header />
-            <main className="flex-1">
-              {children}
-            </main>
-            <Footer />
-            <ScrollToTop />
-          </PostHogProvider>
+          <FontSizeProvider>
+            <PostHogProvider>
+              <ToastProvider />
+              <Header />
+              <main className="flex-1">
+                {children}
+              </main>
+              <Footer />
+              <ScrollToTop />
+            </PostHogProvider>
+          </FontSizeProvider>
         </Suspense>
       </body>
     </html>
