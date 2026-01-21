@@ -11,11 +11,27 @@ import { RecentSearches } from './RecentSearches';
 interface SearchFormProps {
   showAdvanced?: boolean;
   className?: string;
+  /** 'inline' for desktop, 'drawer' for mobile filter drawer */
+  variant?: 'inline' | 'drawer';
+  /** Called when filters change, provides active filter count */
+  onFilterCountChange?: (count: number) => void;
+  /** Ref to expose submit function for drawer apply button */
+  submitRef?: React.MutableRefObject<(() => void) | null>;
+  /** Ref to expose clear function for drawer clear button */
+  clearRef?: React.MutableRefObject<(() => void) | null>;
 }
 
-export function SearchForm({ showAdvanced = true, className = '' }: SearchFormProps) {
+export function SearchForm({
+  showAdvanced = true,
+  className = '',
+  variant = 'inline',
+  onFilterCountChange,
+  submitRef,
+  clearRef,
+}: SearchFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const isDrawer = variant === 'drawer';
 
   // Recent searches
   const { recentSearches, addSearch, removeSearch, clearAll } = useRecentSearches();
@@ -56,6 +72,34 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
 
   // NYC All Boroughs preset
   const NYC_BOROUGHS = ['New York', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island'];
+
+  // Calculate active filter count
+  useEffect(() => {
+    if (!onFilterCountChange) return;
+
+    let count = 0;
+    if (specialty) count++;
+    if (state) count++;
+    if (healthSystem) count++;
+    if (selectedInsurancePlan) count++;
+    if (selectedCities.length > 0) count++;
+    if (zip) count++;
+
+    onFilterCountChange(count);
+  }, [specialty, state, healthSystem, selectedInsurancePlan, selectedCities, zip, onFilterCountChange]);
+
+  // Expose submit and clear functions via refs for drawer
+  useEffect(() => {
+    if (submitRef) {
+      submitRef.current = () => {
+        const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
+        handleSubmit(fakeEvent);
+      };
+    }
+    if (clearRef) {
+      clearRef.current = handleClear;
+    }
+  });
 
   // Load health systems from API - filtered by state and cities
   useEffect(() => {
@@ -719,23 +763,25 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
         </div>
       </div>
 
-      {/* Mobile Sticky Search Button */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 p-4 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 shadow-lg z-40">
-        <div className="flex gap-3 max-w-lg mx-auto">
-          <button type="submit" className="btn-primary flex-1 flex items-center justify-center gap-2">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            Search Providers
-          </button>
-          <button type="button" onClick={handleClear} className="btn-secondary px-4">
-            Clear
-          </button>
+      {/* Mobile Sticky Search Button - Hidden in drawer mode */}
+      {!isDrawer && (
+        <div className="md:hidden fixed bottom-16 left-0 right-0 p-4 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 shadow-lg z-30">
+          <div className="flex gap-3 max-w-lg mx-auto">
+            <button type="submit" className="btn-primary flex-1 flex items-center justify-center gap-2">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              Search Providers
+            </button>
+            <button type="button" onClick={handleClear} className="btn-secondary px-4">
+              Clear
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Spacer for mobile sticky button */}
-      <div className="md:hidden h-20"></div>
+      {/* Spacer for mobile sticky button - Hidden in drawer mode */}
+      {!isDrawer && <div className="md:hidden h-24"></div>}
 
       {/* Advanced options */}
       {showAdvanced && searchMode === 'providers' && (

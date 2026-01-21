@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense, useCallback } from 'react';
+import { useState, useEffect, Suspense, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { SearchForm } from '@/components/SearchForm';
 import { ProviderCard } from '@/components/ProviderCard';
@@ -9,6 +9,8 @@ import { SearchResultsSkeleton } from '@/components/ProviderCardSkeleton';
 import ErrorMessage from '@/components/ErrorMessage';
 import { EmptyState, SearchSuggestion } from '@/components/EmptyState';
 import { SaveProfileButton } from '@/components/SaveProfileButton';
+import { FilterButton } from '@/components/FilterButton';
+import { FilterDrawer } from '@/components/FilterDrawer';
 import { providerApi, locationApi, Provider, Location, Pagination } from '@/lib/api';
 import { trackSearch } from '@/lib/analytics';
 
@@ -336,7 +338,20 @@ function SearchResults() {
   );
 }
 
-export default function SearchPage() {
+function SearchPageContent() {
+  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+  const [activeFilterCount, setActiveFilterCount] = useState(0);
+  const drawerSubmitRef = useRef<(() => void) | null>(null);
+  const drawerClearRef = useRef<(() => void) | null>(null);
+
+  const handleApplyFilters = () => {
+    drawerSubmitRef.current?.();
+  };
+
+  const handleClearFilters = () => {
+    drawerClearRef.current?.();
+  };
+
   return (
     <div className="py-8 md:py-12">
       <div className="container-wide">
@@ -357,11 +372,34 @@ export default function SearchPage() {
           </div>
         </div>
 
-        {/* Search Form */}
-        <div className="card mb-8">
+        {/* Desktop Search Form - Hidden on mobile */}
+        <div className="hidden md:block card mb-8">
           <Suspense fallback={<div className="animate-pulse h-40 bg-gray-100 dark:bg-gray-700 rounded" />}>
-            <SearchForm />
+            <SearchForm
+              variant="inline"
+              onFilterCountChange={setActiveFilterCount}
+            />
           </Suspense>
+        </div>
+
+        {/* Mobile Filter Summary - Shows when filters are active */}
+        <div className="md:hidden mb-4">
+          {activeFilterCount > 0 && (
+            <button
+              onClick={() => setIsFilterDrawerOpen(true)}
+              className="w-full p-3 bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-lg text-left"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-primary-700 dark:text-primary-300">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                  </svg>
+                  <span className="font-medium">{activeFilterCount} filter{activeFilterCount !== 1 ? 's' : ''} applied</span>
+                </div>
+                <span className="text-sm text-primary-600 dark:text-primary-400">Edit</span>
+              </div>
+            </button>
+          )}
         </div>
 
         {/* Results */}
@@ -369,6 +407,37 @@ export default function SearchPage() {
           <SearchResults />
         </Suspense>
       </div>
+
+      {/* Mobile Filter Button - Fixed above BottomNav */}
+      <FilterButton
+        activeFilterCount={activeFilterCount}
+        onClick={() => setIsFilterDrawerOpen(true)}
+      />
+
+      {/* Mobile Filter Drawer */}
+      <FilterDrawer
+        isOpen={isFilterDrawerOpen}
+        onClose={() => setIsFilterDrawerOpen(false)}
+        onApply={handleApplyFilters}
+        onClear={handleClearFilters}
+        activeFilterCount={activeFilterCount}
+      >
+        <SearchForm
+          variant="drawer"
+          showAdvanced={true}
+          onFilterCountChange={setActiveFilterCount}
+          submitRef={drawerSubmitRef}
+          clearRef={drawerClearRef}
+        />
+      </FilterDrawer>
     </div>
+  );
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<SearchResultsSkeleton count={5} />}>
+      <SearchPageContent />
+    </Suspense>
   );
 }
