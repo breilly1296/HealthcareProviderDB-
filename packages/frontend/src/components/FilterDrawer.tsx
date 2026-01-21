@@ -127,17 +127,21 @@ export function FilterDrawer({
           {children}
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between gap-3 px-4 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+        {/* Footer - Sticky */}
+        <div className="sticky bottom-0 left-0 right-0 flex gap-3 px-4 py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
           <button
             type="button"
             onClick={onClear}
             className="
-              px-4 py-2.5
-              text-gray-600 dark:text-gray-400
-              hover:text-gray-900 dark:hover:text-white
+              flex-1
+              px-4 py-3
+              border border-gray-300 dark:border-gray-600
+              text-gray-700 dark:text-gray-300
+              hover:bg-gray-100 dark:hover:bg-gray-800
               font-medium
+              rounded-lg
               transition-colors
+              focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500
             "
           >
             Clear All
@@ -146,8 +150,8 @@ export function FilterDrawer({
             type="button"
             onClick={handleApply}
             className="
-              flex-1 max-w-[200px]
-              px-6 py-2.5
+              flex-1
+              px-4 py-3
               bg-primary-600 hover:bg-primary-700
               text-white font-medium
               rounded-lg
