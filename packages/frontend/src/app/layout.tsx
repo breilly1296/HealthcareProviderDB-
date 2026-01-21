@@ -5,6 +5,7 @@ import { Suspense } from 'react';
 import './globals.css';
 import ToastProvider from '@/components/ToastProvider';
 import { PostHogProvider } from '@/components/PostHogProvider';
+import { ScrollToTop } from '@/components/ScrollToTop';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -182,6 +183,7 @@ export default function RootLayout({
               {children}
             </main>
             <Footer />
+            <ScrollToTop />
           </PostHogProvider>
         </Suspense>
       </body>
