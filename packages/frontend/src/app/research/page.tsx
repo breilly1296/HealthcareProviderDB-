@@ -4,20 +4,20 @@ export default function ResearchPage() {
   return (
     <div>
       {/* Hero Section */}
-      <section className="bg-gradient-to-b from-primary-50 to-white py-16 md:py-24">
+      <section className="bg-gradient-to-b from-primary-50 dark:from-gray-800 to-white dark:to-gray-900 py-16 md:py-24">
         <div className="container-wide text-center">
-          <div className="inline-flex items-center gap-2 bg-white px-4 py-2 rounded-full shadow-sm border border-primary-200 mb-6">
+          <div className="inline-flex items-center gap-2 bg-white dark:bg-gray-800 px-4 py-2 rounded-full shadow-sm border border-primary-200 dark:border-gray-700 mb-6">
             <span className="text-2xl">🔬</span>
-            <span className="text-sm font-medium text-gray-700">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
               Peer-Reviewed Research
             </span>
           </div>
 
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-6">
             The Research Behind
-            <span className="text-primary-600"> VerifyMyProvider</span>
+            <span className="text-primary-600 dark:text-primary-400"> VerifyMyProvider</span>
           </h1>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-8">
+          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto mb-8">
             Our platform is built on peer-reviewed evidence from leading healthcare
             policy and informatics journals. See the science behind our approach.
           </p>
@@ -25,12 +25,12 @@ export default function ResearchPage() {
       </section>
 
       {/* Key Findings Cards */}
-      <section className="py-16 md:py-24 bg-white">
+      <section className="py-16 md:py-24 bg-white dark:bg-gray-900">
         <div className="container-wide">
-          <h2 className="text-3xl md:text-4xl font-bold text-center text-gray-900 mb-4">
+          <h2 className="text-3xl md:text-4xl font-bold text-center text-gray-900 dark:text-white mb-4">
             Core Research Findings
           </h2>
-          <p className="text-xl text-gray-600 text-center max-w-2xl mx-auto mb-12">
+          <p className="text-xl text-gray-600 dark:text-gray-300 text-center max-w-2xl mx-auto mb-12">
             Three critical studies that shaped our product
           </p>
 
@@ -38,17 +38,17 @@ export default function ResearchPage() {
             {/* Card 1: Directory Inaccuracy */}
             <div className="card border-t-4 border-t-red-500">
               <div className="mb-6">
-                <div className="text-5xl font-bold text-red-600 mb-2">46-77%</div>
-                <div className="text-xl font-semibold text-gray-900">
+                <div className="text-5xl font-bold text-red-600 dark:text-red-500 mb-2">46-77%</div>
+                <div className="text-xl font-semibold text-gray-900 dark:text-white">
                   Directory Inaccuracy
                 </div>
               </div>
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
                 Studies show insurance provider directories are wrong nearly half the time,
                 with some plans showing inaccuracy rates as high as 77%. Patients face
                 4x more surprise bills when relying on inaccurate directories.
               </p>
-              <div className="text-sm text-gray-500 mb-4">
+              <div className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                 Haeder, S.F. & Xu, W.Y. (2024)
                 <br />
                 <em>World Medical & Health Policy</em>
@@ -66,17 +66,17 @@ export default function ResearchPage() {
             {/* Card 2: Crowdsourcing Effectiveness */}
             <div className="card border-t-4 border-t-green-500">
               <div className="mb-6">
-                <div className="text-5xl font-bold text-green-600 mb-2">κ=0.58</div>
-                <div className="text-xl font-semibold text-gray-900">
+                <div className="text-5xl font-bold text-green-600 dark:text-green-500 mb-2">κ=0.58</div>
+                <div className="text-xl font-semibold text-gray-900 dark:text-white">
                   Expert-Level Accuracy
                 </div>
               </div>
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
                 Crowdsourced verification achieves expert-level accuracy (κ=0.58 vs 0.59)
                 while being 5-150x faster and 75% cheaper. Research shows 3 verifications
                 per item is optimal for reliability.
               </p>
-              <div className="text-sm text-gray-500 mb-4">
+              <div className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                 Mortensen, J. et al. (2015)
                 <br />
                 <em>Journal of the American Medical Informatics Association</em>
@@ -94,17 +94,17 @@ export default function ResearchPage() {
             {/* Card 3: Financial Impact */}
             <div className="card border-t-4 border-t-yellow-500">
               <div className="mb-6">
-                <div className="text-5xl font-bold text-yellow-600 mb-2">540</div>
-                <div className="text-xl font-semibold text-gray-900">
+                <div className="text-5xl font-bold text-yellow-600 dark:text-yellow-500 mb-2">540</div>
+                <div className="text-xl font-semibold text-gray-900 dark:text-white">
                   Days to Fix Errors
                 </div>
               </div>
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
                 Directory inaccuracies persist for an average of 540 days—far exceeding
                 the 90-day federal requirement. Only 11.6% of errors are corrected
                 within 4-9 months of identification.
               </p>
-              <div className="text-sm text-gray-500 mb-4">
+              <div className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                 Haeder, S.F. & Zhu, J.M. (2024)
                 <br />
                 <em>Health Affairs Scholar</em>
@@ -123,9 +123,9 @@ export default function ResearchPage() {
       </section>
 
       {/* Why This Matters Section */}
-      <section className="py-16 md:py-24 bg-gray-50">
+      <section className="py-16 md:py-24 bg-gray-50 dark:bg-gray-800">
         <div className="container-wide">
-          <h2 className="text-3xl md:text-4xl font-bold text-center text-gray-900 mb-12">
+          <h2 className="text-3xl md:text-4xl font-bold text-center text-gray-900 dark:text-white mb-12">
             Why This Matters
           </h2>
 
@@ -134,19 +134,19 @@ export default function ResearchPage() {
               {/* Impact Card 1 */}
               <div className="card">
                 <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="w-12 h-12 bg-red-100 dark:bg-red-900/40 rounded-full flex items-center justify-center flex-shrink-0">
+                    <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                       Financial Harm
                     </h3>
-                    <p className="text-gray-600">
-                      <strong className="text-gray-900">51%</strong> of patients affected by directory errors
+                    <p className="text-gray-600 dark:text-gray-300">
+                      <strong className="text-gray-900 dark:text-white">51%</strong> of patients affected by directory errors
                       report financial problems. Inaccurate directories cause patients to receive
-                      <strong className="text-gray-900"> 4x more surprise medical bills</strong> (16% vs 4%).
+                      <strong className="text-gray-900 dark:text-white"> 4x more surprise medical bills</strong> (16% vs 4%).
                     </p>
                   </div>
                 </div>
@@ -155,18 +155,18 @@ export default function ResearchPage() {
               {/* Impact Card 2 */}
               <div className="card">
                 <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-900/40 rounded-full flex items-center justify-center flex-shrink-0">
+                    <svg className="w-6 h-6 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                       Delayed Care
                     </h3>
-                    <p className="text-gray-600">
-                      <strong className="text-gray-900">28%</strong> of patients delay necessary medical care,
-                      and <strong className="text-gray-900">10% forgo care entirely</strong> due to confusion
+                    <p className="text-gray-600 dark:text-gray-300">
+                      <strong className="text-gray-900 dark:text-white">28%</strong> of patients delay necessary medical care,
+                      and <strong className="text-gray-900 dark:text-white">10% forgo care entirely</strong> due to confusion
                       from inaccurate provider directories.
                     </p>
                   </div>
@@ -176,18 +176,18 @@ export default function ResearchPage() {
               {/* Impact Card 3 */}
               <div className="card">
                 <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/40 rounded-full flex items-center justify-center flex-shrink-0">
+                    <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                       Regulatory Failure
                     </h3>
-                    <p className="text-gray-600">
-                      Federal regulations require directory updates every <strong className="text-gray-900">90 days</strong>,
-                      but errors persist for an average of <strong className="text-gray-900">540 days</strong>—
+                    <p className="text-gray-600 dark:text-gray-300">
+                      Federal regulations require directory updates every <strong className="text-gray-900 dark:text-white">90 days</strong>,
+                      but errors persist for an average of <strong className="text-gray-900 dark:text-white">540 days</strong>—
                       6x longer than required.
                     </p>
                   </div>
@@ -197,18 +197,18 @@ export default function ResearchPage() {
               {/* Impact Card 4 */}
               <div className="card">
                 <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="w-12 h-12 bg-green-100 dark:bg-green-900/40 rounded-full flex items-center justify-center flex-shrink-0">
+                    <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                       Network Churn
                     </h3>
-                    <p className="text-gray-600">
-                      Providers exit insurance networks at a <strong className="text-gray-900">12% annual rate</strong>,
-                      with <strong className="text-gray-900">34% leaving over 5 years</strong>. Mental health
+                    <p className="text-gray-600 dark:text-gray-300">
+                      Providers exit insurance networks at a <strong className="text-gray-900 dark:text-white">12% annual rate</strong>,
+                      with <strong className="text-gray-900 dark:text-white">34% leaving over 5 years</strong>. Mental health
                       providers show even higher turnover rates.
                     </p>
                   </div>
@@ -217,28 +217,28 @@ export default function ResearchPage() {
             </div>
 
             {/* Solution Statement */}
-            <div className="card bg-primary-50 border-primary-200">
+            <div className="card bg-primary-50 dark:bg-primary-900/30 border-primary-200 dark:border-primary-800">
               <div className="text-center">
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
                   Our Solution
                 </h3>
-                <p className="text-lg text-gray-700 mb-4">
-                  VerifyMyProvider combines <strong>crowdsourced verification</strong> with
-                  <strong> research-backed algorithms</strong> to provide real-time, accurate
+                <p className="text-lg text-gray-700 dark:text-gray-300 mb-4">
+                  VerifyMyProvider combines <strong className="text-gray-900 dark:text-white">crowdsourced verification</strong> with
+                  <strong className="text-gray-900 dark:text-white"> research-backed algorithms</strong> to provide real-time, accurate
                   provider directory information—solving what regulation couldn't fix.
                 </p>
                 <div className="flex flex-wrap justify-center gap-6 mt-6">
                   <div>
-                    <div className="text-2xl font-bold text-primary-600">Expert-Level</div>
-                    <div className="text-sm text-gray-600">Accuracy (κ=0.58)</div>
+                    <div className="text-2xl font-bold text-primary-600 dark:text-primary-400">Expert-Level</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">Accuracy (κ=0.58)</div>
                   </div>
                   <div>
-                    <div className="text-2xl font-bold text-primary-600">5-150x</div>
-                    <div className="text-sm text-gray-600">Faster Updates</div>
+                    <div className="text-2xl font-bold text-primary-600 dark:text-primary-400">5-150x</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">Faster Updates</div>
                   </div>
                   <div>
-                    <div className="text-2xl font-bold text-primary-600">Real-Time</div>
-                    <div className="text-sm text-gray-600">vs 540-Day Lag</div>
+                    <div className="text-2xl font-bold text-primary-600 dark:text-primary-400">Real-Time</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">vs 540-Day Lag</div>
                   </div>
                 </div>
               </div>
@@ -248,9 +248,9 @@ export default function ResearchPage() {
       </section>
 
       {/* Full Citations */}
-      <section className="py-16 md:py-24 bg-white">
+      <section className="py-16 md:py-24 bg-white dark:bg-gray-900">
         <div className="container-wide">
-          <h2 className="text-3xl md:text-4xl font-bold text-center text-gray-900 mb-12">
+          <h2 className="text-3xl md:text-4xl font-bold text-center text-gray-900 dark:text-white mb-12">
             Academic Citations
           </h2>
 
@@ -259,9 +259,9 @@ export default function ResearchPage() {
               {/* Citation 1 */}
               <div className="card">
                 <div className="flex items-start gap-4">
-                  <div className="text-primary-600 font-bold text-lg flex-shrink-0">[1]</div>
+                  <div className="text-primary-600 dark:text-primary-400 font-bold text-lg flex-shrink-0">[1]</div>
                   <div>
-                    <p className="text-gray-700">
+                    <p className="text-gray-700 dark:text-gray-300">
                       Haeder, S.F. & Xu, W.Y. (2024). "Consumer Experiences Navigating Health Care
                       Provider Directories." <em>World Medical & Health Policy</em>.
                     </p>
@@ -270,7 +270,7 @@ export default function ResearchPage() {
                         href="/research/reports/Elicit - Financial Impact of Provider Directory Inaccuracie - Report.pdf"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                        className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium"
                       >
                         View PDF →
                       </a>
@@ -282,9 +282,9 @@ export default function ResearchPage() {
               {/* Citation 2 */}
               <div className="card">
                 <div className="flex items-start gap-4">
-                  <div className="text-primary-600 font-bold text-lg flex-shrink-0">[2]</div>
+                  <div className="text-primary-600 dark:text-primary-400 font-bold text-lg flex-shrink-0">[2]</div>
                   <div>
-                    <p className="text-gray-700">
+                    <p className="text-gray-700 dark:text-gray-300">
                       Haeder, S.F. & Zhu, J.M. (2024). "Inaccuracies in provider directories persist
                       for long periods of time." <em>Health Affairs Scholar</em>, 2(6), qxae079.
                     </p>
@@ -293,7 +293,7 @@ export default function ResearchPage() {
                         href="/research/reports/qxae079.pdf"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                        className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium"
                       >
                         View PDF →
                       </a>
@@ -305,9 +305,9 @@ export default function ResearchPage() {
               {/* Citation 3 */}
               <div className="card">
                 <div className="flex items-start gap-4">
-                  <div className="text-primary-600 font-bold text-lg flex-shrink-0">[3]</div>
+                  <div className="text-primary-600 dark:text-primary-400 font-bold text-lg flex-shrink-0">[3]</div>
                   <div>
-                    <p className="text-gray-700">
+                    <p className="text-gray-700 dark:text-gray-300">
                       Mortensen, J., Minty, E.P., Januszyk, M., Sweeney, T.E., Agarwal, G.S.,
                       Noy, N.F., & Musen, M.A. (2015). "Using the Wisdom of the Crowds to Find
                       Critical Errors in Biomedical Ontologies: A Study of SNOMED CT."
@@ -318,7 +318,7 @@ export default function ResearchPage() {
                         href="/research/reports/Elicit - Effectiveness of Crowdsourcing in Healthcare Verif - Report.pdf"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                        className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium"
                       >
                         View PDF →
                       </a>
@@ -330,9 +330,9 @@ export default function ResearchPage() {
               {/* Citation 4 */}
               <div className="card">
                 <div className="flex items-start gap-4">
-                  <div className="text-primary-600 font-bold text-lg flex-shrink-0">[4]</div>
+                  <div className="text-primary-600 dark:text-primary-400 font-bold text-lg flex-shrink-0">[4]</div>
                   <div>
-                    <p className="text-gray-700">
+                    <p className="text-gray-700 dark:text-gray-300">
                       Ndumele, C.D., Elliott, M.N., Haviland, A.M., Haas, A., Dembosky, J.W., &
                       Gildner, J.L. (2018). "Network Optimization And The Continuity Of Physicians
                       In Medicaid Managed Care." <em>Health Affairs</em>, 37(6), 929-935.
@@ -342,7 +342,7 @@ export default function ResearchPage() {
                         href="/research/reports/Elicit - Insurance Network Participation Changes - Report.pdf"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                        className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium"
                       >
                         View PDF →
                       </a>
@@ -353,9 +353,9 @@ export default function ResearchPage() {
             </div>
 
             {/* Research Note */}
-            <div className="mt-8 p-6 bg-gray-50 rounded-lg border border-gray-200">
-              <p className="text-sm text-gray-600">
-                <strong className="text-gray-900">Note:</strong> All research studies cited on this page
+            <div className="mt-8 p-6 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                <strong className="text-gray-900 dark:text-white">Note:</strong> All research studies cited on this page
                 are peer-reviewed publications from leading healthcare policy and informatics journals.
                 PDF copies are provided for transparency and are subject to copyright by their respective publishers.
               </p>

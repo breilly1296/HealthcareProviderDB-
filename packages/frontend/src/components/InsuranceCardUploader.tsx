@@ -78,9 +78,9 @@ export default function InsuranceCardUploader() {
   const renderDataField = (label: string, value: string | null) => {
     if (!value) return null;
     return (
-      <div className="flex justify-between py-2 border-b border-gray-100 last:border-0">
-        <span className="text-gray-600 text-sm">{label}</span>
-        <span className="font-medium text-gray-900 text-sm text-right max-w-[60%]">{value}</span>
+      <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
+        <span className="text-gray-600 dark:text-gray-400 text-sm">{label}</span>
+        <span className="font-medium text-gray-900 dark:text-white text-sm text-right max-w-[60%]">{value}</span>
       </div>
     );
   };
@@ -88,16 +88,16 @@ export default function InsuranceCardUploader() {
   return (
     <div className="max-w-2xl mx-auto">
       {/* Upload Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Upload Insurance Card</h2>
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Upload Insurance Card</h2>
 
         {!selectedImage ? (
           <div
             onClick={() => fileInputRef.current?.click()}
-            className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-primary-500 hover:bg-primary-50 transition-colors"
+            className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center cursor-pointer hover:border-primary-500 dark:hover:border-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
           >
             <svg
-              className="w-12 h-12 mx-auto text-gray-400 mb-4"
+              className="w-12 h-12 mx-auto text-gray-400 dark:text-gray-500 mb-4"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -109,8 +109,8 @@ export default function InsuranceCardUploader() {
                 d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
               />
             </svg>
-            <p className="text-gray-600 mb-2">Click to upload or drag and drop</p>
-            <p className="text-sm text-gray-500">PNG, JPG, WebP or GIF (max 10MB)</p>
+            <p className="text-gray-600 dark:text-gray-300 mb-2">Click to upload or drag and drop</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">PNG, JPG, WebP or GIF (max 10MB)</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -118,13 +118,13 @@ export default function InsuranceCardUploader() {
               <img
                 src={selectedImage}
                 alt="Insurance card preview"
-                className="w-full rounded-lg border border-gray-200"
+                className="w-full rounded-lg border border-gray-200 dark:border-gray-700"
               />
               <button
                 onClick={handleReset}
-                className="absolute top-2 right-2 bg-white rounded-full p-1 shadow-md hover:bg-gray-100"
+                className="absolute top-2 right-2 bg-white dark:bg-gray-700 rounded-full p-1 shadow-md hover:bg-gray-100 dark:hover:bg-gray-600"
               >
-                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
@@ -184,9 +184,9 @@ export default function InsuranceCardUploader() {
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-6">
           <div className="flex items-start gap-3">
-            <svg className="w-5 h-5 text-red-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 text-red-500 dark:text-red-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -195,8 +195,8 @@ export default function InsuranceCardUploader() {
               />
             </svg>
             <div>
-              <p className="font-medium text-red-800">Extraction Error</p>
-              <p className="text-sm text-red-700">{error}</p>
+              <p className="font-medium text-red-800 dark:text-red-200">Extraction Error</p>
+              <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
             </div>
           </div>
         </div>
@@ -204,21 +204,21 @@ export default function InsuranceCardUploader() {
 
       {/* Extracted Data */}
       {extractedData && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="bg-green-50 border-b border-green-100 px-6 py-4">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="bg-green-50 dark:bg-green-900/30 border-b border-green-100 dark:border-green-800 px-6 py-4">
             <div className="flex items-center gap-2">
-              <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
-              <h3 className="font-semibold text-green-800">Insurance Data Extracted</h3>
+              <h3 className="font-semibold text-green-800 dark:text-green-200">Insurance Data Extracted</h3>
             </div>
           </div>
 
           <div className="p-6 space-y-6">
             {/* Plan Information */}
             <div>
-              <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                <svg className="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <h4 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                <svg className="w-4 h-4 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -228,7 +228,7 @@ export default function InsuranceCardUploader() {
                 </svg>
                 Plan Information
               </h4>
-              <div className="bg-gray-50 rounded-lg p-4">
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                 {renderDataField('Insurance Company', extractedData.insurance_company)}
                 {renderDataField('Plan Name', extractedData.plan_name)}
                 {renderDataField('Plan Type', extractedData.plan_type)}
@@ -239,8 +239,8 @@ export default function InsuranceCardUploader() {
 
             {/* Subscriber Information */}
             <div>
-              <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                <svg className="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <h4 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                <svg className="w-4 h-4 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -250,7 +250,7 @@ export default function InsuranceCardUploader() {
                 </svg>
                 Subscriber Information
               </h4>
-              <div className="bg-gray-50 rounded-lg p-4">
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                 {renderDataField('Subscriber Name', extractedData.subscriber_name)}
                 {renderDataField('Subscriber ID', extractedData.subscriber_id)}
                 {renderDataField('Group Number', extractedData.group_number)}
@@ -264,8 +264,8 @@ export default function InsuranceCardUploader() {
               extractedData.copay_urgent ||
               extractedData.copay_er) && (
               <div>
-                <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <svg className="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <h4 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                  <svg className="w-4 h-4 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -275,7 +275,7 @@ export default function InsuranceCardUploader() {
                   </svg>
                   Copays
                 </h4>
-                <div className="bg-gray-50 rounded-lg p-4">
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                   {renderDataField('Primary Care', extractedData.copay_pcp)}
                   {renderDataField('Specialist', extractedData.copay_specialist)}
                   {renderDataField('Urgent Care', extractedData.copay_urgent)}
@@ -290,8 +290,8 @@ export default function InsuranceCardUploader() {
               extractedData.oop_max_individual ||
               extractedData.oop_max_family) && (
               <div>
-                <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <svg className="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <h4 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                  <svg className="w-4 h-4 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -301,7 +301,7 @@ export default function InsuranceCardUploader() {
                   </svg>
                   Deductibles & Out-of-Pocket Max
                 </h4>
-                <div className="bg-gray-50 rounded-lg p-4">
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                   {renderDataField('Individual Deductible', extractedData.deductible_individual)}
                   {renderDataField('Family Deductible', extractedData.deductible_family)}
                   {renderDataField('Individual OOP Max', extractedData.oop_max_individual)}
@@ -313,8 +313,8 @@ export default function InsuranceCardUploader() {
             {/* Pharmacy (Rx) */}
             {(extractedData.rxbin || extractedData.rxpcn || extractedData.rxgrp) && (
               <div>
-                <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <svg className="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <h4 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                  <svg className="w-4 h-4 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -324,7 +324,7 @@ export default function InsuranceCardUploader() {
                   </svg>
                   Pharmacy Information
                 </h4>
-                <div className="bg-gray-50 rounded-lg p-4">
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                   {renderDataField('RxBIN', extractedData.rxbin)}
                   {renderDataField('RxPCN', extractedData.rxpcn)}
                   {renderDataField('RxGRP', extractedData.rxgrp)}
@@ -335,8 +335,8 @@ export default function InsuranceCardUploader() {
             {/* Contact */}
             {(extractedData.customer_care_phone || extractedData.website) && (
               <div>
-                <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <svg className="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <h4 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                  <svg className="w-4 h-4 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -346,7 +346,7 @@ export default function InsuranceCardUploader() {
                   </svg>
                   Contact Information
                 </h4>
-                <div className="bg-gray-50 rounded-lg p-4">
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                   {renderDataField('Customer Care', extractedData.customer_care_phone)}
                   {renderDataField('Website', extractedData.website)}
                 </div>

@@ -207,16 +207,16 @@ export default function ProviderDetailPage() {
       <div className="container-wide">
         {/* Breadcrumb */}
         <nav className="mb-6">
-          <ol className="flex items-center gap-2 text-sm text-gray-500">
+          <ol className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
             <li>
-              <Link href="/" className="hover:text-primary-600">Home</Link>
+              <Link href="/" className="hover:text-primary-600 dark:hover:text-primary-400">Home</Link>
             </li>
             <li>/</li>
             <li>
-              <Link href="/search" className="hover:text-primary-600">Search</Link>
+              <Link href="/search" className="hover:text-primary-600 dark:hover:text-primary-400">Search</Link>
             </li>
             <li>/</li>
-            <li className="text-gray-900 font-medium truncate max-w-[200px]">
+            <li className="text-gray-900 dark:text-white font-medium truncate max-w-[200px]">
               {provider.displayName}
             </li>
           </ol>
@@ -231,17 +231,17 @@ export default function ProviderDetailPage() {
                 <div className="flex-1">
                   <div className="flex items-start gap-3 mb-4">
                     <div className="flex-1">
-                      <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
+                      <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">
                         {provider.displayName}
                       </h1>
-                      <p className="text-lg sm:text-xl text-primary-600 font-medium mb-2">
+                      <p className="text-lg sm:text-xl text-primary-600 dark:text-primary-400 font-medium mb-2">
                         {specialty}
                       </p>
 
                       {/* Research Badge */}
                       <Link
                         href="/research"
-                        className="inline-flex items-center gap-1.5 text-xs font-medium text-primary-700 hover:text-primary-800 bg-primary-50 px-3 py-1.5 rounded-full border border-primary-200 transition-colors"
+                        className="inline-flex items-center gap-1.5 text-xs font-medium text-primary-700 dark:text-primary-300 hover:text-primary-800 dark:hover:text-primary-200 bg-primary-50 dark:bg-primary-900/40 px-3 py-1.5 rounded-full border border-primary-200 dark:border-primary-700 transition-colors"
                       >
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -252,14 +252,14 @@ export default function ProviderDetailPage() {
                   </div>
 
                   {/* Contact Info */}
-                  <div className="space-y-2 text-gray-600">
+                  <div className="space-y-2 text-gray-600 dark:text-gray-300">
                     <a
                       href={`https://maps.google.com/?q=${encodeURIComponent(`${provider.addressLine1}${provider.addressLine2 ? ' ' + provider.addressLine2 : ''}, ${provider.city}, ${provider.state} ${provider.zip}`)}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-start gap-2 text-primary-600 hover:text-primary-700 transition-colors group"
+                      className="flex items-start gap-2 text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors group"
                     >
-                      <svg className="w-5 h-5 text-gray-400 group-hover:text-primary-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-5 h-5 text-gray-400 dark:text-gray-500 group-hover:text-primary-600 dark:group-hover:text-primary-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
@@ -274,9 +274,9 @@ export default function ProviderDetailPage() {
                     {provider.phone && (
                       <a
                         href={`tel:${provider.phone}`}
-                        className="flex items-center gap-2 text-primary-600 hover:text-primary-700 transition-colors"
+                        className="flex items-center gap-2 text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
                       >
-                        <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                         </svg>
                         <span className="text-base">{provider.phone}</span>
@@ -297,10 +297,10 @@ export default function ProviderDetailPage() {
             {/* Accepted Plans */}
             <div className="card">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
                   Accepted Insurance Plans
                   {acceptedPlans.length > 0 && (
-                    <span className="ml-2 text-base font-normal text-gray-500">
+                    <span className="ml-2 text-base font-normal text-gray-500 dark:text-gray-400">
                       ({acceptedPlans.length} plan{acceptedPlans.length !== 1 ? 's' : ''})
                     </span>
                   )}
@@ -309,14 +309,14 @@ export default function ProviderDetailPage() {
                   <div className="flex gap-2">
                     <button
                       onClick={() => setExpandedCarriers(new Set(groupedPlans.map(([carrier]) => carrier)))}
-                      className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                      className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium"
                     >
                       Expand All
                     </button>
-                    <span className="text-gray-300">|</span>
+                    <span className="text-gray-300 dark:text-gray-600">|</span>
                     <button
                       onClick={() => setExpandedCarriers(new Set())}
-                      className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                      className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium"
                     >
                       Collapse All
                     </button>
@@ -329,7 +329,7 @@ export default function ProviderDetailPage() {
                 <div className="mb-6">
                   <div className="relative">
                     <svg
-                      className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
+                      className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -346,12 +346,12 @@ export default function ProviderDetailPage() {
                       placeholder="Search plans or carriers..."
                       value={planSearchQuery}
                       onChange={(e) => setPlanSearchQuery(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     />
                     {planSearchQuery && (
                       <button
                         onClick={() => setPlanSearchQuery('')}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -368,31 +368,31 @@ export default function ProviderDetailPage() {
                     {groupedPlans.map(([carrier, plans]) => {
                       const isExpanded = expandedCarriers.has(carrier);
                       return (
-                        <div key={carrier} className="border border-gray-200 rounded-lg overflow-hidden">
+                        <div key={carrier} className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
                           {/* Carrier Header */}
                           <button
                             onClick={() => toggleCarrier(carrier)}
-                            className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+                            className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left"
                           >
                             <div className="flex items-center gap-3">
                               <svg
-                                className={`w-5 h-5 text-gray-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                                className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
                                 fill="none"
                                 stroke="currentColor"
                                 viewBox="0 0 24 24"
                               >
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                               </svg>
-                              <span className="font-semibold text-gray-900">{carrier}</span>
+                              <span className="font-semibold text-gray-900 dark:text-white">{carrier}</span>
                             </div>
-                            <span className="text-sm text-gray-500 bg-gray-200 px-2 py-1 rounded-full">
+                            <span className="text-sm text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded-full">
                               {plans.length} plan{plans.length !== 1 ? 's' : ''}
                             </span>
                           </button>
 
                           {/* Plans List */}
                           {isExpanded && (
-                            <div className="divide-y divide-gray-100">
+                            <div className="divide-y divide-gray-100 dark:divide-gray-700">
                               {plans.map((pa) => {
                                 // Get confidence level for display
                                 const confidenceLevel = (pa.confidence?.level ||
@@ -424,10 +424,10 @@ export default function ProviderDetailPage() {
                                   <div key={pa.id} className="p-4 space-y-4">
                                     <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                                       <div className="flex-1">
-                                        <h3 className="font-medium text-gray-900">
+                                        <h3 className="font-medium text-gray-900 dark:text-white">
                                           {pa.plan?.planName || 'Unknown Plan'}
                                         </h3>
-                                        <p className="text-sm text-gray-600">
+                                        <p className="text-sm text-gray-600 dark:text-gray-400">
                                           {pa.plan?.planType}
                                         </p>
                                         {pa.acceptsNewPatients !== null && (
@@ -487,21 +487,21 @@ export default function ProviderDetailPage() {
                     })}
                   </div>
                 ) : (
-                  <div className="text-center py-8 bg-gray-50 rounded-lg">
-                    <p className="text-gray-600">
+                  <div className="text-center py-8 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <p className="text-gray-600 dark:text-gray-300">
                       No plans match your search.
                     </p>
                     <button
                       onClick={() => setPlanSearchQuery('')}
-                      className="mt-2 text-primary-600 hover:text-primary-700 font-medium"
+                      className="mt-2 text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium"
                     >
                       Clear search
                     </button>
                   </div>
                 )
               ) : (
-                <div className="text-center py-8 bg-gray-50 rounded-lg">
-                  <p className="text-gray-600 mb-4">
+                <div className="text-center py-8 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <p className="text-gray-600 dark:text-gray-300 mb-4">
                     No verified insurance plans yet.
                   </p>
                   <VerificationButton
@@ -517,14 +517,14 @@ export default function ProviderDetailPage() {
               {/* Loading state - show when fetching or not yet fetched */}
               {(loadingColocated || (!colocatedFetched && !colocatedError)) && (
                 <div className="card">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
                     Other Providers at This Location
                   </h2>
                   <div className="space-y-3">
                     {[1, 2, 3].map((i) => (
-                      <div key={i} className="animate-pulse p-4 border border-gray-200 rounded-lg">
-                        <div className="h-5 bg-gray-200 rounded w-2/3 mb-2"></div>
-                        <div className="h-4 bg-gray-100 rounded w-1/2"></div>
+                      <div key={i} className="animate-pulse p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+                        <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-2/3 mb-2"></div>
+                        <div className="h-4 bg-gray-100 dark:bg-gray-600 rounded w-1/2"></div>
                       </div>
                     ))}
                   </div>
@@ -534,19 +534,19 @@ export default function ProviderDetailPage() {
               {/* Error state */}
               {!loadingColocated && colocatedError && (
               <div className="card">
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
                   Other Providers at This Location
                 </h2>
-                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                   <div className="flex items-start gap-3">
-                    <svg className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 text-yellow-600 dark:text-yellow-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
                     <div>
-                      <p className="text-sm text-yellow-800">{colocatedError}</p>
+                      <p className="text-sm text-yellow-800 dark:text-yellow-200">{colocatedError}</p>
                       <button
                         onClick={fetchColocatedProviders}
-                        className="text-sm font-medium text-yellow-700 hover:text-yellow-800 mt-2"
+                        className="text-sm font-medium text-yellow-700 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-300 mt-2"
                       >
                         Try again
                       </button>
@@ -559,15 +559,15 @@ export default function ProviderDetailPage() {
               {/* Zero colocated providers */}
               {!loadingColocated && !colocatedError && colocatedFetched && colocatedTotal === 0 && (
                 <div className="card">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
                     Other Providers at This Location
                   </h2>
-                  <div className="p-4 bg-gray-50 rounded-lg text-center">
-                    <svg className="w-10 h-10 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg text-center">
+                    <svg className="w-10 h-10 text-gray-400 dark:text-gray-500 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
-                    <p className="text-gray-600 font-medium">
+                    <p className="text-gray-600 dark:text-gray-300 font-medium">
                       This is the only provider at this location
                     </p>
                   </div>
@@ -578,13 +578,13 @@ export default function ProviderDetailPage() {
               {!loadingColocated && !colocatedError && colocatedFetched && colocatedTotal !== null && colocatedTotal > 0 && location && (
               <div className="card">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-2xl font-bold text-gray-900">
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
                     Other Providers at This Location
                   </h2>
                   {colocatedTotal > 10 && (
                     <Link
                       href={`/search?city=${encodeURIComponent(location.city)}&state=${location.state}&zipCode=${location.zipCode.substring(0, 5)}`}
-                      className="text-sm font-medium text-primary-600 hover:text-primary-700 flex items-center gap-1"
+                      className="text-sm font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 flex items-center gap-1"
                     >
                       View all {colocatedTotal}
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -594,22 +594,22 @@ export default function ProviderDetailPage() {
                   )}
                 </div>
 
-                <div className="mb-4 p-3 bg-gray-50 rounded-lg flex items-start gap-2">
-                  <svg className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg flex items-start gap-2">
+                  <svg className="w-5 h-5 text-gray-400 dark:text-gray-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
-                  <div className="text-sm text-gray-700">
+                  <div className="text-sm text-gray-700 dark:text-gray-300">
                     {location.name && (
-                      <p className="font-semibold text-base text-gray-900 mb-1">{location.name}</p>
+                      <p className="font-semibold text-base text-gray-900 dark:text-white mb-1">{location.name}</p>
                     )}
                     {location.healthSystem && (
-                      <p className="text-primary-600 mb-1">{location.healthSystem}</p>
+                      <p className="text-primary-600 dark:text-primary-400 mb-1">{location.healthSystem}</p>
                     )}
                     <p className="font-medium">{location.addressLine1}</p>
                     {location.addressLine2 && <p>{location.addressLine2}</p>}
                     <p>{location.city}, {location.state} {location.zipCode}</p>
-                    <p className="text-gray-500 mt-1">
+                    <p className="text-gray-500 dark:text-gray-400 mt-1">
                       {colocatedTotal + 1} provider{colocatedTotal + 1 !== 1 ? 's' : ''} at this {location.facilityType ? location.facilityType.toLowerCase() : 'address'}
                     </p>
                   </div>
@@ -620,18 +620,18 @@ export default function ProviderDetailPage() {
                     <Link
                       key={colProvider.npi}
                       href={`/provider/${colProvider.npi}`}
-                      className="block p-4 border border-gray-200 rounded-lg hover:border-primary-300 hover:bg-primary-50/30 transition-all"
+                      className="block p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-300 dark:hover:border-primary-600 hover:bg-primary-50/30 dark:hover:bg-primary-900/20 transition-all"
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
-                          <h3 className="font-medium text-gray-900 hover:text-primary-600">
+                          <h3 className="font-medium text-gray-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400">
                             {colProvider.displayName}
                           </h3>
-                          <p className="text-sm text-gray-600 mt-1">
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                             {colProvider.taxonomyDescription || colProvider.specialtyCategory || 'Healthcare Provider'}
                           </p>
                           {colProvider.phone && (
-                            <p className="text-sm text-gray-500 mt-1 flex items-center gap-1">
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1">
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                               </svg>
@@ -639,7 +639,7 @@ export default function ProviderDetailPage() {
                             </p>
                           )}
                         </div>
-                        <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                         </svg>
                       </div>
@@ -648,7 +648,7 @@ export default function ProviderDetailPage() {
                 </div>
 
                 {colocatedTotal > 10 && (
-                  <div className="mt-4 pt-4 border-t border-gray-200 text-center">
+                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 text-center">
                     <Link
                       href={`/search?city=${encodeURIComponent(location.city)}&state=${location.state}&zipCode=${location.zipCode.substring(0, 5)}`}
                       className="btn-secondary"
@@ -714,28 +714,28 @@ export default function ProviderDetailPage() {
             </div>
 
             {/* Research Explainer */}
-            <div className="card bg-gray-50 border-gray-200">
+            <div className="card bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700">
               <div className="flex items-start gap-3 mb-3">
-                <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center flex-shrink-0">
+                <div className="w-8 h-8 bg-gray-700 dark:bg-gray-600 rounded-full flex items-center justify-center flex-shrink-0">
                   <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-1">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
                     Why Verification Matters
                   </h3>
-                  <div className="text-xs text-gray-700 space-y-2">
+                  <div className="text-xs text-gray-700 dark:text-gray-300 space-y-2">
                     <p>
-                      <strong>46-77%</strong> of insurance directories are wrong, causing:
+                      <strong className="text-gray-900 dark:text-white">46-77%</strong> of insurance directories are wrong, causing:
                     </p>
                     <ul className="list-disc list-inside ml-2 space-y-1">
-                      <li><strong>4x more surprise bills</strong></li>
+                      <li><strong className="text-gray-900 dark:text-white">4x more surprise bills</strong></li>
                       <li>28% delay needed care</li>
                       <li>540 days to fix errors</li>
                     </ul>
                     <p className="pt-2">
-                      Our crowdsourced verification achieves <strong>expert-level accuracy</strong> (κ=0.58) with just 3 patients.
+                      Our crowdsourced verification achieves <strong className="text-gray-900 dark:text-white">expert-level accuracy</strong> (κ=0.58) with just 3 patients.
                     </p>
                   </div>
                 </div>
@@ -743,7 +743,7 @@ export default function ProviderDetailPage() {
 
               <Link
                 href="/research"
-                className="text-xs font-medium text-primary-700 hover:text-primary-800 flex items-center gap-1 mt-3"
+                className="text-xs font-medium text-primary-700 dark:text-primary-400 hover:text-primary-800 dark:hover:text-primary-300 flex items-center gap-1 mt-3"
               >
                 Read the research
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -754,33 +754,33 @@ export default function ProviderDetailPage() {
 
             {/* Provider Details */}
             <div className="card">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                 Provider Details
               </h3>
               <dl className="space-y-3">
                 <div>
-                  <dt className="text-sm text-gray-500">NPI Number</dt>
-                  <dd className="font-mono text-gray-900">{provider.npi}</dd>
+                  <dt className="text-sm text-gray-500 dark:text-gray-400">NPI Number</dt>
+                  <dd className="font-mono text-gray-900 dark:text-white">{provider.npi}</dd>
                 </div>
                 <div>
-                  <dt className="text-sm text-gray-500">Entity Type</dt>
-                  <dd className="text-gray-900">
+                  <dt className="text-sm text-gray-500 dark:text-gray-400">Entity Type</dt>
+                  <dd className="text-gray-900 dark:text-white">
                     {provider.entityType === 'INDIVIDUAL' ? 'Individual' : 'Organization'}
                   </dd>
                 </div>
                 {provider.taxonomyCode && (
                   <div>
-                    <dt className="text-sm text-gray-500">Taxonomy Code</dt>
-                    <dd className="font-mono text-gray-900">{provider.taxonomyCode}</dd>
+                    <dt className="text-sm text-gray-500 dark:text-gray-400">Taxonomy Code</dt>
+                    <dd className="font-mono text-gray-900 dark:text-white">{provider.taxonomyCode}</dd>
                   </div>
                 )}
                 <div>
-                  <dt className="text-sm text-gray-500">Status</dt>
+                  <dt className="text-sm text-gray-500 dark:text-gray-400">Status</dt>
                   <dd>
                     <span className={`inline-flex items-center px-2 py-1 rounded text-sm font-medium ${
                       provider.npiStatus === 'ACTIVE'
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
+                        ? 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300'
+                        : 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300'
                     }`}>
                       {provider.npiStatus}
                     </span>
@@ -790,11 +790,11 @@ export default function ProviderDetailPage() {
             </div>
 
             {/* Disclaimer */}
-            <div className="card bg-yellow-50 border-yellow-200">
-              <h3 className="text-lg font-semibold text-yellow-900 mb-2">
+            <div className="card bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">
+              <h3 className="text-lg font-semibold text-yellow-900 dark:text-yellow-200 mb-2">
                 Important Note
               </h3>
-              <p className="text-yellow-800 text-sm">
+              <p className="text-yellow-800 dark:text-yellow-300 text-sm">
                 Insurance acceptance can change. Always call the provider to confirm they accept your specific plan before your visit.
               </p>
             </div>
