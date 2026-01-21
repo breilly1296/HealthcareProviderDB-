@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef, FormEvent } from 'react';
+import { useState, useEffect, useRef, FormEvent, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 import { providerApi, locationApi, planApi, CarrierGroup } from '@/lib/api';
 import { SPECIALTY_OPTIONS, STATE_OPTIONS } from '@/lib/provider-utils';
+import { useRecentSearches, RecentSearchParams } from '@/hooks/useRecentSearches';
+import { RecentSearches } from './RecentSearches';
 
 interface SearchFormProps {
   showAdvanced?: boolean;
@@ -14,6 +16,9 @@ interface SearchFormProps {
 export function SearchForm({ showAdvanced = true, className = '' }: SearchFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // Recent searches
+  const { recentSearches, addSearch, removeSearch, clearAll } = useRecentSearches();
 
   const [searchMode, setSearchMode] = useState<'providers' | 'locations'>(
     searchParams.get('mode') as 'providers' | 'locations' || 'providers'
@@ -230,6 +235,33 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
     setSelectedCities(prev => prev.filter(c => c !== cityToRemove));
   };
 
+  // Handle selecting a recent search
+  const handleSelectRecentSearch = useCallback((params: RecentSearchParams) => {
+    // Populate form fields
+    if (params.specialty !== undefined) setSpecialty(params.specialty);
+    if (params.state !== undefined) {
+      setState(params.state);
+    }
+    if (params.cities !== undefined) {
+      setSelectedCities(params.cities ? params.cities.split(',').filter(Boolean) : []);
+    }
+    if (params.healthSystem !== undefined) setHealthSystem(params.healthSystem);
+    if (params.insurancePlanId !== undefined) setSelectedInsurancePlan(params.insurancePlanId);
+    if (params.zipCode !== undefined) setZip(params.zipCode);
+
+    // Build URL and navigate
+    const urlParams = new URLSearchParams();
+    urlParams.set('mode', 'providers');
+    if (params.state) urlParams.set('state', params.state);
+    if (params.cities) urlParams.set('cities', params.cities);
+    if (params.zipCode) urlParams.set('zip', params.zipCode);
+    if (params.healthSystem) urlParams.set('healthSystem', params.healthSystem);
+    if (params.specialty) urlParams.set('specialty', params.specialty);
+    if (params.insurancePlanId) urlParams.set('insurancePlanId', params.insurancePlanId);
+
+    router.push(`/search?${urlParams.toString()}`);
+  }, [router]);
+
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
 
@@ -244,6 +276,16 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
       if (specialty) params.set('specialty', specialty);
       if (name) params.set('name', name);
       if (selectedInsurancePlan) params.set('insurancePlanId', selectedInsurancePlan);
+
+      // Save to recent searches (providers mode only)
+      addSearch({
+        specialty: specialty || undefined,
+        state: state || undefined,
+        cities: selectedCities.length > 0 ? selectedCities.join(',') : undefined,
+        healthSystem: healthSystem || undefined,
+        insurancePlanId: selectedInsurancePlan || undefined,
+        zipCode: zip || undefined,
+      });
     } else {
       if (locationName) params.set('locationName', locationName);
     }
@@ -269,6 +311,16 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
 
   return (
     <form onSubmit={handleSubmit} className={`space-y-4 md:space-y-6 ${className}`}>
+      {/* Recent Searches - Only show for provider search */}
+      {searchMode === 'providers' && (
+        <RecentSearches
+          searches={recentSearches}
+          onSelect={handleSelectRecentSearch}
+          onRemove={removeSearch}
+          onClearAll={clearAll}
+        />
+      )}
+
       {/* Search Mode Toggle */}
       <div className="flex items-center gap-2 p-1 bg-gray-100 rounded-lg inline-flex">
         <button

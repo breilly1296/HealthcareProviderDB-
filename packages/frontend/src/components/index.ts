@@ -14,3 +14,4 @@ export { ProviderCard, ProviderCardCompact } from './ProviderCard';
 export { SearchForm } from './SearchForm';
 export { VerificationButton } from './VerificationButton';
 export { ScrollToTop } from './ScrollToTop';
+export { RecentSearches } from './RecentSearches';
