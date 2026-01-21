@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { FontSizeToggle } from './FontSizeToggle';
 
 export function Header() {
   return (
@@ -31,11 +30,6 @@ export function Header() {
           </Link>
 
           <div className="flex items-center gap-2 sm:gap-4">
-            {/* Font Size Toggle - Desktop */}
-            <div className="hidden md:block">
-              <FontSizeToggle />
-            </div>
-
             <Link
               href="/search"
               className="hidden md:inline text-base font-medium text-gray-600 hover:text-primary-600 transition-colors"
@@ -55,11 +49,6 @@ export function Header() {
               <span className="hidden sm:inline">Search Now</span>
               <span className="sm:hidden">Search</span>
             </Link>
-
-            {/* Font Size Toggle - Mobile (visible as icon) */}
-            <div className="md:hidden">
-              <FontSizeToggle />
-            </div>
           </div>
         </nav>
       </div>

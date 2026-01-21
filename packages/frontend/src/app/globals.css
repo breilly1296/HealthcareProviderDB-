@@ -4,23 +4,9 @@
 
 /* Base styles for accessibility and older demographic */
 @layer base {
-  /* Default font size (Normal = 16px) */
   html {
-    font-size: 16px;
-    scroll-behavior: smooth;
-  }
-
-  /* Font size variations for accessibility toggle */
-  html.font-size-normal {
-    font-size: 16px;
-  }
-
-  html.font-size-large {
     font-size: 18px;
-  }
-
-  html.font-size-xl {
-    font-size: 20px;
+    scroll-behavior: smooth;
   }
 
   body {
