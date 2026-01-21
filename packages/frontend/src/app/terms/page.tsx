@@ -171,10 +171,24 @@ export default function TermsOfServicePage() {
               </p>
             </div>
 
+            {/* Governing Law */}
+            <div className="card mb-8">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                9. Governing Law
+              </h2>
+              <p className="text-gray-600">
+                These Terms of Service and any disputes arising from your use of VerifyMyProvider
+                shall be governed by and construed in accordance with the laws of the State of
+                Delaware, without regard to its conflict of law provisions. You agree to submit
+                to the personal and exclusive jurisdiction of the courts located in Delaware for
+                the resolution of any disputes.
+              </p>
+            </div>
+
             {/* Contact */}
             <div className="card mb-8 bg-gray-50">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                9. Contact Us
+                10. Contact Us
               </h2>
               <p className="text-gray-600 mb-4">
                 If you have questions about these Terms of Service, please contact us:

@@ -179,12 +179,20 @@ export default function PrivacyPolicyPage() {
                 6. Data Retention
               </h2>
               <p className="text-gray-600 mb-4">
+                Verification data is retained indefinitely to maintain the accuracy and history of
+                our crowdsourced database. However, we reserve the right to archive or remove stale,
+                redundant, or low-quality data to maintain database integrity.
+              </p>
+              <p className="text-gray-600 mb-4">
                 We retain data as follows:
               </p>
-              <ul className="list-disc pl-6 text-gray-600 space-y-2">
+              <ul className="list-disc pl-6 text-gray-600 space-y-2 mb-4">
                 <li>
                   <strong>Verifications:</strong> Kept indefinitely to maintain directory accuracy
                   and calculate confidence scores
+                </li>
+                <li>
+                  <strong>Account information:</strong> Retained until you request deletion
                 </li>
                 <li>
                   <strong>Server logs (IP addresses):</strong> Retained for 90 days for security purposes
