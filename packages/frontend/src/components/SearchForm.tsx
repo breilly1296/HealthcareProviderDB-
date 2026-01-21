@@ -322,14 +322,14 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
       )}
 
       {/* Search Mode Toggle */}
-      <div className="flex items-center gap-2 p-1 bg-gray-100 rounded-lg inline-flex">
+      <div className="flex items-center gap-2 p-1 bg-gray-100 dark:bg-gray-800 rounded-lg inline-flex">
         <button
           type="button"
           onClick={() => setSearchMode('providers')}
           className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
             searchMode === 'providers'
-              ? 'bg-white text-primary-600 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
+              ? 'bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
           }`}
         >
           <svg className="w-4 h-4 inline-block mr-1.5 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -342,8 +342,8 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
           onClick={() => setSearchMode('locations')}
           className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
             searchMode === 'locations'
-              ? 'bg-white text-primary-600 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
+              ? 'bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
           }`}
         >
           <svg className="w-4 h-4 inline-block mr-1.5 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -449,7 +449,7 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
               aria-expanded={showInsuranceDropdown}
               aria-label={`Select insurance plan${selectedInsurancePlan ? `, ${selectedInsurancePlanName} selected` : ''}`}
             >
-              <span className={selectedInsurancePlan ? 'text-gray-900 truncate' : 'text-gray-500'}>
+              <span className={selectedInsurancePlan ? 'text-gray-900 dark:text-white truncate' : 'text-gray-500 dark:text-gray-400'}>
                 {insurancePlansLoading ? 'Loading plans...' :
                  selectedInsurancePlan ? selectedInsurancePlanName :
                  'All Insurance Plans'}
@@ -462,7 +462,7 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
                       e.stopPropagation();
                       clearInsurancePlan();
                     }}
-                    className="text-gray-400 hover:text-gray-600"
+                    className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
                     aria-label="Clear insurance plan"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -488,19 +488,19 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
             {/* Insurance Plan Dropdown */}
             {showInsuranceDropdown && !insurancePlansLoading && (
               <div
-                className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden flex flex-col"
+                className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden flex flex-col"
                 style={{ maxHeight: '400px' }}
                 role="listbox"
                 aria-label="Available insurance plans"
               >
                 {/* Search Bar */}
-                <div className="p-3 border-b bg-gray-50">
+                <div className="p-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
                   <input
                     type="text"
                     value={insuranceSearchInput}
                     onChange={(e) => setInsuranceSearchInput(e.target.value)}
                     placeholder="Search plans or carriers..."
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                     autoFocus
                   />
                 </div>
@@ -508,14 +508,14 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
                 {/* Plans List grouped by Carrier */}
                 <div className="overflow-y-auto" style={{ maxHeight: '320px' }}>
                   {filteredCarrierGroups.length === 0 ? (
-                    <div className="px-4 py-3 text-sm text-gray-500 text-center">
+                    <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 text-center">
                       {insuranceSearchInput ? 'No plans match your search' : 'No insurance plans available'}
                     </div>
                   ) : (
                     filteredCarrierGroups.map((group) => (
                       <div key={group.carrier}>
                         {/* Carrier Header */}
-                        <div className="px-4 py-2 bg-gray-100 text-xs font-semibold text-gray-700 uppercase tracking-wide sticky top-0">
+                        <div className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide sticky top-0">
                           {group.carrier}
                         </div>
                         {/* Plans under this Carrier */}
@@ -524,8 +524,8 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
                             key={plan.planId}
                             type="button"
                             onClick={() => selectInsurancePlan(plan.planId, plan.planName || plan.planId)}
-                            className={`w-full text-left px-4 py-2 text-sm hover:bg-primary-50 ${
-                              selectedInsurancePlan === plan.planId ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-700'
+                            className={`w-full text-left px-4 py-2 text-sm hover:bg-primary-50 dark:hover:bg-primary-900/30 ${
+                              selectedInsurancePlan === plan.planId ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 font-medium' : 'text-gray-700 dark:text-gray-300'
                             }`}
                             role="option"
                             aria-selected={selectedInsurancePlan === plan.planId}
@@ -533,7 +533,7 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
                             <div className="flex items-center justify-between">
                               <span className="truncate">{plan.planName || plan.planId}</span>
                               {plan.planType && (
-                                <span className="ml-2 text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                                <span className="ml-2 text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">
                                   {plan.planType}
                                 </span>
                               )}
@@ -567,7 +567,7 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
               aria-expanded={showCityDropdown}
               aria-label={`Select cities${selectedCities.length > 0 ? `, ${selectedCities.length} selected` : ''}`}
             >
-              <span className={selectedCities.length > 0 ? 'text-gray-900' : 'text-gray-500'}>
+              <span className={selectedCities.length > 0 ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'}>
                 {!state ? 'Select a state first' :
                  citiesLoading ? 'Loading cities...' :
                  selectedCities.length > 0 ? `${selectedCities.length} ${selectedCities.length === 1 ? 'city' : 'cities'} selected` :
@@ -592,28 +592,28 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
           {showCityDropdown && state && !citiesLoading && (
             <div
               ref={cityDropdownRef}
-              className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden flex flex-col"
+              className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden flex flex-col"
               style={{ maxHeight: '400px' }}
               role="listbox"
               aria-label="Available cities"
               aria-multiselectable="true"
             >
               {/* Search Bar */}
-              <div className="p-3 border-b bg-gray-50">
+              <div className="p-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
                 <input
                   type="text"
                   value={citySearchInput}
                   onChange={(e) => setCitySearchInput(e.target.value)}
                   placeholder="Search cities..."
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                   autoFocus
                 />
               </div>
 
               {/* Selected Cities Display */}
               {selectedCities.length > 0 && (
-                <div className="p-3 border-b bg-primary-50">
-                  <div className="text-xs font-medium text-primary-900 mb-2">
+                <div className="p-3 border-b border-gray-200 dark:border-gray-700 bg-primary-50 dark:bg-primary-900/30">
+                  <div className="text-xs font-medium text-primary-900 dark:text-primary-300 mb-2">
                     {selectedCities.length} selected:
                   </div>
                   <div className="flex flex-wrap gap-1.5">
@@ -622,7 +622,7 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
                         key={city}
                         type="button"
                         onClick={() => removeCity(city)}
-                        className="inline-flex items-center gap-1 px-2 py-1 bg-white text-primary-700 rounded text-xs hover:bg-primary-100"
+                        className="inline-flex items-center gap-1 px-2 py-1 bg-white dark:bg-gray-700 text-primary-700 dark:text-primary-300 rounded text-xs hover:bg-primary-100 dark:hover:bg-gray-600"
                       >
                         {city}
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -639,8 +639,8 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
                 <button
                   type="button"
                   onClick={toggleNYCBoroughs}
-                  className={`w-full px-4 py-2.5 text-left text-sm font-medium border-b hover:bg-primary-50 ${
-                    isNYCBoroughsSelected ? 'bg-primary-100 text-primary-700' : 'text-gray-700'
+                  className={`w-full px-4 py-2.5 text-left text-sm font-medium border-b border-gray-200 dark:border-gray-700 hover:bg-primary-50 dark:hover:bg-primary-900/30 ${
+                    isNYCBoroughsSelected ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300' : 'text-gray-700 dark:text-gray-300'
                   }`}
                 >
                   <div className="flex items-center gap-2">
@@ -648,7 +648,7 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
                       type="checkbox"
                       checked={isNYCBoroughsSelected}
                       readOnly
-                      className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                      className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
                     />
                     <span>NYC (All 5 Boroughs)</span>
                   </div>
@@ -658,29 +658,29 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
               {/* City Checkboxes */}
               <div className="overflow-y-auto" style={{ maxHeight: '250px' }}>
                 {filteredCities.length === 0 ? (
-                  <div className="px-4 py-3 text-sm text-gray-500 text-center">
+                  <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 text-center">
                     {citySearchInput ? 'No cities match your search' : 'No cities available'}
                   </div>
                 ) : (
                   filteredCities.slice(0, 100).map((c) => (
                     <label
                       key={c}
-                      className={`flex items-center gap-2 px-4 py-2 cursor-pointer hover:bg-primary-50 ${
-                        selectedCities.includes(c) ? 'bg-primary-50' : ''
+                      className={`flex items-center gap-2 px-4 py-2 cursor-pointer hover:bg-primary-50 dark:hover:bg-primary-900/30 ${
+                        selectedCities.includes(c) ? 'bg-primary-50 dark:bg-primary-900/30' : ''
                       }`}
                     >
                       <input
                         type="checkbox"
                         checked={selectedCities.includes(c)}
                         onChange={() => toggleCity(c)}
-                        className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
                       />
-                      <span className={`text-sm ${selectedCities.includes(c) ? 'font-medium text-primary-700' : 'text-gray-700'}`}>{c}</span>
+                      <span className={`text-sm ${selectedCities.includes(c) ? 'font-medium text-primary-700 dark:text-primary-300' : 'text-gray-700 dark:text-gray-300'}`}>{c}</span>
                     </label>
                   ))
                 )}
                 {filteredCities.length > 100 && (
-                  <div className="px-4 py-2 text-xs text-gray-400 border-t bg-gray-50 text-center">
+                  <div className="px-4 py-2 text-xs text-gray-400 dark:text-gray-500 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-center">
                     Showing first 100 of {filteredCities.length} cities
                   </div>
                 )}
@@ -720,7 +720,7 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
       </div>
 
       {/* Mobile Sticky Search Button */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 shadow-lg z-40">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 p-4 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 shadow-lg z-40">
         <div className="flex gap-3 max-w-lg mx-auto">
           <button type="submit" className="btn-primary flex-1 flex items-center justify-center gap-2">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -739,11 +739,11 @@ export function SearchForm({ showAdvanced = true, className = '' }: SearchFormPr
 
       {/* Advanced options */}
       {showAdvanced && searchMode === 'providers' && (
-        <div className="border-t pt-4">
+        <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
           <button
             type="button"
             onClick={() => setShowMore(!showMore)}
-            className="text-primary-600 hover:text-primary-700 font-medium text-sm flex items-center gap-1"
+            className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium text-sm flex items-center gap-1"
           >
             {showMore ? 'Hide' : 'More'} options
             <svg

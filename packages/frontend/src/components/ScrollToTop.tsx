@@ -48,10 +48,11 @@ export function ScrollToTop() {
         w-10 h-10 md:w-12 md:h-12
         flex items-center justify-center
         bg-primary-500 hover:bg-primary-600 active:bg-primary-700
+        dark:bg-primary-600 dark:hover:bg-primary-500 dark:active:bg-primary-400
         text-white rounded-full
-        shadow-lg hover:shadow-xl
+        shadow-lg hover:shadow-xl dark:shadow-primary-900/30
         transition-all duration-300 ease-in-out
-        focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2
+        focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900
         ${isVisible
           ? 'opacity-100 translate-y-0 pointer-events-auto'
           : 'opacity-0 translate-y-4 pointer-events-none'

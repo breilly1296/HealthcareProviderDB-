@@ -38,12 +38,12 @@ export default function ProviderCardSkeleton({ count = 3, className = '' }: Prov
           </div>
 
           {/* Freshness Warning Placeholder */}
-          <div className="mt-4 pt-4 border-t border-gray-100">
+          <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
             <Shimmer className="h-4 w-3/4 rounded" />
           </div>
 
           {/* View Details */}
-          <div className="mt-4 pt-4 border-t border-gray-100 flex justify-end">
+          <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 flex justify-end">
             <Shimmer className="h-4 w-24 rounded" />
           </div>
         </div>
@@ -90,7 +90,7 @@ export function ProviderDetailSkeleton() {
               <div className="space-y-6">
                 {[1, 2, 3].map((i) => (
                   <div key={i} className="space-y-4">
-                    <div className="p-4 bg-gray-50 rounded-lg">
+                    <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                       <Shimmer className="h-5 w-3/4 rounded mb-2" />
                       <Shimmer className="h-4 w-1/2 rounded" />
                     </div>
@@ -125,7 +125,7 @@ export function ProviderCardSkeletonCompact({ count = 1 }: { count?: number }) {
     <div role="status" aria-label="Loading">
       <span className="sr-only">Loading...</span>
       {Array.from({ length: count }).map((_, index) => (
-        <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg mb-2" aria-hidden="true">
+        <div key={index} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg mb-2" aria-hidden="true">
           <div className="space-y-2">
             <Shimmer className="h-5 w-40 rounded" />
             <Shimmer className="h-4 w-24 rounded" />
@@ -185,12 +185,12 @@ export function SearchResultsSkeleton({ count = 5 }: { count?: number }) {
               </div>
 
               {/* Freshness Warning */}
-              <div className="mt-4 pt-4 border-t border-gray-100">
+              <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
                 <Shimmer className="h-4 w-3/4 rounded" />
               </div>
 
               {/* View Details */}
-              <div className="mt-4 pt-4 border-t border-gray-100 flex justify-end">
+              <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 flex justify-end">
                 <Shimmer className="h-4 w-24 rounded" />
               </div>
             </div>

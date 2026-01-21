@@ -62,7 +62,7 @@ export function BottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 md:hidden z-50 safe-bottom"
+      className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 md:hidden z-50 safe-bottom transition-colors duration-200"
       aria-label="Main navigation"
     >
       <div className="flex justify-around items-center h-16">
@@ -79,8 +79,8 @@ export function BottomNav() {
                 flex-1 h-full
                 min-w-[64px]
                 transition-colors duration-150
-                focus:outline-none focus-visible:bg-gray-100
-                ${active ? 'text-primary-600' : 'text-gray-500 active:text-gray-700'}
+                focus:outline-none focus-visible:bg-gray-100 dark:focus-visible:bg-gray-800
+                ${active ? 'text-primary-600 dark:text-primary-400' : 'text-gray-500 dark:text-gray-400 active:text-gray-700 dark:active:text-gray-300'}
               `}
               aria-current={active ? 'page' : undefined}
             >

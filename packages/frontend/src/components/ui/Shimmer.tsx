@@ -13,6 +13,7 @@ export function Shimmer({ className = '' }: ShimmerProps) {
       className={`
         animate-shimmer
         bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200
+        dark:from-gray-700 dark:via-gray-600 dark:to-gray-700
         bg-[length:200%_100%]
         rounded
         ${className}

@@ -27,3 +27,4 @@ export {
 } from './ProviderCardSkeleton';
 export { Header } from './Header';
 export { BottomNav } from './BottomNav';
+export { ThemeToggle } from './ThemeToggle';

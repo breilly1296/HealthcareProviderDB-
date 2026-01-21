@@ -1,15 +1,16 @@
 'use client';
 
 import Link from 'next/link';
+import { ThemeToggle } from './ThemeToggle';
 
 export function Header() {
   return (
-    <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
+    <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50 transition-colors duration-200">
       <div className="container-wide">
         <nav className="flex items-center justify-between h-16">
           <Link
             href="/"
-            className="flex items-center gap-2 text-lg sm:text-xl font-bold text-primary-600 hover:text-primary-700"
+            className="flex items-center gap-2 text-lg sm:text-xl font-bold text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300"
           >
             <svg
               className="w-7 h-7 sm:w-8 sm:h-8 flex-shrink-0"
@@ -32,16 +33,17 @@ export function Header() {
           <div className="flex items-center gap-2 sm:gap-4">
             <Link
               href="/search"
-              className="hidden md:inline text-base font-medium text-gray-600 hover:text-primary-600 transition-colors"
+              className="hidden md:inline text-base font-medium text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
             >
               Find Providers
             </Link>
             <Link
               href="/insurance"
-              className="hidden md:inline text-base font-medium text-gray-600 hover:text-primary-600 transition-colors"
+              className="hidden md:inline text-base font-medium text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
             >
               Scan Card
             </Link>
+            <ThemeToggle />
             <Link
               href="/search"
               className="btn-primary text-sm sm:text-base px-3 py-2 sm:px-4 sm:py-2"

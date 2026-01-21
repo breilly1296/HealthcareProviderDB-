@@ -53,10 +53,10 @@ export function EmptyState({
       </div>
 
       {/* Text content */}
-      <h3 className="text-xl font-semibold text-gray-900 mb-2">
+      <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
         {title}
       </h3>
-      <p className="text-gray-600 max-w-md mx-auto mb-6">
+      <p className="text-gray-600 dark:text-gray-300 max-w-md mx-auto mb-6">
         {description}
       </p>
 
@@ -71,11 +71,11 @@ export function EmptyState({
               className="
                 inline-flex items-center gap-1.5
                 px-4 py-2
-                bg-primary-50 hover:bg-primary-100
-                text-primary-700 text-sm font-medium
+                bg-primary-50 hover:bg-primary-100 dark:bg-primary-900/30 dark:hover:bg-primary-900/50
+                text-primary-700 dark:text-primary-300 text-sm font-medium
                 rounded-full
                 transition-colors
-                focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2
+                focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900
               "
             >
               {suggestion.label}

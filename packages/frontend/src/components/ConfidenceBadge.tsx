@@ -79,26 +79,26 @@ export function ConfidenceIndicator({
 
   if (!isVerified) {
     return (
-      <div className="flex items-center gap-1.5 text-sm text-gray-500">
+      <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
         <span className="text-amber-500">⚠️</span>
         <span>Unverified</span>
-        <span className="text-gray-300">·</span>
-        <span className="text-primary-600">Be the first to verify</span>
+        <span className="text-gray-300 dark:text-gray-600">·</span>
+        <span className="text-primary-600 dark:text-primary-400">Be the first to verify</span>
       </div>
     );
   }
 
   return (
-    <div className="flex items-center gap-1.5 text-sm text-gray-600 flex-wrap">
-      <span className="text-green-600">✅</span>
-      <span className="text-green-700 font-medium">Verified</span>
+    <div className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-300 flex-wrap">
+      <span className="text-green-600 dark:text-green-500">✅</span>
+      <span className="text-green-700 dark:text-green-400 font-medium">Verified</span>
       {lastVerifiedAt && (
         <>
-          <span className="text-gray-300">·</span>
+          <span className="text-gray-300 dark:text-gray-600">·</span>
           <span>Last verified {formatDate(lastVerifiedAt)}</span>
         </>
       )}
-      <span className="text-gray-300">·</span>
+      <span className="text-gray-300 dark:text-gray-600">·</span>
       <span>
         {verificationCount} {verificationCount === 1 ? 'user' : 'users'} confirmed
       </span>
@@ -112,13 +112,13 @@ export function ConfidenceProgressBar({ score }: { score: number }) {
 
   return (
     <div className="flex items-center gap-2" title={`Confidence: ${Math.round(score)}%`}>
-      <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
+      <div className="w-16 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
         <div
           className={`h-full rounded-full ${CONFIDENCE_BAR_COLORS[level]}`}
           style={{ width: `${Math.min(100, score)}%` }}
         />
       </div>
-      <span className="text-sm text-gray-600">{Math.round(score)}%</span>
+      <span className="text-sm text-gray-600 dark:text-gray-400">{Math.round(score)}%</span>
     </div>
   );
 }

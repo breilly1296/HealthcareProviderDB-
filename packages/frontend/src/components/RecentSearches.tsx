@@ -24,14 +24,14 @@ export function RecentSearches({
     <div className="mb-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2 text-gray-600">
+        <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
           <ClockIcon className="w-4 h-4" />
           <span className="text-sm font-medium">Recent Searches</span>
         </div>
         <button
           type="button"
           onClick={onClearAll}
-          className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+          className="text-xs text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
         >
           Clear all
         </button>
@@ -42,12 +42,12 @@ export function RecentSearches({
         {searches.map((search) => (
           <div
             key={search.id}
-            className="group relative inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-full text-sm text-gray-700 transition-colors cursor-pointer"
+            className="group relative inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 rounded-full text-sm text-gray-700 dark:text-gray-300 transition-colors cursor-pointer"
           >
             <button
               type="button"
               onClick={() => onSelect(search.params)}
-              className="focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 rounded-full"
+              className="focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900 rounded-full"
             >
               {search.displayText}
             </button>
@@ -59,10 +59,10 @@ export function RecentSearches({
               }}
               className="
                 md:opacity-0 md:group-hover:opacity-100
-                text-gray-400 hover:text-gray-600
+                text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300
                 transition-opacity
                 p-0.5 -mr-1
-                focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded-full
+                focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:focus-visible:ring-offset-gray-900 rounded-full
               "
               aria-label={`Remove "${search.displayText}" from recent searches`}
             >
