@@ -199,6 +199,8 @@ model VerificationLog {
   @@index([isApproved])
   @@index([expiresAt])
   @@index([providerNpi, createdAt])
+  @@index([providerNpi, planId, sourceIp, createdAt])    // Sybil attack prevention
+  @@index([providerNpi, planId, submittedBy, createdAt]) // Sybil attack prevention
 
   @@map("verification_logs")
 }

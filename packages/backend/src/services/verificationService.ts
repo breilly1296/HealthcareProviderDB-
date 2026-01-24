@@ -112,6 +112,46 @@ export async function submitVerification(input: SubmitVerificationInput) {
     throw AppError.notFound(`Plan with ID ${planId} not found`);
   }
 
+  // Sybil attack prevention: Check for duplicate verification from same IP
+  if (sourceIp) {
+    const existingFromIp = await prisma.verificationLog.findFirst({
+      where: {
+        providerNpi: provider.npi,
+        planId: plan.planId,
+        sourceIp: sourceIp,
+        createdAt: {
+          gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days
+        },
+      },
+    });
+
+    if (existingFromIp) {
+      throw AppError.conflict(
+        'You have already submitted a verification for this provider-plan pair within the last 30 days.'
+      );
+    }
+  }
+
+  // Sybil attack prevention: Check for duplicate verification from same email
+  if (submittedBy) {
+    const existingFromEmail = await prisma.verificationLog.findFirst({
+      where: {
+        providerNpi: provider.npi,
+        planId: plan.planId,
+        submittedBy: submittedBy,
+        createdAt: {
+          gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days
+        },
+      },
+    });
+
+    if (existingFromEmail) {
+      throw AppError.conflict(
+        'This email has already submitted a verification for this provider-plan pair within the last 30 days.'
+      );
+    }
+  }
+
   // Find or create acceptance record
   let acceptance = await prisma.providerPlanAcceptance.findUnique({
     where: {
