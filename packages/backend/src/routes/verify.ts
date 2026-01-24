@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { verificationRateLimiter, voteRateLimiter, defaultRateLimiter } from '../middleware/rateLimiter';
+import { verifyCaptcha } from '../middleware/captcha';
 import {
   submitVerification,
   voteOnVerification,
@@ -22,10 +23,12 @@ const submitVerificationSchema = z.object({
   notes: z.string().max(1000).optional(),
   evidenceUrl: z.string().url().max(500).optional(),
   submittedBy: z.string().email().max(200).optional(),
+  captchaToken: z.string().optional(), // reCAPTCHA v3 token
 });
 
 const voteSchema = z.object({
   vote: z.enum(['up', 'down']),
+  captchaToken: z.string().optional(), // reCAPTCHA v3 token
 });
 
 const verificationIdParamSchema = z.object({
@@ -50,6 +53,7 @@ const recentQuerySchema = z.object({
 router.post(
   '/',
   verificationRateLimiter,
+  verifyCaptcha,
   asyncHandler(async (req, res) => {
     const body = submitVerificationSchema.parse(req.body);
 
@@ -99,6 +103,7 @@ router.post(
 router.post(
   '/:verificationId/vote',
   voteRateLimiter,
+  verifyCaptcha,
   asyncHandler(async (req, res) => {
     const { verificationId } = verificationIdParamSchema.parse(req.params);
     const { vote } = voteSchema.parse(req.body);
