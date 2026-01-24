@@ -175,19 +175,31 @@ export async function submitVerification(input: SubmitVerificationInput) {
       },
     });
 
-    // Count how many past verifications agree with the NEW status
-    // Agreement means their newValue.acceptanceStatus matches our newStatus
-    let upvotes = 1; // Start with 1 for the current verification (it agrees with itself)
-    let downvotes = 0;
+    // Count ACCEPTED vs NOT_ACCEPTED directly (not agreement with new submission)
+    // This prevents an attacker from flipping status by submitting the opposite value
+    let acceptedCount = 0;
+    let notAcceptedCount = 0;
 
+    // Include current submission in the count
+    if (newStatus === 'ACCEPTED') {
+      acceptedCount++;
+    } else {
+      notAcceptedCount++;
+    }
+
+    // Count past verifications by their actual acceptanceStatus value
     for (const v of pastVerifications) {
       const pastValue = v.newValue as { acceptanceStatus?: string } | null;
-      if (pastValue?.acceptanceStatus === newStatus) {
-        upvotes++;
-      } else if (pastValue?.acceptanceStatus) {
-        downvotes++;
+      if (pastValue?.acceptanceStatus === 'ACCEPTED') {
+        acceptedCount++;
+      } else if (pastValue?.acceptanceStatus === 'NOT_ACCEPTED') {
+        notAcceptedCount++;
       }
     }
+
+    // For confidence scoring, upvotes = majority count, downvotes = minority count
+    const upvotes = Math.max(acceptedCount, notAcceptedCount);
+    const downvotes = Math.min(acceptedCount, notAcceptedCount);
 
     // Calculate new confidence score with accurate agreement data
     const { score, factors } = calculateConfidenceScore({
@@ -200,13 +212,13 @@ export async function submitVerification(input: SubmitVerificationInput) {
 
     // Security fix: Only change acceptanceStatus when consensus is reached
     // Requires: verificationCount >= 3, score >= 60, and clear majority (2:1 ratio)
-    const hasClearMajority = upvotes > downvotes * 2 || downvotes > upvotes * 2;
+    const hasClearMajority = acceptedCount > notAcceptedCount * 2 || notAcceptedCount > acceptedCount * 2;
     const shouldUpdateStatus = verificationCount >= 3 && score >= 60 && hasClearMajority;
 
     let finalStatus: string;
     if (shouldUpdateStatus) {
       // Consensus reached - update status based on majority
-      finalStatus = upvotes > downvotes ? 'ACCEPTED' : 'NOT_ACCEPTED';
+      finalStatus = acceptedCount > notAcceptedCount ? 'ACCEPTED' : 'NOT_ACCEPTED';
     } else {
       // No consensus - keep existing status, or set to PENDING if currently UNKNOWN
       finalStatus = acceptance.acceptanceStatus === 'UNKNOWN'
