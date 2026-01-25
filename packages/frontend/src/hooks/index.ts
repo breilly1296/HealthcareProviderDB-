@@ -20,6 +20,10 @@ export {
   clearInsurancePlansCache,
 } from './useInsurancePlans';
 
+// Search form hook
+export { useSearchForm } from './useSearchForm';
+export type { UseSearchFormOptions, UseSearchFormResult } from './useSearchForm';
+
 // Existing hooks
 export { useCompare } from './useCompare';
 export type { CompareProvider } from './useCompare';

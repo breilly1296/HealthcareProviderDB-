@@ -11,15 +11,16 @@ import { EmptyState, SearchSuggestion } from '@/components/EmptyState';
 import { SaveProfileButton } from '@/components/SaveProfileButton';
 import { FilterButton } from '@/components/FilterButton';
 import { FilterDrawer } from '@/components/FilterDrawer';
-import { providerApi, locationApi, Provider, Location, Pagination } from '@/lib/api';
+import { providerApi, locationApi } from '@/lib/api';
+import type { ProviderDisplay, Location, PaginationState } from '@/types';
 import { trackSearch } from '@/lib/analytics';
 
 function SearchResults() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [providers, setProviders] = useState<(Provider & { displayName: string })[]>([]);
+  const [providers, setProviders] = useState<ProviderDisplay[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
-  const [pagination, setPagination] = useState<Pagination | null>(null);
+  const [pagination, setPagination] = useState<PaginationState | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<{ message: string; type: 'network' | 'server' } | null>(null);
   const [hasSearched, setHasSearched] = useState(false);

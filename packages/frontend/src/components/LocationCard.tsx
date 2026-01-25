@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Location } from '@/lib/api';
+import type { Location } from '@/types';
 
 interface LocationCardProps {
   location: Location;

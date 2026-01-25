@@ -3,7 +3,7 @@
  * Displays a single insurance plan with verification details
  */
 
-import { PlanAcceptance } from '@/lib/api';
+import type { PlanAcceptanceDisplay } from '@/types';
 import { ConfidenceIndicator } from '../ConfidenceBadge';
 import { VerificationButton } from '../VerificationButton';
 import FreshnessWarning from '../FreshnessWarning';
@@ -11,7 +11,7 @@ import { ConfidenceScoreExplainer } from './ConfidenceScoreExplainer';
 import { VerificationTimeline } from './VerificationTimeline';
 
 interface PlanAcceptanceCardProps {
-  planAcceptance: PlanAcceptance;
+  planAcceptance: PlanAcceptanceDisplay;
   providerNpi: string;
   providerName: string;
   providerSpecialty: string | null | undefined;

@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { providerApi, Provider, PlanAcceptance, Location } from '@/lib/api';
+import { providerApi } from '@/lib/api';
+import type { ProviderDisplay, PlanAcceptanceDisplay, Location } from '@/types';
 import { ConfidenceBadge, ConfidenceIndicator } from '@/components/ConfidenceBadge';
 import {
   ConfidenceScoreBreakdown,
@@ -16,9 +17,8 @@ import { ProviderDetailSkeleton } from '@/components/ProviderCardSkeleton';
 import ErrorMessage from '@/components/ErrorMessage';
 import { trackProviderView } from '@/lib/analytics';
 
-interface ProviderWithPlans extends Provider {
-  displayName: string;
-  planAcceptances: PlanAcceptance[];
+interface ProviderWithPlans extends ProviderDisplay {
+  planAcceptances: PlanAcceptanceDisplay[];
 }
 
 export default function ProviderDetailPage() {
@@ -28,7 +28,7 @@ export default function ProviderDetailPage() {
   const [provider, setProvider] = useState<ProviderWithPlans | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<{ message: string; type: 'network' | 'server' | 'not-found' } | null>(null);
-  const [colocatedProviders, setColocatedProviders] = useState<(Provider & { displayName: string })[]>([]);
+  const [colocatedProviders, setColocatedProviders] = useState<ProviderDisplay[]>([]);
   const [location, setLocation] = useState<Location | null>(null);
   const [colocatedTotal, setColocatedTotal] = useState<number | null>(null);
   const [loadingColocated, setLoadingColocated] = useState(false);
@@ -133,7 +133,7 @@ export default function ProviderDetailPage() {
   }, [provider]);
 
   const groupedPlans = useMemo(() => {
-    const groups: Record<string, PlanAcceptance[]> = {};
+    const groups: Record<string, PlanAcceptanceDisplay[]> = {};
 
     for (const pa of acceptedPlans) {
       // Use carrier with fallback to issuerName for grouping

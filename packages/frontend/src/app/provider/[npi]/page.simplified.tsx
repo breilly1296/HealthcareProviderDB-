@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { providerApi, Provider, PlanAcceptance } from '@/lib/api';
+import { providerApi } from '@/lib/api';
+import type { ProviderDisplay, PlanAcceptanceDisplay } from '@/types';
 import { VerificationButton } from '@/components/VerificationButton';
 import { getSpecialtyDisplay } from '@/lib/provider-utils';
 import { LocationIcon, PhoneIcon } from '@/components/icons/Icons';
@@ -11,9 +12,8 @@ import { PlanAcceptanceCard } from '@/components/provider/PlanAcceptanceCard';
 import { VerificationCallToAction } from '@/components/provider/VerificationCallToAction';
 import { ResearchExplainer } from '@/components/provider/ResearchExplainer';
 
-interface ProviderWithPlans extends Provider {
-  displayName: string;
-  planAcceptances: PlanAcceptance[];
+interface ProviderWithPlans extends ProviderDisplay {
+  planAcceptances: PlanAcceptanceDisplay[];
 }
 
 export default function ProviderDetailPage() {
@@ -190,7 +190,7 @@ function AcceptedPlansSection({
   provider,
   specialty,
 }: {
-  acceptedPlans: PlanAcceptance[];
+  acceptedPlans: PlanAcceptanceDisplay[];
   provider: ProviderWithPlans;
   specialty: string;
 }) {

@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { locationApi, Provider, Location, Pagination } from '@/lib/api';
+import { locationApi } from '@/lib/api';
+import type { ProviderDisplay, Location, PaginationState } from '@/types';
 import { ProviderCard } from '@/components/ProviderCard';
 import ProviderCardSkeleton from '@/components/ProviderCardSkeleton';
 import ErrorMessage from '@/components/ErrorMessage';
@@ -37,8 +38,8 @@ export default function LocationDetailPage() {
   const specialtyFilter = searchParams.get('specialty') || '';
 
   const [location, setLocation] = useState<Location | null>(null);
-  const [providers, setProviders] = useState<(Provider & { displayName: string })[]>([]);
-  const [pagination, setPagination] = useState<Pagination | null>(null);
+  const [providers, setProviders] = useState<ProviderDisplay[]>([]);
+  const [pagination, setPagination] = useState<PaginationState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<{ message: string; type: 'network' | 'server' | 'not-found' } | null>(null);
 
@@ -47,7 +48,7 @@ export default function LocationDetailPage() {
     setError(null);
 
     try {
-      const result = await locationApi.getById(locationId, {
+      const result = await locationApi.getProviders(locationId, {
         page,
         limit: 20,
       });

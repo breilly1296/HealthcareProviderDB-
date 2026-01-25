@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Provider } from '@/lib/api';
+import type { ProviderDisplay } from '@/types';
 import { ConfidenceBadge, ConfidenceIndicator } from './ConfidenceBadge';
 import FreshnessWarning from './FreshnessWarning';
 import { getSpecialtyDisplay } from '@/lib/provider-utils';
@@ -9,7 +9,7 @@ import { CompareCheckbox } from './compare';
 import { useCompare, CompareProvider } from '@/hooks/useCompare';
 
 interface ProviderCardProps {
-  provider: Provider & { displayName: string };
+  provider: ProviderDisplay;
   confidenceScore?: number;
   showConfidence?: boolean;
   lastVerifiedAt?: Date | null;
@@ -138,7 +138,7 @@ export function ProviderCard({
 export function ProviderCardCompact({
   provider,
 }: {
-  provider: Provider & { displayName: string };
+  provider: ProviderDisplay;
 }) {
   return (
     <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">

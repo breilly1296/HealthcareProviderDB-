@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef, FormEvent, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-import { providerApi, locationApi, planApi, CarrierGroup } from '@/lib/api';
+import { providerApi, locationApi, planApi } from '@/lib/api';
+import type { CarrierGroup } from '@/types';
 import { SPECIALTY_OPTIONS, STATE_OPTIONS } from '@/lib/provider-utils';
 import { useRecentSearches, RecentSearchParams } from '@/hooks/useRecentSearches';
 import { RecentSearches } from './RecentSearches';

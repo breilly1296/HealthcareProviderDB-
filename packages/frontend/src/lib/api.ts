@@ -185,23 +185,38 @@ export interface Issuer {
 
 const providers = {
   search: (
-    filters: Partial<SearchFilters>,
-    page: number = 1,
-    limit: number = 20
+    filters: Partial<Omit<SearchFilters, 'cities'>> & {
+      // Legacy params for backward compatibility
+      cities?: string[] | string;
+      zip?: string;
+      page?: number;
+      limit?: number;
+    },
+    page?: number,
+    limit?: number
   ) => {
+    // Support both old style (page/limit in filters) and new style (separate args)
+    const pageNum = page ?? filters.page ?? 1;
+    const limitNum = limit ?? filters.limit ?? 20;
+
+    // Handle cities as string or array
+    const citiesValue = Array.isArray(filters.cities)
+      ? filters.cities.join(',')
+      : filters.cities;
+
     const params = {
       state: filters.state,
       city: filters.city,
-      cities: filters.cities?.join(','),
-      zip: filters.zipCode,
+      cities: citiesValue,
+      zip: filters.zipCode || filters.zip,
       healthSystem: filters.healthSystem,
       specialty: filters.specialty,
       name: filters.name,
       npi: filters.npi,
       entityType: filters.entityType,
       insurancePlanId: filters.insurancePlanId,
-      page,
-      limit,
+      page: pageNum,
+      limit: limitNum,
     };
     return apiFetch<{
       providers: ProviderDisplay[];
@@ -260,6 +275,14 @@ const plans = {
     }>(`/plans/search?${buildQueryString(params)}`),
 
   getGrouped: (params?: { search?: string; state?: string }) => {
+    const query = buildQueryString(params || {});
+    return apiFetch<{ carriers: CarrierGroup[]; totalPlans: number }>(
+      `/plans/grouped${query ? `?${query}` : ''}`
+    );
+  },
+
+  // Legacy alias for backward compatibility
+  getGroupedPlans: (params?: { search?: string; state?: string }) => {
     const query = buildQueryString(params || {});
     return apiFetch<{ carriers: CarrierGroup[]; totalPlans: number }>(
       `/plans/grouped${query ? `?${query}` : ''}`
@@ -352,16 +375,19 @@ const locations = {
     search?: string;
     state?: string;
     city?: string;
-    cities?: string[];
+    cities?: string[] | string;
     zipCode?: string;
     healthSystem?: string;
     minProviders?: number;
     page?: number;
     limit?: number;
   }) => {
+    const citiesValue = Array.isArray(params.cities)
+      ? params.cities.join(',')
+      : params.cities;
     const queryParams = {
       ...params,
-      cities: params.cities?.join(','),
+      cities: citiesValue,
     };
     return apiFetch<{
       locations: Location[];
@@ -369,13 +395,29 @@ const locations = {
     }>(`/locations/search?${buildQueryString(queryParams)}`);
   },
 
-  getHealthSystems: (state: string, cities?: string[]) =>
-    apiFetch<{ healthSystems: string[]; count: number }>(
+  getHealthSystems: (
+    stateOrParams: string | { state?: string; cities?: string },
+    cities?: string[]
+  ) => {
+    // Support both old style (object param) and new style (separate args)
+    let queryState: string | undefined;
+    let queryCities: string | undefined;
+
+    if (typeof stateOrParams === 'object') {
+      queryState = stateOrParams.state;
+      queryCities = stateOrParams.cities;
+    } else {
+      queryState = stateOrParams;
+      queryCities = cities?.join(',');
+    }
+
+    return apiFetch<{ healthSystems: string[]; count: number }>(
       `/locations/health-systems?${buildQueryString({
-        state,
-        cities: cities?.join(','),
+        state: queryState,
+        cities: queryCities,
       })}`
-    ),
+    );
+  },
 
   getById: (locationId: number) =>
     apiFetch<{ location: Location }>(`/locations/${locationId}`),
