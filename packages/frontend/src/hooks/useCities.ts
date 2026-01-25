@@ -3,6 +3,20 @@ import api from '../lib/api';
 import type { CityData } from '../types';
 
 // ============================================================================
+// NYC All Boroughs Configuration
+// ============================================================================
+
+/**
+ * Special value for selecting all NYC boroughs at once
+ */
+export const NYC_ALL_BOROUGHS_VALUE = 'NYC_ALL_BOROUGHS';
+
+/**
+ * The 5 NYC boroughs
+ */
+export const NYC_BOROUGHS = ['New York', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island'];
+
+// ============================================================================
 // Pinned Cities Configuration
 // ============================================================================
 
@@ -95,6 +109,26 @@ function reorderCitiesWithPinned(cities: CityData[], state: string): CityData[] 
   return [...pinnedCities, ...remainingCities];
 }
 
+/**
+ * Inject NYC All Boroughs option at position 0 for NY state
+ */
+function injectNycAllBoroughsOption(cities: CityData[], state: string): CityData[] {
+  if (state.toUpperCase() !== 'NY') {
+    return cities;
+  }
+
+  // Check if all 5 NYC boroughs exist in the city list
+  const cityNames = new Set(cities.map(c => c.city));
+  const hasAllBoroughs = NYC_BOROUGHS.every(borough => cityNames.has(borough));
+
+  if (!hasAllBoroughs) {
+    return cities;
+  }
+
+  // Inject the special option at position 0
+  return [{ city: NYC_ALL_BOROUGHS_VALUE, state }, ...cities];
+}
+
 // ============================================================================
 // Cache Configuration
 // ============================================================================
@@ -151,7 +185,10 @@ export async function prefetchCities(state: string): Promise<CityData[]> {
       }));
 
       // Reorder with pinned cities first
-      const cities = reorderCitiesWithPinned(rawCities, state);
+      const reorderedCities = reorderCitiesWithPinned(rawCities, state);
+
+      // Inject NYC All Boroughs option for NY state
+      const cities = injectNycAllBoroughsOption(reorderedCities, state);
 
       // Cache the result
       citiesCache.set(cacheKey, {
@@ -246,7 +283,10 @@ export function useCities(state: string | undefined): UseCitiesResult {
       }));
 
       // Reorder with pinned cities first
-      const cityData = reorderCitiesWithPinned(rawCities, stateToFetch);
+      const reorderedCities = reorderCitiesWithPinned(rawCities, stateToFetch);
+
+      // Inject NYC All Boroughs option for NY state
+      const cityData = injectNycAllBoroughsOption(reorderedCities, stateToFetch);
 
       // Cache the result
       citiesCache.set(cacheKey, {

@@ -7,6 +7,8 @@ export {
   useCities,
   clearCitiesCache,
   prefetchCities,
+  NYC_ALL_BOROUGHS_VALUE,
+  NYC_BOROUGHS,
 } from './useCities';
 
 export {

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useImperativeHandle, forwardRef } from 'react';
 import { Search, X, Loader2, ChevronDown } from 'lucide-react';
-import { useSearchForm, useCities, useHealthSystems, useInsurancePlans } from '@/hooks';
+import { useSearchForm, useCities, useHealthSystems, useInsurancePlans, NYC_ALL_BOROUGHS_VALUE, NYC_BOROUGHS } from '@/hooks';
 import { SearchableSelect } from './ui/SearchableSelect';
 import { SPECIALTY_OPTIONS, STATE_OPTIONS } from '@/lib/provider-utils';
 import type { SearchFilters, ProviderDisplay, PaginationState, SelectOption, GroupedSelectOptions } from '@/types';
@@ -94,7 +94,10 @@ export const SearchForm = forwardRef<SearchFormRef, SearchFormProps>(function Se
   // Convert data to select options
   const cityOptions: SelectOption[] = useMemo(() => [
     { value: '', label: 'All Cities' },
-    ...cities.map(c => ({ value: c.city, label: c.city })),
+    ...cities.map(c => ({
+      value: c.city,
+      label: c.city === NYC_ALL_BOROUGHS_VALUE ? 'NYC (All Boroughs)' : c.city,
+    })),
   ], [cities]);
 
   const healthSystemOptions: SelectOption[] = useMemo(() => [
@@ -108,9 +111,53 @@ export const SearchForm = forwardRef<SearchFormRef, SearchFormProps>(function Se
     search();
   };
 
+  // Handle city selection with NYC All Boroughs logic
+  const handleCityChange = (newValues: string[]) => {
+    const prevValues = filters.cities;
+    const hadNycCombo = prevValues.includes(NYC_ALL_BOROUGHS_VALUE);
+    const hasNycCombo = newValues.includes(NYC_ALL_BOROUGHS_VALUE);
+
+    // Case 1: NYC All Boroughs was just selected
+    if (hasNycCombo && !hadNycCombo) {
+      // Remove individual boroughs and just keep the combo
+      const nonBoroughs = newValues.filter(
+        city => city !== NYC_ALL_BOROUGHS_VALUE && !NYC_BOROUGHS.includes(city)
+      );
+      setFilter('cities', [NYC_ALL_BOROUGHS_VALUE, ...nonBoroughs]);
+      return;
+    }
+
+    // Case 2: NYC All Boroughs was deselected (combo removed directly)
+    if (hadNycCombo && !hasNycCombo) {
+      // Check if a borough was individually deselected
+      const removedBoroughs = NYC_BOROUGHS.filter(
+        borough => prevValues.includes(NYC_ALL_BOROUGHS_VALUE) && !newValues.includes(borough)
+      );
+
+      if (removedBoroughs.length > 0) {
+        // A borough was deselected while combo was active - expand to remaining boroughs
+        const remainingBoroughs = NYC_BOROUGHS.filter(
+          borough => !removedBoroughs.includes(borough)
+        );
+        const nonBoroughs = newValues.filter(
+          city => city !== NYC_ALL_BOROUGHS_VALUE && !NYC_BOROUGHS.includes(city)
+        );
+        setFilter('cities', [...remainingBoroughs, ...nonBoroughs]);
+        return;
+      }
+    }
+
+    // Default case: just set the values as-is
+    setFilter('cities', newValues);
+  };
+
   // Get display label for active filter
   const getFilterLabel = (key: keyof SearchFilters, value: string | string[]): string => {
     if (Array.isArray(value)) {
+      // Check if NYC All Boroughs is selected
+      if (value.length === 1 && value[0] === NYC_ALL_BOROUGHS_VALUE) {
+        return 'NYC (All Boroughs)';
+      }
       return `${value.length} ${value.length === 1 ? 'city' : 'cities'}`;
     }
 
@@ -171,7 +218,7 @@ export const SearchForm = forwardRef<SearchFormRef, SearchFormProps>(function Se
           label="City"
           options={cityOptions}
           value={filters.cities}
-          onChange={(v) => setFilter('cities', (v as string[]) || [])}
+          onChange={(v) => handleCityChange((v as string[]) || [])}
           placeholder={!filters.state ? 'Select state first' : 'Select cities'}
           disabled={!filters.state}
           isLoading={citiesLoading}
@@ -285,7 +332,7 @@ export const SearchForm = forwardRef<SearchFormRef, SearchFormProps>(function Se
           label="City"
           options={cityOptions}
           value={filters.cities}
-          onChange={(v) => setFilter('cities', (v as string[]) || [])}
+          onChange={(v) => handleCityChange((v as string[]) || [])}
           placeholder={!filters.state ? 'Select state first' : 'Select cities'}
           disabled={!filters.state}
           isLoading={citiesLoading}

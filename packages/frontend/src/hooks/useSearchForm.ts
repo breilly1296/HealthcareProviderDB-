@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import api from '../lib/api';
+import { NYC_ALL_BOROUGHS_VALUE, NYC_BOROUGHS } from './useCities';
 import type {
   SearchFilters,
   PaginationState,
@@ -246,7 +247,16 @@ export function useSearchForm(options: UseSearchFormOptions = {}): UseSearchForm
       setHasSearched(true);
 
       try {
-        const response = await api.providers.search(filters, page, opts.pageSize);
+        // Expand NYC_ALL_BOROUGHS to actual borough names before API call
+        const expandedCities = filters.cities.flatMap(city =>
+          city === NYC_ALL_BOROUGHS_VALUE ? NYC_BOROUGHS : [city]
+        );
+        const searchFilters = {
+          ...filters,
+          cities: expandedCities,
+        };
+
+        const response = await api.providers.search(searchFilters, page, opts.pageSize);
 
         // Check if this request was aborted
         if (abortControllerRef.current?.signal.aborted) {
