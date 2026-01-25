@@ -1,13 +1,24 @@
 /**
  * Generate cities.json for frontend static loading
- * Run: node scripts/generate-cities-json.cjs
+ *
+ * Usage:
+ *   DATABASE_URL=postgresql://user:pass@host:5432/db node scripts/generate-cities-json.cjs
+ *
+ * Or if DATABASE_URL is already set in environment:
+ *   node scripts/generate-cities-json.cjs
  */
 
 const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
 
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://postgres:vMp%24db2026%21xKq9Tz@35.223.46.51:5432/providerdb';
+const DATABASE_URL = process.env.DATABASE_URL;
+
+if (!DATABASE_URL) {
+  console.error('ERROR: DATABASE_URL environment variable is required');
+  console.error('Usage: DATABASE_URL=postgresql://user:pass@host:5432/db node scripts/generate-cities-json.cjs');
+  process.exit(1);
+}
 
 async function main() {
   const pool = new Pool({

@@ -1,11 +1,23 @@
 /**
  * Fast Backfill Specialty Categories Script
  * Uses bulk UPDATE with CASE statement for speed
+ *
+ * Usage:
+ *   DATABASE_URL=postgresql://user:pass@host:5432/db node scripts/backfill-specialty-fast.cjs
+ *
+ * Or if DATABASE_URL is already set in environment:
+ *   node scripts/backfill-specialty-fast.cjs
  */
 
 const { Pool } = require('pg');
 
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://postgres:vMp%24db2026%21xKq9Tz@35.222.45.196:5432/providerdb';
+const DATABASE_URL = process.env.DATABASE_URL;
+
+if (!DATABASE_URL) {
+  console.error('ERROR: DATABASE_URL environment variable is required');
+  console.error('Usage: DATABASE_URL=postgresql://user:pass@host:5432/db node scripts/backfill-specialty-fast.cjs');
+  process.exit(1);
+}
 
 // Prefix-based mappings (most common patterns)
 const PREFIX_RULES = [

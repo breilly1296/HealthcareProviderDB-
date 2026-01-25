@@ -1,6 +1,31 @@
 # PowerShell script to update DATABASE_URL secret in Google Cloud Secret Manager
+#
+# Usage:
+#   .\scripts\update-secret.ps1 -DatabaseUrl "postgresql://user:pass@host:5432/db"
+#
+# Or set via environment variable:
+#   $env:NEW_DATABASE_URL = "postgresql://..."
+#   .\scripts\update-secret.ps1
 
-$newDatabaseUrl = "postgresql://postgres:vMp`$db2026!xKq9Tz@35.223.46.51:5432/providerdb"
+param(
+    [Parameter(Mandatory=$false)]
+    [string]$DatabaseUrl
+)
+
+# Get database URL from parameter or environment variable
+$newDatabaseUrl = if ($DatabaseUrl) { $DatabaseUrl } else { $env:NEW_DATABASE_URL }
+
+if (-not $newDatabaseUrl) {
+    Write-Host "ERROR: Database URL is required" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "Usage:" -ForegroundColor Yellow
+    Write-Host "  .\scripts\update-secret.ps1 -DatabaseUrl `"postgresql://user:pass@host:5432/db`"" -ForegroundColor White
+    Write-Host ""
+    Write-Host "Or set via environment variable:" -ForegroundColor Yellow
+    Write-Host "  `$env:NEW_DATABASE_URL = `"postgresql://...`"" -ForegroundColor White
+    Write-Host "  .\scripts\update-secret.ps1" -ForegroundColor White
+    exit 1
+}
 
 Write-Host "Updating DATABASE_URL secret in Google Cloud Secret Manager..." -ForegroundColor Cyan
 Write-Host ""
@@ -18,8 +43,7 @@ if (-not $gcloudExists) {
     Write-Host "1. Go to: https://console.cloud.google.com/security/secret-manager" -ForegroundColor White
     Write-Host "2. Find and click 'DATABASE_URL'" -ForegroundColor White
     Write-Host "3. Click 'NEW VERSION'" -ForegroundColor White
-    Write-Host "4. Paste this value:" -ForegroundColor White
-    Write-Host "   $newDatabaseUrl" -ForegroundColor Green
+    Write-Host "4. Paste the new database URL" -ForegroundColor White
     Write-Host "5. Click 'ADD NEW VERSION'" -ForegroundColor White
     exit 1
 }
@@ -44,8 +68,7 @@ try {
     Write-Host "1. Go to: https://console.cloud.google.com/security/secret-manager" -ForegroundColor White
     Write-Host "2. Find and click 'DATABASE_URL'" -ForegroundColor White
     Write-Host "3. Click 'NEW VERSION'" -ForegroundColor White
-    Write-Host "4. Paste this value:" -ForegroundColor White
-    Write-Host "   $newDatabaseUrl" -ForegroundColor Green
+    Write-Host "4. Paste the new database URL" -ForegroundColor White
     Write-Host "5. Click 'ADD NEW VERSION'" -ForegroundColor White
     exit 1
 }
