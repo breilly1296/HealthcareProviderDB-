@@ -17,6 +17,28 @@ import type {
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
 
 // ============================================================================
+// Retry Configuration
+// ============================================================================
+
+export interface RetryOptions {
+  /** Maximum number of retry attempts (default: 2) */
+  maxRetries?: number;
+  /** Base delay between retries in milliseconds (default: 1000) */
+  retryDelay?: number;
+  /** HTTP status codes that should trigger a retry */
+  retryableStatuses?: number[];
+  /** Whether to use exponential backoff (default: true) */
+  exponentialBackoff?: boolean;
+}
+
+const DEFAULT_RETRY_OPTIONS: Required<RetryOptions> = {
+  maxRetries: 2,
+  retryDelay: 1000,
+  retryableStatuses: [429, 500, 502, 503, 504],
+  exponentialBackoff: true,
+};
+
+// ============================================================================
 // ApiError Class
 // ============================================================================
 
@@ -30,18 +52,21 @@ export class ApiError extends Error {
   public readonly statusCode: number;
   public readonly code: string;
   public readonly details: ApiErrorDetails | null;
+  public readonly retryAfter: number | null;
 
   constructor(
     message: string,
     statusCode: number,
     code: string = 'UNKNOWN_ERROR',
-    details: ApiErrorDetails | null = null
+    details: ApiErrorDetails | null = null,
+    retryAfter: number | null = null
   ) {
     super(message);
     this.name = 'ApiError';
     this.statusCode = statusCode;
     this.code = code;
     this.details = details;
+    this.retryAfter = retryAfter;
   }
 
   isRateLimited(): boolean {
@@ -59,11 +84,111 @@ export class ApiError extends Error {
   isUnauthorized(): boolean {
     return this.statusCode === 401 || this.statusCode === 403;
   }
+
+  isRetryable(): boolean {
+    return DEFAULT_RETRY_OPTIONS.retryableStatuses.includes(this.statusCode);
+  }
 }
 
 // ============================================================================
 // Helper Functions
 // ============================================================================
+
+/**
+ * Sleep for a specified number of milliseconds
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Check if an error is an AbortError (request was cancelled)
+ */
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'AbortError';
+}
+
+/**
+ * Check if an error appears to be a network error
+ */
+function isNetworkError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+
+  const message = error.message.toLowerCase();
+  return (
+    error.name === 'TypeError' || // fetch network errors are TypeErrors
+    message.includes('network') ||
+    message.includes('failed to fetch') ||
+    message.includes('connection') ||
+    message.includes('timeout') ||
+    message.includes('econnrefused') ||
+    message.includes('econnreset')
+  );
+}
+
+/**
+ * Parse Retry-After header value to milliseconds
+ * Supports both seconds (integer) and HTTP-date format
+ */
+function parseRetryAfter(headerValue: string | null): number | null {
+  if (!headerValue) return null;
+
+  // Try parsing as seconds (integer)
+  const seconds = parseInt(headerValue, 10);
+  if (!isNaN(seconds)) {
+    return seconds * 1000;
+  }
+
+  // Try parsing as HTTP-date
+  const date = new Date(headerValue);
+  if (!isNaN(date.getTime())) {
+    const delayMs = date.getTime() - Date.now();
+    return delayMs > 0 ? delayMs : null;
+  }
+
+  return null;
+}
+
+/**
+ * Calculate delay for retry attempt with exponential backoff
+ */
+function calculateRetryDelay(
+  attempt: number,
+  baseDelay: number,
+  useExponentialBackoff: boolean,
+  retryAfterMs: number | null
+): number {
+  // If we have a Retry-After header, use it (but cap at 30 seconds)
+  if (retryAfterMs !== null) {
+    return Math.min(retryAfterMs, 30000);
+  }
+
+  // Calculate exponential backoff: baseDelay * 2^attempt
+  // e.g., 1000ms, 2000ms, 4000ms for attempts 0, 1, 2
+  if (useExponentialBackoff) {
+    return baseDelay * Math.pow(2, attempt);
+  }
+
+  return baseDelay;
+}
+
+/**
+ * Log retry attempt for debugging
+ */
+function logRetry(
+  attempt: number,
+  maxRetries: number,
+  url: string,
+  reason: string,
+  delayMs: number
+): void {
+  if (process.env.NODE_ENV === 'development') {
+    console.warn(
+      `[API Retry] Attempt ${attempt + 1}/${maxRetries + 1} for ${url}: ${reason}. ` +
+      `Retrying in ${Math.round(delayMs / 1000)}s...`
+    );
+  }
+}
 
 /**
  * Format seconds into human-readable time for rate limit messages
@@ -101,40 +226,125 @@ export function buildQueryString(params: Record<string, unknown>): string {
 }
 
 // ============================================================================
+// Fetch with Retry
+// ============================================================================
+
+/**
+ * Fetch wrapper with automatic retry for transient failures.
+ *
+ * Features:
+ * - Retries on 5xx errors and 429 (rate limit)
+ * - Retries on network errors
+ * - Exponential backoff between retries
+ * - Respects Retry-After header for 429 responses
+ * - Does NOT retry aborted requests
+ * - Does NOT retry 4xx client errors (except 429)
+ */
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit = {},
+  retryOptions: RetryOptions = {}
+): Promise<Response> {
+  const {
+    maxRetries,
+    retryDelay,
+    retryableStatuses,
+    exponentialBackoff,
+  } = { ...DEFAULT_RETRY_OPTIONS, ...retryOptions };
+
+  let lastError: Error | null = null;
+  let lastResponse: Response | null = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, options);
+
+      // Check if we should retry based on status code
+      if (!response.ok && retryableStatuses.includes(response.status)) {
+        // Don't retry if this is the last attempt
+        if (attempt < maxRetries) {
+          const retryAfterMs = parseRetryAfter(response.headers.get('Retry-After'));
+          const delayMs = calculateRetryDelay(attempt, retryDelay, exponentialBackoff, retryAfterMs);
+
+          logRetry(attempt, maxRetries, url, `HTTP ${response.status}`, delayMs);
+
+          await sleep(delayMs);
+          continue;
+        }
+      }
+
+      // Return response (caller will handle non-ok responses)
+      return response;
+
+    } catch (error) {
+      lastError = error as Error;
+
+      // Never retry aborted requests
+      if (isAbortError(error)) {
+        throw error;
+      }
+
+      // Retry network errors
+      if (isNetworkError(error) && attempt < maxRetries) {
+        const delayMs = calculateRetryDelay(attempt, retryDelay, exponentialBackoff, null);
+
+        logRetry(attempt, maxRetries, url, error instanceof Error ? error.message : 'Network error', delayMs);
+
+        await sleep(delayMs);
+        continue;
+      }
+
+      // Non-retryable error, throw immediately
+      throw error;
+    }
+  }
+
+  // Should not reach here, but if we do, throw the last error
+  throw lastError ?? new Error('Request failed after retries');
+}
+
+// ============================================================================
 // API Fetch Wrapper
 // ============================================================================
 
 /**
- * Fetch wrapper with automatic JSON parsing and error handling
+ * Fetch wrapper with automatic JSON parsing, error handling, and retry logic
  */
 export async function apiFetch<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  retryOptions: RetryOptions = {}
 ): Promise<T> {
   const url = `${API_URL}${endpoint}`;
 
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
+  const response = await fetchWithRetry(
+    url,
+    {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
     },
-  });
+    retryOptions
+  );
 
   const data = await response.json();
 
   if (!response.ok) {
+    const retryAfter = data.retryAfter ?? null;
     const error = new ApiError(
       data.error?.message || data.message || 'An error occurred',
       response.status,
       data.error?.code || 'API_ERROR',
-      data.error?.details || null
+      data.error?.details || null,
+      retryAfter
     );
 
-    // Show toast for rate limiting
+    // Show toast for rate limiting (only if we've exhausted retries)
     if (error.isRateLimited()) {
-      const retryAfter = data.retryAfter || 60;
-      toast.error(`Rate limit exceeded. Try again in ${formatRetryTime(retryAfter)}.`, {
+      const retrySeconds = retryAfter || 60;
+      toast.error(`Rate limit exceeded. Try again in ${formatRetryTime(retrySeconds)}.`, {
         duration: 6000,
         id: 'rate-limit',
       });

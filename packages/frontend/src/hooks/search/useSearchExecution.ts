@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import api from '../../lib/api';
 import { NYC_ALL_BOROUGHS_VALUE, NYC_BOROUGHS } from '../useCities';
+import { isAbortError, toAppError, getUserMessage, logError } from '../../lib/errorUtils';
 import type { SearchFilters, PaginationState, ProviderDisplay } from '../../types';
 
 // ============================================================================
@@ -86,13 +87,15 @@ export function useSearchExecution(options: UseSearchExecutionOptions): UseSearc
         setResults(response.providers);
         setPagination(response.pagination);
       } catch (err) {
-        // Ignore abort errors
-        if (err instanceof Error && err.name === 'AbortError') {
+        // Ignore abort errors (user cancelled the request)
+        if (isAbortError(err)) {
           return;
         }
 
-        const errorMessage = err instanceof Error ? err.message : 'Search failed';
-        setError(errorMessage);
+        // Use standardized error handling
+        const appError = toAppError(err);
+        logError('useSearchExecution.performSearch', err);
+        setError(getUserMessage(appError));
         setResults([]);
         setPagination(null);
       } finally {

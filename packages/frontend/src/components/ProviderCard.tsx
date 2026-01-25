@@ -1,5 +1,6 @@
 'use client';
 
+import { memo, useMemo } from 'react';
 import Link from 'next/link';
 import type { ProviderDisplay } from '@/types';
 import { ConfidenceBadge, ConfidenceIndicator } from './ConfidenceBadge';
@@ -7,6 +8,7 @@ import FreshnessWarning from './FreshnessWarning';
 import { getSpecialtyDisplay } from '@/lib/provider-utils';
 import { CompareCheckbox } from './compare';
 import { useCompare, CompareProvider } from '@/hooks/useCompare';
+import { LocationIcon, PhoneIcon, ChevronRightIcon } from '@/components/icons';
 
 interface ProviderCardProps {
   provider: ProviderDisplay;
@@ -17,7 +19,11 @@ interface ProviderCardProps {
   planName?: string;
 }
 
-export function ProviderCard({
+/**
+ * Memoized to prevent re-renders when parent list updates but this provider hasn't changed.
+ * Uses custom comparison to check only relevant props for equality.
+ */
+function ProviderCardComponent({
   provider,
   confidenceScore,
   showConfidence = false,
@@ -25,23 +31,62 @@ export function ProviderCard({
   planId,
   planName,
 }: ProviderCardProps) {
-  const specialty = getSpecialtyDisplay(provider.specialtyCategory, provider.taxonomyDescription);
   const { isSelected } = useCompare();
   const selected = isSelected(provider.npi);
 
-  // Build CompareProvider object for the checkbox
-  const compareProvider: CompareProvider = {
-    npi: provider.npi,
-    name: provider.displayName,
-    specialty: specialty,
-    healthSystem: provider.organizationName || null,
-    address: provider.addressLine1 + (provider.addressLine2 ? ` ${provider.addressLine2}` : ''),
-    city: provider.city,
-    state: provider.state,
-    zip: provider.zip,
-    confidenceScore: confidenceScore,
-    phone: provider.phone || null,
-  };
+  // Memoize computed specialty to avoid recalculating on every render
+  const specialty = useMemo(
+    () => getSpecialtyDisplay(provider.specialtyCategory, provider.taxonomyDescription),
+    [provider.specialtyCategory, provider.taxonomyDescription]
+  );
+
+  // Memoize the CompareProvider object to maintain referential equality
+  const compareProvider: CompareProvider = useMemo(
+    () => ({
+      npi: provider.npi,
+      name: provider.displayName,
+      specialty: specialty,
+      healthSystem: provider.organizationName || null,
+      address: provider.addressLine1 + (provider.addressLine2 ? ` ${provider.addressLine2}` : ''),
+      city: provider.city,
+      state: provider.state,
+      zip: provider.zip,
+      confidenceScore: confidenceScore,
+      phone: provider.phone || null,
+    }),
+    [
+      provider.npi,
+      provider.displayName,
+      specialty,
+      provider.organizationName,
+      provider.addressLine1,
+      provider.addressLine2,
+      provider.city,
+      provider.state,
+      provider.zip,
+      confidenceScore,
+      provider.phone,
+    ]
+  );
+
+  // Memoize the Google Maps URL to avoid recalculating on every render
+  const mapsUrl = useMemo(
+    () => {
+      const address = `${provider.addressLine1}${provider.addressLine2 ? ' ' + provider.addressLine2 : ''}, ${provider.city}, ${provider.state} ${provider.zip}`;
+      return `https://maps.google.com/?q=${encodeURIComponent(address)}`;
+    },
+    [provider.addressLine1, provider.addressLine2, provider.city, provider.state, provider.zip]
+  );
+
+  // Memoize the formatted address for display
+  const formattedAddress = useMemo(
+    () => ({
+      line1: provider.addressLine1,
+      line2: provider.addressLine2 ? `, ${provider.addressLine2}` : '',
+      cityStateZip: `${provider.city}, ${provider.state} ${provider.zip}`,
+    }),
+    [provider.addressLine1, provider.addressLine2, provider.city, provider.state, provider.zip]
+  );
 
   return (
     <Link href={`/provider/${provider.npi}`}>
@@ -59,21 +104,18 @@ export function ProviderCard({
             </p>
             <div className="text-gray-600 dark:text-gray-300 space-y-1 text-sm sm:text-base">
               <a
-                href={`https://maps.google.com/?q=${encodeURIComponent(`${provider.addressLine1}${provider.addressLine2 ? ' ' + provider.addressLine2 : ''}, ${provider.city}, ${provider.state} ${provider.zip}`)}`}
+                href={mapsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-start gap-2 text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
                 onClick={(e) => e.stopPropagation()}
               >
-                <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
+                <LocationIcon className="w-4 h-4 text-gray-400 dark:text-gray-500 mt-0.5 flex-shrink-0" />
                 <span>
-                  {provider.addressLine1}
-                  {provider.addressLine2 && `, ${provider.addressLine2}`}
+                  {formattedAddress.line1}
+                  {formattedAddress.line2}
                   <br />
-                  {provider.city}, {provider.state} {provider.zip}
+                  {formattedAddress.cityStateZip}
                 </span>
               </a>
               {provider.phone && (
@@ -82,9 +124,7 @@ export function ProviderCard({
                   className="flex items-center gap-2 text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                  </svg>
+                  <PhoneIcon className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
                   <span>{provider.phone}</span>
                 </a>
               )}
@@ -124,9 +164,7 @@ export function ProviderCard({
         <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 flex justify-end">
           <span className="text-primary-600 dark:text-primary-400 font-medium flex items-center gap-1 group-hover:gap-2 transition-all">
             View Details
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
+            <ChevronRightIcon className="w-4 h-4" />
           </span>
         </div>
       </article>
@@ -134,8 +172,37 @@ export function ProviderCard({
   );
 }
 
-// Compact version for listing in provider detail
-export function ProviderCardCompact({
+// Custom comparison function for memo - only re-render if relevant data changes
+function arePropsEqual(prevProps: ProviderCardProps, nextProps: ProviderCardProps): boolean {
+  // Compare provider by NPI (primary identifier) and key display fields
+  if (prevProps.provider.npi !== nextProps.provider.npi) return false;
+  if (prevProps.provider.displayName !== nextProps.provider.displayName) return false;
+  if (prevProps.provider.phone !== nextProps.provider.phone) return false;
+  if (prevProps.provider.addressLine1 !== nextProps.provider.addressLine1) return false;
+  if (prevProps.provider.city !== nextProps.provider.city) return false;
+  if (prevProps.provider.state !== nextProps.provider.state) return false;
+
+  // Compare other props
+  if (prevProps.confidenceScore !== nextProps.confidenceScore) return false;
+  if (prevProps.showConfidence !== nextProps.showConfidence) return false;
+  if (prevProps.planId !== nextProps.planId) return false;
+  if (prevProps.planName !== nextProps.planName) return false;
+
+  // Compare lastVerifiedAt (handle Date comparison)
+  const prevDate = prevProps.lastVerifiedAt?.getTime?.() ?? prevProps.lastVerifiedAt;
+  const nextDate = nextProps.lastVerifiedAt?.getTime?.() ?? nextProps.lastVerifiedAt;
+  if (prevDate !== nextDate) return false;
+
+  return true;
+}
+
+export const ProviderCard = memo(ProviderCardComponent, arePropsEqual);
+
+/**
+ * Compact version for listing in provider detail.
+ * Memoized to prevent unnecessary re-renders in lists.
+ */
+function ProviderCardCompactComponent({
   provider,
 }: {
   provider: ProviderDisplay;
@@ -157,3 +224,8 @@ export function ProviderCardCompact({
     </div>
   );
 }
+
+export const ProviderCardCompact = memo(
+  ProviderCardCompactComponent,
+  (prevProps, nextProps) => prevProps.provider.npi === nextProps.provider.npi
+);

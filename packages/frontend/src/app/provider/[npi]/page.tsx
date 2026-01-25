@@ -6,8 +6,9 @@ import Link from 'next/link';
 import { providerApi } from '@/lib/api';
 import type { ProviderDisplay, PlanAcceptanceDisplay } from '@/types';
 import { ProviderDetailSkeleton } from '@/components/ProviderCardSkeleton';
-import ErrorMessage from '@/components/ErrorMessage';
+import ErrorMessage, { ErrorVariant } from '@/components/ErrorMessage';
 import { trackProviderView } from '@/lib/analytics';
+import { createErrorState, logError, type ErrorVariant as AppErrorVariant } from '@/lib/errorUtils';
 import {
   ProviderHeader,
   ProviderPlansSection,
@@ -19,13 +20,20 @@ interface ProviderWithPlans extends ProviderDisplay {
   planAcceptances: PlanAcceptanceDisplay[];
 }
 
+// Map app error variants to ErrorMessage component variants
+function toErrorMessageVariant(variant: AppErrorVariant): ErrorVariant {
+  if (variant === 'rate-limit') return 'server';
+  if (variant === 'unknown') return 'server';
+  return variant;
+}
+
 export default function ProviderDetailPage() {
   const params = useParams();
   const npi = params.npi as string;
 
   const [provider, setProvider] = useState<ProviderWithPlans | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<{ message: string; type: 'network' | 'server' | 'not-found' } | null>(null);
+  const [error, setError] = useState<{ message: string; type: ErrorVariant; retryable: boolean } | null>(null);
 
   const fetchProvider = async () => {
     setLoading(true);
@@ -41,16 +49,13 @@ export default function ProviderDetailPage() {
         providerName: result.provider.displayName,
       });
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load provider';
-      const isNetworkError = errorMessage.toLowerCase().includes('network') ||
-                            errorMessage.toLowerCase().includes('fetch') ||
-                            errorMessage.toLowerCase().includes('connection');
-      const isNotFound = errorMessage.toLowerCase().includes('not found') ||
-                        errorMessage.toLowerCase().includes('404');
-
+      // Use standardized error handling
+      logError('ProviderDetailPage.fetchProvider', err);
+      const errorState = createErrorState(err);
       setError({
-        message: errorMessage,
-        type: isNotFound ? 'not-found' : isNetworkError ? 'network' : 'server'
+        message: errorState.message,
+        type: toErrorMessageVariant(errorState.type),
+        retryable: errorState.retryable,
       });
     } finally {
       setLoading(false);
@@ -75,7 +80,7 @@ export default function ProviderDetailPage() {
             variant={error?.type || 'not-found'}
             message={error?.message || 'The provider you are looking for does not exist.'}
             action={
-              error?.type === 'network' || error?.type === 'server'
+              error?.retryable
                 ? { label: 'Try Again', onClick: fetchProvider }
                 : undefined
             }

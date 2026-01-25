@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { providerApi } from '@/lib/api';
+import { toAppError, getUserMessage, logError } from '@/lib/errorUtils';
 import type { ProviderDisplay, Location } from '@/types';
 
 interface ColocatedProvidersProps {
@@ -29,8 +30,10 @@ export function ColocatedProviders({ npi }: ColocatedProvidersProps) {
       setColocatedTotal(result.pagination.total);
       setFetched(true);
     } catch (err) {
-      console.error('Failed to load colocated providers:', err);
-      setError('Unable to load other providers at this location');
+      // Use standardized error handling
+      logError('ColocatedProviders.fetchColocatedProviders', err);
+      const appError = toAppError(err);
+      setError(getUserMessage(appError));
     } finally {
       setLoading(false);
     }
