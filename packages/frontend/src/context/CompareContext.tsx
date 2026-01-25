@@ -34,23 +34,58 @@ const STORAGE_KEY = 'verifymyprovider-compare';
 
 function getStoredProviders(): CompareProvider[] {
   if (typeof window === 'undefined') return [];
+
   try {
     const stored = sessionStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      return JSON.parse(stored);
+    if (!stored) return [];
+
+    const parsed = JSON.parse(stored);
+
+    // Validate the parsed data is an array
+    if (!Array.isArray(parsed)) {
+      console.warn('[CompareContext] Stored data is not an array, resetting');
+      sessionStorage.removeItem(STORAGE_KEY);
+      return [];
     }
-  } catch {
-    // Invalid JSON or storage error
+
+    return parsed;
+  } catch (error) {
+    // P0 FIX: Log the error instead of silently swallowing it
+    if (error instanceof SyntaxError) {
+      console.error('[CompareContext] Invalid JSON in sessionStorage, resetting:', error.message);
+      try {
+        sessionStorage.removeItem(STORAGE_KEY);
+      } catch (removeError) {
+        console.error('[CompareContext] Failed to remove corrupted storage:', removeError);
+      }
+    } else if (error instanceof DOMException) {
+      console.error('[CompareContext] Storage access error:', error.name, error.message);
+    } else {
+      console.error('[CompareContext] Unexpected error reading storage:', error);
+    }
+
+    return [];
   }
-  return [];
 }
 
-function storeProviders(providers: CompareProvider[]) {
+function storeProviders(providers: CompareProvider[]): void {
   if (typeof window === 'undefined') return;
+
   try {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(providers));
-  } catch {
-    // Storage error (quota exceeded, etc.)
+  } catch (error) {
+    // P0 FIX: Log the error with context
+    if (error instanceof DOMException) {
+      if (error.name === 'QuotaExceededError') {
+        console.error('[CompareContext] Storage quota exceeded:', error.message);
+      } else if (error.name === 'SecurityError') {
+        console.error('[CompareContext] Storage access denied (private browsing?):', error.message);
+      } else {
+        console.error('[CompareContext] Storage DOMException:', error.name, error.message);
+      }
+    } else {
+      console.error('[CompareContext] Unexpected error saving to storage:', error);
+    }
   }
 }
 

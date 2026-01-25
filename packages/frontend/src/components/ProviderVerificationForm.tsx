@@ -77,8 +77,12 @@ export default function ProviderVerificationForm({
   const newVerificationTotal = existingVerificationCount + 1;
   const verificationsNeeded = Math.max(0, 3 - newVerificationTotal);
 
-  const handleAnswer = (field: keyof FormData, value: any) => {
-    setFormData({ ...formData, [field]: value });
+  // === P0 FIX: Type-safe answer handler ===
+  const handleAnswer = <K extends keyof FormData>(
+    field: K,
+    value: FormData[K]
+  ): void => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleNext = (step: Step) => {

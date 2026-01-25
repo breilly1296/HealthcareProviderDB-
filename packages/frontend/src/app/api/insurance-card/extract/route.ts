@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { InsuranceCardData } from '@/types/insurance';
 import { checkRateLimit, getRateLimitHeaders } from '@/lib/rateLimit';
+import { parseInsuranceCardResponse } from '@/lib/insuranceCardSchema';
 
 // === Protection Constants ===
 const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB max
@@ -212,19 +213,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Parse JSON from response
+    // === P0 FIX: Safe JSON parsing with Zod validation ===
     const responseText = textContent.text.trim();
+    const parseResult = parseInsuranceCardResponse(responseText);
 
-    // Try to extract JSON from the response (in case there's extra text)
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
+    if (!parseResult.success) {
+      console.error('Insurance card parsing failed:', parseResult.error);
       return NextResponse.json(
-        { success: false, error: 'Could not parse JSON from response' },
+        {
+          success: false,
+          error: 'Could not parse insurance card data. Please try again or upload a clearer image.',
+        },
         { status: 500 }
       );
     }
 
-    const extractedData: InsuranceCardData = JSON.parse(jsonMatch[0]);
+    // Cast to InsuranceCardData type for API compatibility
+    const extractedData = parseResult.data as InsuranceCardData;
 
     // Return success with rate limit headers
     return NextResponse.json(
@@ -237,12 +242,35 @@ export async function POST(request: NextRequest) {
       }
     );
   } catch (error) {
-    console.error('Insurance card extraction error:', error);
+    // === P0 FIX: Improved error handling with specific error types ===
+    console.error('Insurance card extraction error:', {
+      name: error instanceof Error ? error.name : 'Unknown',
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
 
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    // Handle specific error types
+    if (error instanceof SyntaxError) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid request format' },
+        { status: 400 }
+      );
+    }
 
+    if (error instanceof Anthropic.APIError) {
+      console.error('Anthropic API error:', {
+        status: error.status,
+        message: error.message,
+      });
+      return NextResponse.json(
+        { success: false, error: 'AI service temporarily unavailable. Please try again.' },
+        { status: 503 }
+      );
+    }
+
+    // Generic error - don't expose internal details to client
     return NextResponse.json(
-      { success: false, error: errorMessage },
+      { success: false, error: 'An unexpected error occurred. Please try again.' },
       { status: 500 }
     );
   }
