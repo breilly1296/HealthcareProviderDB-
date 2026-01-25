@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { locationApi } from '@/lib/api';
+import { DEFAULT_PAGE_SIZE } from '@/lib/constants';
 import type { ProviderDisplay, Location, PaginationState } from '@/types';
 import { ProviderCard } from '@/components/ProviderCard';
 import ProviderCardSkeleton from '@/components/ProviderCardSkeleton';
@@ -50,7 +51,7 @@ export default function LocationDetailPage() {
     try {
       const result = await locationApi.getProviders(locationId, {
         page,
-        limit: 20,
+        limit: DEFAULT_PAGE_SIZE,
       });
 
       setLocation(result.location);

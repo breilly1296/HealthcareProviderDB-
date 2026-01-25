@@ -3,6 +3,8 @@
  * Centralized location for specialty labels and provider formatting
  */
 
+import { CONFIDENCE_THRESHOLDS } from './constants';
+
 /** Comprehensive specialty labels mapping */
 export const SPECIALTY_LABELS: Record<string, string> = {
   ACUPUNCTURE: 'Acupuncture',
@@ -125,9 +127,9 @@ export const STATE_OPTIONS = [
 export type ConfidenceLevel = 'high' | 'medium' | 'low';
 
 export const CONFIDENCE_LEVELS: { min: number; level: ConfidenceLevel }[] = [
-  { min: 70, level: 'high' },
-  { min: 40, level: 'medium' },
-  { min: 0, level: 'low' },
+  { min: CONFIDENCE_THRESHOLDS.HIGH, level: 'high' },
+  { min: CONFIDENCE_THRESHOLDS.MEDIUM, level: 'medium' },
+  { min: CONFIDENCE_THRESHOLDS.LOW, level: 'low' },
 ];
 
 export const CONFIDENCE_STYLES: Record<ConfidenceLevel, { color: string; bgColor: string; label: string }> = {

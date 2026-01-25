@@ -10,9 +10,13 @@ priority: 1
 # No HIPAA Compliance Review
 
 ## Files to Review
-- `packages/backend/prisma/schema.prisma` (verify no PHI fields)
-- `packages/backend/src/api/routes.ts` (verify what data is collected)
+- `prisma/schema.prisma` (verify no PHI fields)
+- `packages/backend/src/routes/` (verify what data is collected)
+  - `providers.ts` - provider search/detail endpoints
+  - `verify.ts` - verification submission endpoints
+  - `plans.ts` - insurance plan endpoints
 - `packages/backend/src/services/*` (verify no PHI processing)
+- `packages/backend/src/middleware/requestLogger.ts` (verify PII exclusion in logs)
 
 ## VerifyMyProvider Compliance Architecture
 - **HIPAA Required:** NO

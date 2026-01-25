@@ -122,9 +122,10 @@ export default function InsuranceCardUploader() {
               />
               <button
                 onClick={handleReset}
+                aria-label="Remove image"
                 className="absolute top-2 right-2 bg-white dark:bg-gray-700 rounded-full p-1 shadow-md hover:bg-gray-100 dark:hover:bg-gray-600"
               >
-                <svg className="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
@@ -172,8 +173,12 @@ export default function InsuranceCardUploader() {
           </div>
         )}
 
+        <label htmlFor="insurance-card-upload" className="sr-only">
+          Upload insurance card image
+        </label>
         <input
           ref={fileInputRef}
+          id="insurance-card-upload"
           type="file"
           accept="image/*"
           capture="environment"

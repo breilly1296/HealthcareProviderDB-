@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useCallback } from 'react';
+import FocusTrap from 'focus-trap-react';
 import { useCompare, CompareProvider } from '@/hooks/useCompare';
+import { CONFIDENCE_THRESHOLDS } from '@/lib/constants';
 
 interface CompareModalProps {
   isOpen: boolean;
@@ -12,10 +14,10 @@ function getConfidenceColor(score?: number): { bg: string; text: string; label: 
   if (score === undefined) {
     return { bg: 'bg-gray-100 dark:bg-gray-700', text: 'text-gray-600 dark:text-gray-400', label: 'N/A' };
   }
-  if (score >= 70) {
+  if (score >= CONFIDENCE_THRESHOLDS.HIGH) {
     return { bg: 'bg-green-100 dark:bg-green-900/40', text: 'text-green-700 dark:text-green-300', label: 'High' };
   }
-  if (score >= 40) {
+  if (score >= CONFIDENCE_THRESHOLDS.MEDIUM) {
     return { bg: 'bg-yellow-100 dark:bg-yellow-900/40', text: 'text-yellow-700 dark:text-yellow-300', label: 'Medium' };
   }
   return { bg: 'bg-red-100 dark:bg-red-900/40', text: 'text-red-700 dark:text-red-300', label: 'Low' };
@@ -342,13 +344,20 @@ export function CompareModal({ isOpen, onClose }: CompareModalProps) {
   ];
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 animate-fade-in"
-      onClick={handleBackdropClick}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="compare-modal-title"
+    <FocusTrap
+      focusTrapOptions={{
+        initialFocus: () => closeButtonRef.current,
+        allowOutsideClick: true,
+        escapeDeactivates: false, // We handle escape key ourselves
+      }}
     >
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 animate-fade-in"
+        onClick={handleBackdropClick}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="compare-modal-title"
+      >
       <div
         ref={modalRef}
         className="
@@ -438,5 +447,6 @@ export function CompareModal({ isOpen, onClose }: CompareModalProps) {
         </div>
       </div>
     </div>
+    </FocusTrap>
   );
 }

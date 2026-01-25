@@ -10,9 +10,11 @@ priority: 1
 # Environment & Secrets Review
 
 ## Files to Review
-- `.env.example` files
-- `packages/backend/src/config/` (config loading)
-- GCP Secret Manager
+- `.env.example` (root level)
+- `packages/backend/.env.example` (backend specific)
+- `packages/frontend/.env.example` (frontend specific)
+- `packages/backend/src/index.ts` (environment variable usage)
+- GCP Secret Manager (DATABASE_URL, ADMIN_SECRET, etc.)
 
 ## Questions to Ask
 1. What secrets exist in Secret Manager? (DATABASE_URL, etc.)

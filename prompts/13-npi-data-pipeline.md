@@ -10,9 +10,12 @@ priority: 2
 # NPI Data Pipeline Review
 
 ## Files to Review
-- `scripts/import-npi-direct.ts` (import script)
-- `scripts/split-npi-by-state.ts` (state splitting)
-- `packages/backend/src/taxonomy-mappings.ts` (specialty mappings)
+- `scripts/import-npi-direct.ts` (main import script)
+- `scripts/normalize-city-names.ts` (city name cleanup)
+- `scripts/cleanup-deactivated-providers.ts` (deactivated provider handling)
+- `scripts/backfill-verification-ttl.ts` (TTL backfill)
+- `scripts/generate-cities-json.cjs` (city dropdown generation)
+- `src/taxonomy-mappings.ts` (specialty mappings - at root level)
 - NPI data files (if available locally)
 
 ## VerifyMyProvider NPI Architecture

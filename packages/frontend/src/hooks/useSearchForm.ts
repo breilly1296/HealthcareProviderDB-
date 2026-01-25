@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import api from '../lib/api';
+import { DEFAULT_PAGE_SIZE } from '../lib/constants';
 import { NYC_ALL_BOROUGHS_VALUE, NYC_BOROUGHS } from './useCities';
 import type {
   SearchFilters,
@@ -73,7 +74,7 @@ const DEFAULT_FILTERS: SearchFilters = {
 
 const DEFAULT_OPTIONS: Required<UseSearchFormOptions> = {
   defaultFilters: {},
-  pageSize: 20,
+  pageSize: DEFAULT_PAGE_SIZE,
   syncWithUrl: true,
   autoSearch: false,
   autoSearchDebounce: 500,

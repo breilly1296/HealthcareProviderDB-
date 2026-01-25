@@ -10,9 +10,10 @@ priority: 3
 # Audit Logging Review
 
 ## Files to Review
-- `packages/backend/src/services/auditLog.ts` (if exists)
-- `packages/backend/src/api/routes.ts` (check for logging)
-- `packages/backend/prisma/schema.prisma` (AuditLog model if exists)
+- `packages/backend/src/middleware/requestLogger.ts` (✅ IMPLEMENTED - structured logging)
+- `packages/backend/src/routes/` (logging in route handlers)
+- `prisma/schema.prisma` (VerificationLog model for audit trail)
+- `packages/backend/src/services/verificationService.ts` (verification audit logic)
 
 ## VerifyMyProvider Audit Architecture
 - **HIPAA Required:** NO (no PHI = simpler logging)
@@ -35,10 +36,23 @@ priority: 3
 - [ ] CSRF tokens
 - [ ] Session IDs
 
-### 3. Current Logging
-- [ ] Console.log statements (development only?)
-- [ ] Cloud Run logs (automatic)
-- [ ] Structured logging? (JSON format?)
+### 3. Current Logging (✅ IMPLEMENTED Jan 2026)
+- [x] Structured JSON logging via `requestLogger.ts` middleware
+- [x] Cloud Run compatible (structured for Cloud Logging)
+- [x] Request ID generation and correlation (X-Request-ID header)
+- [x] Response time tracking
+- [x] Rate limit info extraction and logging
+- [x] PII exclusion (no IP addresses, user agents in logs)
+- [x] In-memory buffer for statistics (last 20 logs)
+- [x] Production JSON format, development colored console
+
+**Privacy-Preserving Design:**
+```typescript
+// From requestLogger.ts - explicitly excludes PII
+// No IP addresses logged
+// No user agents logged
+// No identifying information captured
+```
 
 ## Questions to Ask
 

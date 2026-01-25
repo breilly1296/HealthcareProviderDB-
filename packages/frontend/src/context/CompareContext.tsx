@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
+import { MAX_COMPARE_PROVIDERS } from '@/lib/constants';
 
 export interface CompareProvider {
   npi: string;
@@ -29,7 +30,6 @@ interface CompareContextType {
 
 const CompareContext = createContext<CompareContextType | undefined>(undefined);
 
-const MAX_PROVIDERS = 3;
 const STORAGE_KEY = 'verifymyprovider-compare';
 
 function getStoredProviders(): CompareProvider[] {
@@ -109,7 +109,7 @@ export function CompareProvider({ children }: { children: ReactNode }) {
   const addProvider = useCallback((provider: CompareProvider) => {
     setSelectedProviders((prev) => {
       // Don't add if already at max or already selected
-      if (prev.length >= MAX_PROVIDERS || prev.some((p) => p.npi === provider.npi)) {
+      if (prev.length >= MAX_COMPARE_PROVIDERS || prev.some((p) => p.npi === provider.npi)) {
         return prev;
       }
       return [...prev, provider];
@@ -129,7 +129,7 @@ export function CompareProvider({ children }: { children: ReactNode }) {
     [selectedProviders]
   );
 
-  const canAddMore = selectedProviders.length < MAX_PROVIDERS;
+  const canAddMore = selectedProviders.length < MAX_COMPARE_PROVIDERS;
 
   return (
     <CompareContext.Provider

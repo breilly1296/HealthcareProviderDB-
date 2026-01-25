@@ -10,9 +10,9 @@ priority: 3
 # CSRF Protection Review
 
 ## Files to Review
-- `packages/backend/src/middleware/csrf.ts` (if exists)
-- `packages/backend/src/app.ts` (middleware registration)
-- `packages/frontend/src/services/api.ts` (frontend API client)
+- `packages/backend/src/middleware/` (no csrf.ts yet - not needed without auth)
+- `packages/backend/src/index.ts` (middleware registration)
+- `packages/frontend/src/` (frontend Next.js app)
 
 ## VerifyMyProvider CSRF Architecture
 - **Current State:** NO CSRF protection (no auth = no sessions to hijack)

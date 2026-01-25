@@ -10,9 +10,10 @@ priority: 1
 # Database Schema Review
 
 ## Files to Review
-- `packages/backend/prisma/schema.prisma` (primary)
-- `packages/backend/prisma/migrations/` (migration history)
-- `packages/backend/src/services/database.ts` (if exists)
+- `prisma/schema.prisma` (primary - root level)
+- `prisma/migrations/` (migration history)
+- `packages/backend/src/lib/prisma.ts` (Prisma client singleton)
+- `packages/backend/src/services/` (service layer using Prisma)
 
 ## VerifyMyProvider Database Architecture
 - **ORM**: Prisma with PostgreSQL
@@ -42,18 +43,35 @@ priority: 1
 - [ ] `VerificationLog` - Anonymous user verifications with upvotes/downvotes
 - [ ] `SyncLog` - Data import tracking
 
-### 4. Indexes
-- [ ] Compound indexes exist for common query patterns:
-  - `Provider(state, city, specialtyPrimary)` - geographic search
-  - `Provider(specialtyPrimary, state)` - specialty search
-  - `Provider(locationId)` - location lookup - **NEW**
-  - `ProviderPlanAcceptance(npi, planId)` - acceptance lookup
-  - `ProviderPlanAcceptance(confidenceScore)` - quality filtering
-  - `VerificationLog(providerNpi, createdAt)` - recent verifications
-  - `Location(state)` - state-based location search - **NEW**
-  - `Location(city, state)` - city-based location search - **NEW**
-  - `Location(zipCode)` - ZIP-based location search - **NEW**
-- [ ] No missing indexes on foreign keys
+### 4. Indexes (as implemented in schema.prisma)
+- [x] Provider indexes:
+  - `Provider(state)` - state filtering
+  - `Provider(specialtyCode)` - specialty search
+  - `Provider(lastName)` - name search
+  - `Provider(firstName)` - name search
+  - `Provider(city)` - location filtering
+  - `Provider(organizationName)` - org search
+  - `Provider(state, specialtyCode)` - combined search
+  - `Provider(locationId)` - location lookup
+- [x] ProviderPlanAcceptance indexes:
+  - `@@unique([providerNpi, planId])` - acceptance lookup
+  - `(acceptanceStatus)` - status filtering
+  - `(confidenceScore)` - quality filtering
+  - `(lastVerified)` - recency queries
+  - `(expiresAt)` - TTL cleanup
+- [x] VerificationLog indexes:
+  - `(providerNpi)` - provider lookups
+  - `(planId)` - plan lookups
+  - `(verificationType)` - type filtering
+  - `(createdAt)` - recent verifications
+  - `(isApproved)` - moderation queries
+  - `(expiresAt)` - TTL cleanup
+  - `(providerNpi, createdAt)` - combined
+- [x] Location indexes:
+  - `(state)` - state-based search
+  - `(city, state)` - city-based search
+  - `(zipCode)` - ZIP-based search
+- [x] No missing indexes on foreign keys
 
 ### 5. Data Quality Fields
 - [ ] Confidence scoring fields present (0-100 integer)

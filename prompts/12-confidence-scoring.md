@@ -10,8 +10,10 @@ priority: 2
 # Confidence Scoring Algorithm Review
 
 ## Files to Review
-- `packages/backend/src/matching/confidence.ts` (✅ IMPLEMENTED - 82 tests passing)
-- `packages/backend/prisma/schema.prisma` (ProviderPlanAcceptance.confidenceScore field)
+- `packages/backend/src/services/confidenceService.ts` (✅ IMPLEMENTED - main confidence algorithm)
+- `packages/backend/src/services/__tests__/confidenceService.test.ts` (comprehensive tests)
+- `src/matching/confidence.ts` (original/demo mode algorithm at root level)
+- `prisma/schema.prisma` (ProviderPlanAcceptance.confidenceScore field)
 - `packages/backend/src/services/verificationService.ts` (score updates)
 
 ## VerifyMyProvider Confidence Scoring

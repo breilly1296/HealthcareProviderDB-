@@ -15,8 +15,10 @@ priority: 2
 - `packages/backend/src/routes/verify.ts` (verification submissions, votes)
 - `packages/backend/src/routes/locations.ts` (location/organization search)
 - `packages/backend/src/routes/plans.ts` (insurance plan lookup)
+- `packages/backend/src/routes/admin.ts` (admin cleanup, stats - requires X-Admin-Secret)
 - `packages/backend/src/middleware/rateLimiter.ts` (rate limiting)
 - `packages/backend/src/middleware/errorHandler.ts` (error handling)
+- `packages/backend/src/middleware/requestLogger.ts` (structured logging)
 
 ## Current Route Structure
 Routes are split into domain-specific files:
@@ -24,6 +26,8 @@ Routes are split into domain-specific files:
 - `/api/v1/verify/*` - Verification submissions and votes
 - `/api/v1/locations/*` - Location/organization queries
 - `/api/v1/plans/*` - Insurance plan lookup
+- `/api/v1/admin/*` - Admin endpoints (requires X-Admin-Secret header)
+- `/health` - Health check endpoint (before rate limiter)
 
 ## Questions to Ask
 1. Which routes are currently implemented?

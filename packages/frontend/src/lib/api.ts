@@ -454,6 +454,6 @@ export default api;
 // ============================================================================
 
 export const providerApi = providers;
-export const planApi = plans;
+// planApi removed - unused
 export const verificationApi = verify;
 export const locationApi = locations;

@@ -184,8 +184,9 @@ export default function FreshnessWarning({
                   onMouseLeave={() => setShowTooltip(false)}
                   onClick={() => setShowTooltip(!showTooltip)}
                   className="text-yellow-600 hover:text-yellow-700"
+                  aria-label="More information about verification freshness"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </button>
@@ -233,8 +234,9 @@ export default function FreshnessWarning({
                   onMouseLeave={() => setShowTooltip(false)}
                   onClick={() => setShowTooltip(!showTooltip)}
                   className="text-red-600 hover:text-red-700"
+                  aria-label="More information about verification freshness"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </button>

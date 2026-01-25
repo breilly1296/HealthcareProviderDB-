@@ -10,9 +10,23 @@ priority: 2
 # Authentication Review
 
 ## Files to Review
-- `packages/backend/src/middleware/auth.ts` (if exists - likely doesn't)
-- `packages/backend/src/api/routes.ts` (check for auth middleware usage)
-- `src/contexts/AuthContext.tsx` (frontend - if exists)
+- `packages/backend/src/routes/admin.ts` (admin auth via X-Admin-Secret header)
+- `packages/backend/src/routes/` (check for auth middleware usage)
+- `packages/backend/src/index.ts` (CORS and middleware configuration)
+- `packages/frontend/src/` (frontend - Next.js app)
+
+## Current Admin Authentication (Implemented Jan 2026)
+The admin routes (`/api/v1/admin/*`) use a simple header-based authentication:
+```typescript
+// In routes/admin.ts
+const adminSecret = process.env.ADMIN_SECRET;
+if (!adminSecret) return res.status(503).json({ error: 'Admin not configured' });
+if (req.headers['x-admin-secret'] !== adminSecret) return res.status(401).json({ error: 'Unauthorized' });
+```
+Protected endpoints:
+- `POST /api/v1/admin/cleanup-expired` - Delete expired records
+- `GET /api/v1/admin/expiration-stats` - View expiration statistics
+- `GET /api/v1/admin/health` - Admin health check
 
 ## VerifyMyProvider Auth Architecture
 - **Current State:** NO authentication (all endpoints public/anonymous)

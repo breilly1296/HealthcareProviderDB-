@@ -3,6 +3,8 @@
  * Re-exports shared types and defines frontend-specific types
  */
 
+import { DEFAULT_PAGE_SIZE } from '@/lib/constants';
+
 // Re-export from shared package
 export {
   // Provider types
@@ -300,7 +302,7 @@ export const defaultSearchFilters: SearchFilters = {
 export const defaultPaginationState: PaginationState = {
   total: 0,
   page: 1,
-  limit: 20,
+  limit: DEFAULT_PAGE_SIZE,
   totalPages: 0,
   hasMore: false,
 };

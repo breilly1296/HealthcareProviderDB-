@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useCallback, ReactNode } from 'react';
+import FocusTrap from 'focus-trap-react';
 
 interface FilterDrawerProps {
   isOpen: boolean;
@@ -63,12 +64,19 @@ export function FilterDrawer({
   if (!isOpen) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 md:hidden"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="filter-drawer-title"
+    <FocusTrap
+      focusTrapOptions={{
+        initialFocus: () => closeButtonRef.current,
+        allowOutsideClick: true,
+        escapeDeactivates: false, // We handle escape key ourselves
+      }}
     >
+      <div
+        className="fixed inset-0 z-50 md:hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="filter-drawer-title"
+      >
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50 transition-opacity duration-300"
@@ -165,5 +173,6 @@ export function FilterDrawer({
         </div>
       </div>
     </div>
+    </FocusTrap>
   );
 }

@@ -267,10 +267,10 @@ export function VerificationButton({
 
                     {/* Accepts Insurance */}
                     <div>
-                      <label className="label">
+                      <label id="accepts-insurance-label" className="label">
                         Does this provider accept this insurance? *
                       </label>
-                      <div className="flex gap-3">
+                      <div className="flex gap-3" role="group" aria-labelledby="accepts-insurance-label">
                         <button
                           type="button"
                           onClick={() => setAcceptsInsurance(true)}
@@ -304,10 +304,10 @@ export function VerificationButton({
 
                     {/* Accepts New Patients */}
                     <div>
-                      <label className="label">
+                      <label id="accepts-new-patients-label" className="label">
                         Accepting new patients?
                       </label>
-                      <div className="flex gap-3">
+                      <div className="flex gap-3" role="group" aria-labelledby="accepts-new-patients-label">
                         <button
                           type="button"
                           onClick={() => setAcceptsNewPatients(true)}
