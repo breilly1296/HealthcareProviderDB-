@@ -56,7 +56,7 @@ export async function verifyCaptcha(req: Request, res: Response, next: NextFunct
       body: params,
     });
 
-    const data: RecaptchaResponse = await response.json();
+    const data = (await response.json()) as RecaptchaResponse;
 
     if (!data.success) {
       console.warn(`[Security] CAPTCHA failed from IP ${req.ip}:`, data['error-codes']);
