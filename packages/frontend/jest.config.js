@@ -1,3 +1,5 @@
+const path = require('path');
+
 /** @type {import('jest').Config} */
 const config = {
   testEnvironment: 'jsdom',
@@ -17,6 +19,9 @@ const config = {
   transformIgnorePatterns: [
     '/node_modules/',
   ],
+  transform: {
+    '^.+\\.(ts|tsx|js|jsx)$': ['babel-jest', { configFile: path.join(__dirname, 'babel.config.jest.js') }],
+  },
 };
 
 module.exports = config;

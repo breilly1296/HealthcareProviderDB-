@@ -1,3 +1,5 @@
+const path = require('path');
+
 /** @type {import('jest').Config} */
 module.exports = {
   projects: [
@@ -11,7 +13,7 @@ module.exports = {
       },
       testMatch: ['<rootDir>/src/**/__tests__/**/*.test.ts?(x)'],
       transform: {
-        '^.+\\.(ts|tsx|js|jsx)$': 'babel-jest',
+        '^.+\\.(ts|tsx|js|jsx)$': ['babel-jest', { configFile: path.join(__dirname, 'packages/frontend/babel.config.jest.js') }],
       },
       moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
       testPathIgnorePatterns: ['/node_modules/', '/.next/', '/e2e/'],
