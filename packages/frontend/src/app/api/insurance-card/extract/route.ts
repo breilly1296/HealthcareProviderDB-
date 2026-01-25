@@ -3,15 +3,6 @@ import Anthropic from '@anthropic-ai/sdk';
 import { InsuranceCardData } from '@/types/insurance';
 import { checkRateLimit, getRateLimitHeaders } from '@/lib/rateLimit';
 
-// Route segment config - limit request body size
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '6mb', // Slightly larger than 5MB image limit for JSON wrapper
-    },
-  },
-};
-
 // === Protection Constants ===
 const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB max
 const MAX_BASE64_LENGTH = Math.ceil(MAX_IMAGE_SIZE_BYTES * 1.37); // Base64 is ~37% larger
