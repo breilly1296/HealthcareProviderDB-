@@ -1,6 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { InsuranceCardData } from '@/types/insurance';
+import { checkRateLimit, getRateLimitHeaders } from '@/lib/rateLimit';
+
+// Route segment config - limit request body size
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '6mb', // Slightly larger than 5MB image limit for JSON wrapper
+    },
+  },
+};
+
+// === Protection Constants ===
+const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB max
+const MAX_BASE64_LENGTH = Math.ceil(MAX_IMAGE_SIZE_BYTES * 1.37); // Base64 is ~37% larger
+const RATE_LIMIT_PER_HOUR = 10; // 10 extractions per hour per IP
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -74,14 +89,91 @@ function detectMediaType(base64Data: string): ImageMediaType {
   return 'image/jpeg';
 }
 
+/**
+ * Get client IP from request headers
+ */
+function getClientIp(request: NextRequest): string {
+  return (
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    request.headers.get('x-real-ip') ||
+    'unknown'
+  );
+}
+
 export async function POST(request: NextRequest) {
   try {
+    // === PROTECTION 1: Rate Limiting ===
+    const clientIp = getClientIp(request);
+
+    const rateLimitResult = checkRateLimit(
+      `insurance-extract:${clientIp}`,
+      RATE_LIMIT_PER_HOUR,
+      60 * 60 * 1000 // 1 hour
+    );
+
+    if (!rateLimitResult.success) {
+      const retryAfter = Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000);
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Too many requests. Please try again later.',
+          retryAfter,
+        },
+        {
+          status: 429,
+          headers: {
+            ...getRateLimitHeaders(rateLimitResult),
+            'Retry-After': String(retryAfter),
+          },
+        }
+      );
+    }
+
     const body = await request.json();
     const { image } = body;
 
     if (!image) {
       return NextResponse.json(
         { success: false, error: 'No image provided' },
+        { status: 400 }
+      );
+    }
+
+    // === PROTECTION 2: Payload Type Validation ===
+    if (typeof image !== 'string') {
+      return NextResponse.json(
+        { success: false, error: 'Invalid image format - expected base64 string' },
+        { status: 400 }
+      );
+    }
+
+    // === PROTECTION 3: Payload Size Validation ===
+    if (image.length > MAX_BASE64_LENGTH) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Image too large. Maximum size is ${MAX_IMAGE_SIZE_BYTES / (1024 * 1024)}MB`,
+        },
+        { status: 413 } // Payload Too Large
+      );
+    }
+
+    // === PROTECTION 4: Base64 Format Validation ===
+    const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
+
+    // Check for valid base64 characters
+    const base64Regex = /^[A-Za-z0-9+/]+=*$/;
+    if (!base64Regex.test(base64Data)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid base64 image data' },
+        { status: 400 }
+      );
+    }
+
+    // Validate minimum length (at least a few bytes of image data)
+    if (base64Data.length < 100) {
+      return NextResponse.json(
+        { success: false, error: 'Image data too small to be valid' },
         { status: 400 }
       );
     }
@@ -93,8 +185,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Remove data URL prefix if present and detect media type
-    const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
     const mediaType = detectMediaType(image);
 
     // Call Claude Haiku for extraction
@@ -145,10 +235,16 @@ export async function POST(request: NextRequest) {
 
     const extractedData: InsuranceCardData = JSON.parse(jsonMatch[0]);
 
-    return NextResponse.json({
-      success: true,
-      data: extractedData,
-    });
+    // Return success with rate limit headers
+    return NextResponse.json(
+      {
+        success: true,
+        data: extractedData,
+      },
+      {
+        headers: getRateLimitHeaders(rateLimitResult),
+      }
+    );
   } catch (error) {
     console.error('Insurance card extraction error:', error);
 
