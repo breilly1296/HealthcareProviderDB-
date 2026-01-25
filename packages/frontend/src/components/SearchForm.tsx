@@ -8,16 +8,6 @@ import { SPECIALTY_OPTIONS, STATE_OPTIONS } from '@/lib/provider-utils';
 import type { SearchFilters, ProviderDisplay, PaginationState, SelectOption, GroupedSelectOptions } from '@/types';
 
 // ============================================================================
-// Constants
-// ============================================================================
-
-const ENTITY_TYPES: SelectOption[] = [
-  { value: '', label: 'All Entity Types' },
-  { value: 'INDIVIDUAL', label: 'Individual Provider' },
-  { value: 'ORGANIZATION', label: 'Organization' },
-];
-
-// ============================================================================
 // Types
 // ============================================================================
 
@@ -105,8 +95,6 @@ export function SearchForm({
         return STATE_OPTIONS.find(s => s.value === value)?.label || value;
       case 'specialty':
         return SPECIALTY_OPTIONS.find(s => s.value === value)?.label || value;
-      case 'entityType':
-        return ENTITY_TYPES.find(e => e.value === value)?.label || value;
       case 'insurancePlanId':
         return findPlan(value)?.planName || value;
       default:
@@ -123,9 +111,9 @@ export function SearchForm({
     if (filters.specialty) chips.push({ key: 'specialty', label: getFilterLabel('specialty', filters.specialty), value: filters.specialty });
     if (filters.healthSystem) chips.push({ key: 'healthSystem', label: filters.healthSystem, value: filters.healthSystem });
     if (filters.insurancePlanId) chips.push({ key: 'insurancePlanId', label: getFilterLabel('insurancePlanId', filters.insurancePlanId), value: filters.insurancePlanId });
-    if (filters.entityType) chips.push({ key: 'entityType', label: getFilterLabel('entityType', filters.entityType), value: filters.entityType });
     if (filters.zipCode) chips.push({ key: 'zipCode', label: `ZIP: ${filters.zipCode}`, value: filters.zipCode });
     if (filters.name) chips.push({ key: 'name', label: `Name: ${filters.name}`, value: filters.name });
+    if (filters.npi) chips.push({ key: 'npi', label: `NPI: ${filters.npi}`, value: filters.npi });
 
     return chips;
   }, [filters, findPlan]);
@@ -233,16 +221,7 @@ export function SearchForm({
             )}
           </summary>
 
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-            <SearchableSelect
-              label="Entity Type"
-              options={ENTITY_TYPES}
-              value={filters.entityType}
-              onChange={(v) => setFilter('entityType', (v as string) || '')}
-              placeholder="All Types"
-              clearable
-            />
-
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Provider Name
