@@ -19,6 +19,8 @@ export { EmptyState } from './EmptyState';
 export type { EmptyStateType, SearchSuggestion } from './EmptyState';
 export { NoResultsIllustration, SearchLandingIllustration } from './illustrations';
 export { Shimmer, ShimmerLine, ShimmerCircle, ShimmerBadge, ShimmerButton } from './ui/Shimmer';
+export { SearchableSelect } from './ui/SearchableSelect';
+export type { SearchableSelectProps, SearchableSelectRef } from './ui/SearchableSelect';
 export {
   SearchResultsSkeleton,
   ProviderDetailSkeleton,
