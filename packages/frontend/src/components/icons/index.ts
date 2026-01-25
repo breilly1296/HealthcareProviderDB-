@@ -20,7 +20,10 @@ export { TrashIcon } from './Icons';
 export { CheckIcon, CheckCircleIcon } from './Icons';
 export { InfoIcon } from './Icons';
 export { WarningIcon, AlertTriangleIcon } from './Icons';
+export { AlertIcon, ExclamationCircleIcon } from './Icons';
 export { SpinnerIcon } from './Icons';
+export { WifiOffIcon } from './Icons';
+export { ServerIcon } from './Icons';
 
 // Contact/location icons
 export { PhoneIcon } from './Icons';

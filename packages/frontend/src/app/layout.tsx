@@ -11,7 +11,9 @@ import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { CompareProvider } from '@/context/CompareContext';
+import { ErrorProvider } from '@/context/ErrorContext';
 import { CompareBar } from '@/components/compare';
+import { GlobalErrorBanner } from '@/components/GlobalErrorBanner';
 
 // Script to prevent flash of wrong theme on page load
 const themeScript = `
@@ -147,15 +149,18 @@ export default function RootLayout({
             <QueryProvider>
               <ThemeProvider>
                 <CompareProvider>
-                  <ToastProvider />
-                  <Header />
-                  <main className="flex-1 pb-20 md:pb-0">
-                    {children}
-                  </main>
-                  <Footer />
-                  <ScrollToTop />
-                  <CompareBar />
-                  <BottomNav />
+                  <ErrorProvider>
+                    <ToastProvider />
+                    <GlobalErrorBanner />
+                    <Header />
+                    <main className="flex-1 pb-20 md:pb-0">
+                      {children}
+                    </main>
+                    <Footer />
+                    <ScrollToTop />
+                    <CompareBar />
+                    <BottomNav />
+                  </ErrorProvider>
                 </CompareProvider>
               </ThemeProvider>
             </QueryProvider>

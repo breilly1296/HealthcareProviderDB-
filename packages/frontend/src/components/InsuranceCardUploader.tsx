@@ -2,13 +2,15 @@
 
 import { useState, useRef } from 'react';
 import { InsuranceCardData, InsuranceCardExtractionResponse } from '@/types/insurance';
+import { useError } from '@/context/ErrorContext';
 
 export default function InsuranceCardUploader() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [extractedData, setExtractedData] = useState<InsuranceCardData | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { showErrorToast } = useError();
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -16,17 +18,17 @@ export default function InsuranceCardUploader() {
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      setError('Please select an image file');
+      setValidationError('Please select an image file');
       return;
     }
 
     // Validate file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
-      setError('Image size must be less than 10MB');
+      setValidationError('Image size must be less than 10MB');
       return;
     }
 
-    setError(null);
+    setValidationError(null);
     setExtractedData(null);
 
     // Convert to base64
@@ -41,7 +43,7 @@ export default function InsuranceCardUploader() {
     if (!selectedImage) return;
 
     setLoading(true);
-    setError(null);
+    setValidationError(null);
 
     try {
       const response = await fetch('/api/insurance-card/extract', {
@@ -57,10 +59,12 @@ export default function InsuranceCardUploader() {
       if (result.success && result.data) {
         setExtractedData(result.data);
       } else {
-        setError(result.error || 'Failed to extract insurance data');
+        // Show API errors globally using the error banner
+        showErrorToast(new Error(result.error || 'Failed to extract insurance data'));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      // Show network/unexpected errors globally
+      showErrorToast(err);
     } finally {
       setLoading(false);
     }
@@ -69,7 +73,7 @@ export default function InsuranceCardUploader() {
   const handleReset = () => {
     setSelectedImage(null);
     setExtractedData(null);
-    setError(null);
+    setValidationError(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -187,8 +191,8 @@ export default function InsuranceCardUploader() {
         />
       </div>
 
-      {/* Error Message */}
-      {error && (
+      {/* Validation Error Message (file type/size issues) */}
+      {validationError && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-6">
           <div className="flex items-start gap-3">
             <svg className="w-5 h-5 text-red-500 dark:text-red-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -200,8 +204,8 @@ export default function InsuranceCardUploader() {
               />
             </svg>
             <div>
-              <p className="font-medium text-red-800 dark:text-red-200">Extraction Error</p>
-              <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+              <p className="font-medium text-red-800 dark:text-red-200">Invalid File</p>
+              <p className="text-sm text-red-700 dark:text-red-300">{validationError}</p>
             </div>
           </div>
         </div>

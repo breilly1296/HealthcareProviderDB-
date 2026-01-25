@@ -49,3 +49,11 @@ coverage/
 .cache/
 *.tsbuildinfo
 tmpclaude-*-cwd
+
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/
+packages/frontend/test-results/
+packages/frontend/playwright-report/
+packages/frontend/playwright/.cache/

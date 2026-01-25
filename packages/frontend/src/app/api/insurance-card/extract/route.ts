@@ -4,6 +4,15 @@ import { InsuranceCardData } from '@/types/insurance';
 import { checkRateLimit, getRateLimitHeaders } from '@/lib/rateLimit';
 import { parseInsuranceCardResponse } from '@/lib/insuranceCardSchema';
 
+// === Model Configuration ===
+// Model ID verified: January 2026
+// Using Claude Haiku 4.5 for insurance card extraction:
+// - Fast response time for good UX
+// - Cost-effective for high-volume structured extraction
+// - Sufficient accuracy for OCR/data extraction tasks
+// Upgrade to Sonnet 4 if extraction accuracy issues arise
+const CLAUDE_MODEL_ID = 'claude-haiku-4-5-20251001';
+
 // === Protection Constants ===
 const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB max
 const MAX_BASE64_LENGTH = Math.ceil(MAX_IMAGE_SIZE_BYTES * 1.37); // Base64 is ~37% larger
@@ -179,9 +188,9 @@ export async function POST(request: NextRequest) {
 
     const mediaType = detectMediaType(image);
 
-    // Call Claude Haiku for extraction
+    // Call Claude for insurance card extraction
     const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: CLAUDE_MODEL_ID,
       max_tokens: 1024,
       messages: [
         {
