@@ -216,29 +216,16 @@ router.get('/providers/:npi', (req: Request, res: Response) => {
 
 /**
  * POST /providers/:npi/verify
+ *
+ * DISABLED: This insecure mock endpoint has been removed.
+ * Use the secure endpoint at POST /api/v1/verify in packages/backend/
+ * which includes rate limiting, CAPTCHA, and Sybil attack protection.
  */
-router.post('/providers/:npi/verify', (req: Request, res: Response) => {
-  const { npi } = req.params;
-  const { acceptsInsurance } = req.body;
-
-  const provider = MOCK_PROVIDERS.find(p => p.npi === npi);
-
-  if (!provider) {
-    res.status(404).json({ error: 'Provider not found' });
-    return;
-  }
-
-  // In mock mode, just acknowledge the verification
-  provider.verificationCount += 1;
-
-  res.status(201).json({
-    message: 'Verification submitted successfully',
-    verification: {
-      id: `mock-${Date.now()}`,
-      status: acceptsInsurance ? 'ACCEPTED' : 'NOT_ACCEPTED',
-      verificationCount: provider.verificationCount,
-      submittedAt: new Date().toISOString(),
-    },
+router.post('/providers/:npi/verify', (_req: Request, res: Response) => {
+  res.status(410).json({
+    error: 'This endpoint has been disabled for security reasons',
+    message: 'Please use the production API at /api/v1/verify which includes proper security controls',
+    documentation: 'https://github.com/breilly1296/HealthcareProviderDB-',
   });
 });
 

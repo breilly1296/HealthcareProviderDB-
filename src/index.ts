@@ -67,8 +67,11 @@ app.get('/api-info', (_req: Request, res: Response) => {
       'GET /api/providers': 'Search providers (query params: state, specialty, city, zip, name)',
       'GET /api/providers/:npi': 'Get provider details by NPI',
       'GET /api/providers/:npi/plans': 'Get provider accepted insurance plans',
-      'POST /api/providers/:npi/verify': 'Submit crowdsource verification',
-      'POST /api/verifications/:id/vote': 'Vote on verification submission',
+    },
+    secureEndpoints: {
+      note: 'Verification endpoints require the production API (packages/backend/)',
+      'POST /api/v1/verify': 'Submit crowdsource verification (with rate limiting, CAPTCHA)',
+      'POST /api/v1/verify/:id/vote': 'Vote on verification (with rate limiting, CAPTCHA)',
     },
     specialties: [
       'endocrinology',
