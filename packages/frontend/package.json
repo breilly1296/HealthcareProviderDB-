@@ -13,6 +13,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
     "@healthcareproviderdb/shared": "*",
+    "@tanstack/react-query": "^5.90.20",
     "focus-trap-react": "^11.0.6",
     "lucide-react": "^0.563.0",
     "next": "^14.2.35",
@@ -23,6 +24,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@next/swc-wasm-nodejs": "^16.1.4",
     "@types/node": "^20.10.0",
     "@types/react": "^18.2.45",
     "@types/react-dom": "^18.2.18",

@@ -5,6 +5,7 @@ import { Suspense } from 'react';
 import './globals.css';
 import ToastProvider from '@/components/ToastProvider';
 import { PostHogProvider } from '@/components/PostHogProvider';
+import { QueryProvider } from '@/components/providers/QueryProvider';
 import { ScrollToTop } from '@/components/ScrollToTop';
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
@@ -143,19 +144,21 @@ export default function RootLayout({
       <body className={`${inter.className} flex flex-col min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-200`}>
         <Suspense fallback={null}>
           <PostHogProvider>
-            <ThemeProvider>
-              <CompareProvider>
-                <ToastProvider />
-                <Header />
-                <main className="flex-1 pb-20 md:pb-0">
-                  {children}
-                </main>
-                <Footer />
-                <ScrollToTop />
-                <CompareBar />
-                <BottomNav />
-              </CompareProvider>
-            </ThemeProvider>
+            <QueryProvider>
+              <ThemeProvider>
+                <CompareProvider>
+                  <ToastProvider />
+                  <Header />
+                  <main className="flex-1 pb-20 md:pb-0">
+                    {children}
+                  </main>
+                  <Footer />
+                  <ScrollToTop />
+                  <CompareBar />
+                  <BottomNav />
+                </CompareProvider>
+              </ThemeProvider>
+            </QueryProvider>
           </PostHogProvider>
         </Suspense>
       </body>
