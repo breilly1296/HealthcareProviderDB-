@@ -1,9 +1,72 @@
 import toast from 'react-hot-toast';
+import type {
+  SearchFilters,
+  PaginationState,
+  Location,
+  ProviderDisplay,
+  InsurancePlanDisplay,
+  PlanAcceptanceDisplay,
+  Verification,
+  CarrierGroup,
+} from '../types';
+
+// ============================================================================
+// Configuration
+// ============================================================================
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
 
+// ============================================================================
+// ApiError Class
+// ============================================================================
+
+export interface ApiErrorDetails {
+  field?: string;
+  constraint?: string;
+  [key: string]: unknown;
+}
+
+export class ApiError extends Error {
+  public readonly statusCode: number;
+  public readonly code: string;
+  public readonly details: ApiErrorDetails | null;
+
+  constructor(
+    message: string,
+    statusCode: number,
+    code: string = 'UNKNOWN_ERROR',
+    details: ApiErrorDetails | null = null
+  ) {
+    super(message);
+    this.name = 'ApiError';
+    this.statusCode = statusCode;
+    this.code = code;
+    this.details = details;
+  }
+
+  isRateLimited(): boolean {
+    return this.statusCode === 429;
+  }
+
+  isValidationError(): boolean {
+    return this.statusCode === 400 || this.code === 'VALIDATION_ERROR';
+  }
+
+  isNotFound(): boolean {
+    return this.statusCode === 404;
+  }
+
+  isUnauthorized(): boolean {
+    return this.statusCode === 401 || this.statusCode === 403;
+  }
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
 /**
- * Format seconds into human-readable time
+ * Format seconds into human-readable time for rate limit messages
  */
 function formatRetryTime(seconds: number): string {
   if (seconds < 60) {
@@ -18,177 +81,33 @@ function formatRetryTime(seconds: number): string {
 }
 
 /**
- * Build URLSearchParams from object, filtering out undefined/empty values
+ * Build URLSearchParams from object, filtering out undefined/null/empty values
  */
-function buildQueryString(params: Record<string, unknown>): string {
+export function buildQueryString(params: Record<string, unknown>): string {
   const searchParams = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== '') {
-      searchParams.set(key, String(value));
+    if (value !== undefined && value !== null && value !== '') {
+      if (Array.isArray(value)) {
+        // Join arrays with commas for multi-value params
+        if (value.length > 0) {
+          searchParams.set(key, value.join(','));
+        }
+      } else {
+        searchParams.set(key, String(value));
+      }
     }
   });
   return searchParams.toString();
 }
 
-// Types
-export interface Provider {
-  id: string;
-  npi: string;
-  entityType: 'INDIVIDUAL' | 'ORGANIZATION';
-  firstName: string | null;
-  lastName: string | null;
-  middleName: string | null;
-  credential: string | null;
-  organizationName: string | null;
-  addressLine1: string;
-  addressLine2: string | null;
-  city: string;
-  state: string;
-  zip: string;
-  phone: string | null;
-  taxonomyCode: string | null;
-  taxonomyDescription: string | null;
-  specialtyCategory: string | null;
-  npiStatus: string;
-  displayName?: string;
-}
+// ============================================================================
+// API Fetch Wrapper
+// ============================================================================
 
-export interface InsurancePlan {
-  planId: string;
-  planName: string | null;
-  issuerName: string | null;
-  planType: string | null;
-  state: string | null;
-  carrier: string | null;
-  planVariant: string | null;
-  rawName: string | null;
-  sourceHealthSystem: string | null;
-  providerCount: number;
-}
-
-export interface ConfidenceFactors {
-  dataSourceScore: number;
-  recencyScore: number;
-  verificationScore: number;
-  agreementScore: number;
-}
-
-export interface ConfidenceMetadata {
-  researchNote?: string;
-  isStale?: boolean;
-  daysSinceVerification?: number | null;
-  daysUntilStale?: number;
-  freshnessThreshold?: number;
-  recommendReVerification?: boolean;
-  explanation?: string;
-}
-
-export interface ConfidenceDetails {
-  score: number;
-  level: 'VERY_HIGH' | 'HIGH' | 'MEDIUM' | 'LOW' | 'VERY_LOW';
-  description?: string;
-  factors: ConfidenceFactors;
-  metadata?: ConfidenceMetadata;
-}
-
-export interface PlanAcceptance {
-  id: string;
-  providerId: string;
-  planId: string;
-  acceptanceStatus: 'ACCEPTED' | 'NOT_ACCEPTED' | 'PENDING' | 'UNKNOWN';
-  acceptsNewPatients: boolean | null;
-  confidenceScore: number;
-  confidenceLevel: string;
-  confidenceDescription: string;
-  lastVerifiedAt: string | null;
-  verificationCount: number;
-  plan?: InsurancePlan;
-  confidence?: ConfidenceDetails;
-  expiresAt?: string | null;
-}
-
-export interface Verification {
-  id: string;
-  providerId: string | null;
-  planId: string | null;
-  verificationType: string;
-  verificationSource: string;
-  upvotes: number;
-  downvotes: number;
-  isApproved: boolean | null;
-  notes: string | null;
-  createdAt: string;
-  provider?: {
-    npi: string;
-    firstName: string | null;
-    lastName: string | null;
-    organizationName: string | null;
-    entityType: string;
-  };
-  plan?: {
-    planId: string;
-    planName: string;
-    carrier: string | null;
-    issuerName: string | null;
-  };
-}
-
-export interface Location {
-  id: number;
-  addressLine1: string;
-  addressLine2: string | null;
-  city: string;
-  state: string;
-  zipCode: string;
-  name: string | null;
-  healthSystem: string | null;
-  facilityType: string | null;
-  providerCount: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface Pagination {
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-  hasMore: boolean;
-}
-
-export interface CarrierGroup {
-  carrier: string;
-  plans: {
-    planId: string;
-    planName: string | null;
-    planType: string | null;
-  }[];
-}
-
-export interface ApiResponse<T> {
-  success: boolean;
-  data: T;
-  error?: {
-    message: string;
-    code: string;
-    statusCode: number;
-  };
-}
-
-// API Error class
-export class ApiError extends Error {
-  constructor(
-    message: string,
-    public statusCode: number,
-    public code?: string
-  ) {
-    super(message);
-    this.name = 'ApiError';
-  }
-}
-
-// Fetch wrapper with error handling
-async function fetchApi<T>(
+/**
+ * Fetch wrapper with automatic JSON parsing and error handling
+ */
+export async function apiFetch<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
@@ -205,101 +124,128 @@ async function fetchApi<T>(
   const data = await response.json();
 
   if (!response.ok) {
-    // Handle rate limiting with toast notification
-    if (response.status === 429) {
+    const error = new ApiError(
+      data.error?.message || data.message || 'An error occurred',
+      response.status,
+      data.error?.code || 'API_ERROR',
+      data.error?.details || null
+    );
+
+    // Show toast for rate limiting
+    if (error.isRateLimited()) {
       const retryAfter = data.retryAfter || 60;
       toast.error(`Rate limit exceeded. Try again in ${formatRetryTime(retryAfter)}.`, {
         duration: 6000,
-        id: 'rate-limit', // Prevent duplicate toasts
+        id: 'rate-limit',
       });
     }
 
-    throw new ApiError(
-      data.error?.message || data.message || 'An error occurred',
-      response.status,
-      data.error?.code
-    );
+    throw error;
   }
 
   return data.data;
 }
 
-// Provider API
-export const providerApi = {
-  search: (params: {
-    state?: string;
-    city?: string;
-    cities?: string;
-    zip?: string;
-    healthSystem?: string;
-    specialty?: string;
-    name?: string;
-    insurancePlanId?: string;
-    page?: number;
-    limit?: number;
-  }) => fetchApi<{
-    providers: (Provider & { displayName: string })[];
-    pagination: Pagination;
-  }>(`/providers/search?${buildQueryString(params)}`),
+// ============================================================================
+// Type Definitions for API Responses
+// ============================================================================
 
-  getByNpi: (npi: string) => fetchApi<{
-    provider: Provider & { displayName: string; planAcceptances: PlanAcceptance[] };
-  }>(`/providers/${npi}`),
+export interface VerificationSubmission {
+  npi: string;
+  planId: string;
+  acceptsInsurance: boolean;
+  acceptsNewPatients?: boolean;
+  notes?: string;
+  submittedBy?: string;
+}
 
-  getPlans: (npi: string, params: { status?: string; minConfidence?: number; page?: number; limit?: number } = {}) =>
-    fetchApi<{ npi: string; acceptances: PlanAcceptance[]; pagination: Pagination }>(
-      `/providers/${npi}/plans?${buildQueryString(params)}`
-    ),
+export interface VerificationStats {
+  total: number;
+  approved: number;
+  pending: number;
+  recentCount: number;
+}
 
-  getCities: (state: string) => fetchApi<{ state: string; cities: string[]; count: number }>(
-    `/providers/cities?state=${encodeURIComponent(state)}`
-  ),
+export interface LocationStats {
+  state: string;
+  totalLocations: number;
+  totalProviders: number;
+  avgProvidersPerLocation: number;
+  maxProvidersAtLocation: number;
+}
 
-  getColocated: (npi: string, params: { page?: number; limit?: number } = {}) =>
-    fetchApi<{ location: Location; providers: (Provider & { displayName: string })[]; pagination: Pagination }>(
-      `/providers/${npi}/colocated?${buildQueryString(params)}`
-    ),
-};
+export interface Issuer {
+  carrierId: string | null;
+  carrierName: string;
+}
 
-// Location API
-export const locationApi = {
-  search: (params: {
-    search?: string;
-    state?: string;
-    city?: string;
-    cities?: string;
-    zipCode?: string;
-    healthSystem?: string;
-    minProviders?: number;
-    page?: number;
-    limit?: number;
-  }) => fetchApi<{ locations: Location[]; pagination: Pagination }>(
-    `/locations/search?${buildQueryString(params)}`
-  ),
+// ============================================================================
+// API Namespaces
+// ============================================================================
 
-  getById: (locationId: number, params: { page?: number; limit?: number } = {}) =>
-    fetchApi<{ location: Location; providers: (Provider & { displayName: string })[]; pagination: Pagination }>(
-      `/locations/${locationId}/providers?${buildQueryString(params)}`
-    ),
-
-  getStats: (state: string) => fetchApi<{
-    state: string;
-    totalLocations: number;
-    totalProviders: number;
-    avgProvidersPerLocation: number;
-    maxProvidersAtLocation: number;
-  }>(`/locations/stats/${encodeURIComponent(state)}`),
-
-  getHealthSystems: (params?: { state?: string; cities?: string }) => {
-    const query = buildQueryString(params || {});
-    return fetchApi<{ healthSystems: string[]; count: number }>(
-      `/locations/health-systems${query ? `?${query}` : ''}`
-    );
+const providers = {
+  search: (
+    filters: Partial<SearchFilters>,
+    page: number = 1,
+    limit: number = 20
+  ) => {
+    const params = {
+      state: filters.state,
+      city: filters.city,
+      cities: filters.cities?.join(','),
+      zip: filters.zipCode,
+      healthSystem: filters.healthSystem,
+      specialty: filters.specialty,
+      name: filters.name,
+      npi: filters.npi,
+      entityType: filters.entityType,
+      insurancePlanId: filters.insurancePlanId,
+      page,
+      limit,
+    };
+    return apiFetch<{
+      providers: ProviderDisplay[];
+      pagination: PaginationState;
+    }>(`/providers/search?${buildQueryString(params)}`);
   },
+
+  getByNpi: (npi: string) =>
+    apiFetch<{
+      provider: ProviderDisplay & { planAcceptances: PlanAcceptanceDisplay[] };
+    }>(`/providers/${npi}`),
+
+  getCities: (state: string) =>
+    apiFetch<{ state: string; cities: string[]; count: number }>(
+      `/providers/cities?state=${encodeURIComponent(state)}`
+    ),
+
+  getPlans: (
+    npi: string,
+    params: {
+      status?: string;
+      minConfidence?: number;
+      page?: number;
+      limit?: number;
+    } = {}
+  ) =>
+    apiFetch<{
+      npi: string;
+      acceptances: PlanAcceptanceDisplay[];
+      pagination: PaginationState;
+    }>(`/providers/${npi}/plans?${buildQueryString(params)}`),
+
+  getColocated: (
+    npi: string,
+    params: { page?: number; limit?: number } = {}
+  ) =>
+    apiFetch<{
+      location: Location;
+      providers: ProviderDisplay[];
+      pagination: PaginationState;
+    }>(`/providers/${npi}/colocated?${buildQueryString(params)}`),
 };
 
-// Plan API
-export const planApi = {
+const plans = {
   search: (params: {
     carrierName?: string;
     planType?: string;
@@ -307,59 +253,165 @@ export const planApi = {
     planYear?: number;
     page?: number;
     limit?: number;
-  }) => fetchApi<{ plans: InsurancePlan[]; pagination: Pagination }>(
-    `/plans/search?${buildQueryString(params)}`
-  ),
+  }) =>
+    apiFetch<{
+      plans: InsurancePlanDisplay[];
+      pagination: PaginationState;
+    }>(`/plans/search?${buildQueryString(params)}`),
 
-  getByPlanId: (planId: string) => fetchApi<{ plan: InsurancePlan & { providerCount: number } }>(
-    `/plans/${encodeURIComponent(planId)}`
-  ),
-
-  getIssuers: (params: { state?: string; planYear?: number } = {}) =>
-    fetchApi<{ issuers: { carrierId: string | null; carrierName: string }[]; count: number }>(
-      `/plans/meta/issuers?${buildQueryString(params)}`
-    ),
-
-  getGroupedPlans: (params?: { search?: string; state?: string }) => {
+  getGrouped: (params?: { search?: string; state?: string }) => {
     const query = buildQueryString(params || {});
-    return fetchApi<{ carriers: CarrierGroup[]; totalPlans: number }>(
+    return apiFetch<{ carriers: CarrierGroup[]; totalPlans: number }>(
       `/plans/grouped${query ? `?${query}` : ''}`
     );
   },
-};
 
-// Verification API
-export const verificationApi = {
-  submit: (data: {
-    npi: string;
-    planId: string;
-    acceptsInsurance: boolean;
-    acceptsNewPatients?: boolean;
-    notes?: string;
-    submittedBy?: string;
-  }) => fetchApi<{ verification: Verification; acceptance: PlanAcceptance; message: string }>('/verify', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
-
-  vote: (verificationId: string, vote: 'up' | 'down') =>
-    fetchApi<{ verification: { id: string; upvotes: number; downvotes: number; netVotes: number }; message: string }>(
-      `/verify/${verificationId}/vote`,
-      { method: 'POST', body: JSON.stringify({ vote }) }
+  getIssuers: (state?: string) =>
+    apiFetch<{ issuers: Issuer[]; count: number }>(
+      `/plans/meta/issuers?${buildQueryString({ state })}`
     ),
 
-  getStats: () => fetchApi<{ stats: { total: number; approved: number; pending: number; recentCount: number } }>(
-    '/verify/stats'
-  ),
+  getPlanTypes: (params?: { state?: string; carrier?: string }) => {
+    const query = buildQueryString(params || {});
+    return apiFetch<{ planTypes: string[]; count: number }>(
+      `/plans/meta/plan-types${query ? `?${query}` : ''}`
+    );
+  },
+
+  getById: (planId: string) =>
+    apiFetch<{ plan: InsurancePlanDisplay & { providerCount: number } }>(
+      `/plans/${encodeURIComponent(planId)}`
+    ),
+
+  getProviders: (
+    planId: string,
+    params: {
+      state?: string;
+      city?: string;
+      specialty?: string;
+      page?: number;
+      limit?: number;
+    } = {}
+  ) =>
+    apiFetch<{
+      plan: InsurancePlanDisplay;
+      providers: ProviderDisplay[];
+      pagination: PaginationState;
+    }>(`/plans/${encodeURIComponent(planId)}/providers?${buildQueryString(params)}`),
+};
+
+const verify = {
+  submit: (data: VerificationSubmission) =>
+    apiFetch<{
+      verification: Verification;
+      acceptance: PlanAcceptanceDisplay;
+      message: string;
+    }>('/verify', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  vote: (verificationId: string, vote: 'up' | 'down') =>
+    apiFetch<{
+      verification: {
+        id: string;
+        upvotes: number;
+        downvotes: number;
+        netVotes: number;
+      };
+      message: string;
+    }>(`/verify/${verificationId}/vote`, {
+      method: 'POST',
+      body: JSON.stringify({ vote }),
+    }),
+
+  getStats: () =>
+    apiFetch<{ stats: VerificationStats }>('/verify/stats'),
 
   getRecent: (params: { limit?: number; npi?: string; planId?: string } = {}) =>
-    fetchApi<{ verifications: Verification[]; count: number }>(`/verify/recent?${buildQueryString(params)}`),
+    apiFetch<{ verifications: Verification[]; count: number }>(
+      `/verify/recent?${buildQueryString(params)}`
+    ),
 
-  getForPair: (npi: string, planId: string) => fetchApi<{
-    npi: string;
-    planId: string;
-    acceptance: PlanAcceptance | null;
-    verifications: Verification[];
-    summary: { totalVerifications: number; totalUpvotes: number; totalDownvotes: number };
-  }>(`/verify/${npi}/${encodeURIComponent(planId)}`),
+  getForPair: (npi: string, planId: string) =>
+    apiFetch<{
+      npi: string;
+      planId: string;
+      acceptance: PlanAcceptanceDisplay | null;
+      verifications: Verification[];
+      summary: {
+        totalVerifications: number;
+        totalUpvotes: number;
+        totalDownvotes: number;
+      };
+    }>(`/verify/${npi}/${encodeURIComponent(planId)}`),
 };
+
+const locations = {
+  search: (params: {
+    search?: string;
+    state?: string;
+    city?: string;
+    cities?: string[];
+    zipCode?: string;
+    healthSystem?: string;
+    minProviders?: number;
+    page?: number;
+    limit?: number;
+  }) => {
+    const queryParams = {
+      ...params,
+      cities: params.cities?.join(','),
+    };
+    return apiFetch<{
+      locations: Location[];
+      pagination: PaginationState;
+    }>(`/locations/search?${buildQueryString(queryParams)}`);
+  },
+
+  getHealthSystems: (state: string, cities?: string[]) =>
+    apiFetch<{ healthSystems: string[]; count: number }>(
+      `/locations/health-systems?${buildQueryString({
+        state,
+        cities: cities?.join(','),
+      })}`
+    ),
+
+  getById: (locationId: number) =>
+    apiFetch<{ location: Location }>(`/locations/${locationId}`),
+
+  getProviders: (
+    locationId: number,
+    params: { page?: number; limit?: number } = {}
+  ) =>
+    apiFetch<{
+      location: Location;
+      providers: ProviderDisplay[];
+      pagination: PaginationState;
+    }>(`/locations/${locationId}/providers?${buildQueryString(params)}`),
+
+  getStats: (state: string) =>
+    apiFetch<LocationStats>(`/locations/stats/${encodeURIComponent(state)}`),
+};
+
+// ============================================================================
+// Unified API Object
+// ============================================================================
+
+const api = {
+  providers,
+  plans,
+  verify,
+  locations,
+} as const;
+
+export default api;
+
+// ============================================================================
+// Legacy exports for backward compatibility
+// ============================================================================
+
+export const providerApi = providers;
+export const planApi = plans;
+export const verificationApi = verify;
+export const locationApi = locations;
