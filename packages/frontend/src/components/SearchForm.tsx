@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useImperativeHandle, forwardRef } from 'react';
 import { Search, X, Loader2, ChevronDown } from 'lucide-react';
 import { useSearchForm, useCities, useHealthSystems, useInsurancePlans } from '@/hooks';
 import { SearchableSelect } from './ui/SearchableSelect';
@@ -11,23 +11,34 @@ import type { SearchFilters, ProviderDisplay, PaginationState, SelectOption, Gro
 // Types
 // ============================================================================
 
+export interface SearchFormRef {
+  search: () => void;
+  clear: () => void;
+}
+
 interface SearchFormProps {
   onResultsChange?: (results: ProviderDisplay[], pagination: PaginationState | null) => void;
   showAdvancedFilters?: boolean;
   className?: string;
   defaultFilters?: Partial<SearchFilters>;
+  /** 'inline' shows full form with Search button, 'drawer' hides Search button for mobile drawer use */
+  variant?: 'inline' | 'drawer';
+  /** Callback when active filter count changes (for mobile badge) */
+  onFilterCountChange?: (count: number) => void;
 }
 
 // ============================================================================
 // Component
 // ============================================================================
 
-export function SearchForm({
+export const SearchForm = forwardRef<SearchFormRef, SearchFormProps>(function SearchForm({
   onResultsChange,
   showAdvancedFilters = true,
   className = '',
   defaultFilters,
-}: SearchFormProps) {
+  variant = 'inline',
+  onFilterCountChange,
+}, ref) {
   const {
     filters,
     setFilter,
@@ -42,6 +53,19 @@ export function SearchForm({
     activeFilterCount,
     canSearch,
   } = useSearchForm({ defaultFilters, syncWithUrl: true });
+
+  const isDrawer = variant === 'drawer';
+
+  // Expose search and clear methods via ref
+  useImperativeHandle(ref, () => ({
+    search: () => search(),
+    clear: () => clearFilters(),
+  }), [search, clearFilters]);
+
+  // Notify parent of filter count changes
+  useEffect(() => {
+    onFilterCountChange?.(activeFilterCount);
+  }, [activeFilterCount, onFilterCountChange]);
 
   // Data fetching hooks
   const { cities, isLoading: citiesLoading } = useCities(filters.state);
@@ -118,6 +142,120 @@ export function SearchForm({
     return chips;
   }, [filters, findPlan]);
 
+  // Drawer variant: single column layout with all fields visible
+  if (isDrawer) {
+    return (
+      <div className={`space-y-4 ${className}`}>
+        <SearchableSelect
+          label="Specialty"
+          options={SPECIALTY_OPTIONS}
+          value={filters.specialty}
+          onChange={(v) => setFilter('specialty', (v as string) || '')}
+          placeholder="All Specialties"
+          searchable
+          clearable
+        />
+
+        <SearchableSelect
+          label="State"
+          options={STATE_OPTIONS}
+          value={filters.state}
+          onChange={(v) => setFilter('state', (v as string) || '')}
+          placeholder="Select State"
+          searchable
+          clearable
+          required
+        />
+
+        <SearchableSelect
+          label="City"
+          options={cityOptions}
+          value={filters.cities}
+          onChange={(v) => setFilter('cities', (v as string[]) || [])}
+          placeholder={!filters.state ? 'Select state first' : 'Select cities'}
+          disabled={!filters.state}
+          isLoading={citiesLoading}
+          searchable
+          clearable
+          multiple
+        />
+
+        <SearchableSelect
+          label="Health System"
+          options={healthSystemOptions}
+          value={filters.healthSystem}
+          onChange={(v) => setFilter('healthSystem', (v as string) || '')}
+          placeholder="All Health Systems"
+          isLoading={healthSystemsLoading}
+          searchable
+          clearable
+        />
+
+        <SearchableSelect
+          label="Insurance Plan"
+          options={insuranceOptions as GroupedSelectOptions[]}
+          value={filters.insurancePlanId}
+          onChange={(v) => setFilter('insurancePlanId', (v as string) || '')}
+          placeholder="All Insurance Plans"
+          isLoading={insuranceLoading}
+          searchable
+          clearable
+        />
+
+        <div>
+          <label htmlFor="zipCode-drawer" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            ZIP Code
+          </label>
+          <input
+            type="text"
+            id="zipCode-drawer"
+            value={filters.zipCode}
+            onChange={(e) => setFilter('zipCode', e.target.value)}
+            placeholder="Enter ZIP code"
+            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
+            maxLength={10}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="name-drawer" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Provider Name
+          </label>
+          <input
+            type="text"
+            id="name-drawer"
+            value={filters.name}
+            onChange={(e) => setFilter('name', e.target.value)}
+            placeholder="Search by name"
+            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="npi-drawer" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            NPI Number
+          </label>
+          <input
+            type="text"
+            id="npi-drawer"
+            value={filters.npi}
+            onChange={(e) => setFilter('npi', e.target.value)}
+            placeholder="10-digit NPI"
+            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
+            maxLength={10}
+          />
+        </div>
+
+        {error && (
+          <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-400 text-sm">
+            {error}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Inline variant: desktop layout with grid and search button
   return (
     <form onSubmit={handleSubmit} className={`space-y-4 ${className}`}>
       {/* Primary Search Row */}
@@ -287,6 +425,6 @@ export function SearchForm({
       )}
     </form>
   );
-}
+});
 
 export default SearchForm;

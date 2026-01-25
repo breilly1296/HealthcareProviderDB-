@@ -1,13 +1,15 @@
 'use client';
 
-import { useState, useCallback, Suspense } from 'react';
+import { useState, useCallback, Suspense, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { SearchForm } from '@/components/SearchForm';
+import { SearchForm, type SearchFormRef } from '@/components/SearchForm';
 import { ProviderCard } from '@/components/ProviderCard';
 import { SearchResultsSkeleton } from '@/components/ProviderCardSkeleton';
 import ErrorMessage from '@/components/ErrorMessage';
-import { EmptyState, SearchSuggestion } from '@/components/EmptyState';
+import { EmptyState, type SearchSuggestion } from '@/components/EmptyState';
 import { SaveProfileButton } from '@/components/SaveProfileButton';
+import { FilterButton } from '@/components/FilterButton';
+import { FilterDrawer } from '@/components/FilterDrawer';
 import type { ProviderDisplay, PaginationState } from '@/types';
 
 function SearchResultsDisplay({
@@ -170,6 +172,11 @@ function SearchPageContent() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Mobile filter drawer state
+  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+  const [activeFilterCount, setActiveFilterCount] = useState(0);
+  const drawerFormRef = useRef<SearchFormRef>(null);
+
   const handleResultsChange = useCallback((
     newProviders: ProviderDisplay[],
     newPagination: PaginationState | null
@@ -178,6 +185,14 @@ function SearchPageContent() {
     setPagination(newPagination);
     setHasSearched(newProviders.length > 0 || newPagination !== null);
     setError(null);
+  }, []);
+
+  const handleApplyFilters = useCallback(() => {
+    drawerFormRef.current?.search();
+  }, []);
+
+  const handleClearFilters = useCallback(() => {
+    drawerFormRef.current?.clear();
   }, []);
 
   return (
@@ -200,12 +215,37 @@ function SearchPageContent() {
           </div>
         </div>
 
-        {/* Search Form */}
-        <div className="card mb-8">
+        {/* Desktop Search Form - hidden on mobile */}
+        <div className="hidden md:block card mb-8">
           <Suspense fallback={<div className="animate-pulse h-40 bg-gray-100 dark:bg-gray-700 rounded" />}>
-            <SearchForm onResultsChange={handleResultsChange} />
+            <SearchForm
+              onResultsChange={handleResultsChange}
+              onFilterCountChange={setActiveFilterCount}
+            />
           </Suspense>
         </div>
+
+        {/* Mobile Filter Button */}
+        <FilterButton
+          activeFilterCount={activeFilterCount}
+          onClick={() => setIsFilterDrawerOpen(true)}
+        />
+
+        {/* Mobile Filter Drawer */}
+        <FilterDrawer
+          isOpen={isFilterDrawerOpen}
+          onClose={() => setIsFilterDrawerOpen(false)}
+          onApply={handleApplyFilters}
+          onClear={handleClearFilters}
+          activeFilterCount={activeFilterCount}
+        >
+          <SearchForm
+            ref={drawerFormRef}
+            variant="drawer"
+            onResultsChange={handleResultsChange}
+            onFilterCountChange={setActiveFilterCount}
+          />
+        </FilterDrawer>
 
         {/* Results */}
         {isLoading ? (
