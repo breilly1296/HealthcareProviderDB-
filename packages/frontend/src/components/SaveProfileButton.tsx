@@ -2,6 +2,7 @@
 
 import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
+import { logError } from '@/lib/errorUtils';
 
 export function SaveProfileButton() {
   const searchParams = useSearchParams();
@@ -25,9 +26,9 @@ export function SaveProfileButton() {
           url: currentUrl,
         });
       } catch (err) {
-        // User cancelled or error occurred
+        // User cancelled - not an error
         if ((err as Error).name !== 'AbortError') {
-          console.error('Share failed:', err);
+          logError('SaveProfileButton.share', err);
         }
       }
     } else {

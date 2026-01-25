@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { progressWidth, absolutePosition } from '@/lib/utils';
 
 // ============================================================================
 // Types
@@ -173,7 +174,8 @@ interface ProgressBarProps {
 }
 
 function ProgressBar({ value, max, fillClass, bgClass }: ProgressBarProps) {
-  const percentage = Math.min(100, (value / max) * 100);
+  const percentage = (value / max) * 100;
+  const barWidth = progressWidth(percentage);
 
   return (
     <div
@@ -185,7 +187,7 @@ function ProgressBar({ value, max, fillClass, bgClass }: ProgressBarProps) {
     >
       <div
         className={`h-full rounded-full transition-all duration-300 ${fillClass}`}
-        style={{ width: `${percentage}%` }}
+        style={barWidth}
       />
     </div>
   );
@@ -520,10 +522,7 @@ export function ConfidenceScoreTooltip({
             ${style.bg} ${style.border}
             animate-in fade-in-0 zoom-in-95 duration-150
           `}
-          style={{
-            top: tooltipPosition.top,
-            left: tooltipPosition.left,
-          }}
+          style={absolutePosition(tooltipPosition)}
         >
           {/* Header */}
           <div className="flex items-center gap-2 mb-3">
@@ -547,7 +546,8 @@ export function ConfidenceScoreTooltip({
           <div className="space-y-2 text-sm">
             {FACTOR_CONFIG.map((config) => {
               const value = factors[config.key];
-              const percentage = Math.round((value / config.maxPoints) * 100);
+              const percentage = (value / config.maxPoints) * 100;
+              const barWidth = progressWidth(percentage);
 
               return (
                 <div key={config.key} className="flex items-center justify-between">
@@ -556,7 +556,7 @@ export function ConfidenceScoreTooltip({
                     <div className={`w-12 h-1.5 rounded-full ${style.progressBg}`}>
                       <div
                         className={`h-full rounded-full ${style.progressFill}`}
-                        style={{ width: `${percentage}%` }}
+                        style={barWidth}
                       />
                     </div>
                     <span className={`text-xs font-medium ${style.text} w-8 text-right`}>

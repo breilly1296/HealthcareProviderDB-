@@ -5,6 +5,7 @@
 
 import { ClockIcon, CheckIcon } from '../icons/Icons';
 import { formatConfidenceLevel, getAcceptanceStatusText, getNewPatientStatusText, formatDate } from '@/lib/provider-utils';
+import { progressWidth } from '@/lib/utils';
 
 interface VerificationTimelineProps {
   verificationCount: number;
@@ -25,9 +26,10 @@ export function VerificationTimeline({
   acceptanceStatus,
   acceptsNewPatients,
 }: VerificationTimelineProps) {
-  const progressPercentage = Math.min(100, (verificationCount / MIN_VERIFICATIONS) * 100);
+  const progressPercentage = (verificationCount / MIN_VERIFICATIONS) * 100;
   const isExpertLevel = verificationCount >= MIN_VERIFICATIONS;
   const verificationsNeeded = MIN_VERIFICATIONS - verificationCount;
+  const barWidth = progressWidth(progressPercentage);
 
   return (
     <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
@@ -55,7 +57,7 @@ export function VerificationTimeline({
                 className={`h-full transition-all ${
                   isExpertLevel ? 'bg-green-500' : 'bg-primary-500'
                 }`}
-                style={{ width: `${progressPercentage}%` }}
+                style={barWidth}
               />
             </div>
             {isExpertLevel ? (

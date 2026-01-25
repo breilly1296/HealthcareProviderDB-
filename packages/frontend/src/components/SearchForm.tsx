@@ -49,6 +49,7 @@ export const SearchForm = forwardRef<SearchFormRef, SearchFormProps>(function Se
     isLoading,
     error,
     search,
+    searchImmediate,
     hasActiveFilters,
     activeFilterCount,
     canSearch,
@@ -57,10 +58,11 @@ export const SearchForm = forwardRef<SearchFormRef, SearchFormProps>(function Se
   const isDrawer = variant === 'drawer';
 
   // Expose search and clear methods via ref
+  // Use searchImmediate for explicit button clicks (bypasses debounce)
   useImperativeHandle(ref, () => ({
-    search: () => search(),
+    search: () => searchImmediate(),
     clear: () => clearFilters(),
-  }), [search, clearFilters]);
+  }), [searchImmediate, clearFilters]);
 
   // Notify parent of filter count changes
   useEffect(() => {
@@ -105,10 +107,10 @@ export const SearchForm = forwardRef<SearchFormRef, SearchFormProps>(function Se
     ...healthSystems.map(hs => ({ value: hs.name, label: hs.name })),
   ], [healthSystems]);
 
-  // Handle form submission
+  // Handle form submission - use immediate search (bypasses debounce)
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    search();
+    searchImmediate();
   };
 
   // Handle city selection with NYC All Boroughs logic

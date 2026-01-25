@@ -214,3 +214,80 @@ export function DropdownLoadingSkeleton({ count = 5 }: { count?: number }) {
     </div>
   );
 }
+
+// Skeleton for location detail page
+export function LocationDetailSkeleton() {
+  return (
+    <div className="py-8 md:py-12" role="status" aria-label="Loading location details">
+      <span className="sr-only">Loading location details...</span>
+      <div className="container-wide" aria-hidden="true">
+        {/* Breadcrumb Skeleton */}
+        <div className="mb-6 flex items-center gap-2">
+          <Shimmer className="h-4 w-12 rounded" />
+          <Shimmer className="h-4 w-4 rounded" />
+          <Shimmer className="h-4 w-20 rounded" />
+          <Shimmer className="h-4 w-4 rounded" />
+          <Shimmer className="h-4 w-32 rounded" />
+        </div>
+
+        {/* Location Header Card */}
+        <div className="card mb-8">
+          <div className="flex items-start gap-4">
+            {/* Icon placeholder */}
+            <Shimmer className="w-12 h-12 rounded-full flex-shrink-0" />
+
+            <div className="flex-1 space-y-3">
+              {/* Location name */}
+              <Shimmer className="h-8 w-3/4 rounded" />
+              {/* Health system */}
+              <Shimmer className="h-5 w-1/2 rounded" />
+              {/* Facility type */}
+              <Shimmer className="h-4 w-24 rounded" />
+              {/* Address lines */}
+              <div className="space-y-2">
+                <Shimmer className="h-5 w-2/3 rounded" />
+                <Shimmer className="h-5 w-1/2 rounded" />
+              </div>
+              {/* Provider count and map link */}
+              <div className="flex items-center gap-4 pt-2">
+                <Shimmer className="h-5 w-28 rounded" />
+                <Shimmer className="h-5 w-36 rounded" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Filter Header */}
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <Shimmer className="h-7 w-56 rounded" />
+          <div className="flex items-center gap-3">
+            <Shimmer className="h-5 w-32 rounded" />
+            <Shimmer className="h-10 w-40 rounded" />
+          </div>
+        </div>
+
+        {/* Provider Cards */}
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="card">
+              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                <div className="flex-1 space-y-3">
+                  <Shimmer className="h-7 w-3/4 rounded" />
+                  <Shimmer className="h-5 w-1/2 rounded" />
+                  <div className="space-y-2">
+                    <Shimmer className="h-4 w-full rounded" />
+                    <Shimmer className="h-4 w-2/3 rounded" />
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                  <Shimmer className="h-8 w-24 rounded-full" />
+                  <Shimmer className="h-4 w-32 rounded" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -3,7 +3,7 @@
 import { memo, useMemo } from 'react';
 import Link from 'next/link';
 import type { ProviderDisplay } from '@/types';
-import { ConfidenceBadge, ConfidenceIndicator } from './ConfidenceBadge';
+import { ConfidenceBadge } from './ConfidenceBadge';
 import FreshnessWarning from './FreshnessWarning';
 import { getSpecialtyDisplay } from '@/lib/provider-utils';
 import { CompareCheckbox } from './compare';

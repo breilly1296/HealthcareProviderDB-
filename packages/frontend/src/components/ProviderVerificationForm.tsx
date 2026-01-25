@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { progressWidth } from '@/lib/utils';
+import { logError } from '@/lib/errorUtils';
 
 /**
  * Verification Form - Research-Backed Simplicity
@@ -119,7 +121,7 @@ export default function ProviderVerificationForm({
 
       setCurrentStep('success');
     } catch (error) {
-      console.error('Error submitting verification:', error);
+      logError('ProviderVerificationForm.submit', error);
       alert('Failed to submit verification. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -156,22 +158,25 @@ export default function ProviderVerificationForm({
   );
 
   // Progress indicator component
-  const ProgressBar = () => (
-    <div className="mb-8">
-      <div className="flex justify-between items-center mb-2">
-        <span className="text-sm font-medium text-gray-700">
-          Question {currentStepNumber} of {totalSteps}
-        </span>
-        <span className="text-sm text-gray-500">
-          ~{Math.max(1, totalSteps - currentStepNumber)} min remaining
-        </span>
-      </div>
-      <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-        <div
-          className="h-full bg-primary-600 transition-all duration-300 ease-in-out"
-          style={{ width: `${(currentStepNumber / totalSteps) * 100}%` }}
-        />
-      </div>
+  const ProgressBar = () => {
+    const barWidth = progressWidth((currentStepNumber / totalSteps) * 100);
+
+    return (
+      <div className="mb-8">
+        <div className="flex justify-between items-center mb-2">
+          <span className="text-sm font-medium text-gray-700">
+            Question {currentStepNumber} of {totalSteps}
+          </span>
+          <span className="text-sm text-gray-500">
+            ~{Math.max(1, totalSteps - currentStepNumber)} min remaining
+          </span>
+        </div>
+        <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-primary-600 transition-all duration-300 ease-in-out"
+            style={barWidth}
+          />
+        </div>
 
       {/* Verification count progress */}
       <div className="mt-4 text-center">
@@ -202,7 +207,8 @@ export default function ProviderVerificationForm({
         )}
       </div>
     </div>
-  );
+    );
+  };
 
   // ============================================================
   // INTRO SCREEN

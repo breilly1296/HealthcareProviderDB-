@@ -7,7 +7,7 @@ import { locationApi } from '@/lib/api';
 import { DEFAULT_PAGE_SIZE } from '@/lib/constants';
 import type { ProviderDisplay, Location, PaginationState } from '@/types';
 import { ProviderCard } from '@/components/ProviderCard';
-import ProviderCardSkeleton from '@/components/ProviderCardSkeleton';
+import { LocationDetailSkeleton } from '@/components/ProviderCardSkeleton';
 import ErrorMessage from '@/components/ErrorMessage';
 
 const SPECIALTIES = [
@@ -89,17 +89,7 @@ export default function LocationDetailPage() {
     : providers;
 
   if (loading) {
-    return (
-      <div className="py-12">
-        <div className="container-wide">
-          <div className="animate-pulse space-y-6">
-            <div className="h-8 bg-gray-200 rounded w-1/2"></div>
-            <div className="h-4 bg-gray-200 rounded w-1/3"></div>
-            <ProviderCardSkeleton count={3} />
-          </div>
-        </div>
-      </div>
-    );
+    return <LocationDetailSkeleton />;
   }
 
   if (error || !location) {
@@ -129,16 +119,16 @@ export default function LocationDetailPage() {
       <div className="container-wide">
         {/* Breadcrumb */}
         <nav className="mb-6">
-          <ol className="flex items-center gap-2 text-sm text-gray-500">
+          <ol className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
             <li>
-              <Link href="/" className="hover:text-primary-600">Home</Link>
+              <Link href="/" className="hover:text-primary-600 dark:hover:text-primary-400">Home</Link>
             </li>
             <li>/</li>
             <li>
-              <Link href="/search?mode=locations" className="hover:text-primary-600">Locations</Link>
+              <Link href="/search?mode=locations" className="hover:text-primary-600 dark:hover:text-primary-400">Locations</Link>
             </li>
             <li>/</li>
-            <li className="text-gray-900 font-medium truncate max-w-[200px]">
+            <li className="text-gray-900 dark:text-white font-medium truncate max-w-[200px]">
               {location.name || location.addressLine1}
             </li>
           </ol>
@@ -251,7 +241,8 @@ export default function LocationDetailPage() {
                     );
                   })
                   .map((p, idx, arr) => {
-                    const showEllipsisBefore = idx > 0 && p - arr[idx - 1] > 1;
+                    const prevPage = arr[idx - 1];
+                    const showEllipsisBefore = idx > 0 && prevPage !== undefined && p - prevPage > 1;
 
                     return (
                       <div key={p} className="flex items-center gap-2">

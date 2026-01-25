@@ -6,6 +6,7 @@ import {
   CONFIDENCE_BAR_COLORS,
   type ConfidenceLevel,
 } from '@/lib/provider-utils';
+import { progressWidth } from '@/lib/utils';
 
 /** SVG icons for confidence levels */
 const CONFIDENCE_ICONS: Record<ConfidenceLevel, JSX.Element> = {
@@ -109,13 +110,14 @@ export function ConfidenceIndicator({
 // Legacy percentage-based indicator (for backwards compatibility)
 export function ConfidenceProgressBar({ score }: { score: number }) {
   const level = getConfidenceLevel(score);
+  const barWidth = progressWidth(score);
 
   return (
     <div className="flex items-center gap-2" title={`Confidence: ${Math.round(score)}%`}>
       <div className="w-16 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
         <div
           className={`h-full rounded-full ${CONFIDENCE_BAR_COLORS[level]}`}
-          style={{ width: `${Math.min(100, score)}%` }}
+          style={barWidth}
         />
       </div>
       <span className="text-sm text-gray-600 dark:text-gray-400">{Math.round(score)}%</span>

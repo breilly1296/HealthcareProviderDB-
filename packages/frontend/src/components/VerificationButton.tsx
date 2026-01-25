@@ -29,7 +29,8 @@ export function VerificationButton({
 
   // Form state
   const [planId, setPlanId] = useState(initialPlanId || '');
-  const [planName, setPlanName] = useState(initialPlanName || '');
+  // Plan name is stored for potential future use in API calls
+  const [_planName, setPlanName] = useState(initialPlanName || '');
   const [acceptsInsurance, setAcceptsInsurance] = useState<boolean | null>(null);
   const [acceptsNewPatients, setAcceptsNewPatients] = useState<boolean | null>(null);
   const [notes, setNotes] = useState('');

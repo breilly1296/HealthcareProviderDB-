@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { SPECIALTY_LABELS, US_STATES } from '@/lib/provider-utils';
+import { logError } from '@/lib/errorUtils';
 
 const STORAGE_KEY = 'vmp_recent_searches';
 const MAX_SEARCHES = 5;
@@ -98,7 +99,7 @@ export function useRecentSearches() {
         }
       }
     } catch (error) {
-      console.error('Failed to load recent searches:', error);
+      logError('useRecentSearches.load', error);
     }
     setIsHydrated(true);
   }, []);
@@ -109,7 +110,7 @@ export function useRecentSearches() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(recentSearches));
     } catch (error) {
-      console.error('Failed to save recent searches:', error);
+      logError('useRecentSearches.save', error);
     }
   }, [recentSearches, isHydrated]);
 
@@ -121,11 +122,11 @@ export function useRecentSearches() {
     setRecentSearches(prev => {
       // Check for duplicate
       const existingIndex = prev.findIndex(s => areParamsEqual(s.params, params));
+      const existing = prev[existingIndex];
 
-      if (existingIndex !== -1) {
+      if (existingIndex !== -1 && existing) {
         // Move existing search to top with updated timestamp
-        const existing = prev[existingIndex];
-        const updated = { ...existing, timestamp: Date.now() };
+        const updated: RecentSearch = { ...existing, timestamp: Date.now() };
         const filtered = prev.filter((_, i) => i !== existingIndex);
         return [updated, ...filtered];
       }

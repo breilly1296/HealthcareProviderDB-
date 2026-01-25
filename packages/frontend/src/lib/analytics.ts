@@ -81,10 +81,11 @@ export function trackProviderView(props: ProviderViewEventProps) {
  * Track when a user submits a verification
  * Privacy: Only sends that a submission occurred, not health-related details
  */
-export function trackVerificationSubmit(props: VerificationSubmitEventProps) {
+export function trackVerificationSubmit(_props: VerificationSubmitEventProps) {
   if (typeof window === 'undefined') return;
 
   // Privacy-preserving: Don't send identifiable info
+  // _props is intentionally unused - we only track that a submission occurred
   posthog.capture('verification_submit', {
     // Only track that a verification was submitted
     // NOT sending: npi, plan_id, accepts_insurance

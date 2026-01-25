@@ -131,7 +131,8 @@ function SearchResultsDisplay({
           {Array.from({ length: pagination.totalPages }, (_, i) => i + 1)
             .filter((p) => p === 1 || p === pagination.totalPages || Math.abs(p - pagination.page) <= 2)
             .map((p, idx, arr) => {
-              const showEllipsisBefore = idx > 0 && p - arr[idx - 1] > 1;
+              const prevPage = arr[idx - 1];
+              const showEllipsisBefore = idx > 0 && prevPage !== undefined && p - prevPage > 1;
 
               return (
                 <div key={p} className="flex items-center gap-2">
@@ -170,7 +171,8 @@ function SearchPageContent() {
   const [pagination, setPagination] = useState<PaginationState | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  // Loading state is managed by SearchForm, but kept here for potential direct use
+  const [isLoading, _setIsLoading] = useState(false);
 
   // Mobile filter drawer state
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);

@@ -13,6 +13,7 @@ import {
 } from 'react';
 import { ChevronDown, X, Check, Search, Loader2 } from 'lucide-react';
 import type { SelectOption, GroupedSelectOptions } from '@/types';
+import { maxHeightStyle } from '@/lib/utils';
 
 // ============================================================================
 // Types
@@ -52,7 +53,8 @@ interface FlatOption extends SelectOption {
 function isGroupedOptions(
   options: SelectOption[] | GroupedSelectOptions[]
 ): options is GroupedSelectOptions[] {
-  return options.length > 0 && 'options' in options[0];
+  const firstOption = options[0];
+  return firstOption !== undefined && 'options' in firstOption;
 }
 
 function flattenOptions(
@@ -172,6 +174,8 @@ export const SearchableSelect = forwardRef<
 
   // Close dropdown when clicking outside
   useEffect(() => {
+    if (!isOpen) return;
+
     function handleClickOutside(event: globalThis.MouseEvent) {
       if (
         containerRef.current &&
@@ -182,10 +186,8 @@ export const SearchableSelect = forwardRef<
       }
     }
 
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen]);
 
   // Focus search input when dropdown opens
@@ -327,7 +329,7 @@ export const SearchableSelect = forwardRef<
       : undefined;
 
   // Render option item
-  const renderOption = (option: SelectOption, index: number) => {
+  const renderOption = (option: SelectOption, _index: number) => {
     const flatIndex = flatFilteredOptions.findIndex(
       (o) => o.value === option.value
     );
@@ -513,7 +515,7 @@ export const SearchableSelect = forwardRef<
             role="listbox"
             aria-multiselectable={multiple}
             className="overflow-y-auto"
-            style={{ maxHeight }}
+            style={maxHeightStyle(maxHeight)}
           >
             {renderOptions()}
           </ul>

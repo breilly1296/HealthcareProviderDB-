@@ -49,7 +49,6 @@ export interface UseFilterStateResult {
   setFilters: (partial: Partial<SearchFilters>) => void;
   clearFilters: () => void;
   clearFilter: (key: keyof SearchFilters) => void;
-  resetResults: () => void;
   hasActiveFilters: boolean;
   activeFilterCount: number;
   canSearch: boolean;
@@ -59,7 +58,6 @@ export function useFilterState(options: UseFilterStateOptions): UseFilterStateRe
   const { initialFilters, onFiltersChange } = options;
 
   const [filters, setFiltersState] = useState<SearchFilters>(initialFilters);
-  const [resultsCleared, setResultsCleared] = useState(false);
 
   const updateFilters = useCallback(
     (newFilters: SearchFilters) => {
@@ -101,7 +99,6 @@ export function useFilterState(options: UseFilterStateOptions): UseFilterStateRe
 
   const clearFilters = useCallback(() => {
     updateFilters(initialFilters);
-    setResultsCleared(true);
   }, [initialFilters, updateFilters]);
 
   const clearFilter = useCallback(
@@ -128,10 +125,6 @@ export function useFilterState(options: UseFilterStateOptions): UseFilterStateRe
     },
     [onFiltersChange]
   );
-
-  const resetResults = useCallback(() => {
-    setResultsCleared(true);
-  }, []);
 
   // ============================================================================
   // Computed Values
@@ -178,7 +171,6 @@ export function useFilterState(options: UseFilterStateOptions): UseFilterStateRe
     setFilters,
     clearFilters,
     clearFilter,
-    resetResults,
     hasActiveFilters,
     activeFilterCount,
     canSearch,

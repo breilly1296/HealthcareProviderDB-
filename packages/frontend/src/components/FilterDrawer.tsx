@@ -36,17 +36,17 @@ export function FilterDrawer({
 
   // Focus trap and body scroll lock
   useEffect(() => {
-    if (isOpen) {
-      document.addEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = 'hidden';
-      // Focus the close button when drawer opens
-      setTimeout(() => closeButtonRef.current?.focus(), 100);
+    if (!isOpen) return;
 
-      return () => {
-        document.removeEventListener('keydown', handleKeyDown);
-        document.body.style.overflow = '';
-      };
-    }
+    document.addEventListener('keydown', handleKeyDown);
+    document.body.style.overflow = 'hidden';
+    // Focus the close button when drawer opens
+    setTimeout(() => closeButtonRef.current?.focus(), 100);
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = '';
+    };
   }, [isOpen, handleKeyDown]);
 
   // Handle backdrop click

@@ -1,6 +1,7 @@
 'use client';
 
 import { DEFAULT_PAGE_SIZE } from '../lib/constants';
+import { SEARCH_DEBOUNCE_MS } from '../lib/debounce';
 import { useSearchUrlParams } from './search/useSearchParams';
 import { useFilterState, DEFAULT_FILTERS } from './search/useFilterState';
 import { useSearchExecution } from './search/useSearchExecution';
@@ -11,6 +12,7 @@ export interface UseSearchFormOptions {
   pageSize?: number;
   syncWithUrl?: boolean;
   autoSearch?: boolean;
+  /** Debounce delay for auto-search in ms. Default: 450ms */
   autoSearchDebounce?: number;
 }
 
@@ -25,7 +27,10 @@ export interface UseSearchFormResult {
   isLoading: boolean;
   error: string | null;
   hasSearched: boolean;
-  search: () => Promise<void>;
+  /** Debounced search (for auto-search/typing). Waits 450ms. */
+  search: () => void;
+  /** Immediate search (for button clicks). Bypasses debounce. */
+  searchImmediate: () => Promise<void>;
   goToPage: (page: number) => Promise<void>;
   hasActiveFilters: boolean;
   activeFilterCount: number;
@@ -38,7 +43,7 @@ export function useSearchForm(options: UseSearchFormOptions = {}): UseSearchForm
     pageSize = DEFAULT_PAGE_SIZE,
     syncWithUrl = true,
     autoSearch = false,
-    autoSearchDebounce = 500,
+    autoSearchDebounce = SEARCH_DEBOUNCE_MS,
   } = options;
 
   const mergedDefaultFilters: SearchFilters = { ...DEFAULT_FILTERS, ...userDefaultFilters };
@@ -78,6 +83,7 @@ export function useSearchForm(options: UseSearchFormOptions = {}): UseSearchForm
     error: searchExecution.error,
     hasSearched: searchExecution.hasSearched,
     search: searchExecution.search,
+    searchImmediate: searchExecution.searchImmediate,
     goToPage: searchExecution.goToPage,
     hasActiveFilters: filterState.hasActiveFilters,
     activeFilterCount: filterState.activeFilterCount,

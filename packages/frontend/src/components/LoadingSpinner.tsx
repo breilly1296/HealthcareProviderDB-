@@ -1,7 +1,5 @@
 'use client';
 
-import { ReactNode } from 'react';
-
 export type SpinnerSize = 'sm' | 'md' | 'lg' | 'xl';
 export type SpinnerVariant = 'primary' | 'white' | 'gray';
 

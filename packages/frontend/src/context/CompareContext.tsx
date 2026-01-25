@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
 import { MAX_COMPARE_PROVIDERS } from '@/lib/constants';
+import { logError } from '@/lib/errorUtils';
 
 export interface CompareProvider {
   npi: string;
@@ -43,7 +44,7 @@ function getStoredProviders(): CompareProvider[] {
 
     // Validate the parsed data is an array
     if (!Array.isArray(parsed)) {
-      console.warn('[CompareContext] Stored data is not an array, resetting');
+      logError('CompareContext.getStoredProviders', new Error('Stored data is not an array, resetting'));
       sessionStorage.removeItem(STORAGE_KEY);
       return [];
     }
@@ -52,16 +53,16 @@ function getStoredProviders(): CompareProvider[] {
   } catch (error) {
     // P0 FIX: Log the error instead of silently swallowing it
     if (error instanceof SyntaxError) {
-      console.error('[CompareContext] Invalid JSON in sessionStorage, resetting:', error.message);
+      logError('CompareContext.getStoredProviders', error);
       try {
         sessionStorage.removeItem(STORAGE_KEY);
       } catch (removeError) {
-        console.error('[CompareContext] Failed to remove corrupted storage:', removeError);
+        logError('CompareContext.removeCorruptedStorage', removeError);
       }
     } else if (error instanceof DOMException) {
-      console.error('[CompareContext] Storage access error:', error.name, error.message);
+      logError('CompareContext.storageAccess', error);
     } else {
-      console.error('[CompareContext] Unexpected error reading storage:', error);
+      logError('CompareContext.getStoredProviders', error);
     }
 
     return [];
@@ -77,14 +78,14 @@ function storeProviders(providers: CompareProvider[]): void {
     // P0 FIX: Log the error with context
     if (error instanceof DOMException) {
       if (error.name === 'QuotaExceededError') {
-        console.error('[CompareContext] Storage quota exceeded:', error.message);
+        logError('CompareContext.storeProviders.quotaExceeded', error);
       } else if (error.name === 'SecurityError') {
-        console.error('[CompareContext] Storage access denied (private browsing?):', error.message);
+        logError('CompareContext.storeProviders.securityError', error);
       } else {
-        console.error('[CompareContext] Storage DOMException:', error.name, error.message);
+        logError('CompareContext.storeProviders.domException', error);
       }
     } else {
-      console.error('[CompareContext] Unexpected error saving to storage:', error);
+      logError('CompareContext.storeProviders', error);
     }
   }
 }

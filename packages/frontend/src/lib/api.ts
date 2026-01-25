@@ -253,7 +253,6 @@ async function fetchWithRetry(
   } = { ...DEFAULT_RETRY_OPTIONS, ...retryOptions };
 
   let lastError: Error | null = null;
-  let lastResponse: Response | null = null;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {

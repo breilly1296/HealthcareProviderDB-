@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { providerApi } from '@/lib/api';
 import { toAppError, getUserMessage, logError } from '@/lib/errorUtils';
+import { Shimmer } from '@/components/ui/Shimmer';
 import type { ProviderDisplay, Location } from '@/types';
 
 interface ColocatedProvidersProps {
@@ -45,7 +46,8 @@ export function ColocatedProviders({ npi }: ColocatedProvidersProps) {
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && !fetched) {
+        const entry = entries[0];
+        if (entry?.isIntersecting && !fetched) {
           fetchColocatedProviders();
         }
       },
@@ -60,15 +62,16 @@ export function ColocatedProviders({ npi }: ColocatedProvidersProps) {
     <div ref={sectionRef}>
       {/* Loading state */}
       {(loading || (!fetched && !error)) && (
-        <div className="card">
+        <div className="card" role="status" aria-label="Loading colocated providers">
+          <span className="sr-only">Loading other providers at this location...</span>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
             Other Providers at This Location
           </h2>
-          <div className="space-y-3">
+          <div className="space-y-3" aria-hidden="true">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="animate-pulse p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
-                <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-2/3 mb-2"></div>
-                <div className="h-4 bg-gray-100 dark:bg-gray-600 rounded w-1/2"></div>
+              <div key={i} className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+                <Shimmer className="h-5 w-2/3 mb-2" />
+                <Shimmer className="h-4 w-1/2" />
               </div>
             ))}
           </div>
