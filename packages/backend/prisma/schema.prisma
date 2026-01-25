@@ -148,6 +148,7 @@ model VerificationLog {
   expiresAt          DateTime?          @map("expires_at") // TTL: 6 months from created_at (12% annual provider turnover)
   plan               InsurancePlan?     @relation(fields: [planId], references: [planId])
   provider           Provider?          @relation(fields: [providerNpi], references: [npi])
+  votes              VoteLog[]
 
   @@index([providerNpi])
   @@index([planId])
@@ -159,6 +160,22 @@ model VerificationLog {
   @@index([providerNpi, planId, sourceIp, createdAt])    // Sybil attack prevention
   @@index([providerNpi, planId, submittedBy, createdAt]) // Sybil attack prevention
   @@map("verification_logs")
+}
+
+// Vote deduplication - prevents unlimited voting from same IP
+model VoteLog {
+  id             String   @id @default(cuid())
+  verificationId String   @map("verification_id")
+  sourceIp       String   @map("source_ip") @db.VarChar(50)
+  vote           String   @db.VarChar(10) // 'up' or 'down'
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  verification   VerificationLog @relation(fields: [verificationId], references: [id], onDelete: Cascade)
+
+  @@unique([verificationId, sourceIp]) // One vote per IP per verification
+  @@index([verificationId])
+  @@index([sourceIp])
+  @@map("vote_logs")
 }
 
 model SyncLog {

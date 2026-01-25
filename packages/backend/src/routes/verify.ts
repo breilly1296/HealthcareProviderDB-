@@ -107,19 +107,20 @@ router.post(
   asyncHandler(async (req, res) => {
     const { verificationId } = verificationIdParamSchema.parse(req.params);
     const { vote } = voteSchema.parse(req.body);
+    const sourceIp = req.ip || 'unknown';
 
-    const verification = await voteOnVerification(verificationId, vote);
+    const result = await voteOnVerification(verificationId, vote, sourceIp);
 
     res.json({
       success: true,
       data: {
         verification: {
-          id: verification.id,
-          upvotes: verification.upvotes,
-          downvotes: verification.downvotes,
-          netVotes: verification.upvotes - verification.downvotes,
+          id: result.id,
+          upvotes: result.upvotes,
+          downvotes: result.downvotes,
+          netVotes: result.upvotes - result.downvotes,
         },
-        message: `Vote recorded: ${vote}`,
+        message: result.voteChanged ? `Vote changed to: ${vote}` : `Vote recorded: ${vote}`,
       },
     });
   })

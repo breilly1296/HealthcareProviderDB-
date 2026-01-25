@@ -314,32 +314,126 @@ export async function submitVerification(input: SubmitVerificationInput) {
 
 /**
  * Vote on a verification
+ * Prevents duplicate votes from the same IP
  */
 export async function voteOnVerification(
   verificationId: string,
-  vote: 'up' | 'down'
+  vote: 'up' | 'down',
+  sourceIp?: string
 ) {
-  const verification = await prisma.verificationLog.update({
+  // Validate sourceIp is provided
+  if (!sourceIp) {
+    throw AppError.badRequest('Source IP is required for voting');
+  }
+
+  // Check if verification exists
+  const existingVerification = await prisma.verificationLog.findUnique({
     where: { id: verificationId },
-    data: {
-      upvotes: vote === 'up' ? { increment: 1 } : undefined,
-      downvotes: vote === 'down' ? { increment: 1 } : undefined,
+  });
+
+  if (!existingVerification) {
+    throw AppError.notFound('Verification not found');
+  }
+
+  // Check for existing vote from this IP
+  const existingVote = await prisma.voteLog.findUnique({
+    where: {
+      verificationId_sourceIp: {
+        verificationId,
+        sourceIp,
+      },
     },
   });
 
+  let updatedVerification;
+  let voteChanged = false;
+
+  if (existingVote) {
+    // If same vote direction, reject as duplicate
+    if (existingVote.vote === vote) {
+      throw AppError.conflict('You have already voted on this verification');
+    }
+
+    // Changing vote direction - update existing vote and adjust counts
+    voteChanged = true;
+    await prisma.$transaction(async (tx) => {
+      // Update the vote record
+      await tx.voteLog.update({
+        where: {
+          verificationId_sourceIp: {
+            verificationId,
+            sourceIp,
+          },
+        },
+        data: { vote },
+      });
+
+      // Adjust the counts: remove old vote, add new vote
+      if (vote === 'up') {
+        // Changed from down to up
+        await tx.verificationLog.update({
+          where: { id: verificationId },
+          data: {
+            upvotes: { increment: 1 },
+            downvotes: { decrement: 1 },
+          },
+        });
+      } else {
+        // Changed from up to down
+        await tx.verificationLog.update({
+          where: { id: verificationId },
+          data: {
+            upvotes: { decrement: 1 },
+            downvotes: { increment: 1 },
+          },
+        });
+      }
+    });
+  } else {
+    // No existing vote - create new vote
+    await prisma.$transaction(async (tx) => {
+      // Create vote log entry
+      await tx.voteLog.create({
+        data: {
+          verificationId,
+          sourceIp,
+          vote,
+        },
+      });
+
+      // Increment the appropriate counter
+      await tx.verificationLog.update({
+        where: { id: verificationId },
+        data: {
+          upvotes: vote === 'up' ? { increment: 1 } : undefined,
+          downvotes: vote === 'down' ? { increment: 1 } : undefined,
+        },
+      });
+    });
+  }
+
+  // Fetch updated verification
+  updatedVerification = await prisma.verificationLog.findUnique({
+    where: { id: verificationId },
+  });
+
+  if (!updatedVerification) {
+    throw AppError.notFound('Verification not found after update');
+  }
+
   // Update confidence score on the acceptance
-  if (verification.acceptanceId) {
+  if (updatedVerification.acceptanceId) {
     const acceptanceRecord = await prisma.providerPlanAcceptance.findUnique({
-      where: { id: parseInt(verification.acceptanceId) },
+      where: { id: parseInt(updatedVerification.acceptanceId) },
     });
 
     if (acceptanceRecord) {
-      const { score, factors } = calculateConfidenceScore({
+      const { score } = calculateConfidenceScore({
         dataSource: VerificationSource.CROWDSOURCE,
         lastVerifiedAt: acceptanceRecord.lastVerified,
         verificationCount: acceptanceRecord.verificationCount || 0,
-        upvotes: verification.upvotes,
-        downvotes: verification.downvotes,
+        upvotes: updatedVerification.upvotes,
+        downvotes: updatedVerification.downvotes,
       });
 
       await prisma.providerPlanAcceptance.update({
@@ -351,7 +445,10 @@ export async function voteOnVerification(
     }
   }
 
-  return stripVerificationPII(verification);
+  return {
+    ...stripVerificationPII(updatedVerification),
+    voteChanged,
+  };
 }
 
 /**
