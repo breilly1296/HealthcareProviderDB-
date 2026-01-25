@@ -31,8 +31,29 @@ if (process.env.NODE_ENV === 'development') {
 // Set to 1 to trust only the first proxy (Cloud Run's load balancer)
 app.set('trust proxy', 1);
 
-// Security middleware
-app.use(helmet());
+// Security middleware with strict CSP for JSON API
+// This backend serves only JSON responses (no HTML), so we use a restrictive policy
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'none'"],      // Deny all by default
+      scriptSrc: ["'none'"],       // No scripts needed for JSON API
+      styleSrc: ["'none'"],        // No styles needed for JSON API
+      imgSrc: ["'none'"],          // No images served
+      connectSrc: ["'self'"],      // Allow API calls to self
+      fontSrc: ["'none'"],         // No fonts served
+      objectSrc: ["'none'"],       // No plugins/objects
+      frameAncestors: ["'none'"],  // Cannot be embedded in iframes
+      formAction: ["'none'"],      // No form submissions
+      upgradeInsecureRequests: [], // Upgrade HTTP to HTTPS
+    },
+  },
+  // Additional security headers
+  crossOriginEmbedderPolicy: true,
+  crossOriginOpenerPolicy: { policy: 'same-origin' },
+  crossOriginResourcePolicy: { policy: 'same-origin' },
+  referrerPolicy: { policy: 'no-referrer' },
+}));
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (mobile apps, curl, Postman, etc.)
