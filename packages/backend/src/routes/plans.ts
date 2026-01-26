@@ -10,6 +10,8 @@ import {
   getProvidersForPlan,
   getGroupedPlans,
 } from '../services/planService';
+import { paginationSchema, planIdParamSchema, stateQuerySchema } from '../schemas/commonSchemas';
+import { buildPaginationMeta, sendSuccess } from '../utils/responseHelpers';
 
 const router = Router();
 
@@ -19,17 +21,7 @@ const searchQuerySchema = z.object({
   planType: z.string().min(1).max(20).optional(),
   search: z.string().min(1).max(200).optional(),
   state: z.string().length(2).toUpperCase().optional(),
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-});
-
-const planIdParamSchema = z.object({
-  planId: z.string().min(1).max(50),
-});
-
-const issuersQuerySchema = z.object({
-  state: z.string().length(2).toUpperCase().optional(),
-});
+}).merge(paginationSchema);
 
 /**
  * GET /api/v1/plans/search
@@ -54,13 +46,7 @@ router.get(
       success: true,
       data: {
         plans: result.plans,
-        pagination: {
-          total: result.total,
-          page: result.page,
-          limit: result.limit,
-          totalPages: result.totalPages,
-          hasMore: result.page < result.totalPages,
-        },
+        pagination: buildPaginationMeta(result.total, result.page, result.limit),
       },
     });
   })
@@ -84,10 +70,7 @@ router.get(
       state: query.state,
     });
 
-    res.json({
-      success: true,
-      data: result,
-    });
+    sendSuccess(res, result);
   })
 );
 
@@ -99,19 +82,13 @@ router.get(
   '/meta/issuers',
   defaultRateLimiter,
   asyncHandler(async (req, res) => {
-    const query = issuersQuerySchema.parse(req.query);
+    const query = stateQuerySchema.parse(req.query);
 
     const issuers = await getIssuers({
       state: query.state,
     });
 
-    res.json({
-      success: true,
-      data: {
-        issuers,
-        count: issuers.length,
-      },
-    });
+    sendSuccess(res, { issuers, count: issuers.length });
   })
 );
 
@@ -123,8 +100,7 @@ router.get(
   '/meta/types',
   defaultRateLimiter,
   asyncHandler(async (req, res) => {
-    const query = z.object({
-      state: z.string().length(2).toUpperCase().optional(),
+    const query = stateQuerySchema.extend({
       issuerName: z.string().min(1).max(200).optional(),
     }).parse(req.query);
 
@@ -133,13 +109,7 @@ router.get(
       issuerName: query.issuerName,
     });
 
-    res.json({
-      success: true,
-      data: {
-        planTypes: types,
-        count: types.length,
-      },
-    });
+    sendSuccess(res, { planTypes: types, count: types.length });
   })
 );
 
@@ -153,10 +123,7 @@ router.get(
   searchRateLimiter,
   asyncHandler(async (req, res) => {
     const { planId } = planIdParamSchema.parse(req.params);
-    const query = z.object({
-      page: z.coerce.number().int().min(1).default(1),
-      limit: z.coerce.number().int().min(1).max(100).default(20),
-    }).parse(req.query);
+    const query = paginationSchema.parse(req.query);
 
     const result = await getProvidersForPlan(planId, {
       page: query.page,
@@ -171,13 +138,7 @@ router.get(
       success: true,
       data: {
         providers: result.providers,
-        pagination: {
-          total: result.total,
-          page: result.page,
-          limit: result.limit,
-          totalPages: result.totalPages,
-          hasMore: result.page < result.totalPages,
-        },
+        pagination: buildPaginationMeta(result.total, result.page, result.limit),
       },
     });
   })

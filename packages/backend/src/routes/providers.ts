@@ -9,8 +9,10 @@ import {
   getProviderDisplayName,
   getCitiesByState,
 } from '../services/providerService';
-import { getConfidenceLevel, getConfidenceLevelDescription, calculateConfidenceScore, ConfidenceResult } from '../services/confidenceService';
+import { enrichAcceptanceWithConfidence } from '../services/confidenceService';
 import { getColocatedProviders } from '../services/locationService';
+import { paginationSchema, npiParamSchema } from '../schemas/commonSchemas';
+import { buildPaginationMeta, sendSuccess } from '../utils/responseHelpers';
 
 const router = Router();
 
@@ -26,20 +28,12 @@ const searchQuerySchema = z.object({
   npi: z.string().length(10).regex(/^\d+$/).optional(),
   entityType: z.enum(['INDIVIDUAL', 'ORGANIZATION']).optional(),
   insurancePlanId: z.string().min(1).max(100).optional(),
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-});
-
-const npiParamSchema = z.object({
-  npi: z.string().length(10).regex(/^\d+$/, 'NPI must be exactly 10 digits'),
-});
+}).merge(paginationSchema);
 
 const plansQuerySchema = z.object({
   status: z.enum(['ACCEPTED', 'NOT_ACCEPTED', 'PENDING', 'UNKNOWN']).optional(),
   minConfidence: z.coerce.number().min(0).max(100).optional(),
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-});
+}).merge(paginationSchema);
 
 /**
  * GET /api/v1/providers/search
@@ -73,13 +67,7 @@ router.get(
           ...p,
           displayName: getProviderDisplayName(p),
         })),
-        pagination: {
-          total: result.total,
-          page: result.page,
-          limit: result.limit,
-          totalPages: result.totalPages,
-          hasMore: result.page < result.totalPages,
-        },
+        pagination: buildPaginationMeta(result.total, result.page, result.limit),
       },
     });
   })
@@ -100,14 +88,7 @@ router.get(
     const { state } = stateSchema.parse(req.query);
     const cities = await getCitiesByState(state);
 
-    res.json({
-      success: true,
-      data: {
-        state,
-        cities,
-        count: cities.length,
-      },
-    });
+    sendSuccess(res, { state, cities, count: cities.length });
   })
 );
 
@@ -133,31 +114,9 @@ router.get(
         provider: {
           ...provider,
           displayName: getProviderDisplayName(provider),
-          planAcceptances: provider.planAcceptances.map((pa) => {
-            // Calculate full confidence breakdown using research-based scoring
-            const confidenceResult = calculateConfidenceScore({
-              dataSource: null, // Verification source tracked in VerificationLog
-              lastVerifiedAt: pa.lastVerified,
-              verificationCount: pa.verificationCount,
-              upvotes: 0, // Will be enhanced when we track votes per acceptance
-              downvotes: 0,
-              specialty: provider.specialty || null,
-              taxonomyDescription: null, // Not stored in Provider model
-            });
-
-            return {
-              ...pa,
-              confidenceLevel: confidenceResult.level,
-              confidenceDescription: confidenceResult.description,
-              confidence: {
-                score: confidenceResult.score,
-                level: confidenceResult.level,
-                description: confidenceResult.description,
-                factors: confidenceResult.factors,
-                metadata: confidenceResult.metadata,
-              },
-            };
-          }),
+          planAcceptances: provider.planAcceptances.map((pa) =>
+            enrichAcceptanceWithConfidence(pa, { specialty: provider.specialty })
+          ),
         },
       },
     });
@@ -190,38 +149,10 @@ router.get(
       success: true,
       data: {
         npi,
-        acceptances: result.acceptances.map((a) => {
-          // Calculate full confidence breakdown using research-based scoring
-          const confidenceResult = calculateConfidenceScore({
-            dataSource: null, // Verification source tracked in VerificationLog
-            lastVerifiedAt: a.lastVerified,
-            verificationCount: a.verificationCount,
-            upvotes: 0, // Will be enhanced when we track votes per acceptance
-            downvotes: 0,
-            specialty: a.plan?.planType || null,
-            taxonomyDescription: null,
-          });
-
-          return {
-            ...a,
-            confidenceLevel: confidenceResult.level,
-            confidenceDescription: confidenceResult.description,
-            confidence: {
-              score: confidenceResult.score,
-              level: confidenceResult.level,
-              description: confidenceResult.description,
-              factors: confidenceResult.factors,
-              metadata: confidenceResult.metadata,
-            },
-          };
-        }),
-        pagination: {
-          total: result.total,
-          page: result.page,
-          limit: result.limit,
-          totalPages: result.totalPages,
-          hasMore: result.page < result.totalPages,
-        },
+        acceptances: result.acceptances.map((a) =>
+          enrichAcceptanceWithConfidence(a, { specialty: a.plan?.planType })
+        ),
+        pagination: buildPaginationMeta(result.total, result.page, result.limit),
       },
     });
   })
@@ -255,13 +186,7 @@ router.get(
           ...p,
           displayName: getProviderDisplayName(p),
         })),
-        pagination: {
-          total: result.total,
-          page: result.page,
-          limit: result.limit,
-          totalPages: result.totalPages,
-          hasMore: result.page < result.totalPages,
-        },
+        pagination: buildPaginationMeta(result.total, result.page, result.limit),
       },
     });
   })

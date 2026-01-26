@@ -10,14 +10,14 @@ import {
   getRecentVerifications,
   getVerificationsForPair,
 } from '../services/verificationService';
-import { getConfidenceLevel, getConfidenceLevelDescription, calculateConfidenceScore } from '../services/confidenceService';
+import { enrichAcceptanceWithConfidence } from '../services/confidenceService';
+import { npiParamSchema, planIdParamSchema } from '../schemas/commonSchemas';
+import { sendSuccess } from '../utils/responseHelpers';
 
 const router = Router();
 
 // Validation schemas
-const submitVerificationSchema = z.object({
-  npi: z.string().length(10).regex(/^\d+$/, 'NPI must be exactly 10 digits'),
-  planId: z.string().min(1).max(50),
+const submitVerificationSchema = npiParamSchema.merge(planIdParamSchema).extend({
   acceptsInsurance: z.boolean(),
   acceptsNewPatients: z.boolean().optional(),
   notes: z.string().max(1000).optional(),
@@ -35,15 +35,12 @@ const verificationIdParamSchema = z.object({
   verificationId: z.string().min(1),
 });
 
-const pairParamsSchema = z.object({
-  npi: z.string().length(10).regex(/^\d+$/),
-  planId: z.string().min(1).max(50),
-});
+const pairParamsSchema = npiParamSchema.merge(planIdParamSchema);
 
 const recentQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
-  npi: z.string().length(10).regex(/^\d+$/).optional(),
-  planId: z.string().min(1).max(50).optional(),
+  npi: npiParamSchema.shape.npi.optional(),
+  planId: planIdParamSchema.shape.planId.optional(),
 });
 
 /**
@@ -63,33 +60,11 @@ router.post(
       userAgent: req.get('User-Agent'),
     });
 
-    // Calculate full confidence breakdown using research-based scoring
-    const confidenceResult = calculateConfidenceScore({
-      dataSource: null, // Verification source tracked in VerificationLog
-      lastVerifiedAt: result.acceptance.lastVerified,
-      verificationCount: result.acceptance.verificationCount,
-      upvotes: 0,
-      downvotes: 0,
-      specialty: null,
-      taxonomyDescription: null,
-    });
-
     res.status(201).json({
       success: true,
       data: {
         verification: result.verification,
-        acceptance: {
-          ...result.acceptance,
-          confidenceLevel: confidenceResult.level,
-          confidenceDescription: confidenceResult.description,
-          confidence: {
-            score: confidenceResult.score,
-            level: confidenceResult.level,
-            description: confidenceResult.description,
-            factors: confidenceResult.factors,
-            metadata: confidenceResult.metadata,
-          },
-        },
+        acceptance: enrichAcceptanceWithConfidence(result.acceptance),
         message: 'Verification submitted successfully',
       },
     });
@@ -135,13 +110,7 @@ router.get(
   defaultRateLimiter,
   asyncHandler(async (req, res) => {
     const stats = await getVerificationStats();
-
-    res.json({
-      success: true,
-      data: {
-        stats,
-      },
-    });
+    sendSuccess(res, { stats });
   })
 );
 
@@ -161,13 +130,7 @@ router.get(
       planId: query.planId,
     });
 
-    res.json({
-      success: true,
-      data: {
-        verifications,
-        count: verifications.length,
-      },
-    });
+    sendSuccess(res, { verifications, count: verifications.length });
   })
 );
 
@@ -187,32 +150,12 @@ router.get(
       throw AppError.notFound('Provider or plan not found');
     }
 
-    let acceptanceWithConfidence = null;
-    if (result.acceptance) {
-      // Calculate full confidence breakdown using research-based scoring
-      const confidenceResult = calculateConfidenceScore({
-        dataSource: null, // Verification source tracked in VerificationLog
-        lastVerifiedAt: result.acceptance.lastVerified,
-        verificationCount: result.acceptance.verificationCount,
-        upvotes: result.summary.totalUpvotes,
-        downvotes: result.summary.totalDownvotes,
-        specialty: null,
-        taxonomyDescription: null,
-      });
-
-      acceptanceWithConfidence = {
-        ...result.acceptance,
-        confidenceLevel: confidenceResult.level,
-        confidenceDescription: confidenceResult.description,
-        confidence: {
-          score: confidenceResult.score,
-          level: confidenceResult.level,
-          description: confidenceResult.description,
-          factors: confidenceResult.factors,
-          metadata: confidenceResult.metadata,
-        },
-      };
-    }
+    const acceptanceWithConfidence = result.acceptance
+      ? enrichAcceptanceWithConfidence(result.acceptance, {
+          upvotes: result.summary.totalUpvotes,
+          downvotes: result.summary.totalDownvotes,
+        })
+      : null;
 
     res.json({
       success: true,

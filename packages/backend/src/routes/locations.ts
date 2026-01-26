@@ -9,33 +9,27 @@ import {
   getHealthSystems,
 } from '../services/locationService';
 import { getProviderDisplayName } from '../services/providerService';
+import { paginationSchema, stateQuerySchema } from '../schemas/commonSchemas';
+import { buildPaginationMeta, sendSuccess } from '../utils/responseHelpers';
 
 const router = Router();
 
 // Validation schemas
 const searchQuerySchema = z.object({
   search: z.string().min(1).max(200).optional(),
-  state: z.string().length(2).toUpperCase().optional(),
   city: z.string().min(1).max(100).optional(),
   cities: z.string().min(1).max(500).optional(), // Comma-separated cities
   zipCode: z.string().min(3).max(10).optional(),
   healthSystem: z.string().min(1).max(200).optional(),
   minProviders: z.coerce.number().int().min(1).optional(),
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-});
+}).merge(stateQuerySchema).merge(paginationSchema);
 
 const locationIdSchema = z.object({
   locationId: z.coerce.number().int().positive(),
 });
 
-const providersQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-});
-
 const stateParamSchema = z.object({
-  state: z.string().length(2).toUpperCase(),
+  state: stateQuerySchema.shape.state.unwrap(), // Required state (not optional)
 });
 
 /**
@@ -64,13 +58,7 @@ router.get(
       success: true,
       data: {
         locations: result.locations,
-        pagination: {
-          total: result.total,
-          page: result.page,
-          limit: result.limit,
-          totalPages: result.totalPages,
-          hasMore: result.page < result.totalPages,
-        },
+        pagination: buildPaginationMeta(result.total, result.page, result.limit),
       },
     });
   })
@@ -85,25 +73,16 @@ router.get(
   '/health-systems',
   defaultRateLimiter,
   asyncHandler(async (req, res) => {
-    const querySchema = z.object({
-      state: z.string().length(2).toUpperCase().optional(),
+    const query = stateQuerySchema.extend({
       cities: z.string().min(1).max(500).optional(), // Comma-separated cities
-    });
-
-    const query = querySchema.parse(req.query);
+    }).parse(req.query);
 
     const healthSystems = await getHealthSystems({
       state: query.state,
       cities: query.cities,
     });
 
-    res.json({
-      success: true,
-      data: {
-        healthSystems,
-        count: healthSystems.length,
-      },
-    });
+    sendSuccess(res, { healthSystems, count: healthSystems.length });
   })
 );
 
@@ -116,16 +95,8 @@ router.get(
   defaultRateLimiter,
   asyncHandler(async (req, res) => {
     const { state } = stateParamSchema.parse(req.params);
-
     const stats = await getLocationStatsByState(state);
-
-    res.json({
-      success: true,
-      data: {
-        state,
-        ...stats,
-      },
-    });
+    sendSuccess(res, { state, ...stats });
   })
 );
 
@@ -145,12 +116,7 @@ router.get(
       throw AppError.notFound(`Location with ID ${locationId} not found`);
     }
 
-    res.json({
-      success: true,
-      data: {
-        location: result.location,
-      },
-    });
+    sendSuccess(res, { location: result.location });
   })
 );
 
@@ -163,7 +129,7 @@ router.get(
   defaultRateLimiter,
   asyncHandler(async (req, res) => {
     const { locationId } = locationIdSchema.parse(req.params);
-    const query = providersQuerySchema.parse(req.query);
+    const query = paginationSchema.parse(req.query);
 
     const result = await getLocationById(locationId, {
       includeProviders: true,
@@ -183,13 +149,7 @@ router.get(
           ...p,
           displayName: getProviderDisplayName(p),
         })),
-        pagination: {
-          total: result.total,
-          page: result.page,
-          limit: result.limit,
-          totalPages: result.totalPages,
-          hasMore: result.page < result.totalPages,
-        },
+        pagination: buildPaginationMeta(result.total ?? 0, result.page ?? 1, result.limit ?? 20),
       },
     });
   })

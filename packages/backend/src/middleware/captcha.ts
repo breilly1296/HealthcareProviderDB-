@@ -1,5 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from './errorHandler';
+import {
+  CAPTCHA_MIN_SCORE,
+  CAPTCHA_API_TIMEOUT_MS,
+  CAPTCHA_FALLBACK_MAX_REQUESTS,
+  CAPTCHA_FALLBACK_WINDOW_MS,
+  RATE_LIMIT_CLEANUP_INTERVAL_MS,
+} from '../config/constants';
 
 /**
  * CAPTCHA Verification Middleware (Google reCAPTCHA v3)
@@ -38,8 +45,6 @@ import { AppError } from './errorHandler';
 
 const RECAPTCHA_SECRET = process.env.RECAPTCHA_SECRET_KEY;
 const RECAPTCHA_VERIFY_URL = 'https://www.google.com/recaptcha/api/siteverify';
-const MIN_SCORE = 0.5; // Threshold for bot detection (0.0 = bot, 1.0 = human)
-const API_TIMEOUT_MS = 5000; // 5 second timeout for Google API
 
 // Fail mode configuration
 type FailMode = 'open' | 'closed';
@@ -55,8 +60,6 @@ if (process.env.NODE_ENV !== 'development' && process.env.NODE_ENV !== 'test') {
 
 // Fallback rate limiting when CAPTCHA fails (much stricter than normal)
 // Normal verification limit: 10/hour. Fallback: 3/hour
-const FALLBACK_WINDOW_MS = 60 * 60 * 1000; // 1 hour
-const FALLBACK_MAX_REQUESTS = 3;
 const fallbackStore: Map<string, { count: number; resetAt: number }> = new Map();
 
 // Cleanup fallback store periodically
@@ -67,7 +70,7 @@ setInterval(() => {
       fallbackStore.delete(key);
     }
   });
-}, 60000); // Every minute
+}, RATE_LIMIT_CLEANUP_INTERVAL_MS);
 
 interface RecaptchaResponse {
   success: boolean;
@@ -88,15 +91,15 @@ function checkFallbackRateLimit(ip: string): { allowed: boolean; remaining: numb
 
   let entry = fallbackStore.get(key);
   if (!entry || entry.resetAt < now) {
-    entry = { count: 0, resetAt: now + FALLBACK_WINDOW_MS };
+    entry = { count: 0, resetAt: now + CAPTCHA_FALLBACK_WINDOW_MS };
     fallbackStore.set(key, entry);
   }
 
   entry.count++;
 
   return {
-    allowed: entry.count <= FALLBACK_MAX_REQUESTS,
-    remaining: Math.max(0, FALLBACK_MAX_REQUESTS - entry.count),
+    allowed: entry.count <= CAPTCHA_FALLBACK_MAX_REQUESTS,
+    remaining: Math.max(0, CAPTCHA_FALLBACK_MAX_REQUESTS - entry.count),
     resetAt: entry.resetAt,
   };
 }
@@ -143,7 +146,7 @@ export async function verifyCaptcha(req: Request, res: Response, next: NextFunct
 
     // Add timeout to prevent hanging on slow Google API responses
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+    const timeout = setTimeout(() => controller.abort(), CAPTCHA_API_TIMEOUT_MS);
 
     const response = await fetch(RECAPTCHA_VERIFY_URL, {
       method: 'POST',
@@ -166,11 +169,11 @@ export async function verifyCaptcha(req: Request, res: Response, next: NextFunct
     }
 
     // reCAPTCHA v3 returns a score (0.0 - 1.0)
-    if (data.score !== undefined && data.score < MIN_SCORE) {
+    if (data.score !== undefined && data.score < CAPTCHA_MIN_SCORE) {
       console.warn('[CAPTCHA] Low score - possible bot', {
         ip: clientIp,
         score: data.score,
-        threshold: MIN_SCORE,
+        threshold: CAPTCHA_MIN_SCORE,
         action: data.action,
         endpoint: req.path,
       });
@@ -209,14 +212,14 @@ export async function verifyCaptcha(req: Request, res: Response, next: NextFunct
 
     // Set headers indicating degraded security and fallback limits
     res.setHeader('X-Security-Degraded', 'captcha-unavailable');
-    res.setHeader('X-Fallback-RateLimit-Limit', FALLBACK_MAX_REQUESTS);
+    res.setHeader('X-Fallback-RateLimit-Limit', CAPTCHA_FALLBACK_MAX_REQUESTS);
     res.setHeader('X-Fallback-RateLimit-Remaining', fallbackResult.remaining);
     res.setHeader('X-Fallback-RateLimit-Reset', Math.ceil(fallbackResult.resetAt / 1000));
 
     if (!fallbackResult.allowed) {
       console.warn('[CAPTCHA] FAIL-OPEN: Fallback rate limit exceeded', {
         ip: clientIp,
-        limit: FALLBACK_MAX_REQUESTS,
+        limit: CAPTCHA_FALLBACK_MAX_REQUESTS,
         window: '1 hour',
         endpoint: req.path,
       });
@@ -228,7 +231,7 @@ export async function verifyCaptcha(req: Request, res: Response, next: NextFunct
     console.warn('[CAPTCHA] FAIL-OPEN: Allowing request with fallback rate limiting', {
       ip: clientIp,
       remaining: fallbackResult.remaining,
-      limit: FALLBACK_MAX_REQUESTS,
+      limit: CAPTCHA_FALLBACK_MAX_REQUESTS,
       endpoint: req.path,
     });
 

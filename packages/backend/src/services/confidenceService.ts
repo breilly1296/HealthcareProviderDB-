@@ -459,3 +459,49 @@ export function getConfidenceLevelDescription(level: string, verificationCount: 
       return 'Unknown confidence level';
   }
 }
+
+// ============================================================================
+// Acceptance Enrichment Helper
+// ============================================================================
+
+/**
+ * Enrich an acceptance record with full confidence breakdown.
+ * Eliminates duplicated confidence calculation pattern in route handlers.
+ *
+ * @param acceptance - The acceptance record with lastVerified and verificationCount
+ * @param options - Optional parameters for confidence calculation
+ * @returns The acceptance with confidence data attached
+ */
+export function enrichAcceptanceWithConfidence<T extends {
+  lastVerified: Date | null;
+  verificationCount: number | null;
+}>(
+  acceptance: T,
+  options: {
+    upvotes?: number;
+    downvotes?: number;
+    specialty?: string | null;
+    taxonomyDescription?: string | null;
+  } = {}
+): T & {
+  confidenceLevel: string;
+  confidenceDescription: string;
+  confidence: ConfidenceResult;
+} {
+  const confidenceResult = calculateConfidenceScore({
+    dataSource: null, // Verification source tracked in VerificationLog
+    lastVerifiedAt: acceptance.lastVerified,
+    verificationCount: acceptance.verificationCount || 0,
+    upvotes: options.upvotes || 0,
+    downvotes: options.downvotes || 0,
+    specialty: options.specialty || null,
+    taxonomyDescription: options.taxonomyDescription || null,
+  });
+
+  return {
+    ...acceptance,
+    confidenceLevel: confidenceResult.level,
+    confidenceDescription: confidenceResult.description,
+    confidence: confidenceResult,
+  };
+}

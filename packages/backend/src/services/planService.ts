@@ -2,6 +2,71 @@ import { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { getPaginationValues } from './utils';
 
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/** Fields that can be queried for distinct values */
+type DistinctableField = 'carrier' | 'planVariant' | 'issuerName' | 'planType' | 'sourceHealthSystem';
+
+/** Options for filtering distinct field queries */
+interface DistinctFieldOptions {
+  state?: string;
+  carrier?: string;
+  issuerName?: string;
+  sourceHealthSystem?: string;
+}
+
+/**
+ * Generic helper to get distinct values for a field with optional filters.
+ * Consolidates the repeated pattern used by getCarriers, getPlanVariants, etc.
+ */
+async function getDistinctField(
+  field: DistinctableField,
+  options: DistinctFieldOptions = {}
+): Promise<string[]> {
+  const { state, carrier, issuerName, sourceHealthSystem } = options;
+
+  // Build where clause - field must not be null
+  const where: Prisma.InsurancePlanWhereInput = {
+    [field]: { not: null },
+  };
+
+  // Apply optional filters
+  if (state) {
+    where.state = state.toUpperCase();
+  }
+
+  if (carrier) {
+    where.carrier = { contains: carrier, mode: 'insensitive' };
+  }
+
+  if (issuerName) {
+    where.issuerName = { contains: issuerName, mode: 'insensitive' };
+  }
+
+  if (sourceHealthSystem) {
+    where.sourceHealthSystem = { contains: sourceHealthSystem, mode: 'insensitive' };
+  }
+
+  // Query with distinct on the specified field
+  const plans = await prisma.insurancePlan.findMany({
+    where,
+    select: { [field]: true },
+    distinct: [field],
+    orderBy: { [field]: 'asc' },
+  });
+
+  // Filter out nulls and return as string array
+  return plans
+    .map(p => (p as Record<string, unknown>)[field] as string | null)
+    .filter((value): value is string => value !== null);
+}
+
+// ============================================================================
+// Types
+// ============================================================================
+
 export interface PlanSearchParams {
   issuerName?: string;
   carrier?: string;
@@ -100,33 +165,8 @@ export async function getPlanByPlanId(planId: string) {
 export async function getCarriers(options: {
   state?: string;
   sourceHealthSystem?: string;
-} = {}) {
-  const { state, sourceHealthSystem } = options;
-
-  const where: Prisma.InsurancePlanWhereInput = {
-    carrier: { not: null },
-  };
-
-  if (state) {
-    where.state = state.toUpperCase();
-  }
-
-  if (sourceHealthSystem) {
-    where.sourceHealthSystem = { contains: sourceHealthSystem, mode: 'insensitive' };
-  }
-
-  const plans = await prisma.insurancePlan.findMany({
-    where,
-    select: {
-      carrier: true,
-    },
-    distinct: ['carrier'],
-    orderBy: { carrier: 'asc' },
-  });
-
-  return plans
-    .filter(p => p.carrier)
-    .map(p => p.carrier!);
+} = {}): Promise<string[]> {
+  return getDistinctField('carrier', options);
 }
 
 /**
@@ -135,53 +175,15 @@ export async function getCarriers(options: {
 export async function getPlanVariants(options: {
   state?: string;
   carrier?: string;
-} = {}) {
-  const { state, carrier } = options;
-
-  const where: Prisma.InsurancePlanWhereInput = {
-    planVariant: { not: null },
-  };
-
-  if (state) {
-    where.state = state.toUpperCase();
-  }
-
-  if (carrier) {
-    where.carrier = { contains: carrier, mode: 'insensitive' };
-  }
-
-  const plans = await prisma.insurancePlan.findMany({
-    where,
-    select: {
-      planVariant: true,
-    },
-    distinct: ['planVariant'],
-    orderBy: { planVariant: 'asc' },
-  });
-
-  return plans
-    .filter(p => p.planVariant)
-    .map(p => p.planVariant!);
+} = {}): Promise<string[]> {
+  return getDistinctField('planVariant', options);
 }
 
 /**
  * Get all unique source health systems
  */
-export async function getSourceHealthSystems() {
-  const plans = await prisma.insurancePlan.findMany({
-    where: {
-      sourceHealthSystem: { not: null },
-    },
-    select: {
-      sourceHealthSystem: true,
-    },
-    distinct: ['sourceHealthSystem'],
-    orderBy: { sourceHealthSystem: 'asc' },
-  });
-
-  return plans
-    .filter(p => p.sourceHealthSystem)
-    .map(p => p.sourceHealthSystem!);
+export async function getSourceHealthSystems(): Promise<string[]> {
+  return getDistinctField('sourceHealthSystem');
 }
 
 /**
@@ -189,29 +191,8 @@ export async function getSourceHealthSystems() {
  */
 export async function getIssuers(options: {
   state?: string;
-} = {}) {
-  const { state } = options;
-
-  const where: Prisma.InsurancePlanWhereInput = {
-    issuerName: { not: null },
-  };
-
-  if (state) {
-    where.state = state.toUpperCase();
-  }
-
-  const plans = await prisma.insurancePlan.findMany({
-    where,
-    select: {
-      issuerName: true,
-    },
-    distinct: ['issuerName'],
-    orderBy: { issuerName: 'asc' },
-  });
-
-  return plans
-    .filter(p => p.issuerName)
-    .map(p => p.issuerName!);
+} = {}): Promise<string[]> {
+  return getDistinctField('issuerName', options);
 }
 
 /**
@@ -220,33 +201,8 @@ export async function getIssuers(options: {
 export async function getPlanTypes(options: {
   state?: string;
   issuerName?: string;
-} = {}) {
-  const { state, issuerName } = options;
-
-  const where: Prisma.InsurancePlanWhereInput = {
-    planType: { not: null },
-  };
-
-  if (state) {
-    where.state = state.toUpperCase();
-  }
-
-  if (issuerName) {
-    where.issuerName = { contains: issuerName, mode: 'insensitive' };
-  }
-
-  const plans = await prisma.insurancePlan.findMany({
-    where,
-    select: {
-      planType: true,
-    },
-    distinct: ['planType'],
-    orderBy: { planType: 'asc' },
-  });
-
-  return plans
-    .filter(p => p.planType)
-    .map(p => p.planType!);
+} = {}): Promise<string[]> {
+  return getDistinctField('planType', options);
 }
 
 /**

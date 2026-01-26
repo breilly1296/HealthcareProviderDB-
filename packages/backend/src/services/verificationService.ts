@@ -2,13 +2,15 @@ import { Prisma, VerificationType, VerificationSource } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { calculateConfidenceScore } from './confidenceService';
 import { AppError } from '../middleware/errorHandler';
+import {
+  VERIFICATION_TTL_MS,
+  SYBIL_PREVENTION_WINDOW_MS,
+  MIN_VERIFICATIONS_FOR_CONSENSUS,
+  MIN_CONFIDENCE_FOR_STATUS_CHANGE,
+} from '../config/constants';
 
-/**
- * TTL (Time To Live) for verifications
- * Based on research showing 12% annual provider turnover, verifications expire after 6 months.
- * This ensures data freshness while balancing verification effort.
- */
-export const VERIFICATION_TTL_MS = 6 * 30 * 24 * 60 * 60 * 1000; // 6 months in milliseconds
+// Re-export for consumers that import from this file
+export { VERIFICATION_TTL_MS };
 
 /**
  * Calculate expiration date for new verifications
@@ -29,6 +31,238 @@ function notExpiredFilter(): Prisma.VerificationLogWhereInput {
     ],
   };
 }
+
+// ============================================================================
+// Helper Functions for submitVerification
+// ============================================================================
+
+/**
+ * Validate that both provider and plan exist in the database
+ * @throws AppError.notFound if either doesn't exist
+ */
+async function validateProviderAndPlan(
+  npi: string,
+  planId: string
+): Promise<{ providerNpi: string; planId: string }> {
+  const provider = await prisma.provider.findUnique({
+    where: { npi },
+    select: { npi: true },
+  });
+
+  if (!provider) {
+    throw AppError.notFound(`Provider with NPI ${npi} not found`);
+  }
+
+  const plan = await prisma.insurancePlan.findUnique({
+    where: { planId },
+    select: { planId: true },
+  });
+
+  if (!plan) {
+    throw AppError.notFound(`Plan with ID ${planId} not found`);
+  }
+
+  return { providerNpi: provider.npi, planId: plan.planId };
+}
+
+/**
+ * Check for Sybil attack patterns - duplicate verifications from same IP or email
+ * @throws AppError.conflict if duplicate found within prevention window
+ */
+async function checkSybilAttack(
+  providerNpi: string,
+  planId: string,
+  sourceIp?: string,
+  submittedBy?: string
+): Promise<void> {
+  const cutoffDate = new Date(Date.now() - SYBIL_PREVENTION_WINDOW_MS);
+
+  // Check for duplicate verification from same IP
+  if (sourceIp) {
+    const existingFromIp = await prisma.verificationLog.findFirst({
+      where: {
+        providerNpi,
+        planId,
+        sourceIp,
+        createdAt: { gte: cutoffDate },
+      },
+    });
+
+    if (existingFromIp) {
+      throw AppError.conflict(
+        'You have already submitted a verification for this provider-plan pair within the last 30 days.'
+      );
+    }
+  }
+
+  // Check for duplicate verification from same email
+  if (submittedBy) {
+    const existingFromEmail = await prisma.verificationLog.findFirst({
+      where: {
+        providerNpi,
+        planId,
+        submittedBy,
+        createdAt: { gte: cutoffDate },
+      },
+    });
+
+    if (existingFromEmail) {
+      throw AppError.conflict(
+        'This email has already submitted a verification for this provider-plan pair within the last 30 days.'
+      );
+    }
+  }
+}
+
+/**
+ * Count verification consensus - how many ACCEPTED vs NOT_ACCEPTED verifications exist
+ * @param includeNewStatus - whether to include a new submission in the count
+ */
+async function countVerificationConsensus(
+  providerNpi: string,
+  planId: string,
+  newStatus?: 'ACCEPTED' | 'NOT_ACCEPTED'
+): Promise<{ acceptedCount: number; notAcceptedCount: number }> {
+  const pastVerifications = await prisma.verificationLog.findMany({
+    where: {
+      providerNpi,
+      planId,
+      verificationType: VerificationType.PLAN_ACCEPTANCE,
+      ...notExpiredFilter(),
+    },
+    select: { newValue: true },
+  });
+
+  let acceptedCount = 0;
+  let notAcceptedCount = 0;
+
+  // Include new submission in the count if provided
+  if (newStatus === 'ACCEPTED') {
+    acceptedCount++;
+  } else if (newStatus === 'NOT_ACCEPTED') {
+    notAcceptedCount++;
+  }
+
+  // Count past verifications by their actual acceptanceStatus value
+  for (const v of pastVerifications) {
+    const pastValue = v.newValue as { acceptanceStatus?: string } | null;
+    if (pastValue?.acceptanceStatus === 'ACCEPTED') {
+      acceptedCount++;
+    } else if (pastValue?.acceptanceStatus === 'NOT_ACCEPTED') {
+      notAcceptedCount++;
+    }
+  }
+
+  return { acceptedCount, notAcceptedCount };
+}
+
+/**
+ * Determine the final acceptance status based on consensus logic
+ * Security: Requires 3+ verifications, score >= 60, and clear 2:1 majority ratio
+ */
+function determineAcceptanceStatus(
+  currentStatus: string | null,
+  verificationCount: number,
+  confidenceScore: number,
+  counts: { acceptedCount: number; notAcceptedCount: number }
+): string {
+  const { acceptedCount, notAcceptedCount } = counts;
+
+  // Check if consensus requirements are met
+  const hasClearMajority = acceptedCount > notAcceptedCount * 2 || notAcceptedCount > acceptedCount * 2;
+  const shouldUpdateStatus =
+    verificationCount >= MIN_VERIFICATIONS_FOR_CONSENSUS &&
+    confidenceScore >= MIN_CONFIDENCE_FOR_STATUS_CHANGE &&
+    hasClearMajority;
+
+  if (shouldUpdateStatus) {
+    // Consensus reached - update status based on majority
+    return acceptedCount > notAcceptedCount ? 'ACCEPTED' : 'NOT_ACCEPTED';
+  }
+
+  // No consensus - keep existing status, or set to PENDING if currently UNKNOWN
+  return currentStatus === 'UNKNOWN' ? 'PENDING' : (currentStatus || 'PENDING');
+}
+
+/**
+ * Create or update the ProviderPlanAcceptance record
+ */
+async function upsertAcceptance(
+  providerNpi: string,
+  planId: string,
+  newStatus: 'ACCEPTED' | 'NOT_ACCEPTED',
+  verificationId: string,
+  existingAcceptance: Awaited<ReturnType<typeof prisma.providerPlanAcceptance.findUnique>> | null
+): Promise<NonNullable<Awaited<ReturnType<typeof prisma.providerPlanAcceptance.findUnique>>>> {
+  if (existingAcceptance) {
+    // Update existing acceptance
+    const verificationCount = (existingAcceptance.verificationCount || 0) + 1;
+    const counts = await countVerificationConsensus(providerNpi, planId, newStatus);
+
+    // For confidence scoring, upvotes = majority count, downvotes = minority count
+    const upvotes = Math.max(counts.acceptedCount, counts.notAcceptedCount);
+    const downvotes = Math.min(counts.acceptedCount, counts.notAcceptedCount);
+
+    const { score } = calculateConfidenceScore({
+      dataSource: VerificationSource.CROWDSOURCE,
+      lastVerifiedAt: new Date(),
+      verificationCount,
+      upvotes,
+      downvotes,
+    });
+
+    const finalStatus = determineAcceptanceStatus(
+      existingAcceptance.acceptanceStatus,
+      verificationCount,
+      score,
+      counts
+    );
+
+    return prisma.providerPlanAcceptance.update({
+      where: { id: existingAcceptance.id },
+      data: {
+        acceptanceStatus: finalStatus,
+        lastVerified: new Date(),
+        verificationCount,
+        confidenceScore: score,
+        expiresAt: getExpirationDate(),
+      },
+    });
+  } else {
+    // Create new acceptance - starts as PENDING until consensus threshold is reached
+    const { score } = calculateConfidenceScore({
+      dataSource: VerificationSource.CROWDSOURCE,
+      lastVerifiedAt: new Date(),
+      verificationCount: 1,
+      upvotes: 1,
+      downvotes: 0,
+    });
+
+    const acceptance = await prisma.providerPlanAcceptance.create({
+      data: {
+        providerNpi,
+        planId,
+        acceptanceStatus: 'PENDING',
+        lastVerified: new Date(),
+        verificationCount: 1,
+        confidenceScore: score,
+        expiresAt: getExpirationDate(),
+      },
+    });
+
+    // Update verification with acceptance ID
+    await prisma.verificationLog.update({
+      where: { id: verificationId },
+      data: { acceptanceId: acceptance.id.toString() },
+    });
+
+    return acceptance;
+  }
+}
+
+// ============================================================================
+// Types
+// ============================================================================
 
 /**
  * Research-based verification input
@@ -92,96 +326,43 @@ export async function submitVerification(input: SubmitVerificationInput) {
     userAgent,
   } = input;
 
-  // Find provider
-  const provider = await prisma.provider.findUnique({
-    where: { npi },
-    select: { npi: true },
-  });
+  // Step 1: Validate provider and plan exist
+  const { providerNpi, planId: validPlanId } = await validateProviderAndPlan(npi, planId);
 
-  if (!provider) {
-    throw AppError.notFound(`Provider with NPI ${npi} not found`);
-  }
+  // Step 2: Check for Sybil attack patterns
+  await checkSybilAttack(providerNpi, validPlanId, sourceIp, submittedBy);
 
-  // Find plan (planId is now the primary key)
-  const plan = await prisma.insurancePlan.findUnique({
-    where: { planId },
-    select: { planId: true },
-  });
-
-  if (!plan) {
-    throw AppError.notFound(`Plan with ID ${planId} not found`);
-  }
-
-  // Sybil attack prevention: Check for duplicate verification from same IP
-  if (sourceIp) {
-    const existingFromIp = await prisma.verificationLog.findFirst({
-      where: {
-        providerNpi: provider.npi,
-        planId: plan.planId,
-        sourceIp: sourceIp,
-        createdAt: {
-          gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days
-        },
-      },
-    });
-
-    if (existingFromIp) {
-      throw AppError.conflict(
-        'You have already submitted a verification for this provider-plan pair within the last 30 days.'
-      );
-    }
-  }
-
-  // Sybil attack prevention: Check for duplicate verification from same email
-  if (submittedBy) {
-    const existingFromEmail = await prisma.verificationLog.findFirst({
-      where: {
-        providerNpi: provider.npi,
-        planId: plan.planId,
-        submittedBy: submittedBy,
-        createdAt: {
-          gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days
-        },
-      },
-    });
-
-    if (existingFromEmail) {
-      throw AppError.conflict(
-        'This email has already submitted a verification for this provider-plan pair within the last 30 days.'
-      );
-    }
-  }
-
-  // Find or create acceptance record
-  let acceptance = await prisma.providerPlanAcceptance.findUnique({
+  // Step 3: Get existing acceptance record for previousValue
+  const existingAcceptance = await prisma.providerPlanAcceptance.findUnique({
     where: {
       providerNpi_planId: {
-        providerNpi: provider.npi,
-        planId: plan.planId,
+        providerNpi,
+        planId: validPlanId,
       },
     },
   });
 
-  const previousValue = acceptance ? {
-    acceptanceStatus: acceptance.acceptanceStatus,
-    confidenceScore: acceptance.confidenceScore,
-  } : null;
+  const previousValue = existingAcceptance
+    ? {
+        acceptanceStatus: existingAcceptance.acceptanceStatus,
+        confidenceScore: existingAcceptance.confidenceScore,
+      }
+    : null;
 
   const newStatus = acceptsInsurance ? 'ACCEPTED' : 'NOT_ACCEPTED';
 
-  // Create verification log with TTL
+  // Step 4: Create verification log with TTL
   const verification = await prisma.verificationLog.create({
     data: {
-      providerNpi: provider.npi,
-      planId: plan.planId,
-      acceptanceId: acceptance?.id.toString(),
+      providerNpi,
+      planId: validPlanId,
+      acceptanceId: existingAcceptance?.id.toString(),
       verificationType: VerificationType.PLAN_ACCEPTANCE,
       verificationSource: VerificationSource.CROWDSOURCE,
       previousValue: previousValue as Prisma.InputJsonValue,
       newValue: {
         acceptanceStatus: newStatus,
         acceptsNewPatients,
-        // Research-based contact verification
         phoneReached,
         phoneCorrect,
         scheduledAppointment,
@@ -193,118 +374,18 @@ export async function submitVerification(input: SubmitVerificationInput) {
       userAgent,
       upvotes: 0,
       downvotes: 0,
-      expiresAt: getExpirationDate(), // TTL: expires after 6 months
+      expiresAt: getExpirationDate(),
     },
   });
 
-  // Update or create acceptance record
-  if (acceptance) {
-    // Get existing verification stats
-    const verificationCount = (acceptance.verificationCount || 0) + 1;
-
-    // Query all non-expired verifications for this provider-plan pair to count agreement
-    const pastVerifications = await prisma.verificationLog.findMany({
-      where: {
-        providerNpi: provider.npi,
-        planId: plan.planId,
-        verificationType: VerificationType.PLAN_ACCEPTANCE,
-        ...notExpiredFilter(), // Exclude expired verifications from consensus
-      },
-      select: {
-        newValue: true,
-      },
-    });
-
-    // Count ACCEPTED vs NOT_ACCEPTED directly (not agreement with new submission)
-    // This prevents an attacker from flipping status by submitting the opposite value
-    let acceptedCount = 0;
-    let notAcceptedCount = 0;
-
-    // Include current submission in the count
-    if (newStatus === 'ACCEPTED') {
-      acceptedCount++;
-    } else {
-      notAcceptedCount++;
-    }
-
-    // Count past verifications by their actual acceptanceStatus value
-    for (const v of pastVerifications) {
-      const pastValue = v.newValue as { acceptanceStatus?: string } | null;
-      if (pastValue?.acceptanceStatus === 'ACCEPTED') {
-        acceptedCount++;
-      } else if (pastValue?.acceptanceStatus === 'NOT_ACCEPTED') {
-        notAcceptedCount++;
-      }
-    }
-
-    // For confidence scoring, upvotes = majority count, downvotes = minority count
-    const upvotes = Math.max(acceptedCount, notAcceptedCount);
-    const downvotes = Math.min(acceptedCount, notAcceptedCount);
-
-    // Calculate new confidence score with accurate agreement data
-    const { score, factors } = calculateConfidenceScore({
-      dataSource: VerificationSource.CROWDSOURCE,
-      lastVerifiedAt: new Date(),
-      verificationCount,
-      upvotes,
-      downvotes,
-    });
-
-    // Security fix: Only change acceptanceStatus when consensus is reached
-    // Requires: verificationCount >= 3, score >= 60, and clear majority (2:1 ratio)
-    const hasClearMajority = acceptedCount > notAcceptedCount * 2 || notAcceptedCount > acceptedCount * 2;
-    const shouldUpdateStatus = verificationCount >= 3 && score >= 60 && hasClearMajority;
-
-    let finalStatus: string;
-    if (shouldUpdateStatus) {
-      // Consensus reached - update status based on majority
-      finalStatus = acceptedCount > notAcceptedCount ? 'ACCEPTED' : 'NOT_ACCEPTED';
-    } else {
-      // No consensus - keep existing status, or set to PENDING if currently UNKNOWN
-      finalStatus = acceptance.acceptanceStatus === 'UNKNOWN'
-        ? 'PENDING'
-        : acceptance.acceptanceStatus || 'PENDING';
-    }
-
-    acceptance = await prisma.providerPlanAcceptance.update({
-      where: { id: acceptance.id },
-      data: {
-        acceptanceStatus: finalStatus,
-        lastVerified: new Date(),
-        verificationCount,
-        confidenceScore: score,
-        expiresAt: getExpirationDate(), // Reset TTL on new verification
-      },
-    });
-  } else {
-    const { score, factors } = calculateConfidenceScore({
-      dataSource: VerificationSource.CROWDSOURCE,
-      lastVerifiedAt: new Date(),
-      verificationCount: 1,
-      upvotes: 1,
-      downvotes: 0,
-    });
-
-    // Security fix: First verification cannot set ACCEPTED/NOT_ACCEPTED
-    // Status starts as PENDING until consensus threshold is reached
-    acceptance = await prisma.providerPlanAcceptance.create({
-      data: {
-        providerNpi: provider.npi,
-        planId: plan.planId,
-        acceptanceStatus: 'PENDING',
-        lastVerified: new Date(),
-        verificationCount: 1,
-        confidenceScore: score,
-        expiresAt: getExpirationDate(), // TTL: expires after 6 months
-      },
-    });
-
-    // Update verification with acceptance ID
-    await prisma.verificationLog.update({
-      where: { id: verification.id },
-      data: { acceptanceId: acceptance.id.toString() },
-    });
-  }
+  // Step 5: Create or update acceptance record
+  const acceptance = await upsertAcceptance(
+    providerNpi,
+    validPlanId,
+    newStatus,
+    verification.id,
+    existingAcceptance
+  );
 
   return {
     verification: stripVerificationPII(verification),
