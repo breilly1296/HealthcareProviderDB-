@@ -9,111 +9,9 @@ import { parse } from 'csv-parse';
 import { createHash } from 'crypto';
 import path from 'path';
 import pg from 'pg';
+import { getSpecialtyCategory } from '../src/taxonomy-mappings';
 
 const { Pool, Client } = pg;
-
-// Prefix-based taxonomy to specialty mappings (ordered by specificity - longest first)
-const PREFIX_MAPPINGS: [string, string][] = [
-  // Specific mappings first (longer prefixes)
-  ['207RH0003', 'ONCOLOGY'],
-  ['207RG0100', 'GASTROENTEROLOGY'],
-  ['207RI0200', 'INFECTIOUS_DISEASE'],
-  ['207RI0011', 'ENDOCRINOLOGY'],
-  ['261QE0700', 'ENDOCRINOLOGY'],
-  ['261QR0401', 'RHEUMATOLOGY'],
-  ['207RG0300', 'GERIATRICS'],
-  ['207RC', 'CARDIOLOGY'],
-  ['2084N', 'NEUROLOGY'],
-  ['207RX', 'ONCOLOGY'],
-  ['207RP', 'PULMONOLOGY'],
-  ['207RN', 'NEPHROLOGY'],
-  ['207RE', 'ENDOCRINOLOGY'],
-  ['207RR', 'RHEUMATOLOGY'],
-  ['207QG', 'GERIATRICS'],
-  ['247100', 'RADIOLOGY'],
-
-  // Mental Health & Behavioral
-  ['101Y', 'MENTAL_HEALTH'],
-  ['103', 'PSYCHOLOGY'],
-  ['104', 'SOCIAL_WORK'],
-  ['106', 'MENTAL_HEALTH'],
-  ['2084', 'PSYCHIATRY'],
-  ['373', 'MENTAL_HEALTH'],
-
-  // Nursing
-  ['163W', 'NURSING'],
-  ['164', 'NURSING'],
-  ['363L', 'NURSE_PRACTITIONER'],
-  ['363A', 'PHYSICIAN_ASSISTANT'],
-
-  // Dental & Vision
-  ['122', 'DENTISTRY'],
-  ['124', 'DENTISTRY'],
-  ['125', 'DENTISTRY'],
-  ['126', 'DENTISTRY'],
-  ['152W', 'OPTOMETRY'],
-  ['156', 'OPTOMETRY'],
-
-  // Pharmacy
-  ['183', 'PHARMACY'],
-  ['331', 'PHARMACY'],
-  ['332', 'PHARMACY'],
-  ['333', 'PHARMACY'],
-
-  // Therapy
-  ['2251', 'PHYSICAL_THERAPY'],
-  ['2252', 'PHYSICAL_THERAPY'],
-  ['225X', 'OCCUPATIONAL_THERAPY'],
-  ['224Z', 'OCCUPATIONAL_THERAPY'],
-  ['2257', 'SPEECH_THERAPY'],
-  ['235', 'SPEECH_THERAPY'],
-  ['237', 'SPEECH_THERAPY'],
-  ['367', 'RESPIRATORY_THERAPY'],
-  ['111N', 'CHIROPRACTIC'],
-  ['1711', 'ACUPUNCTURE'],
-
-  // Medical Specialties
-  ['207P', 'EMERGENCY_MEDICINE'],
-  ['2080', 'PEDIATRICS'],
-  ['207L', 'ANESTHESIOLOGY'],
-  ['2086', 'SURGERY'],
-  ['208G', 'SURGERY'],
-  ['207V', 'OB_GYN'],
-  ['2085', 'RADIOLOGY'],
-  ['207N', 'DERMATOLOGY'],
-  ['2088', 'UROLOGY'],
-  ['207K', 'ALLERGY_IMMUNOLOGY'],
-  ['207Z', 'PATHOLOGY'],
-  ['207X', 'ORTHOPEDICS'],
-  ['207Q', 'FAMILY_MEDICINE'],
-  ['207R', 'INTERNAL_MEDICINE'],
-
-  // Support Services
-  ['133', 'DIETETICS'],
-  ['136', 'DIETETICS'],
-  ['374', 'LAB_PATHOLOGY'],
-  ['246', 'LAB_PATHOLOGY'],
-  ['247', 'LAB_PATHOLOGY'],
-  ['291', 'LAB_PATHOLOGY'],
-  ['292', 'LAB_PATHOLOGY'],
-  ['293', 'LAB_PATHOLOGY'],
-  ['310', 'DME_PROSTHETICS'],
-  ['332B', 'DME_PROSTHETICS'],
-  ['335', 'DME_PROSTHETICS'],
-  ['172V', 'COMMUNITY_HEALTH'],
-  ['251', 'COMMUNITY_HEALTH'],
-  ['171M', 'MIDWIFERY'],
-  ['176B', 'MIDWIFERY'],
-  ['315', 'HOSPICE_PALLIATIVE'],
-
-  // Facilities
-  ['261Q', 'CLINIC_FACILITY'],
-  ['193', 'CLINIC_FACILITY'],
-  ['390', 'CLINIC_FACILITY'],
-  ['27', 'HOSPITAL'],
-  ['28', 'HOSPITAL'],
-  ['31', 'HOME_HEALTH'],
-];
 
 interface NPIRecord {
   NPI: string;
@@ -166,20 +64,6 @@ function cleanPhone(phone: string): string | null {
   if (!phone) return null;
   const cleaned = phone.replace(/\D/g, '');
   return cleaned.length >= 10 ? cleaned : null;
-}
-
-function getSpecialtyCategory(taxonomyCode: string | null | undefined): string {
-  if (!taxonomyCode) return 'OTHER';
-
-  // Sort by prefix length (longest first) for correct matching
-  const sortedMappings = [...PREFIX_MAPPINGS].sort((a, b) => b[0].length - a[0].length);
-
-  for (const [prefix, category] of sortedMappings) {
-    if (taxonomyCode.startsWith(prefix)) {
-      return category;
-    }
-  }
-  return 'OTHER';
 }
 
 function extractSecondaryTaxonomies(record: NPIRecord): string[] {
@@ -395,12 +279,14 @@ async function importNPIData(filePath: string, databaseUrl: string): Promise<Imp
     const entityTypeCode = record['Entity Type Code'];
     const primaryTaxonomy = record['Healthcare Provider Taxonomy Code_1'];
 
-    // Skip deactivated providers (deactivated and not reactivated)
-    const deactivationDate = record['NPI Deactivation Date'];
-    const reactivationDate = record['NPI Reactivation Date'];
+    // Skip deactivated providers (deactivated and not reactivated, or reactivation before deactivation)
+    const deactivationDate = parseDate(record['NPI Deactivation Date']);
+    const reactivationDate = parseDate(record['NPI Reactivation Date']);
 
-    if (deactivationDate && deactivationDate.trim() !== '' &&
-        (!reactivationDate || reactivationDate.trim() === '')) {
+    // A provider is currently deactivated if:
+    // - Has a valid deactivation date AND
+    // - (No valid reactivation date OR reactivation date is before deactivation date)
+    if (deactivationDate && (!reactivationDate || reactivationDate < deactivationDate)) {
       stats.skippedDeactivated++;
       stats.skippedRecords++;
       continue;

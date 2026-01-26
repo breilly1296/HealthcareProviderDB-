@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { timingSafeEqual } from 'crypto';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { cleanupExpiredVerifications, getExpirationStats } from '../services/verificationService';
 
@@ -30,7 +31,17 @@ function adminAuthMiddleware(req: Request, res: Response, next: NextFunction) {
 
   const providedSecret = req.headers['x-admin-secret'];
 
-  if (!providedSecret || providedSecret !== adminSecret) {
+  // Use timing-safe comparison to prevent timing attacks
+  const providedBuffer = Buffer.from(String(providedSecret || ''));
+  const secretBuffer = Buffer.from(adminSecret);
+
+  // timingSafeEqual requires equal length buffers, so check length first
+  // Then use constant-time comparison to prevent timing-based secret extraction
+  const isValid =
+    providedBuffer.length === secretBuffer.length &&
+    timingSafeEqual(providedBuffer, secretBuffer);
+
+  if (!isValid) {
     throw AppError.unauthorized('Invalid or missing admin secret');
   }
 

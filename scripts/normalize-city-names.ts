@@ -1,12 +1,22 @@
 /**
- * NYC City Name Normalization Script
+ * City Name Normalization Script
  *
- * Normalizes inconsistent city names in the providers table for NYC data.
- * Handles variations in borough names, neighborhoods, and common typos.
+ * Normalizes inconsistent city names in the providers table for major metro areas.
+ * Handles variations in city names, neighborhoods, and common typos.
+ *
+ * Supported metros:
+ *   - New York City (NY) - boroughs and neighborhoods
+ *   - Los Angeles (CA) - neighborhoods and unincorporated areas
+ *   - Chicago (IL) - neighborhoods
+ *   - Houston (TX) - neighborhoods and surrounding areas
+ *   - Phoenix (AZ) - neighborhoods and surrounding cities
+ *   - Philadelphia (PA) - neighborhoods
  *
  * Usage:
- *   npx tsx scripts/normalize-city-names.ts          # DRY RUN (preview changes)
- *   npx tsx scripts/normalize-city-names.ts --apply  # Apply changes
+ *   npx tsx scripts/normalize-city-names.ts                    # DRY RUN (all metros)
+ *   npx tsx scripts/normalize-city-names.ts --apply            # Apply changes (all metros)
+ *   npx tsx scripts/normalize-city-names.ts --state NY         # Specific state only
+ *   npx tsx scripts/normalize-city-names.ts --state NY --apply # Apply for specific state
  */
 
 import pg from 'pg';
@@ -15,7 +25,17 @@ import 'dotenv/config';
 const { Pool } = pg;
 
 // ============================================================================
-// NYC CITY NAME MAPPINGS (100+ variations)
+// TYPE DEFINITIONS
+// ============================================================================
+
+interface MetroConfig {
+  states: string[];       // State codes this metro belongs to
+  primaryCity: string;    // Main city name for the metro
+  mappings: Record<string, string>;  // Neighborhood/variation -> normalized name
+}
+
+// ============================================================================
+// NYC CITY NAME MAPPINGS
 // ============================================================================
 
 // Normalized borough names
@@ -404,16 +424,713 @@ const NYC_CITY_MAPPINGS: Record<string, string> = {
 };
 
 // ============================================================================
+// LOS ANGELES AREA MAPPINGS (CA)
+// ============================================================================
+
+const LA_CITY_MAPPINGS: Record<string, string> = {
+  // Main city variations
+  'LOS ANGELES': 'Los Angeles',
+  'LA': 'Los Angeles',
+  'L.A.': 'Los Angeles',
+  'L A': 'Los Angeles',
+  'LOS ANGELAS': 'Los Angeles',
+  'LOS ANGLES': 'Los Angeles',
+  'LOSANGELES': 'Los Angeles',
+  'LOS  ANGELES': 'Los Angeles',
+  'LOS ANGELES CA': 'Los Angeles',
+  'LOS ANGELES, CA': 'Los Angeles',
+
+  // LA Neighborhoods (map to Los Angeles)
+  'HOLLYWOOD': 'Los Angeles',
+  'WEST HOLLYWOOD': 'West Hollywood', // Separate city
+  'WEHO': 'West Hollywood',
+  'EAST HOLLYWOOD': 'Los Angeles',
+  'NORTH HOLLYWOOD': 'Los Angeles',
+  'NOHO': 'Los Angeles',
+  'STUDIO CITY': 'Los Angeles',
+  'SHERMAN OAKS': 'Los Angeles',
+  'ENCINO': 'Los Angeles',
+  'TARZANA': 'Los Angeles',
+  'WOODLAND HILLS': 'Los Angeles',
+  'CANOGA PARK': 'Los Angeles',
+  'CHATSWORTH': 'Los Angeles',
+  'NORTHRIDGE': 'Los Angeles',
+  'GRANADA HILLS': 'Los Angeles',
+  'PORTER RANCH': 'Los Angeles',
+  'SYLMAR': 'Los Angeles',
+  'SAN FERNANDO': 'San Fernando', // Separate city
+  'PACOIMA': 'Los Angeles',
+  'ARLETA': 'Los Angeles',
+  'SUN VALLEY': 'Los Angeles',
+  'SUNLAND': 'Los Angeles',
+  'TUJUNGA': 'Los Angeles',
+  'SHADOW HILLS': 'Los Angeles',
+  'LA TUNA CANYON': 'Los Angeles',
+  'LAKE VIEW TERRACE': 'Los Angeles',
+  'PANORAMA CITY': 'Los Angeles',
+  'VAN NUYS': 'Los Angeles',
+  'VALLEY VILLAGE': 'Los Angeles',
+  'RESEDA': 'Los Angeles',
+  'LAKE BALBOA': 'Los Angeles',
+  'WINNETKA': 'Los Angeles',
+  'WEST HILLS': 'Los Angeles',
+
+  // Westside neighborhoods
+  'WESTWOOD': 'Los Angeles',
+  'BEL AIR': 'Los Angeles',
+  'BEL-AIR': 'Los Angeles',
+  'BELAIR': 'Los Angeles',
+  'BRENTWOOD': 'Los Angeles',
+  'PACIFIC PALISADES': 'Los Angeles',
+  'MAR VISTA': 'Los Angeles',
+  'PALMS': 'Los Angeles',
+  'WEST LA': 'Los Angeles',
+  'WEST LOS ANGELES': 'Los Angeles',
+  'SAWTELLE': 'Los Angeles',
+  'CENTURY CITY': 'Los Angeles',
+  'CHEVIOT HILLS': 'Los Angeles',
+  'RANCHO PARK': 'Los Angeles',
+  'PLAYA DEL REY': 'Los Angeles',
+  'PLAYA VISTA': 'Los Angeles',
+  'MARINA DEL REY': 'Los Angeles',
+  'VENICE': 'Los Angeles',
+  'VENICE BEACH': 'Los Angeles',
+
+  // South LA neighborhoods
+  'SOUTH LA': 'Los Angeles',
+  'SOUTH LOS ANGELES': 'Los Angeles',
+  'WATTS': 'Los Angeles',
+  'COMPTON': 'Compton', // Separate city
+  'WILLOWBROOK': 'Los Angeles',
+  'FLORENCE': 'Los Angeles',
+  'FLORENCE-FIRESTONE': 'Los Angeles',
+  'SOUTH CENTRAL': 'Los Angeles',
+  'SOUTH CENTRAL LA': 'Los Angeles',
+  'HYDE PARK': 'Los Angeles',
+  'LEIMERT PARK': 'Los Angeles',
+  'BALDWIN HILLS': 'Los Angeles',
+  'VIEW PARK': 'Los Angeles',
+  'CRENSHAW': 'Los Angeles',
+  'JEFFERSON PARK': 'Los Angeles',
+  'WEST ADAMS': 'Los Angeles',
+  'EXPOSITION PARK': 'Los Angeles',
+  'VERMONT SQUARE': 'Los Angeles',
+  'VERMONT KNOLLS': 'Los Angeles',
+  'HARBOR CITY': 'Los Angeles',
+  'HARBOR GATEWAY': 'Los Angeles',
+  'WILMINGTON': 'Los Angeles',
+  'SAN PEDRO': 'Los Angeles',
+
+  // Central/East LA neighborhoods
+  'DOWNTOWN LA': 'Los Angeles',
+  'DOWNTOWN LOS ANGELES': 'Los Angeles',
+  'DTLA': 'Los Angeles',
+  'KOREATOWN': 'Los Angeles',
+  'K-TOWN': 'Los Angeles',
+  'KTOWN': 'Los Angeles',
+  'ECHO PARK': 'Los Angeles',
+  'SILVER LAKE': 'Los Angeles',
+  'SILVERLAKE': 'Los Angeles',
+  'LOS FELIZ': 'Los Angeles',
+  'ATWATER VILLAGE': 'Los Angeles',
+  'GLASSELL PARK': 'Los Angeles',
+  'CYPRESS PARK': 'Los Angeles',
+  'HIGHLAND PARK': 'Los Angeles',
+  'EAGLE ROCK': 'Los Angeles',
+  'MT WASHINGTON': 'Los Angeles',
+  'MOUNT WASHINGTON': 'Los Angeles',
+  'EL SERENO': 'Los Angeles',
+  'LINCOLN HEIGHTS': 'Los Angeles',
+  'BOYLE HEIGHTS': 'Los Angeles',
+  'EAST LA': 'East Los Angeles', // Unincorporated area
+  'EAST LOS ANGELES': 'East Los Angeles',
+  'CITY TERRACE': 'Los Angeles',
+
+  // Northeast LA
+  'SUNLAND-TUJUNGA': 'Los Angeles',
+  'LA CRESCENTA': 'La Crescenta-Montrose', // Unincorporated
+  'MONTROSE': 'La Crescenta-Montrose',
+
+  // Separate cities in LA metro (keep as-is but normalize spelling)
+  'BEVERLY HILLS': 'Beverly Hills',
+  'SANTA MONICA': 'Santa Monica',
+  'CULVER CITY': 'Culver City',
+  'INGLEWOOD': 'Inglewood',
+  'HAWTHORNE': 'Hawthorne',
+  'GARDENA': 'Gardena',
+  'TORRANCE': 'Torrance',
+  'REDONDO BEACH': 'Redondo Beach',
+  'HERMOSA BEACH': 'Hermosa Beach',
+  'MANHATTAN BEACH CA': 'Manhattan Beach',
+  'EL SEGUNDO': 'El Segundo',
+  'BURBANK': 'Burbank',
+  'GLENDALE': 'Glendale',
+  'PASADENA': 'Pasadena',
+  'LONG BEACH': 'Long Beach',
+  'LONG BEACH CA': 'Long Beach',
+  'CARSON': 'Carson',
+  'LAKEWOOD': 'Lakewood',
+  'DOWNEY': 'Downey',
+  'NORWALK': 'Norwalk',
+  'CERRITOS': 'Cerritos',
+  'WHITTIER': 'Whittier',
+  'POMONA': 'Pomona',
+  'ARCADIA': 'Arcadia',
+  'MONROVIA': 'Monrovia',
+  'AZUSA': 'Azusa',
+  'COVINA': 'Covina',
+  'WEST COVINA': 'West Covina',
+  'ALHAMBRA': 'Alhambra',
+  'MONTEREY PARK': 'Monterey Park',
+  'ROSEMEAD': 'Rosemead',
+  'SAN GABRIEL': 'San Gabriel',
+  'EL MONTE': 'El Monte',
+  'SOUTH EL MONTE': 'South El Monte',
+  'HUNTINGTON PARK': 'Huntington Park',
+  'BELL': 'Bell',
+  'BELL GARDENS': 'Bell Gardens',
+  'SOUTH GATE': 'South Gate',
+  'LYNWOOD': 'Lynwood',
+  'PARAMOUNT': 'Paramount',
+  'BELLFLOWER': 'Bellflower',
+};
+
+// ============================================================================
+// CHICAGO AREA MAPPINGS (IL)
+// ============================================================================
+
+const CHICAGO_CITY_MAPPINGS: Record<string, string> = {
+  // Main city variations
+  'CHICAGO': 'Chicago',
+  'CHI': 'Chicago',
+  'CHGO': 'Chicago',
+  'CHICAO': 'Chicago',
+  'CHICGO': 'Chicago',
+  'CHICAGP': 'Chicago',
+  'CHICAGO IL': 'Chicago',
+  'CHICAGO, IL': 'Chicago',
+
+  // Chicago neighborhoods (all map to Chicago)
+  'LOOP': 'Chicago',
+  'THE LOOP': 'Chicago',
+  'NEAR NORTH SIDE': 'Chicago',
+  'GOLD COAST': 'Chicago',
+  'OLD TOWN': 'Chicago',
+  'LINCOLN PARK': 'Chicago',
+  'LAKEVIEW': 'Chicago',
+  'LAKE VIEW': 'Chicago',
+  'WRIGLEYVILLE': 'Chicago',
+  'BOYSTOWN': 'Chicago',
+  'UPTOWN': 'Chicago',
+  'EDGEWATER': 'Chicago',
+  'ROGERS PARK': 'Chicago',
+  'ANDERSONVILLE': 'Chicago',
+  'RAVENSWOOD': 'Chicago',
+  'LINCOLN SQUARE': 'Chicago',
+  'ALBANY PARK': 'Chicago',
+  'NORTH CENTER': 'Chicago',
+  'IRVING PARK': 'Chicago',
+  'PORTAGE PARK': 'Chicago',
+  'JEFFERSON PARK': 'Chicago',
+  'NORWOOD PARK': 'Chicago',
+  'EDISON PARK': 'Chicago',
+  'OHARE': 'Chicago',
+  "O'HARE": 'Chicago',
+
+  // West Side neighborhoods
+  'WEST LOOP': 'Chicago',
+  'WEST TOWN': 'Chicago',
+  'WICKER PARK': 'Chicago',
+  'BUCKTOWN': 'Chicago',
+  'UKRAINIAN VILLAGE': 'Chicago',
+  'HUMBOLDT PARK': 'Chicago',
+  'LOGAN SQUARE': 'Chicago',
+  'AVONDALE': 'Chicago',
+  'HERMOSA': 'Chicago',
+  'BELMONT CRAGIN': 'Chicago',
+  'AUSTIN': 'Chicago',
+  'GARFIELD PARK': 'Chicago',
+  'EAST GARFIELD PARK': 'Chicago',
+  'WEST GARFIELD PARK': 'Chicago',
+  'NORTH LAWNDALE': 'Chicago',
+  'LITTLE VILLAGE': 'Chicago',
+  'SOUTH LAWNDALE': 'Chicago',
+  'PILSEN': 'Chicago',
+  'LOWER WEST SIDE': 'Chicago',
+
+  // South Side neighborhoods
+  'NEAR SOUTH SIDE': 'Chicago',
+  'SOUTH LOOP': 'Chicago',
+  'CHINATOWN CHI': 'Chicago',
+  'BRIDGEPORT': 'Chicago',
+  'MCKINLEY PARK': 'Chicago',
+  'BRIGHTON PARK': 'Chicago',
+  'ARCHER HEIGHTS': 'Chicago',
+  'GARFIELD RIDGE': 'Chicago',
+  'CLEARING': 'Chicago',
+  'WEST LAWN': 'Chicago',
+  'CHICAGO LAWN': 'Chicago',
+  'WEST ENGLEWOOD': 'Chicago',
+  'ENGLEWOOD': 'Chicago',
+  'GREATER GRAND CROSSING': 'Chicago',
+  'WOODLAWN CHI': 'Chicago',
+  'SOUTH SHORE': 'Chicago',
+  'HYDE PARK CHI': 'Chicago',
+  'KENWOOD': 'Chicago',
+  'OAKLAND': 'Chicago',
+  'DOUGLAS': 'Chicago',
+  'GRAND BOULEVARD': 'Chicago',
+  'WASHINGTON PARK CHI': 'Chicago',
+  'BRONZEVILLE': 'Chicago',
+  'ARMOUR SQUARE': 'Chicago',
+  'FULLER PARK': 'Chicago',
+  'NEW CITY': 'Chicago',
+  'BACK OF THE YARDS': 'Chicago',
+  'CANARYVILLE': 'Chicago',
+  'GAGE PARK': 'Chicago',
+  'MARQUETTE PARK': 'Chicago',
+  'ASHBURN': 'Chicago',
+  'AUBURN GRESHAM': 'Chicago',
+  'BEVERLY': 'Chicago',
+  'MOUNT GREENWOOD': 'Chicago',
+  'MORGAN PARK': 'Chicago',
+  'WASHINGTON HEIGHTS CHI': 'Chicago',
+  'ROSELAND': 'Chicago',
+  'PULLMAN': 'Chicago',
+  'WEST PULLMAN': 'Chicago',
+  'RIVERDALE CHI': 'Chicago',
+  'HEGEWISCH': 'Chicago',
+  'SOUTH CHICAGO': 'Chicago',
+  'EAST SIDE CHI': 'Chicago',
+  'SOUTH DEERING': 'Chicago',
+  'CALUMET HEIGHTS': 'Chicago',
+  'AVALON PARK': 'Chicago',
+  'CHATHAM': 'Chicago',
+
+  // Separate cities in Chicago metro (normalize spelling)
+  'EVANSTON': 'Evanston',
+  'OAK PARK': 'Oak Park',
+  'CICERO': 'Cicero',
+  'BERWYN': 'Berwyn',
+  'SKOKIE': 'Skokie',
+  'SCHAUMBURG': 'Schaumburg',
+  'NAPERVILLE': 'Naperville',
+  'AURORA': 'Aurora',
+  'JOLIET': 'Joliet',
+  'WAUKEGAN': 'Waukegan',
+  'ELGIN': 'Elgin',
+  'ARLINGTON HEIGHTS': 'Arlington Heights',
+  'PALATINE': 'Palatine',
+  'DES PLAINES': 'Des Plaines',
+  'DOWNERS GROVE': 'Downers Grove',
+  'ELMHURST': 'Elmhurst',
+  'LOMBARD': 'Lombard',
+  'WHEATON': 'Wheaton',
+  'GLEN ELLYN': 'Glen Ellyn',
+  'OAK LAWN': 'Oak Lawn',
+  'ORLAND PARK': 'Orland Park',
+  'TINLEY PARK': 'Tinley Park',
+  'BOLINGBROOK': 'Bolingbrook',
+};
+
+// ============================================================================
+// HOUSTON AREA MAPPINGS (TX)
+// ============================================================================
+
+const HOUSTON_CITY_MAPPINGS: Record<string, string> = {
+  // Main city variations
+  'HOUSTON': 'Houston',
+  'HUSTON': 'Houston',
+  'HOUSTAN': 'Houston',
+  'HOUSTIN': 'Houston',
+  'HOUSTON TX': 'Houston',
+  'HOUSTON, TX': 'Houston',
+  'HTX': 'Houston',
+  'H-TOWN': 'Houston',
+
+  // Houston neighborhoods/areas (all map to Houston)
+  'DOWNTOWN HOUSTON': 'Houston',
+  'MIDTOWN HOUSTON': 'Houston',
+  'MONTROSE': 'Houston',
+  'HEIGHTS': 'Houston',
+  'HOUSTON HEIGHTS': 'Houston',
+  'THE HEIGHTS': 'Houston',
+  'RIVER OAKS': 'Houston',
+  'WEST UNIVERSITY': 'Houston',
+  'WEST UNIVERSITY PLACE': 'West University Place', // Separate city
+  'WEST U': 'West University Place',
+  'BELLAIRE': 'Bellaire', // Separate city
+  'GALLERIA': 'Houston',
+  'UPTOWN HOUSTON': 'Houston',
+  'GREENWAY PLAZA': 'Houston',
+  'UPPER KIRBY': 'Houston',
+  'NEARTOWN': 'Houston',
+  'FOURTH WARD': 'Houston',
+  'THIRD WARD': 'Houston',
+  'FIFTH WARD': 'Houston',
+  'SECOND WARD': 'Houston',
+  'EAST END': 'Houston',
+  'EASTWOOD': 'Houston',
+  'MAGNOLIA PARK': 'Houston',
+  'DENVER HARBOR': 'Houston',
+  'NORTHSIDE': 'Houston',
+  'NEAR NORTHSIDE': 'Houston',
+  'LINDALE': 'Houston',
+  'INDEPENDENCE HEIGHTS': 'Houston',
+  'ACRES HOMES': 'Houston',
+  'OAK FOREST': 'Houston',
+  'GARDEN OAKS': 'Houston',
+  'LAZYBROOK': 'Houston',
+  'TIMBERGROVE': 'Houston',
+  'MEMORIAL': 'Houston',
+  'MEMORIAL PARK': 'Houston',
+  'SPRING BRANCH': 'Houston',
+  'SHARPSTOWN': 'Houston',
+  'GULFTON': 'Houston',
+  'MEYERLAND': 'Houston',
+  'BRAESWOOD': 'Houston',
+  'MEDICAL CENTER': 'Houston',
+  'TEXAS MEDICAL CENTER': 'Houston',
+  'TMC': 'Houston',
+  'MUSEUM DISTRICT': 'Houston',
+  'RICE VILLAGE': 'Houston',
+  'SOUTHAMPTON': 'Houston',
+  'AFTON OAKS': 'Houston',
+  'TANGLEWOOD': 'Houston',
+  'BRIARGROVE': 'Houston',
+  'WESTCHASE': 'Houston',
+  'ENERGY CORRIDOR': 'Houston',
+  'GREATER HEIGHTS': 'Houston',
+  'EAST DOWNTOWN': 'Houston',
+  'EADO': 'Houston',
+  'MIDTOWN': 'Houston',
+  'COTTAGE GROVE': 'Houston',
+  'PLEASANTVILLE': 'Houston',
+  'KASHMERE GARDENS': 'Houston',
+  'TRINITY GARDENS': 'Houston',
+  'SETTEGAST': 'Houston',
+  'SUNNYSIDE': 'Houston',
+  'SOUTH PARK': 'Houston',
+  'SOUTH ACRES': 'Houston',
+  'CRESTMONT PARK': 'Houston',
+  'MINNETEX': 'Houston',
+  'ALIEF': 'Houston',
+  'FONDREN': 'Houston',
+  'BRAEBURN': 'Houston',
+  'WILLOWBEND': 'Houston',
+  'ASTRODOME': 'Houston',
+  'RELIANT': 'Houston',
+  'GREENWAY': 'Houston',
+  'KINGWOOD': 'Houston',
+  'CLEAR LAKE': 'Houston',
+  'CLEAR LAKE CITY': 'Houston',
+
+  // Separate cities in Houston metro (normalize spelling)
+  'PASADENA TX': 'Pasadena',
+  'PEARLAND': 'Pearland',
+  'SUGAR LAND': 'Sugar Land',
+  'SUGARLAND': 'Sugar Land',
+  'THE WOODLANDS': 'The Woodlands',
+  'WOODLANDS': 'The Woodlands',
+  'SPRING': 'Spring',
+  'CYPRESS': 'Cypress',
+  'KATY': 'Katy',
+  'HUMBLE': 'Humble',
+  'BAYTOWN': 'Baytown',
+  'LEAGUE CITY': 'League City',
+  'MISSOURI CITY': 'Missouri City',
+  'STAFFORD': 'Stafford',
+  'FRIENDSWOOD': 'Friendswood',
+  'DEER PARK': 'Deer Park',
+  'LA PORTE': 'La Porte',
+  'GALVESTON': 'Galveston',
+  'TEXAS CITY': 'Texas City',
+  'CONROE': 'Conroe',
+  'RICHMOND': 'Richmond',
+  'ROSENBERG': 'Rosenberg',
+  'TOMBALL': 'Tomball',
+  'WEBSTER': 'Webster',
+  'SEABROOK': 'Seabrook',
+  'KEMAH': 'Kemah',
+};
+
+// ============================================================================
+// PHOENIX AREA MAPPINGS (AZ)
+// ============================================================================
+
+const PHOENIX_CITY_MAPPINGS: Record<string, string> = {
+  // Main city variations
+  'PHOENIX': 'Phoenix',
+  'PHEONIX': 'Phoenix',
+  'PHENIX': 'Phoenix',
+  'PHX': 'Phoenix',
+  'PHOENIX AZ': 'Phoenix',
+  'PHOENIX, AZ': 'Phoenix',
+
+  // Phoenix neighborhoods/areas (all map to Phoenix)
+  'DOWNTOWN PHOENIX': 'Phoenix',
+  'CENTRAL PHOENIX': 'Phoenix',
+  'MIDTOWN PHOENIX': 'Phoenix',
+  'UPTOWN PHOENIX': 'Phoenix',
+  'NORTH PHOENIX': 'Phoenix',
+  'SOUTH PHOENIX': 'Phoenix',
+  'WEST PHOENIX': 'Phoenix',
+  'MARYVALE': 'Phoenix',
+  'ALHAMBRA AZ': 'Phoenix',
+  'ENCANTO': 'Phoenix',
+  'CAMELBACK EAST': 'Phoenix',
+  'BILTMORE': 'Phoenix',
+  'ARCADIA AZ': 'Phoenix',
+  'PARADISE VALLEY VILLAGE': 'Phoenix',
+  'NORTH GATEWAY': 'Phoenix',
+  'DEER VALLEY': 'Phoenix',
+  'NORTH MOUNTAIN': 'Phoenix',
+  'SUNNYSLOPE': 'Phoenix',
+  'LAVEEN': 'Phoenix',
+  'SOUTH MOUNTAIN': 'Phoenix',
+  'AHWATUKEE': 'Phoenix',
+  'AHWATUKEE FOOTHILLS': 'Phoenix',
+  'ESTRELLA': 'Phoenix',
+  'DESERT VIEW': 'Phoenix',
+  'RIO VISTA': 'Phoenix',
+
+  // Separate cities in Phoenix metro (normalize spelling)
+  'SCOTTSDALE': 'Scottsdale',
+  'TEMPE': 'Tempe',
+  'MESA': 'Mesa',
+  'CHANDLER': 'Chandler',
+  'GILBERT': 'Gilbert',
+  'GLENDALE AZ': 'Glendale',
+  'PEORIA': 'Peoria',
+  'SURPRISE': 'Surprise',
+  'AVONDALE': 'Avondale',
+  'GOODYEAR': 'Goodyear',
+  'BUCKEYE': 'Buckeye',
+  'LITCHFIELD PARK': 'Litchfield Park',
+  'TOLLESON': 'Tolleson',
+  'CAVE CREEK': 'Cave Creek',
+  'CAREFREE': 'Carefree',
+  'FOUNTAIN HILLS': 'Fountain Hills',
+  'PARADISE VALLEY': 'Paradise Valley', // Separate town
+  'QUEEN CREEK': 'Queen Creek',
+  'SAN TAN VALLEY': 'San Tan Valley',
+  'APACHE JUNCTION': 'Apache Junction',
+  'GOLD CANYON': 'Gold Canyon',
+  'ANTHEM': 'Phoenix', // Part of Phoenix
+  'DESERT RIDGE': 'Phoenix',
+  'NORTERRA': 'Phoenix',
+};
+
+// ============================================================================
+// PHILADELPHIA AREA MAPPINGS (PA)
+// ============================================================================
+
+const PHILADELPHIA_CITY_MAPPINGS: Record<string, string> = {
+  // Main city variations
+  'PHILADELPHIA': 'Philadelphia',
+  'PHILA': 'Philadelphia',
+  'PHILLY': 'Philadelphia',
+  'PHILDELPHIA': 'Philadelphia',
+  'PHILADEPHIA': 'Philadelphia',
+  'PHILIDELPHIA': 'Philadelphia',
+  'PHILLADELPHIA': 'Philadelphia',
+  'PHILADELPHIA PA': 'Philadelphia',
+  'PHILADELPHIA, PA': 'Philadelphia',
+  'PHL': 'Philadelphia',
+
+  // Philadelphia neighborhoods (all map to Philadelphia)
+  'CENTER CITY': 'Philadelphia',
+  'CENTER CITY PHILADELPHIA': 'Philadelphia',
+  'OLD CITY': 'Philadelphia',
+  'SOCIETY HILL': 'Philadelphia',
+  'WASHINGTON SQUARE WEST': 'Philadelphia',
+  'RITTENHOUSE': 'Philadelphia',
+  'RITTENHOUSE SQUARE': 'Philadelphia',
+  'LOGAN SQUARE PHILLY': 'Philadelphia',
+  'FAIRMOUNT': 'Philadelphia',
+  'SPRING GARDEN': 'Philadelphia',
+  'NORTHERN LIBERTIES': 'Philadelphia',
+  'FISHTOWN': 'Philadelphia',
+  'KENSINGTON': 'Philadelphia',
+  'PORT RICHMOND': 'Philadelphia',
+  'BRIDESBURG': 'Philadelphia',
+  'FRANKFORD': 'Philadelphia',
+  'MAYFAIR': 'Philadelphia',
+  'HOLMESBURG': 'Philadelphia',
+  'TACONY': 'Philadelphia',
+  'TORRESDALE': 'Philadelphia',
+  'NORTHEAST PHILADELPHIA': 'Philadelphia',
+  'NORTHEAST PHILLY': 'Philadelphia',
+  'BUSTLETON': 'Philadelphia',
+  'SOMERTON': 'Philadelphia',
+  'BYBERRY': 'Philadelphia',
+  'OXFORD CIRCLE': 'Philadelphia',
+  'RHAWNHURST': 'Philadelphia',
+  'FOX CHASE': 'Philadelphia',
+  'BURHOLME': 'Philadelphia',
+  'LAWNCREST': 'Philadelphia',
+  'LAWNDALE PHILLY': 'Philadelphia',
+  'CRESCENTVILLE': 'Philadelphia',
+  'FELTONVILLE': 'Philadelphia',
+  'OLNEY': 'Philadelphia',
+  'LOGAN': 'Philadelphia',
+  'FERN ROCK': 'Philadelphia',
+  'OGONTZ': 'Philadelphia',
+  'EAST OAK LANE': 'Philadelphia',
+  'WEST OAK LANE': 'Philadelphia',
+  'GERMANTOWN': 'Philadelphia',
+  'MT AIRY': 'Philadelphia',
+  'MOUNT AIRY': 'Philadelphia',
+  'CHESTNUT HILL': 'Philadelphia',
+  'ROXBOROUGH': 'Philadelphia',
+  'MANAYUNK': 'Philadelphia',
+  'WISSAHICKON': 'Philadelphia',
+  'EAST FALLS': 'Philadelphia',
+  'STRAWBERRY MANSION': 'Philadelphia',
+  'BREWERYTOWN': 'Philadelphia',
+  'NORTH PHILADELPHIA': 'Philadelphia',
+  'NORTH PHILLY': 'Philadelphia',
+  'TEMPLE UNIVERSITY': 'Philadelphia',
+  'TIOGA': 'Philadelphia',
+  'NICETOWN': 'Philadelphia',
+  'HUNTING PARK': 'Philadelphia',
+  'WEST PHILADELPHIA': 'Philadelphia',
+  'WEST PHILLY': 'Philadelphia',
+  'UNIVERSITY CITY': 'Philadelphia',
+  'POWELTON': 'Philadelphia',
+  'SPRUCE HILL': 'Philadelphia',
+  'CEDAR PARK': 'Philadelphia',
+  'SQUIRREL HILL': 'Philadelphia',
+  'COBBS CREEK': 'Philadelphia',
+  'OVERBROOK': 'Philadelphia',
+  'WYNNEFIELD': 'Philadelphia',
+  'WYNNEFIELD HEIGHTS': 'Philadelphia',
+  'PARKSIDE': 'Philadelphia',
+  'HADDINGTON': 'Philadelphia',
+  'CARROLL PARK': 'Philadelphia',
+  'SOUTH PHILADELPHIA': 'Philadelphia',
+  'SOUTH PHILLY': 'Philadelphia',
+  'PASSYUNK': 'Philadelphia',
+  'EAST PASSYUNK': 'Philadelphia',
+  'PENNSPORT': 'Philadelphia',
+  'QUEENS VILLAGE': 'Philadelphia',
+  'BELLA VISTA': 'Philadelphia',
+  'ITALIAN MARKET': 'Philadelphia',
+  'HAWTHORNE': 'Philadelphia',
+  'POINT BREEZE': 'Philadelphia',
+  'GRAYS FERRY': 'Philadelphia',
+  'SOUTHWEST PHILADELPHIA': 'Philadelphia',
+  'SOUTHWEST PHILLY': 'Philadelphia',
+  'EASTWICK': 'Philadelphia',
+  'ELMWOOD': 'Philadelphia',
+  'KINGSESSING': 'Philadelphia',
+  'SOUTHWEST CENTER CITY': 'Philadelphia',
+  'GRADUATE HOSPITAL': 'Philadelphia',
+  'WHITMAN': 'Philadelphia',
+  'GIRARD ESTATES': 'Philadelphia',
+  'PACKER PARK': 'Philadelphia',
+  'STADIUM DISTRICT': 'Philadelphia',
+
+  // Separate cities in Philadelphia metro (normalize spelling)
+  'CAMDEN': 'Camden', // NJ but commonly included
+  'CHERRY HILL': 'Cherry Hill', // NJ
+  'UPPER DARBY': 'Upper Darby',
+  'CHESTER': 'Chester',
+  'NORRISTOWN': 'Norristown',
+  'KING OF PRUSSIA': 'King of Prussia',
+  'CONSHOHOCKEN': 'Conshohocken',
+  'ARDMORE': 'Ardmore',
+  'BRYN MAWR': 'Bryn Mawr',
+  'HAVERFORD': 'Haverford',
+  'WAYNE': 'Wayne',
+  'MEDIA': 'Media',
+  'LANSDALE': 'Lansdale',
+  'DOYLESTOWN': 'Doylestown',
+  'WILLOW GROVE': 'Willow Grove',
+  'JENKINTOWN': 'Jenkintown',
+  'ABINGTON': 'Abington',
+  'ELKINS PARK': 'Elkins Park',
+  'BENSALEM': 'Bensalem',
+  'BRISTOL': 'Bristol',
+  'LEVITTOWN': 'Levittown',
+  'NEWTOWN': 'Newtown',
+  'WEST CHESTER': 'West Chester',
+  'COATESVILLE': 'Coatesville',
+  'EXTON': 'Exton',
+  'MALVERN': 'Malvern',
+  'PHOENIXVILLE': 'Phoenixville',
+  'POTTSTOWN': 'Pottstown',
+};
+
+// ============================================================================
+// METRO CONFIGURATIONS
+// ============================================================================
+
+const METRO_CONFIGS: Record<string, MetroConfig> = {
+  NYC: {
+    states: ['NY'],
+    primaryCity: 'New York',
+    mappings: NYC_CITY_MAPPINGS,
+  },
+  LA: {
+    states: ['CA'],
+    primaryCity: 'Los Angeles',
+    mappings: LA_CITY_MAPPINGS,
+  },
+  CHICAGO: {
+    states: ['IL'],
+    primaryCity: 'Chicago',
+    mappings: CHICAGO_CITY_MAPPINGS,
+  },
+  HOUSTON: {
+    states: ['TX'],
+    primaryCity: 'Houston',
+    mappings: HOUSTON_CITY_MAPPINGS,
+  },
+  PHOENIX: {
+    states: ['AZ'],
+    primaryCity: 'Phoenix',
+    mappings: PHOENIX_CITY_MAPPINGS,
+  },
+  PHILADELPHIA: {
+    states: ['PA'],
+    primaryCity: 'Philadelphia',
+    mappings: PHILADELPHIA_CITY_MAPPINGS,
+  },
+};
+
+// Map state codes to their metro configs
+const STATE_TO_METRO: Record<string, MetroConfig> = {};
+for (const config of Object.values(METRO_CONFIGS)) {
+  for (const state of config.states) {
+    STATE_TO_METRO[state] = config;
+  }
+}
+
+// All supported states
+const SUPPORTED_STATES = Object.keys(STATE_TO_METRO);
+
+// ============================================================================
 // CLEANUP PATTERNS
 // ============================================================================
 
 // Patterns to clean from city names before mapping
 const CLEANUP_PATTERNS: [RegExp, string][] = [
-  // Remove trailing state codes
+  // Remove trailing state codes (common patterns)
   [/,\s*NY$/i, ''],
-  [/,NY$/i, ''],
-  [/\s+NY$/i, ''],
+  [/,\s*CA$/i, ''],
+  [/,\s*IL$/i, ''],
+  [/,\s*TX$/i, ''],
+  [/,\s*AZ$/i, ''],
+  [/,\s*PA$/i, ''],
+  [/,\s*NJ$/i, ''],
+  [/\s+(NY|CA|IL|TX|AZ|PA|NJ)$/i, ''],
   [/,\s*NEW YORK$/i, ''],
+  [/,\s*CALIFORNIA$/i, ''],
+  [/,\s*ILLINOIS$/i, ''],
+  [/,\s*TEXAS$/i, ''],
+  [/,\s*ARIZONA$/i, ''],
+  [/,\s*PENNSYLVANIA$/i, ''],
   [/,\s*N\.?Y\.?$/i, ''],
 
   // Remove zip codes that might be appended
@@ -441,17 +1158,29 @@ function cleanCityName(city: string): string {
   return cleaned.trim();
 }
 
-function normalizeCity(city: string): string | null {
-  if (!city) return null;
+function normalizeCity(city: string, state: string): string | null {
+  if (!city || !state) return null;
 
   const cleaned = cleanCityName(city);
 
-  // Direct lookup
-  if (NYC_CITY_MAPPINGS[cleaned]) {
-    return NYC_CITY_MAPPINGS[cleaned];
+  // Get the metro config for this state
+  const metroConfig = STATE_TO_METRO[state.toUpperCase()];
+  if (!metroConfig) return null;
+
+  // Direct lookup in the state's metro mappings
+  if (metroConfig.mappings[cleaned]) {
+    return metroConfig.mappings[cleaned];
   }
 
   return null; // No normalization needed or unknown
+}
+
+/**
+ * Exportable city normalization function for use in other scripts
+ */
+export function normalizeCityName(city: string, state: string): string {
+  const normalized = normalizeCity(city, state);
+  return normalized || city; // Return original if no normalization found
 }
 
 // ============================================================================
@@ -460,6 +1189,7 @@ function normalizeCity(city: string): string | null {
 
 interface CityStats {
   city: string;
+  state: string;
   count: number;
   normalizedTo: string | null;
 }
@@ -473,6 +1203,7 @@ interface NormalizationResult {
   changes: {
     fromCity: string;
     toCity: string;
+    state: string;
     count: number;
   }[];
   afterStats?: {
@@ -482,21 +1213,23 @@ interface NormalizationResult {
   };
 }
 
-async function analyzeCityData(pool: pg.Pool): Promise<NormalizationResult['beforeStats']> {
-  console.log('\n📊 Analyzing current city data for NY state...\n');
+async function analyzeCityData(pool: pg.Pool, states: string[]): Promise<NormalizationResult['beforeStats']> {
+  const stateList = states.map(s => `'${s}'`).join(', ');
+  console.log(`\n📊 Analyzing current city data for states: ${states.join(', ')}...\n`);
 
   const result = await pool.query(`
-    SELECT city, COUNT(*) as count
+    SELECT city, state, COUNT(*) as count
     FROM providers
-    WHERE state = 'NY'
-    GROUP BY city
+    WHERE state IN (${stateList})
+    GROUP BY city, state
     ORDER BY count DESC
   `);
 
-  const cities: CityStats[] = result.rows.map((row: { city: string; count: string }) => ({
+  const cities: CityStats[] = result.rows.map((row: { city: string; state: string; count: string }) => ({
     city: row.city,
+    state: row.state,
     count: parseInt(row.count),
-    normalizedTo: normalizeCity(row.city),
+    normalizedTo: normalizeCity(row.city, row.state),
   }));
 
   const totalRecords = cities.reduce((sum, c) => sum + c.count, 0);
@@ -516,13 +1249,17 @@ async function previewChanges(beforeStats: NormalizationResult['beforeStats']): 
       changes.push({
         fromCity: city.city,
         toCity: city.normalizedTo,
+        state: city.state,
         count: city.count,
       });
     }
   }
 
-  // Sort by count descending
-  changes.sort((a, b) => b.count - a.count);
+  // Sort by state, then count descending
+  changes.sort((a, b) => {
+    if (a.state !== b.state) return a.state.localeCompare(b.state);
+    return b.count - a.count;
+  });
 
   return changes;
 }
@@ -532,19 +1269,26 @@ async function applyChanges(pool: pg.Pool, changes: NormalizationResult['changes
 
   const client = await pool.connect();
   let totalUpdated = 0;
+  let currentState = '';
 
   try {
     await client.query('BEGIN');
 
     for (const change of changes) {
+      // Print state header when it changes
+      if (change.state !== currentState) {
+        currentState = change.state;
+        console.log(`\n  [${currentState}]`);
+      }
+
       const result = await client.query(`
         UPDATE providers
         SET city = $1
-        WHERE state = 'NY' AND city = $2
-      `, [change.toCity, change.fromCity]);
+        WHERE state = $2 AND city = $3
+      `, [change.toCity, change.state, change.fromCity]);
 
       totalUpdated += result.rowCount || 0;
-      console.log(`  ✓ "${change.fromCity}" → "${change.toCity}" (${result.rowCount} records)`);
+      console.log(`    ✓ "${change.fromCity}" → "${change.toCity}" (${result.rowCount} records)`);
     }
 
     await client.query('COMMIT');
@@ -561,25 +1305,27 @@ async function applyChanges(pool: pg.Pool, changes: NormalizationResult['changes
   return totalUpdated;
 }
 
-function printStats(label: string, stats: NormalizationResult['beforeStats']) {
+function printStats(label: string, stats: NormalizationResult['beforeStats'], states: string[]) {
   console.log(`\n${'='.repeat(80)}`);
   console.log(`${label}`);
   console.log('='.repeat(80));
-  console.log(`Total NY records: ${stats.totalRecords.toLocaleString()}`);
-  console.log(`Unique city names: ${stats.uniqueCities}`);
-  console.log('\nTop 30 city names by frequency:');
-  console.log('-'.repeat(60));
+  console.log(`States: ${states.join(', ')}`);
+  console.log(`Total records: ${stats.totalRecords.toLocaleString()}`);
+  console.log(`Unique city/state combinations: ${stats.uniqueCities}`);
+  console.log('\nTop 40 city names by frequency:');
+  console.log('-'.repeat(70));
 
-  const topCities = stats.cities.slice(0, 30);
+  const topCities = stats.cities.slice(0, 40);
   for (const city of topCities) {
     const normalized = city.normalizedTo && city.normalizedTo !== city.city
       ? ` → ${city.normalizedTo}`
       : '';
-    console.log(`  ${city.city.padEnd(30)} ${city.count.toLocaleString().padStart(8)}${normalized}`);
+    const cityState = `${city.city} (${city.state})`;
+    console.log(`  ${cityState.padEnd(40)} ${city.count.toLocaleString().padStart(8)}${normalized}`);
   }
 
-  if (stats.cities.length > 30) {
-    console.log(`  ... and ${stats.cities.length - 30} more unique city names`);
+  if (stats.cities.length > 40) {
+    console.log(`  ... and ${stats.cities.length - 40} more unique city/state combinations`);
   }
 }
 
@@ -597,29 +1343,39 @@ function printChanges(changes: NormalizationResult['changes']) {
   console.log(`\n${changes.length} city name variations will be normalized.`);
   console.log(`${totalAffected.toLocaleString()} records will be updated.\n`);
 
-  // Group by target city
-  const byTarget: Record<string, typeof changes> = {};
+  // Group by state, then by target city
+  const byState: Record<string, Record<string, typeof changes>> = {};
   for (const change of changes) {
-    if (!byTarget[change.toCity]) {
-      byTarget[change.toCity] = [];
+    if (!byState[change.state]) {
+      byState[change.state] = {};
     }
-    byTarget[change.toCity].push(change);
+    if (!byState[change.state][change.toCity]) {
+      byState[change.state][change.toCity] = [];
+    }
+    byState[change.state][change.toCity].push(change);
   }
 
-  for (const [target, sourceChanges] of Object.entries(byTarget)) {
-    const totalForTarget = sourceChanges.reduce((sum, c) => sum + c.count, 0);
-    console.log(`\n→ "${target}" (${totalForTarget.toLocaleString()} records):`);
+  for (const [state, byTarget] of Object.entries(byState).sort()) {
+    const stateTotal = Object.values(byTarget).flat().reduce((sum, c) => sum + c.count, 0);
+    console.log(`\n${'─'.repeat(60)}`);
+    console.log(`[${state}] - ${stateTotal.toLocaleString()} records to update`);
+    console.log('─'.repeat(60));
 
-    // Sort by count and show top entries
-    const sorted = sourceChanges.sort((a, b) => b.count - a.count);
-    const toShow = sorted.slice(0, 15);
+    for (const [target, sourceChanges] of Object.entries(byTarget)) {
+      const totalForTarget = sourceChanges.reduce((sum, c) => sum + c.count, 0);
+      console.log(`\n  → "${target}" (${totalForTarget.toLocaleString()} records):`);
 
-    for (const change of toShow) {
-      console.log(`    "${change.fromCity}" (${change.count.toLocaleString()})`);
-    }
+      // Sort by count and show top entries
+      const sorted = sourceChanges.sort((a, b) => b.count - a.count);
+      const toShow = sorted.slice(0, 10);
 
-    if (sorted.length > 15) {
-      console.log(`    ... and ${sorted.length - 15} more variations`);
+      for (const change of toShow) {
+        console.log(`      "${change.fromCity}" (${change.count.toLocaleString()})`);
+      }
+
+      if (sorted.length > 10) {
+        console.log(`      ... and ${sorted.length - 10} more variations`);
+      }
     }
   }
 }
@@ -627,10 +1383,53 @@ function printChanges(changes: NormalizationResult['changes']) {
 async function main() {
   const args = process.argv.slice(2);
   const applyMode = args.includes('--apply');
+  const helpMode = args.includes('--help') || args.includes('-h');
+
+  // Parse --state argument
+  const stateIndex = args.findIndex(a => a === '--state' || a === '-s');
+  let targetStates: string[] = SUPPORTED_STATES;
+
+  if (stateIndex !== -1 && args[stateIndex + 1]) {
+    const requestedState = args[stateIndex + 1].toUpperCase();
+    if (!SUPPORTED_STATES.includes(requestedState)) {
+      console.error(`\n❌ Error: Unsupported state "${requestedState}"`);
+      console.error(`   Supported states: ${SUPPORTED_STATES.join(', ')}`);
+      process.exit(1);
+    }
+    targetStates = [requestedState];
+  }
+
+  if (helpMode) {
+    console.log(`
+City Name Normalization Script
+
+Normalizes inconsistent city names in the providers table for major metro areas.
+
+Usage:
+  npx tsx scripts/normalize-city-names.ts [options]
+
+Options:
+  --apply           Apply changes (default is dry run)
+  --state, -s STATE Only process specific state (e.g., --state NY)
+  --help, -h        Show this help message
+
+Supported States:
+  ${SUPPORTED_STATES.join(', ')}
+
+Examples:
+  npx tsx scripts/normalize-city-names.ts                # Dry run for all states
+  npx tsx scripts/normalize-city-names.ts --apply        # Apply changes for all states
+  npx tsx scripts/normalize-city-names.ts --state CA     # Dry run for California only
+  npx tsx scripts/normalize-city-names.ts -s TX --apply  # Apply changes for Texas only
+`);
+    process.exit(0);
+  }
 
   console.log('\n' + '═'.repeat(80));
-  console.log('NYC CITY NAME NORMALIZATION SCRIPT');
+  console.log('CITY NAME NORMALIZATION SCRIPT');
   console.log('═'.repeat(80));
+  console.log(`\nMetros: NYC, LA, Chicago, Houston, Phoenix, Philadelphia`);
+  console.log(`Target states: ${targetStates.join(', ')}`);
 
   if (!applyMode) {
     console.log('\n🔍 DRY RUN MODE - No changes will be made.');
@@ -652,8 +1451,8 @@ async function main() {
 
   try {
     // Analyze before state
-    const beforeStats = await analyzeCityData(pool);
-    printStats('BEFORE NORMALIZATION', beforeStats);
+    const beforeStats = await analyzeCityData(pool, targetStates);
+    printStats('BEFORE NORMALIZATION', beforeStats, targetStates);
 
     // Calculate changes
     const changes = await previewChanges(beforeStats);
@@ -664,23 +1463,24 @@ async function main() {
       await applyChanges(pool, changes);
 
       // Analyze after state
-      const afterStats = await analyzeCityData(pool);
-      printStats('AFTER NORMALIZATION', afterStats);
+      const afterStats = await analyzeCityData(pool, targetStates);
+      printStats('AFTER NORMALIZATION', afterStats, targetStates);
 
       // Summary
       console.log(`\n${'='.repeat(80)}`);
       console.log('SUMMARY');
       console.log('='.repeat(80));
-      console.log(`  Unique city names BEFORE: ${beforeStats.uniqueCities}`);
-      console.log(`  Unique city names AFTER:  ${afterStats.uniqueCities}`);
+      console.log(`  Unique city/state combos BEFORE: ${beforeStats.uniqueCities}`);
+      console.log(`  Unique city/state combos AFTER:  ${afterStats.uniqueCities}`);
       console.log(`  Reduction: ${beforeStats.uniqueCities - afterStats.uniqueCities} fewer unique values`);
 
     } else if (!applyMode && changes.length > 0) {
       console.log(`\n${'='.repeat(80)}`);
       console.log('DRY RUN COMPLETE');
       console.log('='.repeat(80));
+      const stateArg = targetStates.length === 1 ? ` --state ${targetStates[0]}` : '';
       console.log(`\nTo apply these changes, run:`);
-      console.log(`  npx tsx scripts/normalize-city-names.ts --apply\n`);
+      console.log(`  npx tsx scripts/normalize-city-names.ts${stateArg} --apply\n`);
     }
 
   } catch (error: any) {

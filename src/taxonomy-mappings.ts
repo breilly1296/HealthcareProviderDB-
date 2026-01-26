@@ -876,77 +876,135 @@ export const TAXONOMY_TO_SPECIALTY: Record<string, SpecialtyCategory> = {
 };
 
 /**
- * Get specialty category for a given taxonomy code
+ * Prefix-based taxonomy mappings for fallback matching
+ * Used when exact taxonomy code is not found in TAXONOMY_TO_SPECIALTY
+ * Sorted by length at runtime for correct matching (longest/most specific first)
  */
-export function getSpecialtyCategory(taxonomyCode: string | null | undefined): SpecialtyCategory | null {
-  if (!taxonomyCode) return null;
+const PREFIX_MAPPINGS: [string, SpecialtyCategory][] = [
+  // Highly specific mappings (9+ chars) - Internal Medicine subspecialties
+  ['207RH0003', 'ONCOLOGY'],           // Hematology & Oncology
+  ['207RG0100', 'GASTROENTEROLOGY'],   // Gastroenterology
+  ['207RI0200', 'INFECTIOUS_DISEASE'], // Infectious Disease
+  ['207RI0011', 'ENDOCRINOLOGY'],      // Endocrinology (Internal Med)
+  ['261QE0700', 'ENDOCRINOLOGY'],      // Clinic/Center - Endocrinology
+  ['261QR0401', 'RHEUMATOLOGY'],       // Clinic/Center - Rheumatology
+  ['207RG0300', 'GERIATRICS'],         // Geriatric Medicine (Internal Med)
 
-  // Direct lookup
+  // Medium specificity (4-6 chars) - Subspecialties
+  ['247100', 'RADIOLOGY'],
+  ['207RC', 'CARDIOLOGY'],
+  ['2084N', 'NEUROLOGY'],
+  ['207RX', 'ONCOLOGY'],
+  ['207RP', 'PULMONOLOGY'],
+  ['207RN', 'NEPHROLOGY'],
+  ['207RE', 'ENDOCRINOLOGY'],
+  ['207RR', 'RHEUMATOLOGY'],
+  ['207QG', 'GERIATRICS'],
+
+  // Mental Health & Behavioral
+  ['101Y', 'MENTAL_HEALTH'],
+  ['103', 'PSYCHOLOGY'],
+  ['104', 'SOCIAL_WORK'],
+  ['106', 'MENTAL_HEALTH'],
+  ['2084', 'PSYCHIATRY'],
+  ['373', 'MENTAL_HEALTH'],
+
+  // Nursing & Mid-level Providers
+  ['163W', 'NURSING'],
+  ['164', 'NURSING'],
+  ['363L', 'NURSE_PRACTITIONER'],
+  ['363A', 'PHYSICIAN_ASSISTANT'],
+
+  // Dental & Vision
+  ['122', 'DENTISTRY'],
+  ['124', 'DENTISTRY'],
+  ['125', 'DENTISTRY'],
+  ['126', 'DENTISTRY'],
+  ['152W', 'OPTOMETRY'],
+  ['156', 'OPTOMETRY'],
+
+  // Pharmacy
+  ['183', 'PHARMACY'],
+  ['331', 'PHARMACY'],
+  ['332', 'PHARMACY'],
+  ['333', 'PHARMACY'],
+
+  // Therapy Services
+  ['2251', 'PHYSICAL_THERAPY'],
+  ['2252', 'PHYSICAL_THERAPY'],
+  ['225X', 'OCCUPATIONAL_THERAPY'],
+  ['224Z', 'OCCUPATIONAL_THERAPY'],
+  ['2257', 'SPEECH_THERAPY'],
+  ['235', 'SPEECH_THERAPY'],
+  ['237', 'SPEECH_THERAPY'],
+  ['367', 'RESPIRATORY_THERAPY'],
+  ['111N', 'CHIROPRACTIC'],
+  ['1711', 'ACUPUNCTURE'],
+
+  // Medical Specialties
+  ['207P', 'EMERGENCY_MEDICINE'],
+  ['2080', 'PEDIATRICS'],
+  ['207L', 'ANESTHESIOLOGY'],
+  ['2086', 'SURGERY'],
+  ['208G', 'SURGERY'],
+  ['207V', 'OB_GYN'],
+  ['2085', 'RADIOLOGY'],
+  ['207N', 'DERMATOLOGY'],
+  ['2088', 'UROLOGY'],
+  ['207K', 'ALLERGY_IMMUNOLOGY'],
+  ['207Z', 'PATHOLOGY'],
+  ['207X', 'ORTHOPEDICS'],
+  ['207Q', 'FAMILY_MEDICINE'],
+  ['207R', 'INTERNAL_MEDICINE'],
+
+  // Support Services
+  ['133', 'DIETETICS'],
+  ['136', 'DIETETICS'],
+  ['374', 'LAB_PATHOLOGY'],
+  ['246', 'LAB_PATHOLOGY'],
+  ['247', 'LAB_PATHOLOGY'],
+  ['291', 'LAB_PATHOLOGY'],
+  ['292', 'LAB_PATHOLOGY'],
+  ['293', 'LAB_PATHOLOGY'],
+  ['310', 'DME_PROSTHETICS'],
+  ['332B', 'DME_PROSTHETICS'],
+  ['335', 'DME_PROSTHETICS'],
+  ['172V', 'COMMUNITY_HEALTH'],
+  ['251', 'COMMUNITY_HEALTH'],
+  ['171M', 'MIDWIFERY'],
+  ['176B', 'MIDWIFERY'],
+  ['315', 'HOSPICE_PALLIATIVE'],
+
+  // Facilities
+  ['261Q', 'CLINIC_FACILITY'],
+  ['193', 'CLINIC_FACILITY'],
+  ['390', 'CLINIC_FACILITY'],
+  ['27', 'HOSPITAL'],
+  ['28', 'HOSPITAL'],
+  ['31', 'HOME_HEALTH'],
+];
+
+// Pre-sort by prefix length (longest first) for correct matching
+// This ensures more specific codes like '207RH0003' match before broader '207R'
+const SORTED_PREFIX_MAPPINGS = [...PREFIX_MAPPINGS].sort((a, b) => b[0].length - a[0].length);
+
+/**
+ * Get specialty category for a given taxonomy code
+ * Uses direct lookup first, then falls back to prefix matching (sorted by specificity)
+ *
+ * @param taxonomyCode - NPI taxonomy code (e.g., '207RE0101X')
+ * @returns SpecialtyCategory - The mapped specialty or 'OTHER' if not found
+ */
+export function getSpecialtyCategory(taxonomyCode: string | null | undefined): SpecialtyCategory {
+  if (!taxonomyCode) return 'OTHER';
+
+  // Direct lookup for exact matches (most accurate)
   if (TAXONOMY_TO_SPECIALTY[taxonomyCode]) {
     return TAXONOMY_TO_SPECIALTY[taxonomyCode];
   }
 
-  // Try prefix matching for broader categories
-  const prefixMappings: [string, SpecialtyCategory][] = [
-    ['101Y', 'MENTAL_HEALTH'],
-    ['103', 'PSYCHOLOGY'],
-    ['104', 'SOCIAL_WORK'],
-    ['106', 'MENTAL_HEALTH'],
-    ['111N', 'CHIROPRACTIC'],
-    ['122', 'DENTISTRY'],
-    ['124', 'DENTISTRY'],
-    ['125', 'DENTISTRY'],
-    ['126', 'DENTISTRY'],
-    ['133', 'DIETETICS'],
-    ['136', 'DIETETICS'],
-    ['152W', 'OPTOMETRY'],
-    ['156', 'OPTOMETRY'],
-    ['163W', 'NURSING'],
-    ['164', 'NURSING'],
-    ['171M', 'MIDWIFERY'],
-    ['1711', 'ACUPUNCTURE'],
-    ['172V', 'COMMUNITY_HEALTH'],
-    ['176B', 'MIDWIFERY'],
-    ['183', 'PHARMACY'],
-    ['2080', 'PEDIATRICS'],
-    ['2084', 'PSYCHIATRY'],
-    ['2085', 'RADIOLOGY'],
-    ['2086', 'SURGERY'],
-    ['2088', 'UROLOGY'],
-    ['207K', 'ALLERGY_IMMUNOLOGY'],
-    ['207L', 'ANESTHESIOLOGY'],
-    ['207N', 'DERMATOLOGY'],
-    ['207P', 'EMERGENCY_MEDICINE'],
-    ['207Q', 'FAMILY_MEDICINE'],
-    ['207R', 'INTERNAL_MEDICINE'],
-    ['207V', 'OB_GYN'],
-    ['207X', 'ORTHOPEDICS'],
-    ['207Z', 'PATHOLOGY'],
-    ['208G', 'SURGERY'],
-    ['2251', 'PHYSICAL_THERAPY'],
-    ['2252', 'PHYSICAL_THERAPY'],
-    ['225X', 'OCCUPATIONAL_THERAPY'],
-    ['2257', 'SPEECH_THERAPY'],
-    ['224Z', 'OCCUPATIONAL_THERAPY'],
-    ['235', 'SPEECH_THERAPY'],
-    ['237', 'SPEECH_THERAPY'],
-    ['246', 'LAB_PATHOLOGY'],
-    ['247', 'LAB_PATHOLOGY'],
-    ['251', 'COMMUNITY_HEALTH'],
-    ['261Q', 'CLINIC_FACILITY'],
-    ['27', 'HOSPITAL'],
-    ['28', 'HOSPITAL'],
-    ['310', 'DME_PROSTHETICS'],
-    ['332B', 'DME_PROSTHETICS'],
-    ['335', 'DME_PROSTHETICS'],
-    ['363A', 'PHYSICIAN_ASSISTANT'],
-    ['363L', 'NURSE_PRACTITIONER'],
-    ['367', 'RESPIRATORY_THERAPY'],
-    ['373', 'MENTAL_HEALTH'],
-    ['374', 'LAB_PATHOLOGY'],
-  ];
-
-  for (const [prefix, category] of prefixMappings) {
+  // Prefix matching (sorted by length - longest/most specific first)
+  for (const [prefix, category] of SORTED_PREFIX_MAPPINGS) {
     if (taxonomyCode.startsWith(prefix)) {
       return category;
     }

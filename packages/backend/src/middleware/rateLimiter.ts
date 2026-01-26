@@ -1,43 +1,41 @@
 /**
  * Rate Limiting Middleware
  *
- * ═══════════════════════════════════════════════════════════════════════════
- * WARNING: PROCESS-LOCAL RATE LIMITING
- * ═══════════════════════════════════════════════════════════════════════════
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * DUAL-MODE RATE LIMITING
+ * ═══════════════════════════════════════════════════════════════════════════════
  *
- * This rate limiter uses in-memory (process-local) storage.
+ * This middleware supports two modes:
  *
- * In a horizontally scaled deployment (multiple Cloud Run instances), each
- * instance maintains INDEPENDENT counters. An attacker could bypass limits
- * by distributing requests across instances (limits become N× where N = instances).
+ * 1. REDIS MODE (distributed) - Used when REDIS_URL is configured
+ *    - Shared state across all application instances
+ *    - Enables true horizontal scaling
+ *    - Uses sliding window algorithm with sorted sets
  *
- * ┌─────────────────────────────────────────────────────────────────────────┐
- * │ ACCEPTED RISK for beta (single instance deployment)                    │
- * │                                                                         │
- * │ Current: Cloud Run with maxInstances=1 (single instance)               │
- * │ Risk Level: NONE for single instance                                   │
- * └─────────────────────────────────────────────────────────────────────────┘
+ * 2. IN-MEMORY MODE (process-local) - Fallback when Redis unavailable
+ *    - Each instance maintains independent counters
+ *    - Only safe for single-instance deployments
+ *    - Used automatically when REDIS_URL is not set
  *
- * TODO before scaling to multiple instances:
- * 1. Implement Redis-based rate limiting (see OPTION A below)
- * 2. Or use Cloud Armor rate limiting at GCP load balancer level
- * 3. Or use Cloud Run's min/max instances = 1 with vertical scaling only
+ * FAIL-OPEN BEHAVIOR:
+ *   If Redis becomes unavailable during operation, requests are ALLOWED
+ *   with a warning logged. This prioritizes availability over strict
+ *   rate limiting. The in-memory limiter is NOT used as fallback mid-request
+ *   to avoid inconsistent state.
  *
- * OPTION A - Redis Implementation:
- *   npm install ioredis rate-limit-redis
- *   Use Redis sorted sets for sliding window rate limiting
- *   Set REDIS_URL environment variable
- *   GCP: Use Cloud Memorystore for Redis
+ * Environment Variables:
+ *   REDIS_URL - Redis connection string (enables distributed mode)
  *
- * OPTION B - Cloud Armor (infrastructure-level):
- *   gcloud compute security-policies create vmp-rate-limit-policy
- *   Configure rate-based-ban rules at load balancer
- *
- * See: docs/08-RATE_LIMITING.md for full documentation
- * ═══════════════════════════════════════════════════════════════════════════
+ * See: docs/SCALING.md for deployment considerations
+ * ═══════════════════════════════════════════════════════════════════════════════
  */
 
 import { Request, Response, NextFunction } from 'express';
+import { getRedisClient, isRedisConnected } from '../lib/redis';
+
+// ============================================================================
+// TYPE DEFINITIONS
+// ============================================================================
 
 interface RateLimitEntry {
   count: number;
@@ -51,31 +49,38 @@ interface RateLimitStore {
 interface RateLimiterOptions {
   windowMs: number;
   maxRequests: number;
-  name?: string; // Unique name for this limiter's store
+  name?: string;
   message?: string;
   keyGenerator?: (req: Request) => string;
   skip?: (req: Request) => boolean;
 }
 
-// In-memory rate limit store (see file header for scaling considerations)
-const stores: Map<string, RateLimitStore> = new Map();
+type RateLimiterMiddleware = (req: Request, res: Response, next: NextFunction) => void | Promise<void>;
 
-// Cleanup old entries periodically
+// ============================================================================
+// IN-MEMORY RATE LIMITER (fallback for single-instance deployments)
+// ============================================================================
+
+// In-memory rate limit store
+const memoryStores: Map<string, RateLimitStore> = new Map();
+
+// Cleanup old entries periodically (every minute)
 setInterval(() => {
   const now = Date.now();
-  stores.forEach((store) => {
+  memoryStores.forEach((store) => {
     Object.keys(store).forEach((key) => {
       if (store[key].resetAt < now) {
         delete store[key];
       }
     });
   });
-}, 60000); // Cleanup every minute
+}, 60000);
 
 /**
- * Create a rate limiter middleware
+ * Create an in-memory rate limiter (process-local).
+ * Used when Redis is not available.
  */
-export function createRateLimiter(options: RateLimiterOptions) {
+function createInMemoryRateLimiter(options: RateLimiterOptions): RateLimiterMiddleware {
   const {
     windowMs,
     maxRequests,
@@ -86,10 +91,10 @@ export function createRateLimiter(options: RateLimiterOptions) {
   } = options;
 
   const storeName = name || `${windowMs}-${maxRequests}`;
-  if (!stores.has(storeName)) {
-    stores.set(storeName, {});
+  if (!memoryStores.has(storeName)) {
+    memoryStores.set(storeName, {});
   }
-  const store = stores.get(storeName)!;
+  const store = memoryStores.get(storeName)!;
 
   return (req: Request, res: Response, next: NextFunction): void => {
     if (skip(req)) {
@@ -114,7 +119,7 @@ export function createRateLimiter(options: RateLimiterOptions) {
 
     // Set rate limit headers
     const remaining = Math.max(0, maxRequests - entry.count);
-    const resetTimestamp = Math.ceil(entry.resetAt / 1000); // Unix timestamp
+    const resetTimestamp = Math.ceil(entry.resetAt / 1000);
     const retryAfterSeconds = Math.ceil((entry.resetAt - now) / 1000);
 
     res.setHeader('X-RateLimit-Limit', maxRequests);
@@ -135,8 +140,154 @@ export function createRateLimiter(options: RateLimiterOptions) {
   };
 }
 
+// ============================================================================
+// REDIS RATE LIMITER (distributed for horizontal scaling)
+// ============================================================================
+
 /**
- * Default rate limiter for general GET routes: 200 requests per hour
+ * Create a Redis-based rate limiter using sliding window algorithm.
+ * Uses sorted sets to track requests within the time window.
+ */
+function createRedisRateLimiter(options: RateLimiterOptions): RateLimiterMiddleware {
+  const {
+    windowMs,
+    maxRequests,
+    name = 'default',
+    message = 'Too many requests, please try again later.',
+    keyGenerator = (req: Request) => req.ip || 'unknown',
+    skip = () => false,
+  } = options;
+
+  const redis = getRedisClient();
+
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    if (skip(req)) {
+      next();
+      return;
+    }
+
+    // If Redis is not connected, fail open (allow request with warning)
+    if (!redis || !isRedisConnected()) {
+      console.warn(`[RateLimit:${name}] Redis unavailable, allowing request (fail-open)`);
+      res.setHeader('X-RateLimit-Status', 'degraded');
+      next();
+      return;
+    }
+
+    const clientKey = keyGenerator(req);
+    const redisKey = `ratelimit:${name}:${clientKey}`;
+    const now = Date.now();
+    const windowStart = now - windowMs;
+
+    try {
+      // Sliding window using Redis sorted set
+      // Score = timestamp, Member = unique request ID
+      const multi = redis.multi();
+
+      // 1. Remove entries outside the current window
+      multi.zremrangebyscore(redisKey, 0, windowStart);
+
+      // 2. Add current request with timestamp as score
+      // Use timestamp + random suffix to ensure uniqueness
+      const requestId = `${now}-${Math.random().toString(36).substring(2, 9)}`;
+      multi.zadd(redisKey, now, requestId);
+
+      // 3. Count requests in current window
+      multi.zcard(redisKey);
+
+      // 4. Set key expiration (cleanup after window passes)
+      multi.expire(redisKey, Math.ceil(windowMs / 1000) + 1);
+
+      const results = await multi.exec();
+
+      if (!results) {
+        // Transaction failed, fail open
+        console.warn(`[RateLimit:${name}] Redis transaction failed, allowing request`);
+        res.setHeader('X-RateLimit-Status', 'degraded');
+        next();
+        return;
+      }
+
+      // Extract count from ZCARD result (3rd command, index 2)
+      const zcardResult = results[2];
+      const requestCount = (zcardResult && zcardResult[1] as number) || 0;
+
+      // Calculate rate limit headers
+      const remaining = Math.max(0, maxRequests - requestCount);
+      const resetTimestamp = Math.ceil((now + windowMs) / 1000);
+      const retryAfterSeconds = Math.ceil(windowMs / 1000);
+
+      res.setHeader('X-RateLimit-Limit', maxRequests);
+      res.setHeader('X-RateLimit-Remaining', remaining);
+      res.setHeader('X-RateLimit-Reset', resetTimestamp);
+
+      if (requestCount > maxRequests) {
+        res.setHeader('Retry-After', retryAfterSeconds);
+        res.status(429).json({
+          error: 'Too many requests',
+          message,
+          retryAfter: retryAfterSeconds,
+        });
+        return;
+      }
+
+      next();
+    } catch (error) {
+      // Redis error - fail open to prioritize availability
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error(`[RateLimit:${name}] Redis error, allowing request:`, errorMessage);
+      res.setHeader('X-RateLimit-Status', 'degraded');
+      next();
+    }
+  };
+}
+
+// ============================================================================
+// AUTO-SELECTING RATE LIMITER FACTORY
+// ============================================================================
+
+// Track which mode was selected for each limiter (for logging)
+const limiterModes: Map<string, 'redis' | 'memory'> = new Map();
+
+/**
+ * Create a rate limiter middleware.
+ *
+ * Automatically selects the appropriate implementation:
+ * - Redis-based if REDIS_URL is configured
+ * - In-memory fallback otherwise
+ *
+ * @param options - Rate limiter configuration
+ * @returns Express middleware function
+ */
+export function createRateLimiter(options: RateLimiterOptions): RateLimiterMiddleware {
+  const name = options.name || 'unnamed';
+  const redis = getRedisClient();
+
+  // Only log mode selection once per limiter
+  if (!limiterModes.has(name)) {
+    if (redis) {
+      console.log(`[RateLimit] "${name}" using Redis (distributed mode)`);
+      limiterModes.set(name, 'redis');
+    } else {
+      console.log(`[RateLimit] "${name}" using in-memory (single-instance mode)`);
+      limiterModes.set(name, 'memory');
+    }
+  }
+
+  if (redis) {
+    return createRedisRateLimiter(options);
+  }
+
+  return createInMemoryRateLimiter(options);
+}
+
+// ============================================================================
+// PRE-CONFIGURED RATE LIMITERS
+// ============================================================================
+
+/**
+ * Default rate limiter for general API routes.
+ * Limit: 200 requests per hour
  */
 export const defaultRateLimiter = createRateLimiter({
   name: 'default',
@@ -146,7 +297,8 @@ export const defaultRateLimiter = createRateLimiter({
 });
 
 /**
- * Strict rate limiter for verification endpoints: 10 requests per hour
+ * Strict rate limiter for verification submission endpoints.
+ * Limit: 10 requests per hour
  */
 export const verificationRateLimiter = createRateLimiter({
   name: 'verification',
@@ -156,7 +308,8 @@ export const verificationRateLimiter = createRateLimiter({
 });
 
 /**
- * Strict rate limiter for vote endpoints: 10 requests per hour
+ * Strict rate limiter for vote endpoints.
+ * Limit: 10 requests per hour
  */
 export const voteRateLimiter = createRateLimiter({
   name: 'vote',
@@ -166,7 +319,8 @@ export const voteRateLimiter = createRateLimiter({
 });
 
 /**
- * Search rate limiter: 100 requests per hour
+ * Rate limiter for search endpoints.
+ * Limit: 100 requests per hour
  */
 export const searchRateLimiter = createRateLimiter({
   name: 'search',
