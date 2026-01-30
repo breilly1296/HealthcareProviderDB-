@@ -190,9 +190,10 @@ interface PlanRowProps {
   showConfidence: boolean;
   isLast: boolean;
   indented?: boolean;
+  showAcceptedBadge?: boolean;
 }
 
-function PlanRow({ plan, onVerify, showConfidence, isLast, indented = false }: PlanRowProps) {
+function PlanRow({ plan, onVerify, showConfidence, isLast, indented = false, showAcceptedBadge = false }: PlanRowProps) {
   const isAccepted = plan.status === 'accepted';
 
   return (
@@ -213,6 +214,11 @@ function PlanRow({ plan, onVerify, showConfidence, isLast, indented = false }: P
         >
           Verify
         </button>
+        {showAcceptedBadge && isAccepted && (
+          <span className="px-2 py-0.5 text-xs font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 rounded">
+            Accepted
+          </span>
+        )}
         {showConfidence && (
           <span className="text-xs text-slate-500 dark:text-slate-400 w-8 text-right">{plan.confidence}%</span>
         )}
@@ -305,6 +311,7 @@ export function InsuranceList({
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [verifyingPlan, setVerifyingPlan] = useState<InsurancePlan | null>(null);
+  const [otherPlansExpanded, setOtherPlansExpanded] = useState(false);
 
   const verifiedCount = plans.filter(p => p.status === 'accepted').length;
 
@@ -433,18 +440,58 @@ export function InsuranceList({
             {/* Single Plans (Other Plans) */}
             {singlePlans.length > 0 && (
               <div className={groups.length > 0 ? 'mt-4 pt-4 border-t border-slate-200 dark:border-slate-700' : ''}>
-                {groups.length > 0 && (
-                  <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">Other Plans</p>
+                {groups.length > 0 && singlePlans.length > 5 ? (
+                  // Collapsible "Other Plans" section for 6+ plans
+                  <>
+                    <button
+                      onClick={() => setOtherPlansExpanded(!otherPlansExpanded)}
+                      className="w-full flex items-center justify-between py-2 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors -mx-2 px-2 rounded mb-1"
+                    >
+                      <div className="flex items-center gap-2">
+                        {otherPlansExpanded || hasSearch ? (
+                          <ChevronDown className="w-4 h-4 text-slate-400" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4 text-slate-400" />
+                        )}
+                        <span className="text-sm font-medium text-slate-500 dark:text-slate-400">
+                          Other Plans ({singlePlans.length})
+                        </span>
+                      </div>
+                      {singlePlans.filter(p => p.status === 'accepted').length > 0 && (
+                        <span className="text-xs text-green-600 dark:text-green-400">
+                          {singlePlans.filter(p => p.status === 'accepted').length} accepted
+                        </span>
+                      )}
+                    </button>
+                    {(otherPlansExpanded || hasSearch) && singlePlans.map((plan, idx) => (
+                      <PlanRow
+                        key={plan.id}
+                        plan={plan}
+                        onVerify={handleVerify}
+                        showConfidence={showIndividualConfidence}
+                        isLast={idx === singlePlans.length - 1}
+                        showAcceptedBadge
+                      />
+                    ))}
+                  </>
+                ) : (
+                  // Regular display for 5 or fewer plans
+                  <>
+                    {groups.length > 0 && (
+                      <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">Other Plans</p>
+                    )}
+                    {singlePlans.map((plan, idx) => (
+                      <PlanRow
+                        key={plan.id}
+                        plan={plan}
+                        onVerify={handleVerify}
+                        showConfidence={showIndividualConfidence}
+                        isLast={idx === singlePlans.length - 1}
+                        showAcceptedBadge={groups.length > 0}
+                      />
+                    ))}
+                  </>
                 )}
-                {singlePlans.map((plan, idx) => (
-                  <PlanRow
-                    key={plan.id}
-                    plan={plan}
-                    onVerify={handleVerify}
-                    showConfidence={showIndividualConfidence}
-                    isLast={idx === singlePlans.length - 1}
-                  />
-                ))}
               </div>
             )}
           </>
