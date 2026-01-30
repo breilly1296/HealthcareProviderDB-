@@ -10,7 +10,7 @@
   }
 
   body {
-    @apply antialiased text-gray-900 bg-white;
+    @apply antialiased text-gray-900 bg-gray-50;
     @apply dark:text-gray-100 dark:bg-gray-900;
     min-height: 100vh;
     transition: background-color 0.2s ease, color 0.2s ease;
@@ -66,8 +66,8 @@
   }
 
   .input {
-    @apply w-full px-4 py-3 text-base border border-gray-300 rounded-lg;
-    @apply focus-visible:border-primary-500 focus-visible:ring-1 focus-visible:ring-primary-500;
+    @apply w-full px-4 py-3 text-base bg-white border border-gray-300 rounded-lg;
+    @apply focus-visible:border-blue-500 focus-visible:ring-1 focus-visible:ring-blue-500;
     @apply placeholder:text-gray-400;
     @apply dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100;
     @apply dark:placeholder:text-gray-500;
@@ -80,12 +80,12 @@
   }
 
   .card {
-    @apply bg-white rounded-xl shadow-sm border border-gray-200 p-6;
+    @apply bg-white rounded-xl shadow-sm border border-gray-100 p-6;
     @apply dark:bg-gray-800 dark:border-gray-700;
   }
 
   .card-hover {
-    @apply card hover:shadow-md hover:border-gray-300 transition-all duration-200;
+    @apply card hover:shadow-md hover:border-gray-200 transition-all duration-200;
     @apply dark:hover:border-gray-600;
   }
 }

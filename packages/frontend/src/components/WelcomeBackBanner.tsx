@@ -25,7 +25,7 @@ export function WelcomeBackBanner() {
     }
 
     return (
-        <div className="bg-blue-600/10 border-b border-blue-500/20">
+        <div className="bg-blue-50 dark:bg-blue-600/10 border-b border-blue-100 dark:border-blue-500/20">
             <div className="container-wide py-2.5">
                 <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3 min-w-0">
