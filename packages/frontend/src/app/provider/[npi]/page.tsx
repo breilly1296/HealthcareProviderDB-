@@ -9,7 +9,6 @@ import type { ProviderDisplay, PlanAcceptanceDisplay } from '@/types';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import {
   ProviderHeroCard,
-  ScoreBreakdown,
   InsuranceList,
 } from '@/components/provider-detail';
 
@@ -116,14 +115,8 @@ export default function ProviderDetailPage() {
             {/* Hero Card */}
             <ProviderHeroCard provider={provider} confidenceScore={confidenceScore} />
 
-            {/* Two Column Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Score Breakdown */}
-              <ScoreBreakdown />
-
-              {/* Insurance Plans */}
-              <InsuranceList plans={insurancePlans.length > 0 ? insurancePlans : undefined} />
-            </div>
+            {/* Insurance Plans */}
+            <InsuranceList plans={insurancePlans.length > 0 ? insurancePlans : undefined} />
           </div>
         )}
       </div>
