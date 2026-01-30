@@ -10,11 +10,15 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 import {
   ProviderHeroCard,
   InsuranceList,
+  AboutProvider,
+  ColocatedProviders,
 } from '@/components/provider-detail';
 
 // Provider with full plan acceptance data (from detail API)
 interface ProviderWithPlans extends Omit<ProviderDisplay, 'planAcceptances'> {
   planAcceptances: PlanAcceptanceDisplay[];
+  acceptsNewPatients?: boolean | null;
+  languages?: string[] | null;
 }
 
 export default function ProviderDetailPage() {
@@ -50,6 +54,19 @@ export default function ProviderDetailPage() {
     (max, p) => Math.max(max, p.confidence?.score ?? p.confidenceScore ?? 0),
     0
   ) || 0;
+
+  // Count total verifications across all plans
+  const verificationCount = provider?.planAcceptances?.reduce(
+    (total, p) => total + (p.verificationCount || 0),
+    0
+  ) || 0;
+
+  // Get most recent verification date
+  const lastVerifiedAt = provider?.planAcceptances?.reduce((latest, p) => {
+    if (!p.lastVerifiedAt) return latest;
+    if (!latest) return p.lastVerifiedAt;
+    return new Date(p.lastVerifiedAt) > new Date(latest) ? p.lastVerifiedAt : latest;
+  }, null as string | null);
 
   // Transform plan acceptances for InsuranceList - use calculated confidence per plan
   const insurancePlans = provider?.planAcceptances?.map(p => ({
@@ -114,10 +131,32 @@ export default function ProviderDetailPage() {
         {!loading && !error && provider && (
           <div className="space-y-6">
             {/* Hero Card */}
-            <ProviderHeroCard provider={provider} confidenceScore={confidenceScore} />
+            <ProviderHeroCard
+              provider={provider}
+              confidenceScore={confidenceScore}
+              verificationCount={verificationCount}
+            />
+
+            {/* About This Provider */}
+            <AboutProvider
+              entityType={provider.entityType}
+              acceptsNewPatients={provider.acceptsNewPatients}
+              languages={provider.languages}
+              organizationName={provider.organizationName}
+            />
 
             {/* Insurance Plans */}
-            <InsuranceList plans={insurancePlans.length > 0 ? insurancePlans : undefined} npi={npi} />
+            <InsuranceList
+              plans={insurancePlans.length > 0 ? insurancePlans : undefined}
+              npi={npi}
+              providerName={provider.displayName}
+              lastVerifiedAt={lastVerifiedAt}
+              verificationCount={verificationCount}
+              mainConfidenceScore={confidenceScore}
+            />
+
+            {/* Other Providers at This Location */}
+            <ColocatedProviders npi={npi} />
           </div>
         )}
       </div>

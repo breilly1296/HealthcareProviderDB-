@@ -1,6 +1,6 @@
 'use client';
 
-import { MapPin, Phone, BadgeCheck } from 'lucide-react';
+import { MapPin, Phone, BadgeCheck, Navigation } from 'lucide-react';
 import { ConfidenceGauge } from './ConfidenceGauge';
 
 interface Provider {
@@ -12,16 +12,19 @@ interface Provider {
   specialtyCategory?: string | null;
   taxonomyDescription?: string | null;
   addressLine1?: string | null;
+  addressLine2?: string | null;
   city?: string | null;
   state?: string | null;
   zip?: string | null;
   phone?: string | null;
   organizationName?: string | null;
+  entityType?: string | null;
 }
 
 interface ProviderHeroCardProps {
   provider: Provider;
   confidenceScore: number;
+  verificationCount?: number;
 }
 
 function getInitials(name: string): string {
@@ -42,19 +45,32 @@ function formatPhone(phone: string): string {
   return phone;
 }
 
-export function ProviderHeroCard({ provider, confidenceScore }: ProviderHeroCardProps) {
+function getGoogleMapsUrl(provider: Provider): string {
+  const parts = [
+    provider.addressLine1,
+    provider.addressLine2,
+    provider.city,
+    provider.state,
+    provider.zip
+  ].filter(Boolean).join(', ');
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(parts)}`;
+}
+
+export function ProviderHeroCard({ provider, confidenceScore, verificationCount = 0 }: ProviderHeroCardProps) {
   const initials = getInitials(provider.displayName);
   const specialty = provider.specialty || provider.specialtyCategory || provider.taxonomyDescription || 'Healthcare Provider';
   const isVerified = confidenceScore >= 70;
 
-  // Format location
-  const location = provider.city && provider.state
-    ? `${provider.city}, ${provider.state}${provider.zip ? ` ${provider.zip}` : ''}`
-    : null;
+  // Build full address
+  const streetAddress = [provider.addressLine1, provider.addressLine2].filter(Boolean).join(', ');
+  const cityStateZip = [
+    provider.city,
+    provider.state ? `${provider.state}${provider.zip ? ` ${provider.zip}` : ''}` : null
+  ].filter(Boolean).join(', ');
 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 md:p-8">
-      <div className="flex flex-col md:flex-row md:items-center gap-6 md:gap-8">
+      <div className="flex flex-col md:flex-row md:items-start gap-6 md:gap-8">
         {/* Left section: Avatar and Info */}
         <div className="flex items-start gap-4 flex-1">
           {/* Avatar */}
@@ -75,39 +91,65 @@ export function ProviderHeroCard({ provider, confidenceScore }: ProviderHeroCard
 
             <p className="text-[#137fec] font-medium mb-3">{specialty}</p>
 
-            <div className="space-y-1.5 text-sm text-slate-600 dark:text-slate-300">
-              {provider.organizationName && (
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-slate-400 dark:text-slate-500 flex-shrink-0" />
-                  <span>{provider.organizationName}</span>
-                </div>
-              )}
+            {/* Organization name if different */}
+            {provider.organizationName && provider.entityType !== 'ORGANIZATION' && (
+              <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+                {provider.organizationName}
+              </p>
+            )}
 
-              {location && (
-                <div className="flex items-center gap-2">
-                  <div className="w-4" />
-                  <span>{location}</span>
-                </div>
-              )}
-
-              {provider.phone && (
-                <div className="flex items-center gap-2">
-                  <Phone className="w-4 h-4 text-slate-400 dark:text-slate-500 flex-shrink-0" />
-                  <a
-                    href={`tel:${provider.phone}`}
-                    className="hover:text-[#137fec] transition-colors"
-                  >
-                    {formatPhone(provider.phone)}
-                  </a>
+            {/* Address */}
+            <div className="space-y-1 text-sm text-slate-600 dark:text-slate-300 mb-3">
+              {streetAddress && (
+                <div className="flex items-start gap-2">
+                  <MapPin className="w-4 h-4 text-slate-400 dark:text-slate-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p>{streetAddress}</p>
+                    {cityStateZip && <p>{cityStateZip}</p>}
+                  </div>
                 </div>
               )}
             </div>
+
+            {/* Phone and Actions */}
+            <div className="flex flex-wrap items-center gap-4 text-sm">
+              {provider.phone && (
+                <a
+                  href={`tel:${provider.phone}`}
+                  className="inline-flex items-center gap-2 text-slate-600 dark:text-slate-300 hover:text-[#137fec] dark:hover:text-[#137fec] transition-colors"
+                >
+                  <Phone className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                  <span className="font-medium">{formatPhone(provider.phone)}</span>
+                </a>
+              )}
+
+              {(streetAddress || cityStateZip) && (
+                <a
+                  href={getGoogleMapsUrl(provider)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-[#137fec] hover:text-[#0d6edb] font-medium transition-colors"
+                >
+                  <Navigation className="w-4 h-4" />
+                  Get Directions
+                </a>
+              )}
+            </div>
+
+            {/* NPI - subtle below */}
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-3">
+              NPI: {provider.npi}
+            </p>
           </div>
         </div>
 
         {/* Right section: Confidence Gauge */}
         <div className="flex justify-center md:justify-end">
-          <ConfidenceGauge score={confidenceScore} size={140} />
+          <ConfidenceGauge
+            score={confidenceScore}
+            size={140}
+            verificationCount={verificationCount}
+          />
         </div>
       </div>
     </div>

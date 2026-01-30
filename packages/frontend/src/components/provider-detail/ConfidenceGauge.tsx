@@ -4,24 +4,46 @@ interface ConfidenceGaugeProps {
   score: number;
   size?: number;
   showLink?: boolean;
+  verificationCount?: number;
 }
 
-export function ConfidenceGauge({ score, size = 140, showLink = true }: ConfidenceGaugeProps) {
-  const strokeWidth = 10;
+function getConfidenceLevel(score: number): { label: string; color: string } {
+  if (score >= 80) return { label: 'High Confidence', color: '#10b981' };
+  if (score >= 60) return { label: 'Medium Confidence', color: '#3b82f6' };
+  if (score >= 40) return { label: 'Low Confidence', color: '#f59e0b' };
+  return { label: 'Very Low', color: '#ef4444' };
+}
+
+function getImprovementHint(score: number, verificationCount: number): string | null {
+  if (score >= 80) return null;
+
+  const verificationsNeeded = Math.max(0, 3 - verificationCount);
+
+  if (verificationsNeeded > 0) {
+    return `${verificationsNeeded} verification${verificationsNeeded !== 1 ? 's' : ''} needed for high confidence`;
+  }
+
+  if (score < 60) {
+    return 'More recent verifications would improve confidence';
+  }
+
+  return 'Data is being validated';
+}
+
+export function ConfidenceGauge({
+  score,
+  size = 140,
+  showLink = true,
+  verificationCount = 0
+}: ConfidenceGaugeProps) {
+  const strokeWidth = 5;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const progress = (score / 100) * circumference;
   const offset = circumference - progress;
 
-  // Color based on score
-  const getColor = (s: number) => {
-    if (s >= 80) return '#10b981'; // green
-    if (s >= 60) return '#3b82f6'; // blue
-    if (s >= 40) return '#f59e0b'; // amber
-    return '#ef4444'; // red
-  };
-
-  const strokeColor = getColor(score);
+  const { label, color } = getConfidenceLevel(score);
+  const improvementHint = getImprovementHint(score, verificationCount);
 
   return (
     <div className="flex flex-col items-center">
@@ -42,7 +64,7 @@ export function ConfidenceGauge({ score, size = 140, showLink = true }: Confiden
             cy={size / 2}
             r={radius}
             fill="none"
-            stroke={strokeColor}
+            stroke={color}
             strokeWidth={strokeWidth}
             strokeLinecap="round"
             strokeDasharray={circumference}
@@ -57,10 +79,23 @@ export function ConfidenceGauge({ score, size = 140, showLink = true }: Confiden
         </div>
       </div>
 
-      <p className="mt-2 text-sm font-medium text-slate-600 dark:text-slate-400">Confidence Score</p>
+      {/* Confidence Level Label */}
+      <p
+        className="mt-2 text-sm font-semibold"
+        style={{ color }}
+      >
+        {label}
+      </p>
+
+      {/* Improvement hint */}
+      {improvementHint && (
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 text-center max-w-[160px]">
+          {improvementHint}
+        </p>
+      )}
 
       {showLink && (
-        <button className="mt-1 text-xs text-[#137fec] hover:underline">
+        <button className="mt-2 text-xs text-[#137fec] hover:underline">
           How is this calculated?
         </button>
       )}

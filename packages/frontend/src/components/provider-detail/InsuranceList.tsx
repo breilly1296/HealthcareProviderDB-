@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { CheckCircle, HelpCircle, Search, ChevronDown, ChevronUp, MessageSquarePlus, X, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { CheckCircle, HelpCircle, Search, ChevronDown, ChevronUp, MessageSquarePlus, X, ThumbsUp, ThumbsDown, Users } from 'lucide-react';
 import { verificationApi } from '@/lib/api';
 
 interface InsurancePlan {
@@ -16,6 +16,9 @@ interface InsuranceListProps {
   plans?: InsurancePlan[];
   npi?: string;
   providerName?: string;
+  lastVerifiedAt?: string | null;
+  verificationCount?: number;
+  mainConfidenceScore?: number;
 }
 
 // Sample data for demo
@@ -146,11 +149,18 @@ function VerificationModal({ isOpen, onClose, plan, npi, providerName }: Verific
   );
 }
 
-function PlanCard({ plan, onVerify }: { plan: InsurancePlan; onVerify: (plan: InsurancePlan) => void }) {
+interface PlanCardProps {
+  plan: InsurancePlan;
+  onVerify: (plan: InsurancePlan) => void;
+  showConfidence: boolean;
+  isLast: boolean;
+}
+
+function PlanCard({ plan, onVerify, showConfidence, isLast }: PlanCardProps) {
   const isAccepted = plan.status === 'accepted';
 
   return (
-    <div className="flex items-center justify-between py-3 px-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+    <div className={`flex items-center justify-between py-3 ${!isLast ? 'border-b border-slate-100 dark:border-slate-700' : ''}`}>
       <div className="flex items-center gap-3 min-w-0 flex-1">
         {isAccepted ? (
           <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
@@ -160,10 +170,10 @@ function PlanCard({ plan, onVerify }: { plan: InsurancePlan; onVerify: (plan: In
         <span className="font-medium text-slate-900 dark:text-white truncate">{plan.name}</span>
       </div>
 
-      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+      <div className="flex items-center gap-3 flex-shrink-0 ml-2">
         <button
           onClick={() => onVerify(plan)}
-          className="text-xs text-[#137fec] hover:text-[#0d6edb] font-medium transition-colors"
+          className="px-3 py-1 text-xs font-medium text-[#137fec] border border-[#137fec] rounded-md hover:bg-[#137fec] hover:text-white transition-colors"
         >
           Verify
         </button>
@@ -176,13 +186,38 @@ function PlanCard({ plan, onVerify }: { plan: InsurancePlan; onVerify: (plan: In
         >
           {isAccepted ? 'Accepted' : 'Unknown'}
         </span>
-        <span className="text-sm text-slate-500 dark:text-slate-400 w-10 text-right">{plan.confidence}%</span>
+        {showConfidence && (
+          <span className="text-sm text-slate-500 dark:text-slate-400 w-10 text-right">{plan.confidence}%</span>
+        )}
       </div>
     </div>
   );
 }
 
-export function InsuranceList({ plans = samplePlans, npi, providerName = 'This provider' }: InsuranceListProps) {
+function formatLastVerified(dateString: string | null | undefined): string {
+  if (!dateString) return 'No verifications yet';
+
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) return 'Last verified: Today';
+  if (diffDays === 1) return 'Last verified: Yesterday';
+  if (diffDays < 7) return `Last verified: ${diffDays} days ago`;
+  if (diffDays < 30) return `Last verified: ${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) > 1 ? 's' : ''} ago`;
+  if (diffDays < 365) return `Last verified: ${Math.floor(diffDays / 30)} month${Math.floor(diffDays / 30) > 1 ? 's' : ''} ago`;
+
+  return `Last verified: ${date.toLocaleDateString()}`;
+}
+
+export function InsuranceList({
+  plans = samplePlans,
+  npi,
+  providerName = 'This provider',
+  lastVerifiedAt,
+  verificationCount = 0,
+  mainConfidenceScore
+}: InsuranceListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
   const [verifyingPlan, setVerifyingPlan] = useState<InsurancePlan | null>(null);
@@ -198,16 +233,23 @@ export function InsuranceList({ plans = samplePlans, npi, providerName = 'This p
   };
 
   const handleOpenGeneralVerify = () => {
-    // Open modal with first plan or a general verification
     setVerifyingPlan(plans[0] ?? null);
   };
 
-  // Filter plans based on search query
+  // Sort plans alphabetically and filter based on search query
   const filteredPlans = useMemo(() => {
-    if (!searchQuery.trim()) return plans;
+    let sorted = [...plans].sort((a, b) => a.name.localeCompare(b.name));
+    if (!searchQuery.trim()) return sorted;
     const query = searchQuery.toLowerCase();
-    return plans.filter(p => p.name.toLowerCase().includes(query));
+    return sorted.filter(p => p.name.toLowerCase().includes(query));
   }, [plans, searchQuery]);
+
+  // Determine if we should show individual confidence scores
+  // Hide if all scores are the same as the main score
+  const showIndividualConfidence = useMemo(() => {
+    if (mainConfidenceScore === undefined) return true;
+    return plans.some(p => p.confidence !== mainConfidenceScore);
+  }, [plans, mainConfidenceScore]);
 
   // Determine which plans to display
   const hasSearch = searchQuery.trim().length > 0;
@@ -221,7 +263,7 @@ export function InsuranceList({ plans = samplePlans, npi, providerName = 'This p
       {/* Header */}
       <div className="mb-4">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Insurance Acceptance</h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{verifiedCount} verified plans</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{verifiedCount} accepted plans</p>
       </div>
 
       {/* Search Input */}
@@ -246,10 +288,16 @@ export function InsuranceList({ plans = samplePlans, npi, providerName = 'This p
       )}
 
       {/* Plan list */}
-      <div className="space-y-2">
+      <div className="divide-y-0">
         {displayedPlans.length > 0 ? (
-          displayedPlans.map(plan => (
-            <PlanCard key={plan.id} plan={plan} onVerify={handleVerify} />
+          displayedPlans.map((plan, idx) => (
+            <PlanCard
+              key={plan.id}
+              plan={plan}
+              onVerify={handleVerify}
+              showConfidence={showIndividualConfidence}
+              isLast={idx === displayedPlans.length - 1}
+            />
           ))
         ) : (
           <p className="text-sm text-slate-500 dark:text-slate-400 py-4 text-center">
@@ -280,16 +328,32 @@ export function InsuranceList({ plans = samplePlans, npi, providerName = 'This p
 
       {/* Verification CTA */}
       <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-700">
+        {/* Last verified info */}
+        <p className="text-sm text-slate-600 dark:text-slate-400 text-center mb-3">
+          {formatLastVerified(lastVerifiedAt)}
+        </p>
+
         <button
           onClick={handleOpenGeneralVerify}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#137fec] hover:bg-[#0d6edb] text-white font-medium rounded-lg transition-colors"
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-400 hover:to-cyan-400 text-white font-medium rounded-lg shadow-lg shadow-blue-500/25 transition-all hover:scale-[1.02]"
         >
           <MessageSquarePlus className="w-5 h-5" />
           Verify Insurance Acceptance
         </button>
-        <p className="text-xs text-slate-500 dark:text-slate-400 text-center mt-3">
-          Help others by confirming if this provider accepts your insurance
-        </p>
+
+        {/* Social proof */}
+        {verificationCount > 0 && (
+          <p className="flex items-center justify-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 text-center mt-3">
+            <Users className="w-3.5 h-3.5" />
+            Join {verificationCount} {verificationCount === 1 ? 'person' : 'people'} who verified this provider
+          </p>
+        )}
+
+        {verificationCount === 0 && (
+          <p className="text-xs text-slate-500 dark:text-slate-400 text-center mt-3">
+            Be the first to verify this provider's insurance acceptance
+          </p>
+        )}
       </div>
 
       {/* Verification Modal */}
