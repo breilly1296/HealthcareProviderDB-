@@ -39,7 +39,7 @@ function cleanProviderName(name: string): string {
   const parts = name.split(',').map(p => p.trim());
   if (parts.length < 2) return name;
 
-  const namePart = parts[0];
+  const namePart = parts[0] ?? name;
   const credentialsPart = parts.slice(1).join(', ');
 
   // Extract valid credentials from the credentials part
