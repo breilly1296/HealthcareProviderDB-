@@ -70,7 +70,7 @@ export function HeroSection() {
 
           {/* Inline Search Form */}
           <form onSubmit={handleSubmit} className="max-w-4xl mx-auto px-4">
-            <div className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm shadow-lg border border-stone-200 dark:border-slate-700 rounded-xl p-4 md:p-6">
+            <div className="bg-stone-50/90 dark:bg-slate-800/70 backdrop-blur-sm shadow-lg border border-stone-200 dark:border-slate-700 rounded-xl p-4 md:p-6">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-4">
                 {/* Location Input */}
                 <div className="relative">
@@ -80,7 +80,7 @@ export function HeroSection() {
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
                     placeholder="City or ZIP code"
-                    className="w-full pl-11 pr-4 py-3 bg-white dark:bg-slate-900 border border-stone-300 dark:border-slate-600 rounded-lg text-stone-800 dark:text-white placeholder-stone-400 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className="w-full pl-11 pr-4 py-3 bg-stone-50 dark:bg-slate-900 border border-stone-300 dark:border-slate-600 rounded-lg text-stone-800 dark:text-white placeholder-stone-400 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   />
                 </div>
 
@@ -90,7 +90,7 @@ export function HeroSection() {
                   <select
                     value={specialty}
                     onChange={(e) => setSpecialty(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3 bg-white dark:bg-slate-900 border border-stone-300 dark:border-slate-600 rounded-lg text-stone-800 dark:text-white appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className="w-full pl-11 pr-4 py-3 bg-stone-50 dark:bg-slate-900 border border-stone-300 dark:border-slate-600 rounded-lg text-stone-800 dark:text-white appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   >
                     {POPULAR_SPECIALTIES.map((s) => (
                       <option key={s.value} value={s.value}>{s.label}</option>
@@ -109,7 +109,7 @@ export function HeroSection() {
                   <select
                     value={insurance}
                     onChange={(e) => setInsurance(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3 bg-white dark:bg-slate-900 border border-stone-300 dark:border-slate-600 rounded-lg text-stone-800 dark:text-white appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className="w-full pl-11 pr-4 py-3 bg-stone-50 dark:bg-slate-900 border border-stone-300 dark:border-slate-600 rounded-lg text-stone-800 dark:text-white appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   >
                     {POPULAR_INSURANCES.map((i) => (
                       <option key={i.value} value={i.value}>{i.label}</option>

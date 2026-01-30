@@ -38,8 +38,8 @@ export function HowItWorksSection() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {steps.map((step) => (
-            <div key={step.number} className="bg-white/80 dark:bg-gray-800 rounded-xl shadow-sm border border-stone-200 dark:border-gray-700 p-6 text-center">
-              <div className="w-16 h-16 bg-stone-100 dark:bg-primary-900/40 rounded-full flex items-center justify-center mx-auto mb-6">
+            <div key={step.number} className="bg-stone-50 dark:bg-gray-800 rounded-xl shadow-sm border border-stone-200 dark:border-gray-700 p-6 text-center">
+              <div className="w-16 h-16 bg-stone-200/70 dark:bg-primary-900/40 rounded-full flex items-center justify-center mx-auto mb-6">
                 <span className="text-2xl font-bold text-stone-600 dark:text-primary-400">
                   {step.number}
                 </span>

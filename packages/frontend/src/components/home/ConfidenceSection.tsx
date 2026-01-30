@@ -79,7 +79,7 @@ const scoringFactors = [
 
 export function ConfidenceSection() {
   return (
-    <section id="confidence" className="py-10 md:py-14 bg-white/60 dark:bg-gray-800">
+    <section id="confidence" className="py-10 md:py-14 bg-stone-50 dark:bg-gray-800">
       <div className="container-wide">
         <h2 className="text-2xl md:text-3xl font-bold text-center text-stone-800 dark:text-white mb-3">
           Understanding Confidence Scores
@@ -98,7 +98,7 @@ export function ConfidenceSection() {
             {confidenceLevels.map((level) => {
               const styles = colorStyles[level.color];
               return (
-                <div key={level.level} className={`bg-white/80 dark:bg-gray-800 rounded-xl shadow-sm border border-stone-200 dark:border-gray-700 p-6 border-l-4 ${styles.border}`}>
+                <div key={level.level} className={`bg-stone-100 dark:bg-gray-800 rounded-xl shadow-sm border border-stone-200 dark:border-gray-700 p-6 border-l-4 ${styles.border}`}>
                   <div className="flex items-center gap-3 mb-4">
                     <div className={`w-12 h-12 ${styles.bg} rounded-full flex items-center justify-center`}>
                       {level.icon}
@@ -115,7 +115,7 @@ export function ConfidenceSection() {
           </div>
 
           {/* Scoring Factors */}
-          <div className="bg-white/80 dark:bg-gray-800 rounded-xl shadow-sm border border-stone-200 dark:border-gray-700 p-6">
+          <div className="bg-stone-100 dark:bg-gray-800 rounded-xl shadow-sm border border-stone-200 dark:border-gray-700 p-6">
             <h3 className="text-xl font-semibold text-stone-800 dark:text-white mb-6">
               How We Calculate Scores
             </h3>
@@ -140,7 +140,7 @@ export function ConfidenceSection() {
                 </div>
               ))}
             </div>
-            <div className="mt-6 p-4 bg-amber-50/50 dark:bg-primary-900/30 rounded-lg border border-amber-200 dark:border-primary-800">
+            <div className="mt-6 p-4 bg-amber-100/50 dark:bg-primary-900/30 rounded-lg border border-amber-200 dark:border-primary-800">
               <p className="text-xs text-amber-900 dark:text-primary-300">
                 <strong>Total: 100 points</strong> (25 + 30 + 25 + 20) • Updated scoring emphasizes time-sensitivity
                 based on Ndumele et al. (2018) and optimal verification threshold from Mortensen et al. (2015)

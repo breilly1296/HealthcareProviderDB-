@@ -39,7 +39,7 @@ const colorStyles = {
 
 export function WhyItMattersSection() {
   return (
-    <section className="py-8 md:py-12 bg-white/60 dark:bg-gray-900 border-b border-stone-200 dark:border-gray-800">
+    <section className="py-8 md:py-12 bg-stone-50 dark:bg-gray-900 border-b border-stone-200 dark:border-gray-800">
       <div className="container-wide">
         <h2 className="text-2xl md:text-3xl font-bold text-center text-stone-800 dark:text-white mb-3">
           Why This Matters
@@ -54,7 +54,7 @@ export function WhyItMattersSection() {
             return (
               <div
                 key={stat.label}
-                className={`text-center p-6 rounded-xl ${styles.bg} border ${styles.border}`}
+                className={`text-center p-6 rounded-xl shadow-sm ${styles.bg} border ${styles.border}`}
               >
                 <div className={`text-4xl font-bold ${styles.text}`}>{stat.value}</div>
                 <div className="text-stone-700 dark:text-gray-300 mt-2 font-medium">{stat.label}</div>

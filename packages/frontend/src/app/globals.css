@@ -80,7 +80,7 @@
   }
 
   .card {
-    @apply bg-white/80 rounded-xl shadow-sm border border-stone-200 p-6;
+    @apply bg-stone-50 rounded-xl shadow-sm border border-stone-200 p-6;
     @apply dark:bg-gray-800 dark:border-gray-700;
   }
 
