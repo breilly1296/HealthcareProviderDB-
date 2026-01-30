@@ -3,12 +3,15 @@
 import { memo, useMemo } from 'react';
 import Link from 'next/link';
 import type { ProviderDisplay } from '@/types';
-import { ConfidenceBadge } from './ConfidenceBadge';
-import FreshnessWarning from './FreshnessWarning';
 import { getSpecialtyDisplay } from '@/lib/provider-utils';
-import { CompareCheckbox } from './compare';
-import { useCompare, CompareProvider } from '@/hooks/useCompare';
 import { LocationIcon, PhoneIcon, ChevronRightIcon } from '@/components/icons';
+import { CheckCircle, BadgeCheck } from 'lucide-react';
+
+interface PlanAcceptance {
+  planName?: string;
+  issuerName?: string;
+  status?: string;
+}
 
 interface ProviderCardProps {
   provider: ProviderDisplay;
@@ -17,182 +20,240 @@ interface ProviderCardProps {
   lastVerifiedAt?: Date | null;
   planId?: string;
   planName?: string;
+  planAcceptances?: PlanAcceptance[];
+}
+
+// Helper to format phone numbers
+function formatPhoneNumber(phone: string | null): string {
+  if (!phone) return '';
+  const cleaned = phone.replace(/\D/g, '');
+  if (cleaned.length === 10) {
+    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+  }
+  return phone;
+}
+
+// Helper to get initials from provider name
+function getInitials(provider: ProviderDisplay): string {
+  if (provider.entityType === 'ORGANIZATION' && provider.organizationName) {
+    return provider.organizationName
+      .split(' ')
+      .slice(0, 2)
+      .map(w => w[0])
+      .join('')
+      .toUpperCase();
+  }
+
+  const first = provider.firstName?.[0] || '';
+  const last = provider.lastName?.[0] || '';
+
+  if (first && last) {
+    return (first + last).toUpperCase();
+  }
+
+  // Fallback to displayName
+  return provider.displayName
+    .split(' ')
+    .filter(n => !['Dr.', 'MD', 'DO', 'PhD', 'NP', 'PA'].includes(n))
+    .slice(0, 2)
+    .map(n => n[0])
+    .join('')
+    .toUpperCase() || 'DR';
+}
+
+// Helper to get confidence color
+function getConfidenceColor(score: number): { bg: string; bar: string; text: string } {
+  if (score >= 70) {
+    return {
+      bg: 'bg-green-50 dark:bg-green-900/20',
+      bar: 'bg-green-500',
+      text: 'text-green-700 dark:text-green-400',
+    };
+  }
+  if (score >= 50) {
+    return {
+      bg: 'bg-yellow-50 dark:bg-yellow-900/20',
+      bar: 'bg-yellow-500',
+      text: 'text-yellow-700 dark:text-yellow-400',
+    };
+  }
+  return {
+    bg: 'bg-red-50 dark:bg-red-900/20',
+    bar: 'bg-red-500',
+    text: 'text-red-700 dark:text-red-400',
+  };
 }
 
 /**
- * Memoized to prevent re-renders when parent list updates but this provider hasn't changed.
- * Uses custom comparison to check only relevant props for equality.
+ * Memoized provider card for search results
  */
 function ProviderCardComponent({
   provider,
   confidenceScore,
-  showConfidence = false,
-  lastVerifiedAt,
-  planId,
-  planName,
+  showConfidence = true,
+  planAcceptances = [],
 }: ProviderCardProps) {
-  const { isSelected } = useCompare();
-  const selected = isSelected(provider.npi);
-
-  // Memoize computed specialty to avoid recalculating on every render
+  // Memoize computed specialty
   const specialty = useMemo(
     () => getSpecialtyDisplay(provider.specialtyCategory, provider.taxonomyDescription),
     [provider.specialtyCategory, provider.taxonomyDescription]
   );
 
-  // Memoize the CompareProvider object to maintain referential equality
-  const compareProvider: CompareProvider = useMemo(
-    () => ({
-      npi: provider.npi,
-      name: provider.displayName,
-      specialty: specialty,
-      healthSystem: provider.organizationName || null,
-      address: provider.addressLine1 + (provider.addressLine2 ? ` ${provider.addressLine2}` : ''),
-      city: provider.city,
-      state: provider.state,
-      zip: provider.zip,
-      confidenceScore: confidenceScore,
-      phone: provider.phone || null,
-    }),
-    [
-      provider.npi,
-      provider.displayName,
-      specialty,
-      provider.organizationName,
-      provider.addressLine1,
-      provider.addressLine2,
-      provider.city,
-      provider.state,
-      provider.zip,
-      confidenceScore,
-      provider.phone,
-    ]
+  // Get initials for avatar
+  const initials = useMemo(() => getInitials(provider), [provider]);
+
+  // Format address - handle missing zip gracefully
+  const formattedAddress = useMemo(() => {
+    const cityState = `${provider.city}, ${provider.state}`;
+    const zipPart = provider.zip && provider.zip !== 'undefined' ? ` ${provider.zip}` : '';
+    return {
+      street: provider.addressLine1 + (provider.addressLine2 ? `, ${provider.addressLine2}` : ''),
+      cityStateZip: cityState + zipPart,
+    };
+  }, [provider.addressLine1, provider.addressLine2, provider.city, provider.state, provider.zip]);
+
+  // Format phone
+  const formattedPhone = useMemo(
+    () => formatPhoneNumber(provider.phone),
+    [provider.phone]
   );
 
-  // Memoize the Google Maps URL to avoid recalculating on every render
-  const mapsUrl = useMemo(
-    () => {
-      const address = `${provider.addressLine1}${provider.addressLine2 ? ' ' + provider.addressLine2 : ''}, ${provider.city}, ${provider.state} ${provider.zip}`;
-      return `https://maps.google.com/?q=${encodeURIComponent(address)}`;
-    },
-    [provider.addressLine1, provider.addressLine2, provider.city, provider.state, provider.zip]
-  );
+  // Confidence display
+  const hasConfidence = showConfidence && confidenceScore !== undefined && confidenceScore > 0;
+  const isVerified = (confidenceScore ?? 0) >= 70;
+  const confidenceColors = hasConfidence ? getConfidenceColor(confidenceScore!) : null;
 
-  // Memoize the formatted address for display
-  const formattedAddress = useMemo(
-    () => ({
-      line1: provider.addressLine1,
-      line2: provider.addressLine2 ? `, ${provider.addressLine2}` : '',
-      cityStateZip: `${provider.city}, ${provider.state} ${provider.zip}`,
-    }),
-    [provider.addressLine1, provider.addressLine2, provider.city, provider.state, provider.zip]
-  );
+  // Get top accepted plans for preview
+  const acceptedPlans = planAcceptances
+    .filter(p => p.status === 'ACCEPTED')
+    .slice(0, 3);
+  const remainingPlansCount = Math.max(0, planAcceptances.filter(p => p.status === 'ACCEPTED').length - 3);
 
   return (
     <Link href={`/provider/${provider.npi}`}>
-      <article className={`card-hover cursor-pointer transition-all duration-200 ${
-        selected ? 'ring-2 ring-primary-500 dark:ring-primary-400' : ''
-      }`}>
-        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-          {/* Provider Info */}
-          <div className="flex-1">
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-1">
-              {provider.displayName}
-            </h3>
-            <p className="text-primary-600 dark:text-primary-400 font-medium mb-2">
-              {specialty}
-            </p>
-            <div className="text-gray-600 dark:text-gray-300 space-y-1 text-sm sm:text-base">
-              <a
-                href={mapsUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-start gap-2 text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <LocationIcon className="w-4 h-4 text-gray-400 dark:text-gray-500 mt-0.5 flex-shrink-0" />
-                <span>
-                  {formattedAddress.line1}
-                  {formattedAddress.line2}
-                  <br />
-                  {formattedAddress.cityStateZip}
-                </span>
-              </a>
-              {provider.phone && (
-                <a
-                  href={`tel:${provider.phone}`}
-                  className="flex items-center gap-2 text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <PhoneIcon className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
-                  <span>{provider.phone}</span>
-                </a>
-              )}
+      <article className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5 hover:shadow-md hover:border-slate-300 dark:hover:border-slate-600 transition-all duration-200 cursor-pointer">
+        <div className="flex gap-4">
+          {/* Avatar */}
+          <div className="relative flex-shrink-0">
+            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#137fec] to-[#0d5bb5] flex items-center justify-center">
+              <span className="text-white font-bold text-lg">{initials}</span>
             </div>
+            {isVerified && (
+              <div className="absolute -bottom-1 -right-1 bg-white dark:bg-slate-800 rounded-full p-0.5">
+                <CheckCircle className="w-5 h-5 text-green-500 fill-green-500" />
+              </div>
+            )}
           </div>
 
-          {/* Confidence, Compare & NPI */}
-          <div className="flex flex-col items-end gap-2">
-            <CompareCheckbox provider={compareProvider} />
-            {showConfidence && confidenceScore !== undefined && (
-              <ConfidenceBadge score={confidenceScore} size="sm" />
-            )}
-            <span className="text-sm text-gray-500 dark:text-gray-400">
+          {/* Main Content */}
+          <div className="flex-1 min-w-0">
+            {/* Top row: Name and Confidence */}
+            <div className="flex items-start justify-between gap-4 mb-1">
+              <div className="flex items-center gap-2 min-w-0">
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white truncate">
+                  {provider.displayName}
+                </h3>
+                {isVerified && (
+                  <BadgeCheck className="w-5 h-5 text-[#137fec] flex-shrink-0" />
+                )}
+              </div>
+
+              {/* Confidence Score */}
+              {hasConfidence && confidenceColors && (
+                <div className={`flex-shrink-0 px-2.5 py-1 rounded-lg ${confidenceColors.bg}`}>
+                  <div className={`text-sm font-semibold ${confidenceColors.text}`}>
+                    {confidenceScore}% Confidence
+                  </div>
+                  <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-600 rounded-full mt-1 overflow-hidden">
+                    <div
+                      className={`h-full ${confidenceColors.bar} rounded-full transition-all`}
+                      style={{ width: `${confidenceScore}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Specialty */}
+            <p className="text-[#137fec] font-medium text-sm mb-2">{specialty}</p>
+
+            {/* Address and Phone */}
+            <div className="space-y-1 text-sm text-slate-600 dark:text-slate-300">
+              <div className="flex items-start gap-2">
+                <LocationIcon className="w-4 h-4 text-slate-400 dark:text-slate-500 mt-0.5 flex-shrink-0" />
+                <span>
+                  {formattedAddress.street}, {formattedAddress.cityStateZip}
+                </span>
+              </div>
+
+              {formattedPhone && (
+                <div className="flex items-center gap-2">
+                  <PhoneIcon className="w-4 h-4 text-slate-400 dark:text-slate-500 flex-shrink-0" />
+                  <span>{formattedPhone}</span>
+                </div>
+              )}
+            </div>
+
+            {/* NPI - smaller */}
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">
               NPI: {provider.npi}
-            </span>
+            </p>
           </div>
         </div>
 
-        {/* Freshness Warning - Compact Card Variant */}
-        {lastVerifiedAt !== undefined && (
-          <div className="mt-4">
-            <FreshnessWarning
-              lastVerifiedAt={lastVerifiedAt}
-              specialty={provider.specialtyCategory}
-              taxonomyDescription={provider.taxonomyDescription}
-              providerNpi={provider.npi}
-              providerName={provider.displayName}
-              planId={planId}
-              planName={planName}
-              variant="card"
-              showVerifyButton={true}
-            />
-          </div>
-        )}
+        {/* Insurance Preview Section */}
+        <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 flex-wrap">
+              {acceptedPlans.length > 0 ? (
+                <>
+                  {acceptedPlans.map((plan, idx) => (
+                    <span
+                      key={idx}
+                      className="inline-flex items-center gap-1 px-2 py-1 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 text-xs font-medium rounded-full"
+                    >
+                      <CheckCircle className="w-3 h-3" />
+                      {(plan.planName || plan.issuerName || 'Plan')?.slice(0, 20)}
+                      {(plan.planName || plan.issuerName || '').length > 20 ? '...' : ''}
+                    </span>
+                  ))}
+                  {remainingPlansCount > 0 && (
+                    <span className="px-2 py-1 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 text-xs font-medium rounded-full">
+                      +{remainingPlansCount} more
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  View insurance details
+                </span>
+              )}
+            </div>
 
-        {/* View Details Link */}
-        <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 flex justify-end">
-          <span className="text-primary-600 dark:text-primary-400 font-medium flex items-center gap-1 group-hover:gap-2 transition-all">
-            View Details
-            <ChevronRightIcon className="w-4 h-4" />
-          </span>
+            {/* View Details */}
+            <span className="flex items-center gap-1 text-[#137fec] font-medium text-sm hover:gap-2 transition-all">
+              View Details
+              <ChevronRightIcon className="w-4 h-4" />
+            </span>
+          </div>
         </div>
       </article>
     </Link>
   );
 }
 
-// Custom comparison function for memo - only re-render if relevant data changes
+// Custom comparison function for memo
 function arePropsEqual(prevProps: ProviderCardProps, nextProps: ProviderCardProps): boolean {
-  // Compare provider by NPI (primary identifier) and key display fields
   if (prevProps.provider.npi !== nextProps.provider.npi) return false;
   if (prevProps.provider.displayName !== nextProps.provider.displayName) return false;
   if (prevProps.provider.phone !== nextProps.provider.phone) return false;
   if (prevProps.provider.addressLine1 !== nextProps.provider.addressLine1) return false;
   if (prevProps.provider.city !== nextProps.provider.city) return false;
   if (prevProps.provider.state !== nextProps.provider.state) return false;
-
-  // Compare other props
+  if (prevProps.provider.zip !== nextProps.provider.zip) return false;
   if (prevProps.confidenceScore !== nextProps.confidenceScore) return false;
   if (prevProps.showConfidence !== nextProps.showConfidence) return false;
-  if (prevProps.planId !== nextProps.planId) return false;
-  if (prevProps.planName !== nextProps.planName) return false;
-
-  // Compare lastVerifiedAt (handle Date comparison)
-  const prevDate = prevProps.lastVerifiedAt?.getTime?.() ?? prevProps.lastVerifiedAt;
-  const nextDate = nextProps.lastVerifiedAt?.getTime?.() ?? nextProps.lastVerifiedAt;
-  if (prevDate !== nextDate) return false;
-
+  if (prevProps.planAcceptances?.length !== nextProps.planAcceptances?.length) return false;
   return true;
 }
 
@@ -200,7 +261,6 @@ export const ProviderCard = memo(ProviderCardComponent, arePropsEqual);
 
 /**
  * Compact version for listing in provider detail.
- * Memoized to prevent unnecessary re-renders in lists.
  */
 function ProviderCardCompactComponent({
   provider,
@@ -208,16 +268,16 @@ function ProviderCardCompactComponent({
   provider: ProviderDisplay;
 }) {
   return (
-    <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+    <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
       <div>
-        <h4 className="font-medium text-gray-900 dark:text-white">{provider.displayName}</h4>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
+        <h4 className="font-medium text-slate-900 dark:text-white">{provider.displayName}</h4>
+        <p className="text-sm text-slate-600 dark:text-slate-400">
           {provider.city}, {provider.state}
         </p>
       </div>
       <Link
         href={`/provider/${provider.npi}`}
-        className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium text-sm"
+        className="text-[#137fec] hover:text-[#0d6edb] font-medium text-sm"
       >
         View →
       </Link>
