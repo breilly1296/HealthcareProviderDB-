@@ -68,10 +68,30 @@ export function getSpecialtyDisplay(
   specialtyCategory: string | null | undefined,
   taxonomyDescription: string | null | undefined
 ): string {
+  // First try exact match
   if (specialtyCategory && SPECIALTY_LABELS[specialtyCategory]) {
     return SPECIALTY_LABELS[specialtyCategory];
   }
-  return taxonomyDescription || 'Healthcare Provider';
+
+  // Try uppercase version
+  if (specialtyCategory) {
+    const upperKey = specialtyCategory.toUpperCase().replace(/[\s-]/g, '_');
+    if (SPECIALTY_LABELS[upperKey]) {
+      return SPECIALTY_LABELS[upperKey];
+    }
+    // If we have a specialtyCategory but no match, format it nicely
+    return specialtyCategory
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  }
+
+  // Use taxonomy description if available
+  if (taxonomyDescription) {
+    return taxonomyDescription;
+  }
+
+  return 'Healthcare Provider';
 }
 
 export function formatConfidenceLevel(level: string | null | undefined): string {
