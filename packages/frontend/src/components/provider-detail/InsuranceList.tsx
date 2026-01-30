@@ -172,7 +172,7 @@ function VerificationModal({ isOpen, onClose, plan, npi, providerName, onVerifie
           <button
             onClick={() => handleVerify(true)}
             disabled={isLoading}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 text-green-700 dark:text-green-400 font-medium rounded-lg border border-green-200 dark:border-green-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting === 'yes' ? (
               <Loader2 className="w-5 h-5 animate-spin" />
@@ -184,7 +184,7 @@ function VerificationModal({ isOpen, onClose, plan, npi, providerName, onVerifie
           <button
             onClick={() => handleVerify(false)}
             disabled={isLoading}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-700 dark:text-red-400 font-medium rounded-lg border border-red-200 dark:border-red-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting === 'no' ? (
               <Loader2 className="w-5 h-5 animate-spin" />
@@ -204,10 +204,10 @@ function VerificationModal({ isOpen, onClose, plan, npi, providerName, onVerifie
                 key={value}
                 onClick={() => setVerificationDate(verificationDate === value ? null : value)}
                 disabled={isLoading}
-                className={`px-3 py-1 text-xs rounded-full border transition-colors disabled:opacity-50 ${
+                className={`px-3 py-1 text-xs rounded-full border transition-all disabled:opacity-50 ${
                   verificationDate === value
-                    ? 'bg-[#137fec] text-white border-[#137fec]'
-                    : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:border-[#137fec] hover:text-[#137fec]'
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-transparent text-slate-500 dark:text-slate-400 border-slate-300 dark:border-slate-600 hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400'
                 }`}
               >
                 {label}
