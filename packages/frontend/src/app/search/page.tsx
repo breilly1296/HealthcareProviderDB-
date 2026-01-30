@@ -119,7 +119,7 @@ function SearchResultsDisplay({
       </div>
 
       {/* Provider list */}
-      <div className="space-y-4">
+      <div className="space-y-5">
         {providers.map((provider) => (
           <ProviderCard key={provider.id} provider={provider} />
         ))}

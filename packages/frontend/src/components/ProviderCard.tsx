@@ -12,6 +12,85 @@ interface ProviderCardProps {
   showConfidence?: boolean;
 }
 
+// Standard credentials to keep (uppercase for matching)
+const VALID_CREDENTIALS = new Set([
+  'MD', 'DO', 'PhD', 'PharmD', 'DDS', 'DMD', 'DPM', 'DC', 'OD', 'DPT', 'DNP', 'DrPH',
+  'NP', 'PA', 'PA-C', 'RN', 'LPN', 'APRN', 'CNM', 'CRNA', 'CNS',
+  'LCSW', 'LMHC', 'LMFT', 'LPC', 'LCPC', 'LMSW', 'LSW', 'LICSW',
+  'PsyD', 'BCBA', 'BCABA', 'RBT',
+  'CRC', 'CASAC', 'CADC', 'CDCA', 'CAP', 'MAC',
+  'PT', 'OT', 'OTR', 'SLP', 'CCC-SLP', 'AuD',
+  'RD', 'RDN', 'LD', 'CDN',
+  'FACP', 'FACS', 'FACOG', 'FAAP', 'FAAN',
+  'MBA', 'MPH', 'MS', 'MA', 'MSW', 'MEd',
+]);
+
+/**
+ * Clean provider name by removing license numbers and keeping only valid credentials
+ * Examples:
+ * - "Mani Mullen, Crc # 00002984" → "Mani Mullen, CRC"
+ * - "John Smith, Nys 007110" → "John Smith"
+ * - "Jane Doe, Casac 02/04/2010" → "Jane Doe, CASAC"
+ */
+function cleanProviderName(name: string): string {
+  if (!name) return name;
+
+  // Split by comma to separate name from credentials
+  const parts = name.split(',').map(p => p.trim());
+  if (parts.length < 2) return name;
+
+  const namePart = parts[0];
+  const credentialsPart = parts.slice(1).join(', ');
+
+  // Extract valid credentials from the credentials part
+  // Remove patterns like "# 00002984", "007110", "02/04/2010", "Nys", etc.
+  const tokens = credentialsPart.split(/[\s,]+/);
+  const validCreds: string[] = [];
+
+  for (const token of tokens) {
+    // Skip empty tokens
+    if (!token) continue;
+
+    // Skip tokens that are just numbers or dates
+    if (/^\d+$/.test(token)) continue;
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(token)) continue;
+
+    // Skip tokens starting with # or containing mostly numbers
+    if (token.startsWith('#')) continue;
+    if (/^\d+[A-Za-z]*$/.test(token) || /^[A-Za-z]*\d+$/.test(token)) continue;
+
+    // Skip state abbreviations used as license prefixes (Nys, Ny, etc.)
+    if (/^(Nys|Ny|Ca|Tx|Fl|Il|Pa|Oh|Ga|Nc|Nj|Mi|Va|Wa|Az|Ma|In|Tn|Mo|Md|Wi|Co|Mn|Sc|Al|La|Ky|Or|Ok|Ct|Ut|Ia|Nv|Ar|Ms|Ks|Nm|Ne|Wv|Id|Hi|Nh|Me|Mt|Ri|De|Sd|Nd|Ak|Dc|Wy|Vt|Pr)$/i.test(token)) continue;
+
+    // Check if it's a valid credential (case-insensitive)
+    const upperToken = token.toUpperCase().replace(/[^A-Z-]/g, '');
+    if (VALID_CREDENTIALS.has(upperToken)) {
+      validCreds.push(upperToken);
+    }
+  }
+
+  // Return cleaned name
+  if (validCreds.length > 0) {
+    return `${namePart}, ${validCreds.join(', ')}`;
+  }
+  return namePart;
+}
+
+/**
+ * Clean organization name - handle truncation gracefully
+ */
+function cleanOrganizationName(name: string): string {
+  if (!name) return name;
+
+  // If name ends with '&' or other incomplete patterns, it was likely truncated
+  const trimmed = name.trim();
+  if (trimmed.endsWith('&') || trimmed.endsWith('And') || trimmed.endsWith(',')) {
+    // Remove the trailing incomplete word
+    return trimmed.slice(0, -1).trim();
+  }
+  return trimmed;
+}
+
 // Helper to format phone numbers
 function formatPhoneNumber(phone: string | null): string {
   if (!phone) return '';
@@ -84,6 +163,14 @@ function ProviderCardComponent({
   const confidenceScore = provider.confidenceScore ?? null;
   const planAcceptances = provider.planAcceptances ?? [];
 
+  // Clean and format the display name
+  const displayName = useMemo(() => {
+    if (provider.entityType === 'ORGANIZATION' && provider.organizationName) {
+      return cleanOrganizationName(provider.organizationName);
+    }
+    return cleanProviderName(provider.displayName);
+  }, [provider.entityType, provider.organizationName, provider.displayName]);
+
   // Memoize computed specialty
   const specialty = useMemo(
     () => getSpecialtyDisplay(provider.specialtyCategory, provider.taxonomyDescription),
@@ -123,7 +210,7 @@ function ProviderCardComponent({
 
   return (
     <Link href={`/provider/${provider.npi}`}>
-      <article className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5 hover:shadow-md hover:border-slate-300 dark:hover:border-slate-600 transition-all duration-200 cursor-pointer">
+      <article className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5 hover:shadow-lg hover:border-slate-300 dark:hover:border-slate-600 transition-all duration-200 cursor-pointer">
         <div className="flex gap-4">
           {/* Avatar */}
           <div className="relative flex-shrink-0">
@@ -142,8 +229,8 @@ function ProviderCardComponent({
             {/* Top row: Name and Confidence */}
             <div className="flex items-start justify-between gap-4 mb-1">
               <div className="flex items-center gap-2 min-w-0">
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white truncate">
-                  {provider.displayName}
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white truncate" title={displayName}>
+                  {displayName}
                 </h3>
                 {isVerified && (
                   <BadgeCheck className="w-5 h-5 text-[#137fec] flex-shrink-0" />
@@ -206,7 +293,7 @@ function ProviderCardComponent({
                       <span
                         key={idx}
                         title={fullName}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-medium rounded-full border border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors cursor-default"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-medium rounded-full border border-green-200 dark:border-green-800"
                       >
                         <CheckCircle className="w-3 h-3 flex-shrink-0" />
                         <span className="truncate">{displayName}</span>
@@ -221,7 +308,7 @@ function ProviderCardComponent({
                 </>
               ) : (
                 <span className="text-xs text-slate-500 dark:text-slate-400">
-                  View insurance details
+                  No insurance data available
                 </span>
               )}
             </div>
@@ -263,10 +350,17 @@ function ProviderCardCompactComponent({
 }: {
   provider: ProviderDisplay;
 }) {
+  const displayName = useMemo(() => {
+    if (provider.entityType === 'ORGANIZATION' && provider.organizationName) {
+      return cleanOrganizationName(provider.organizationName);
+    }
+    return cleanProviderName(provider.displayName);
+  }, [provider.entityType, provider.organizationName, provider.displayName]);
+
   return (
     <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
       <div>
-        <h4 className="font-medium text-slate-900 dark:text-white">{provider.displayName}</h4>
+        <h4 className="font-medium text-slate-900 dark:text-white">{displayName}</h4>
         <p className="text-sm text-slate-600 dark:text-slate-400">
           {provider.city}, {provider.state}
         </p>
