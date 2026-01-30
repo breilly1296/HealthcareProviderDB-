@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { CheckCircle, HelpCircle, Search, ChevronDown, ChevronRight, MessageSquarePlus, X, ThumbsUp, ThumbsDown, Users } from 'lucide-react';
+import { CheckCircle, HelpCircle, Search, ChevronDown, ChevronRight, MessageSquarePlus, X, ThumbsUp, ThumbsDown, Users, Loader2, MessageSquare } from 'lucide-react';
 import { verificationApi } from '@/lib/api';
+import toast from 'react-hot-toast';
 
 interface InsurancePlan {
   id: string;
@@ -74,111 +75,190 @@ interface VerificationModalProps {
   plan: InsurancePlan | null;
   npi: string;
   providerName: string;
+  onVerified?: (planId: string) => void;
 }
 
-function VerificationModal({ isOpen, onClose, plan, npi, providerName }: VerificationModalProps) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+type VerificationDate = 'today' | 'this_week' | 'this_month' | 'a_while_ago' | null;
+
+const DATE_OPTIONS: { value: VerificationDate; label: string }[] = [
+  { value: 'today', label: 'Today' },
+  { value: 'this_week', label: 'This week' },
+  { value: 'this_month', label: 'This month' },
+  { value: 'a_while_ago', label: 'A while ago' },
+];
+
+function VerificationModal({ isOpen, onClose, plan, npi, providerName, onVerified }: VerificationModalProps) {
+  const [isSubmitting, setIsSubmitting] = useState<'yes' | 'no' | null>(null);
+  const [verificationDate, setVerificationDate] = useState<VerificationDate>(null);
+  const [showNoteField, setShowNoteField] = useState(false);
+  const [note, setNote] = useState('');
 
   if (!isOpen || !plan) return null;
 
   const handleVerify = async (acceptsInsurance: boolean) => {
     if (!plan.planId) {
-      setError('Plan ID is missing');
+      toast.error('Plan ID is missing. Please try again.');
       return;
     }
 
-    setIsSubmitting(true);
-    setError(null);
+    setIsSubmitting(acceptsInsurance ? 'yes' : 'no');
 
     try {
+      // Build notes with date context if provided
+      let fullNote = note.trim();
+      if (verificationDate) {
+        const dateLabel = DATE_OPTIONS.find(d => d.value === verificationDate)?.label || '';
+        const dateContext = `Verified: ${dateLabel}`;
+        fullNote = fullNote ? `${dateContext}. ${fullNote}` : dateContext;
+      }
+
       await verificationApi.submit({
         npi,
         planId: plan.planId,
         acceptsInsurance,
+        notes: fullNote || undefined,
       });
-      setSubmitted(true);
+
+      // Close modal immediately and show success toast
+      resetAndClose();
+      toast.success("Thanks! Your verification helps others find the right care.");
+
+      // Notify parent of successful verification
+      if (onVerified) {
+        onVerified(plan.id);
+      }
     } catch (err) {
-      setError('Failed to submit verification. Please try again.');
+      toast.error('Failed to submit verification. Please try again.');
     } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(null);
     }
   };
 
-  const handleClose = () => {
-    setSubmitted(false);
-    setError(null);
+  const resetAndClose = () => {
+    setIsSubmitting(null);
+    setVerificationDate(null);
+    setShowNoteField(false);
+    setNote('');
     onClose();
   };
 
+  const handleSkip = () => {
+    resetAndClose();
+  };
+
+  const isLoading = isSubmitting !== null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50" onClick={handleClose} />
+      <div className="absolute inset-0 bg-black/50" onClick={resetAndClose} />
       <div className="relative bg-white dark:bg-slate-800 rounded-xl shadow-xl max-w-md w-full p-6">
         <button
-          onClick={handleClose}
+          onClick={resetAndClose}
           className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
         >
           <X className="w-5 h-5" />
         </button>
 
-        {submitted ? (
-          <div className="text-center py-4">
-            <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
-            </div>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Thank You!</h3>
-            <p className="text-slate-600 dark:text-slate-400 mb-4">
-              Your verification helps improve data accuracy for everyone.
-            </p>
-            <button
-              onClick={handleClose}
-              className="px-6 py-2 bg-[#137fec] hover:bg-[#0d6edb] text-white font-medium rounded-lg transition-colors"
-            >
-              Done
-            </button>
-          </div>
-        ) : (
-          <>
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
-              Verify Insurance Acceptance
-            </h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
-              Does <strong className="text-slate-900 dark:text-white">{providerName}</strong> accept{' '}
-              <strong className="text-slate-900 dark:text-white">{plan.name}</strong>?
-            </p>
+        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
+          Verify Insurance Acceptance
+        </h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">
+          Does <strong className="text-slate-900 dark:text-white">{providerName}</strong> accept{' '}
+          <strong className="text-slate-900 dark:text-white">{plan.name}</strong>?
+        </p>
 
-            {error && (
-              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-400">
-                {error}
-              </div>
+        {/* Yes/No Buttons */}
+        <div className="space-y-2.5">
+          <button
+            onClick={() => handleVerify(true)}
+            disabled={isLoading}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 text-green-700 dark:text-green-400 font-medium rounded-lg border border-green-200 dark:border-green-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSubmitting === 'yes' ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <ThumbsUp className="w-5 h-5" />
             )}
+            {isSubmitting === 'yes' ? 'Submitting...' : 'Yes, they accept this plan'}
+          </button>
+          <button
+            onClick={() => handleVerify(false)}
+            disabled={isLoading}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-700 dark:text-red-400 font-medium rounded-lg border border-red-200 dark:border-red-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSubmitting === 'no' ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <ThumbsDown className="w-5 h-5" />
+            )}
+            {isSubmitting === 'no' ? 'Submitting...' : "No, they don't accept this plan"}
+          </button>
+        </div>
 
-            <div className="space-y-3">
+        {/* Date Selector */}
+        <div className="mt-4">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">When did you verify this? (optional)</p>
+          <div className="flex flex-wrap gap-1.5">
+            {DATE_OPTIONS.map(({ value, label }) => (
               <button
-                onClick={() => handleVerify(true)}
-                disabled={isSubmitting}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 text-green-700 dark:text-green-400 font-medium rounded-lg border border-green-200 dark:border-green-800 transition-colors disabled:opacity-50"
+                key={value}
+                onClick={() => setVerificationDate(verificationDate === value ? null : value)}
+                disabled={isLoading}
+                className={`px-3 py-1 text-xs rounded-full border transition-colors disabled:opacity-50 ${
+                  verificationDate === value
+                    ? 'bg-[#137fec] text-white border-[#137fec]'
+                    : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:border-[#137fec] hover:text-[#137fec]'
+                }`}
               >
-                <ThumbsUp className="w-5 h-5" />
-                {isSubmitting ? 'Submitting...' : 'Yes, they accept this plan'}
+                {label}
               </button>
-              <button
-                onClick={() => handleVerify(false)}
-                disabled={isSubmitting}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-700 dark:text-red-400 font-medium rounded-lg border border-red-200 dark:border-red-800 transition-colors disabled:opacity-50"
-              >
-                <ThumbsDown className="w-5 h-5" />
-                {isSubmitting ? 'Submitting...' : "No, they don't accept this plan"}
-              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Optional Note Field */}
+        <div className="mt-4">
+          {!showNoteField ? (
+            <button
+              onClick={() => setShowNoteField(true)}
+              disabled={isLoading}
+              className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-[#137fec] transition-colors disabled:opacity-50"
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              Add a note (optional)
+            </button>
+          ) : (
+            <div>
+              <textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value.slice(0, 200))}
+                placeholder="Optional: When did you verify? Any details?"
+                disabled={isLoading}
+                className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#137fec] focus:border-transparent resize-none disabled:opacity-50"
+                rows={2}
+              />
+              <p className="text-xs text-slate-400 dark:text-slate-500 text-right mt-1">
+                {note.length}/200
+              </p>
             </div>
+          )}
+        </div>
 
-            <p className="text-xs text-slate-500 dark:text-slate-400 text-center mt-4">
-              Your contribution helps others avoid surprise bills
-            </p>
-          </>
-        )}
+        {/* Divider */}
+        <div className="border-t border-slate-100 dark:border-slate-700 mt-4 pt-4">
+          {/* I'm not sure button */}
+          <button
+            onClick={handleSkip}
+            disabled={isLoading}
+            className="w-full flex items-center justify-center gap-1.5 px-4 py-2 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors disabled:opacity-50"
+          >
+            I'm not sure
+          </button>
+        </div>
+
+        <p className="text-xs text-slate-500 dark:text-slate-400 text-center mt-4">
+          Your contribution helps others avoid surprise bills
+        </p>
       </div>
     </div>
   );
@@ -191,9 +271,10 @@ interface PlanRowProps {
   isLast: boolean;
   indented?: boolean;
   showAcceptedBadge?: boolean;
+  recentlyVerified?: boolean;
 }
 
-function PlanRow({ plan, onVerify, showConfidence, isLast, indented = false, showAcceptedBadge = false }: PlanRowProps) {
+function PlanRow({ plan, onVerify, showConfidence, isLast, indented = false, showAcceptedBadge = false, recentlyVerified = false }: PlanRowProps) {
   const isAccepted = plan.status === 'accepted';
 
   return (
@@ -208,12 +289,19 @@ function PlanRow({ plan, onVerify, showConfidence, isLast, indented = false, sho
       </div>
 
       <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-        <button
-          onClick={() => onVerify(plan)}
-          className="px-2.5 py-0.5 text-xs font-medium text-[#137fec] border border-[#137fec] rounded hover:bg-[#137fec] hover:text-white transition-colors"
-        >
-          Verify
-        </button>
+        {recentlyVerified ? (
+          <span className="flex items-center gap-1 px-2.5 py-0.5 text-xs font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded">
+            <CheckCircle className="w-3 h-3" />
+            Verified
+          </span>
+        ) : (
+          <button
+            onClick={() => onVerify(plan)}
+            className="px-2.5 py-0.5 text-xs font-medium text-[#137fec] border border-[#137fec] rounded hover:bg-[#137fec] hover:text-white transition-colors"
+          >
+            Verify
+          </button>
+        )}
         {showAcceptedBadge && isAccepted && (
           <span className="px-2 py-0.5 text-xs font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 rounded">
             Accepted
@@ -234,9 +322,10 @@ interface CarrierGroupSectionProps {
   onVerify: (plan: InsurancePlan) => void;
   showConfidence: boolean;
   forceExpand?: boolean;
+  recentlyVerifiedPlans: Set<string>;
 }
 
-function CarrierGroupSection({ group, isExpanded, onToggle, onVerify, showConfidence, forceExpand }: CarrierGroupSectionProps) {
+function CarrierGroupSection({ group, isExpanded, onToggle, onVerify, showConfidence, forceExpand, recentlyVerifiedPlans }: CarrierGroupSectionProps) {
   const shouldExpand = forceExpand || isExpanded;
   const acceptedCount = group.plans.filter(p => p.status === 'accepted').length;
 
@@ -276,6 +365,7 @@ function CarrierGroupSection({ group, isExpanded, onToggle, onVerify, showConfid
               showConfidence={showConfidence}
               isLast={idx === group.plans.length - 1}
               indented
+              recentlyVerified={recentlyVerifiedPlans.has(plan.id)}
             />
           ))}
         </div>
@@ -312,6 +402,7 @@ export function InsuranceList({
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [verifyingPlan, setVerifyingPlan] = useState<InsurancePlan | null>(null);
   const [otherPlansExpanded, setOtherPlansExpanded] = useState(false);
+  const [recentlyVerifiedPlans, setRecentlyVerifiedPlans] = useState<Set<string>>(new Set());
 
   const verifiedCount = plans.filter(p => p.status === 'accepted').length;
 
@@ -321,6 +412,10 @@ export function InsuranceList({
 
   const handleCloseModal = () => {
     setVerifyingPlan(null);
+  };
+
+  const handleVerificationSuccess = (planId: string) => {
+    setRecentlyVerifiedPlans(prev => new Set(prev).add(planId));
   };
 
   const handleOpenGeneralVerify = () => {
@@ -434,6 +529,7 @@ export function InsuranceList({
                 onVerify={handleVerify}
                 showConfidence={showIndividualConfidence}
                 forceExpand={hasSearch}
+                recentlyVerifiedPlans={recentlyVerifiedPlans}
               />
             ))}
 
@@ -471,6 +567,7 @@ export function InsuranceList({
                         showConfidence={showIndividualConfidence}
                         isLast={idx === singlePlans.length - 1}
                         showAcceptedBadge
+                        recentlyVerified={recentlyVerifiedPlans.has(plan.id)}
                       />
                     ))}
                   </>
@@ -488,6 +585,7 @@ export function InsuranceList({
                         showConfidence={showIndividualConfidence}
                         isLast={idx === singlePlans.length - 1}
                         showAcceptedBadge={groups.length > 0}
+                        recentlyVerified={recentlyVerifiedPlans.has(plan.id)}
                       />
                     ))}
                   </>
@@ -537,6 +635,7 @@ export function InsuranceList({
         plan={verifyingPlan}
         npi={npi || ''}
         providerName={providerName}
+        onVerified={handleVerificationSuccess}
       />
     </div>
   );
