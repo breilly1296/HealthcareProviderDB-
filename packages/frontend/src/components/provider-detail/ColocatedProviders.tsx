@@ -62,9 +62,9 @@ export function ColocatedProviders({ npi }: ColocatedProvidersProps) {
     <div ref={sectionRef}>
       {/* Loading state */}
       {(loading || (!fetched && !error)) && (
-        <div className="card" role="status" aria-label="Loading colocated providers">
+        <div className="card !p-4 sm:!p-6" role="status" aria-label="Loading colocated providers">
           <span className="sr-only">Loading other providers at this location...</span>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+          <h2 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white mb-4">
             Other Providers at This Location
           </h2>
           <div className="space-y-3" aria-hidden="true">
@@ -80,8 +80,8 @@ export function ColocatedProviders({ npi }: ColocatedProvidersProps) {
 
       {/* Error state */}
       {!loading && error && (
-        <div className="card">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+        <div className="card !p-4 sm:!p-6">
+          <h2 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white mb-4">
             Other Providers at This Location
           </h2>
           <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
@@ -105,8 +105,8 @@ export function ColocatedProviders({ npi }: ColocatedProvidersProps) {
 
       {/* Zero colocated providers */}
       {!loading && !error && fetched && colocatedTotal === 0 && (
-        <div className="card">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+        <div className="card !p-4 sm:!p-6">
+          <h2 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white mb-4">
             Other Providers at This Location
           </h2>
           <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg text-center">
@@ -123,9 +123,9 @@ export function ColocatedProviders({ npi }: ColocatedProvidersProps) {
 
       {/* Colocated providers list */}
       {!loading && !error && fetched && colocatedTotal !== null && colocatedTotal > 0 && location && (
-        <div className="card">
+        <div className="card !p-4 sm:!p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+            <h2 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">
               Other Providers at This Location
             </h2>
             {colocatedTotal > 10 && (

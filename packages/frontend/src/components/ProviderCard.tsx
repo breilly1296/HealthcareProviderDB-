@@ -210,16 +210,16 @@ function ProviderCardComponent({
 
   return (
     <Link href={`/provider/${provider.npi}`}>
-      <article className="bg-white dark:bg-gray-800 rounded-xl border border-stone-200 dark:border-gray-700 p-5 hover:shadow-lg hover:border-stone-300 dark:hover:border-gray-600 transition-all duration-200 cursor-pointer">
-        <div className="flex gap-4">
-          {/* Avatar */}
+      <article className="bg-white dark:bg-gray-800 rounded-xl border border-stone-200 dark:border-gray-700 p-4 sm:p-5 hover:shadow-lg hover:border-stone-300 dark:hover:border-gray-600 transition-all duration-200 cursor-pointer">
+        <div className="flex gap-3 sm:gap-4">
+          {/* Avatar - smaller on mobile */}
           <div className="relative flex-shrink-0">
-            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#137fec] to-[#0d5bb5] flex items-center justify-center">
-              <span className="text-white font-bold text-lg">{initials}</span>
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-[#137fec] to-[#0d5bb5] flex items-center justify-center">
+              <span className="text-white font-bold text-base sm:text-lg">{initials}</span>
             </div>
             {isVerified && (
               <div className="absolute -bottom-1 -right-1 bg-white dark:bg-gray-800 rounded-full p-0.5">
-                <CheckCircle className="w-5 h-5 text-green-500 fill-green-500" />
+                <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-500 fill-green-500" />
               </div>
             )}
           </div>
@@ -227,23 +227,23 @@ function ProviderCardComponent({
           {/* Main Content */}
           <div className="flex-1 min-w-0">
             {/* Top row: Name and Confidence */}
-            <div className="flex items-start justify-between gap-4 mb-1">
-              <div className="flex items-center gap-2 min-w-0">
-                <h3 className="text-xl font-bold text-stone-800 dark:text-white truncate" title={displayName}>
+            <div className="flex items-start justify-between gap-2 sm:gap-4 mb-1">
+              <div className="flex items-start gap-2 min-w-0 flex-1">
+                <h3 className="text-lg sm:text-xl font-bold text-stone-800 dark:text-white line-clamp-2" title={displayName}>
                   {displayName}
                 </h3>
                 {isVerified && (
-                  <BadgeCheck className="w-5 h-5 text-[#137fec] flex-shrink-0" />
+                  <BadgeCheck className="w-5 h-5 text-[#137fec] flex-shrink-0 mt-0.5" />
                 )}
               </div>
 
-              {/* Confidence Score */}
+              {/* Confidence Score - compact on mobile */}
               {hasConfidence && confidenceColors && (
-                <div className={`flex-shrink-0 px-3 py-1.5 rounded-lg ${confidenceColors.bg} border ${confidenceColors.bg.includes('green') ? 'border-green-200 dark:border-green-800' : confidenceColors.bg.includes('yellow') ? 'border-yellow-200 dark:border-yellow-800' : 'border-red-200 dark:border-red-800'}`}>
-                  <div className={`text-xs font-bold ${confidenceColors.text}`}>
-                    {confidenceScore}% Confidence
+                <div className={`flex-shrink-0 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg ${confidenceColors.bg} border ${confidenceColors.bg.includes('green') ? 'border-green-200 dark:border-green-800' : confidenceColors.bg.includes('yellow') ? 'border-yellow-200 dark:border-yellow-800' : 'border-red-200 dark:border-red-800'}`}>
+                  <div className={`text-xs font-bold ${confidenceColors.text} text-center`}>
+                    {confidenceScore}%
                   </div>
-                  <div className="w-20 h-1.5 bg-stone-200 dark:bg-gray-700 rounded-full mt-1 overflow-hidden">
+                  <div className="hidden sm:block w-20 h-1.5 bg-stone-200 dark:bg-gray-700 rounded-full mt-1 overflow-hidden">
                     <div
                       className={`h-full ${confidenceColors.bar} rounded-full transition-all`}
                       style={{ width: `${confidenceScore}%` }}
@@ -273,8 +273,8 @@ function ProviderCardComponent({
               )}
             </div>
 
-            {/* NPI - smaller */}
-            <p className="text-xs text-stone-400 dark:text-gray-500 mt-2">
+            {/* NPI - hidden on mobile */}
+            <p className="hidden sm:block text-xs text-stone-400 dark:text-gray-500 mt-2">
               NPI: {provider.npi}
             </p>
           </div>
@@ -282,26 +282,26 @@ function ProviderCardComponent({
 
         {/* Insurance Preview Section */}
         <div className="mt-4 pt-4 border-t border-stone-100 dark:border-gray-700">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            {/* Insurance badges - vertical on mobile, horizontal on desktop */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 sm:flex-wrap">
               {acceptedPlans.length > 0 ? (
                 <>
                   {acceptedPlans.map((plan, idx) => {
                     const fullName = plan.planName || plan.issuerName || 'Plan';
-                    const displayName = fullName.length > 18 ? `${fullName.slice(0, 18)}...` : fullName;
                     return (
                       <span
                         key={idx}
                         title={fullName}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-medium rounded-full border border-green-200 dark:border-green-800"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-medium rounded-full border border-green-200 dark:border-green-800 max-w-[200px] sm:max-w-[150px]"
                       >
                         <CheckCircle className="w-3 h-3 flex-shrink-0" />
-                        <span className="truncate">{displayName}</span>
+                        <span className="truncate">{fullName}</span>
                       </span>
                     );
                   })}
                   {remainingPlansCount > 0 && (
-                    <span className="px-2 py-0.5 bg-stone-100 dark:bg-gray-700 text-stone-600 dark:text-gray-300 text-xs font-medium rounded-full border border-stone-200 dark:border-gray-600">
+                    <span className="px-2 py-0.5 bg-stone-100 dark:bg-gray-700 text-stone-600 dark:text-gray-300 text-xs font-medium rounded-full border border-stone-200 dark:border-gray-600 w-fit">
                       +{remainingPlansCount} more
                     </span>
                   )}
@@ -313,8 +313,8 @@ function ProviderCardComponent({
               )}
             </div>
 
-            {/* View Details */}
-            <span className="flex items-center gap-1 text-[#137fec] font-medium text-sm hover:gap-2 transition-all">
+            {/* View Details - full width tap target on mobile */}
+            <span className="flex items-center justify-center sm:justify-end gap-1 text-[#137fec] font-medium text-sm py-2 sm:py-0 bg-blue-50 sm:bg-transparent rounded-lg sm:rounded-none hover:gap-2 transition-all">
               View Details
               <ChevronRightIcon className="w-4 h-4" />
             </span>

@@ -37,7 +37,7 @@ export function AboutProvider({
   if (!hasData) return null;
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-stone-200 dark:border-gray-700 p-6">
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-stone-200 dark:border-gray-700 p-4 sm:p-6">
       <h2 className="text-lg font-semibold text-stone-800 dark:text-white mb-4">About This Provider</h2>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

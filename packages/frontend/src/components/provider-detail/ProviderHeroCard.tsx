@@ -69,23 +69,23 @@ export function ProviderHeroCard({ provider, confidenceScore, verificationCount 
   ].filter(Boolean).join(', ');
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-stone-200 dark:border-gray-700 p-6 md:p-8">
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-stone-200 dark:border-gray-700 p-4 sm:p-6 md:p-8">
       <div className="flex flex-col md:flex-row md:items-start gap-6 md:gap-8">
         {/* Left section: Avatar and Info */}
-        <div className="flex items-start gap-4 flex-1">
-          {/* Avatar */}
-          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#137fec] to-[#0d5bb5] flex items-center justify-center flex-shrink-0">
-            <span className="text-white font-bold text-2xl">{initials}</span>
+        <div className="flex items-start gap-3 sm:gap-4 flex-1">
+          {/* Avatar - smaller on mobile */}
+          <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-[#137fec] to-[#0d5bb5] flex items-center justify-center flex-shrink-0">
+            <span className="text-white font-bold text-xl sm:text-2xl">{initials}</span>
           </div>
 
           {/* Provider Info */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <h1 className="text-xl md:text-2xl font-bold text-stone-800 dark:text-white truncate">
+            <div className="flex items-start gap-2 mb-1">
+              <h1 className="text-xl md:text-2xl font-bold text-stone-800 dark:text-white">
                 {provider.displayName}
               </h1>
               {isVerified && (
-                <BadgeCheck className="w-5 h-5 text-[#137fec] flex-shrink-0" />
+                <BadgeCheck className="w-5 h-5 text-[#137fec] flex-shrink-0 mt-1" />
               )}
             </div>
 

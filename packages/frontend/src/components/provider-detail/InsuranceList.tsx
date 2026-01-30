@@ -335,24 +335,22 @@ function CarrierGroupSection({ group, isExpanded, onToggle, onVerify, showConfid
         onClick={onToggle}
         className="w-full flex items-center justify-between py-3 hover:bg-stone-50 dark:hover:bg-gray-700/30 transition-colors -mx-2 px-2 rounded"
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
           {shouldExpand ? (
-            <ChevronDown className="w-4 h-4 text-stone-400" />
+            <ChevronDown className="w-4 h-4 text-stone-400 flex-shrink-0" />
           ) : (
-            <ChevronRight className="w-4 h-4 text-stone-400" />
+            <ChevronRight className="w-4 h-4 text-stone-400 flex-shrink-0" />
           )}
-          <span className="font-medium text-stone-800 dark:text-white">{group.displayName}</span>
-          <span className="text-sm text-stone-500 dark:text-gray-400">
-            ({group.plans.length} {group.plans.length === 1 ? 'plan' : 'plans'})
+          <span className="font-medium text-stone-800 dark:text-white truncate">{group.displayName}</span>
+          <span className="text-sm text-stone-500 dark:text-gray-400 flex-shrink-0">
+            ({group.plans.length})
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          {acceptedCount > 0 && (
-            <span className="text-xs text-green-600 dark:text-green-400">
-              {acceptedCount} accepted
-            </span>
-          )}
-        </div>
+        {acceptedCount > 0 && (
+          <span className="text-xs text-green-600 dark:text-green-400 flex-shrink-0 ml-2">
+            {acceptedCount} accepted
+          </span>
+        )}
       </button>
 
       {shouldExpand && (
@@ -487,7 +485,7 @@ export function InsuranceList({
   const totalGroupedPlans = groups.reduce((sum, g) => sum + g.plans.length, 0) + singlePlans.length;
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-stone-200 dark:border-gray-700 p-6">
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-stone-200 dark:border-gray-700 p-4 sm:p-6">
       {/* Header */}
       <div className="mb-4">
         <h2 className="text-lg font-semibold text-stone-800 dark:text-white">Insurance Acceptance</h2>
@@ -543,18 +541,18 @@ export function InsuranceList({
                       onClick={() => setOtherPlansExpanded(!otherPlansExpanded)}
                       className="w-full flex items-center justify-between py-2 hover:bg-stone-50 dark:hover:bg-gray-700/30 transition-colors -mx-2 px-2 rounded mb-1"
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
                         {otherPlansExpanded || hasSearch ? (
-                          <ChevronDown className="w-4 h-4 text-stone-400" />
+                          <ChevronDown className="w-4 h-4 text-stone-400 flex-shrink-0" />
                         ) : (
-                          <ChevronRight className="w-4 h-4 text-stone-400" />
+                          <ChevronRight className="w-4 h-4 text-stone-400 flex-shrink-0" />
                         )}
                         <span className="text-sm font-medium text-stone-500 dark:text-gray-400">
                           Other Plans ({singlePlans.length})
                         </span>
                       </div>
                       {singlePlans.filter(p => p.status === 'accepted').length > 0 && (
-                        <span className="text-xs text-green-600 dark:text-green-400">
+                        <span className="text-xs text-green-600 dark:text-green-400 flex-shrink-0 ml-2">
                           {singlePlans.filter(p => p.status === 'accepted').length} accepted
                         </span>
                       )}
