@@ -8,14 +8,13 @@ interface ConfidenceGaugeProps {
 }
 
 function getConfidenceLevel(score: number): { label: string; color: string } {
-  if (score >= 80) return { label: 'High Confidence', color: '#10b981' };
-  if (score >= 60) return { label: 'Medium Confidence', color: '#3b82f6' };
-  if (score >= 40) return { label: 'Low Confidence', color: '#f59e0b' };
-  return { label: 'Very Low', color: '#ef4444' };
+  if (score >= 70) return { label: 'High Confidence', color: '#10b981' }; // green
+  if (score >= 40) return { label: 'Medium Confidence', color: '#f59e0b' }; // amber/yellow
+  return { label: 'Low Confidence', color: '#ef4444' }; // red
 }
 
 function getImprovementHint(score: number, verificationCount: number): string | null {
-  if (score >= 80) return null;
+  if (score >= 70) return null;
 
   const verificationsNeeded = Math.max(0, 3 - verificationCount);
 
@@ -23,11 +22,11 @@ function getImprovementHint(score: number, verificationCount: number): string | 
     return `${verificationsNeeded} verification${verificationsNeeded !== 1 ? 's' : ''} needed for high confidence`;
   }
 
-  if (score < 60) {
-    return 'More recent verifications would improve confidence';
+  if (score < 40) {
+    return 'More verifications would improve confidence';
   }
 
-  return 'Data is being validated';
+  return 'A few more verifications needed';
 }
 
 export function ConfidenceGauge({
