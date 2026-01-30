@@ -13,7 +13,7 @@ export function CTASection() {
         </p>
         <Link
           href="/search"
-          className="inline-flex items-center justify-center bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-400 hover:to-cyan-400 text-white text-lg font-semibold px-8 py-4 rounded-lg shadow-lg shadow-blue-500/25 transition-all"
+          className="inline-flex items-center justify-center bg-gradient-to-r from-blue-500 to-cyan-400 text-white text-lg font-semibold px-8 py-4 rounded-lg shadow-lg shadow-blue-500/30 hover:scale-105 transition-transform"
         >
           Start Searching
         </Link>
