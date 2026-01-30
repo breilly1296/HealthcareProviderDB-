@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { CheckCircle, HelpCircle, Search, ChevronDown, ChevronUp } from 'lucide-react';
+import Link from 'next/link';
+import { CheckCircle, HelpCircle, Search, ChevronDown, ChevronUp, MessageSquarePlus } from 'lucide-react';
 
 interface InsurancePlan {
   id: string;
+  planId?: string;
   name: string;
   status: 'accepted' | 'unknown';
   confidence: number;
@@ -12,6 +14,7 @@ interface InsurancePlan {
 
 interface InsuranceListProps {
   plans?: InsurancePlan[];
+  npi?: string;
 }
 
 // Sample data for demo
@@ -23,11 +26,14 @@ const samplePlans: InsurancePlan[] = [
 
 const INITIAL_DISPLAY_COUNT = 5;
 
-function PlanCard({ plan }: { plan: InsurancePlan }) {
+function PlanCard({ plan, npi }: { plan: InsurancePlan; npi?: string }) {
   const isAccepted = plan.status === 'accepted';
+  const verifyUrl = npi && plan.planId
+    ? `/verify?npi=${npi}&planId=${encodeURIComponent(plan.planId)}`
+    : `/verify?npi=${npi || ''}`;
 
   return (
-    <div className="flex items-center justify-between py-3 px-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+    <div className="flex items-center justify-between py-3 px-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg group">
       <div className="flex items-center gap-3 min-w-0 flex-1">
         {isAccepted ? (
           <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
@@ -37,7 +43,14 @@ function PlanCard({ plan }: { plan: InsurancePlan }) {
         <span className="font-medium text-slate-900 dark:text-white truncate">{plan.name}</span>
       </div>
 
-      <div className="flex items-center gap-3 flex-shrink-0 ml-2">
+      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+        <Link
+          href={verifyUrl}
+          onClick={(e) => e.stopPropagation()}
+          className="text-xs text-slate-400 hover:text-[#137fec] dark:text-slate-500 dark:hover:text-[#137fec] opacity-0 group-hover:opacity-100 transition-opacity"
+        >
+          Verify
+        </Link>
         <span
           className={`text-xs font-medium px-2.5 py-1 rounded-full ${
             isAccepted
@@ -53,11 +66,12 @@ function PlanCard({ plan }: { plan: InsurancePlan }) {
   );
 }
 
-export function InsuranceList({ plans = samplePlans }: InsuranceListProps) {
+export function InsuranceList({ plans = samplePlans, npi }: InsuranceListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
 
   const verifiedCount = plans.filter(p => p.status === 'accepted').length;
+  const verifyUrl = npi ? `/verify?npi=${npi}` : '/verify';
 
   // Filter plans based on search query
   const filteredPlans = useMemo(() => {
@@ -106,7 +120,7 @@ export function InsuranceList({ plans = samplePlans }: InsuranceListProps) {
       <div className="space-y-2">
         {displayedPlans.length > 0 ? (
           displayedPlans.map(plan => (
-            <PlanCard key={plan.id} plan={plan} />
+            <PlanCard key={plan.id} plan={plan} npi={npi} />
           ))
         ) : (
           <p className="text-sm text-slate-500 dark:text-slate-400 py-4 text-center">
@@ -135,11 +149,18 @@ export function InsuranceList({ plans = samplePlans }: InsuranceListProps) {
         </button>
       )}
 
-      {/* Don't see your plan link */}
-      <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
-        <button className="text-sm text-[#137fec] hover:underline">
-          Don't see your plan?
-        </button>
+      {/* Verification CTA */}
+      <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-700">
+        <Link
+          href={verifyUrl}
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#137fec] hover:bg-[#0d6edb] text-white font-medium rounded-lg transition-colors"
+        >
+          <MessageSquarePlus className="w-5 h-5" />
+          Verify Insurance Acceptance
+        </Link>
+        <p className="text-xs text-slate-500 dark:text-slate-400 text-center mt-3">
+          Help others by confirming if this provider accepts your insurance
+        </p>
       </div>
     </div>
   );

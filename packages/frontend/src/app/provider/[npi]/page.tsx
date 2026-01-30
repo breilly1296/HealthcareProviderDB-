@@ -54,6 +54,7 @@ export default function ProviderDetailPage() {
   // Transform plan acceptances for InsuranceList - use calculated confidence per plan
   const insurancePlans = provider?.planAcceptances?.map(p => ({
     id: p.id,
+    planId: p.planId,
     name: p.plan?.planName || p.plan?.issuerName || 'Unknown Plan',
     status: (p.acceptanceStatus === 'ACCEPTED' ? 'accepted' : 'unknown') as 'accepted' | 'unknown',
     confidence: p.confidence?.score ?? p.confidenceScore ?? 0,
@@ -116,7 +117,7 @@ export default function ProviderDetailPage() {
             <ProviderHeroCard provider={provider} confidenceScore={confidenceScore} />
 
             {/* Insurance Plans */}
-            <InsuranceList plans={insurancePlans.length > 0 ? insurancePlans : undefined} />
+            <InsuranceList plans={insurancePlans.length > 0 ? insurancePlans : undefined} npi={npi} />
           </div>
         )}
       </div>
