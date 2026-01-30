@@ -10,7 +10,7 @@
   }
 
   body {
-    @apply antialiased text-gray-900 bg-gray-50;
+    @apply antialiased text-stone-800 bg-stone-100;
     @apply dark:text-gray-100 dark:bg-gray-900;
     min-height: 100vh;
     transition: background-color 0.2s ease, color 0.2s ease;
@@ -75,17 +75,17 @@
   }
 
   .label {
-    @apply block text-base font-medium text-gray-700 mb-2;
+    @apply block text-base font-medium text-stone-700 mb-2;
     @apply dark:text-gray-300;
   }
 
   .card {
-    @apply bg-white rounded-xl shadow-sm border border-gray-100 p-6;
+    @apply bg-white/80 rounded-xl shadow-sm border border-stone-200 p-6;
     @apply dark:bg-gray-800 dark:border-gray-700;
   }
 
   .card-hover {
-    @apply card hover:shadow-md hover:border-gray-200 transition-all duration-200;
+    @apply card hover:shadow-md hover:border-stone-300 transition-all duration-200;
     @apply dark:hover:border-gray-600;
   }
 }

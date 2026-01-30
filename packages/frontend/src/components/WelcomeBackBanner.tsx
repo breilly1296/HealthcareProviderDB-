@@ -25,15 +25,15 @@ export function WelcomeBackBanner() {
     }
 
     return (
-        <div className="bg-blue-50 dark:bg-blue-600/10 border-b border-blue-100 dark:border-blue-500/20">
+        <div className="bg-amber-50/60 dark:bg-blue-600/10 border-b border-amber-200/60 dark:border-blue-500/20">
             <div className="container-wide py-2.5">
                 <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3 min-w-0">
-                        <Bookmark className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">Welcome back!</span>
+                        <Bookmark className="w-4 h-4 text-amber-600 dark:text-blue-400 flex-shrink-0" />
+                        <span className="text-sm font-medium text-stone-800 dark:text-white">Welcome back!</span>
                         <Link
                             href={savedUrl}
-                            className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                            className="inline-flex items-center gap-1 text-sm font-medium text-primary-600 dark:text-blue-400 hover:text-primary-700 dark:hover:text-blue-300 transition-colors"
                         >
                             Resume your previous search
                             <ArrowRight className="w-3.5 h-3.5" />
@@ -41,7 +41,7 @@ export function WelcomeBackBanner() {
                     </div>
                     <button
                         onClick={handleDismiss}
-                        className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors p-1"
+                        className="text-stone-400 hover:text-stone-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors p-1"
                         aria-label="Dismiss"
                     >
                         <X className="w-4 h-4" />

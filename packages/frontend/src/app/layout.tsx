@@ -36,42 +36,42 @@ export const metadata: Metadata = {
 
 function Footer() {
   return (
-    <footer className="bg-gray-100 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 mt-auto">
+    <footer className="bg-stone-200 dark:bg-gray-800 border-t border-stone-300 dark:border-gray-700 mt-auto">
       <div className="container-wide py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* About */}
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            <h3 className="text-lg font-semibold text-stone-800 dark:text-white mb-4">
               VerifyMyProvider
             </h3>
-            <p className="text-gray-600 dark:text-gray-300">
+            <p className="text-stone-600 dark:text-gray-300">
               Community-verified provider and insurance information to help you find the right care.
             </p>
           </div>
 
           {/* Quick Links */}
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            <h3 className="text-lg font-semibold text-stone-800 dark:text-white mb-4">
               Quick Links
             </h3>
             <ul className="space-y-2">
               <li>
-                <Link href="/search" className="text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
+                <Link href="/search" className="text-stone-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
                   Find Providers
                 </Link>
               </li>
               <li>
-                <Link href="/insurance" className="text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
+                <Link href="/insurance" className="text-stone-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
                   Scan Insurance Card
                 </Link>
               </li>
               <li>
-                <Link href="/#how-it-works" className="text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
+                <Link href="/#how-it-works" className="text-stone-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
                   How It Works
                 </Link>
               </li>
               <li>
-                <Link href="/#confidence" className="text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
+                <Link href="/#confidence" className="text-stone-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
                   Confidence Scores
                 </Link>
               </li>
@@ -80,17 +80,17 @@ function Footer() {
 
           {/* Legal */}
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            <h3 className="text-lg font-semibold text-stone-800 dark:text-white mb-4">
               Legal
             </h3>
             <ul className="space-y-2">
               <li>
-                <Link href="/terms" className="text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
+                <Link href="/terms" className="text-stone-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
                   Terms of Service
                 </Link>
               </li>
               <li>
-                <Link href="/privacy" className="text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
+                <Link href="/privacy" className="text-stone-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
                   Privacy Policy
                 </Link>
               </li>
@@ -99,10 +99,10 @@ function Footer() {
 
           {/* OwnMyHealth */}
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            <h3 className="text-lg font-semibold text-stone-800 dark:text-white mb-4">
               Part of OwnMyHealth
             </h3>
-            <p className="text-gray-600 dark:text-gray-300 mb-4">
+            <p className="text-stone-600 dark:text-gray-300 mb-4">
               Empowering patients with the information they need to make informed healthcare decisions.
             </p>
             <a
@@ -116,7 +116,7 @@ function Footer() {
           </div>
         </div>
 
-        <div className="border-t border-gray-200 dark:border-gray-700 mt-8 pt-8 text-center text-gray-500 dark:text-gray-400">
+        <div className="border-t border-stone-300 dark:border-gray-700 mt-8 pt-8 text-center text-stone-500 dark:text-gray-400">
           <p>© {new Date().getFullYear()} VerifyMyProvider. All rights reserved.</p>
           <p className="mt-2 text-sm">
             Data sourced from CMS NPPES and community verifications.
@@ -143,7 +143,7 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body className={`${inter.className} flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-200`}>
+      <body className={`${inter.className} flex flex-col min-h-screen bg-stone-100 dark:bg-gray-900 text-stone-800 dark:text-gray-100 transition-colors duration-200`}>
         <Suspense fallback={null}>
           <PostHogProvider>
             <QueryProvider>

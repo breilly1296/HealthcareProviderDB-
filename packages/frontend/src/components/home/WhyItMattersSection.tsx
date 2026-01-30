@@ -21,30 +21,30 @@ const statistics = [
 
 const colorStyles = {
   red: {
-    bg: 'bg-red-50 dark:bg-red-900/20',
-    border: 'border-red-100 dark:border-red-800',
-    text: 'text-red-600 dark:text-red-400',
+    bg: 'bg-rose-50/70 dark:bg-red-900/20',
+    border: 'border-rose-200 dark:border-red-800',
+    text: 'text-rose-600 dark:text-red-400',
   },
   amber: {
-    bg: 'bg-amber-50 dark:bg-amber-900/20',
-    border: 'border-amber-100 dark:border-amber-800',
+    bg: 'bg-amber-50/70 dark:bg-amber-900/20',
+    border: 'border-amber-200 dark:border-amber-800',
     text: 'text-amber-600 dark:text-amber-400',
   },
   green: {
-    bg: 'bg-green-50 dark:bg-green-900/20',
-    border: 'border-green-100 dark:border-green-800',
-    text: 'text-green-600 dark:text-green-400',
+    bg: 'bg-emerald-50/70 dark:bg-green-900/20',
+    border: 'border-emerald-200 dark:border-green-800',
+    text: 'text-emerald-600 dark:text-green-400',
   },
 } as const;
 
 export function WhyItMattersSection() {
   return (
-    <section className="py-8 md:py-12 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800">
+    <section className="py-8 md:py-12 bg-white/60 dark:bg-gray-900 border-b border-stone-200 dark:border-gray-800">
       <div className="container-wide">
-        <h2 className="text-2xl md:text-3xl font-bold text-center text-gray-900 dark:text-white mb-3">
+        <h2 className="text-2xl md:text-3xl font-bold text-center text-stone-800 dark:text-white mb-3">
           Why This Matters
         </h2>
-        <p className="text-base text-gray-600 dark:text-gray-300 text-center max-w-2xl mx-auto mb-6">
+        <p className="text-base text-stone-600 dark:text-gray-300 text-center max-w-2xl mx-auto mb-6">
           Insurance directories are notoriously unreliable, leaving patients with unexpected bills
         </p>
 
@@ -57,8 +57,8 @@ export function WhyItMattersSection() {
                 className={`text-center p-6 rounded-xl ${styles.bg} border ${styles.border}`}
               >
                 <div className={`text-4xl font-bold ${styles.text}`}>{stat.value}</div>
-                <div className="text-gray-700 dark:text-gray-300 mt-2 font-medium">{stat.label}</div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{stat.source}</div>
+                <div className="text-stone-700 dark:text-gray-300 mt-2 font-medium">{stat.label}</div>
+                <div className="text-xs text-stone-500 dark:text-gray-400 mt-1">{stat.source}</div>
               </div>
             );
           })}
