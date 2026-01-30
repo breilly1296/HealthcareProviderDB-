@@ -152,11 +152,11 @@ function ProviderCardComponent({
 
               {/* Confidence Score */}
               {hasConfidence && confidenceColors && (
-                <div className={`flex-shrink-0 px-2.5 py-1 rounded-lg ${confidenceColors.bg}`}>
-                  <div className={`text-sm font-semibold ${confidenceColors.text}`}>
+                <div className={`flex-shrink-0 px-3 py-1.5 rounded-lg ${confidenceColors.bg} border ${confidenceColors.bg.includes('green') ? 'border-green-200 dark:border-green-800' : confidenceColors.bg.includes('yellow') ? 'border-yellow-200 dark:border-yellow-800' : 'border-red-200 dark:border-red-800'}`}>
+                  <div className={`text-xs font-bold ${confidenceColors.text}`}>
                     {confidenceScore}% Confidence
                   </div>
-                  <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-600 rounded-full mt-1 overflow-hidden">
+                  <div className="w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full mt-1 overflow-hidden">
                     <div
                       className={`h-full ${confidenceColors.bar} rounded-full transition-all`}
                       style={{ width: `${confidenceScore}%` }}
@@ -196,21 +196,25 @@ function ProviderCardComponent({
         {/* Insurance Preview Section */}
         <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 flex-wrap">
               {acceptedPlans.length > 0 ? (
                 <>
-                  {acceptedPlans.map((plan, idx) => (
-                    <span
-                      key={idx}
-                      className="inline-flex items-center gap-1 px-2 py-1 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 text-xs font-medium rounded-full"
-                    >
-                      <CheckCircle className="w-3 h-3" />
-                      {(plan.planName || plan.issuerName || 'Plan')?.slice(0, 20)}
-                      {(plan.planName || plan.issuerName || '').length > 20 ? '...' : ''}
-                    </span>
-                  ))}
+                  {acceptedPlans.map((plan, idx) => {
+                    const fullName = plan.planName || plan.issuerName || 'Plan';
+                    const displayName = fullName.length > 18 ? `${fullName.slice(0, 18)}...` : fullName;
+                    return (
+                      <span
+                        key={idx}
+                        title={fullName}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-medium rounded-full border border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors cursor-default"
+                      >
+                        <CheckCircle className="w-3 h-3 flex-shrink-0" />
+                        <span className="truncate">{displayName}</span>
+                      </span>
+                    );
+                  })}
                   {remainingPlansCount > 0 && (
-                    <span className="px-2 py-1 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 text-xs font-medium rounded-full">
+                    <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-medium rounded-full border border-slate-200 dark:border-slate-600">
                       +{remainingPlansCount} more
                     </span>
                   )}
