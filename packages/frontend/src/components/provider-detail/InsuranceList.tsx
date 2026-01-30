@@ -199,8 +199,9 @@ export function InsuranceList({ plans = samplePlans, npi, providerName = 'This p
 
   const handleOpenGeneralVerify = () => {
     // Open modal with first plan or a general verification
-    if (plans.length > 0) {
-      setVerifyingPlan(plans[0]);
+    const firstPlan = plans[0];
+    if (firstPlan) {
+      setVerifyingPlan(firstPlan);
     }
   };
 
