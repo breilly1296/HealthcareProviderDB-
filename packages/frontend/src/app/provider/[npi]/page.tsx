@@ -45,18 +45,18 @@ export default function ProviderDetailPage() {
     }
   }, [npi]);
 
-  // Calculate confidence score from plan acceptances
+  // Calculate overall confidence score from plan acceptances (use calculated score if available)
   const confidenceScore = provider?.planAcceptances?.reduce(
-    (max, p) => Math.max(max, p.confidenceScore || 0),
+    (max, p) => Math.max(max, p.confidence?.score ?? p.confidenceScore ?? 0),
     0
   ) || 0;
 
-  // Transform plan acceptances for InsuranceList
+  // Transform plan acceptances for InsuranceList - use calculated confidence per plan
   const insurancePlans = provider?.planAcceptances?.map(p => ({
     id: p.id,
     name: p.plan?.planName || p.plan?.issuerName || 'Unknown Plan',
     status: (p.acceptanceStatus === 'ACCEPTED' ? 'accepted' : 'unknown') as 'accepted' | 'unknown',
-    confidence: p.confidenceScore || 0,
+    confidence: p.confidence?.score ?? p.confidenceScore ?? 0,
   })) || [];
 
   return (
