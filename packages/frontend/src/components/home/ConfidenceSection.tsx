@@ -79,15 +79,15 @@ const scoringFactors = [
 
 export function ConfidenceSection() {
   return (
-    <section id="confidence" className="py-16 md:py-24 bg-gray-50 dark:bg-gray-800">
+    <section id="confidence" className="py-10 md:py-14 bg-gray-50 dark:bg-gray-800">
       <div className="container-wide">
-        <h2 className="text-3xl md:text-4xl font-bold text-center text-gray-900 dark:text-white mb-4">
+        <h2 className="text-2xl md:text-3xl font-bold text-center text-gray-900 dark:text-white mb-3">
           Understanding Confidence Scores
         </h2>
-        <p className="text-xl text-gray-600 dark:text-gray-300 text-center max-w-2xl mx-auto mb-4">
+        <p className="text-base text-gray-600 dark:text-gray-300 text-center max-w-2xl mx-auto mb-3">
           Our scoring system helps you understand how reliable our information is
         </p>
-        <p className="text-sm text-gray-500 dark:text-gray-400 text-center max-w-2xl mx-auto mb-12">
+        <p className="text-sm text-gray-500 dark:text-gray-400 text-center max-w-2xl mx-auto mb-8">
           Research shows crowdsourced verification achieves <strong className="dark:text-gray-200">expert-level accuracy</strong> while being
           <strong className="dark:text-gray-200"> 5-150x faster</strong> and <strong className="dark:text-gray-200">75% cheaper</strong> than traditional methods
         </p>

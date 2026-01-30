@@ -199,10 +199,7 @@ export function InsuranceList({ plans = samplePlans, npi, providerName = 'This p
 
   const handleOpenGeneralVerify = () => {
     // Open modal with first plan or a general verification
-    const firstPlan = plans[0];
-    if (firstPlan) {
-      setVerifyingPlan(firstPlan);
-    }
+    setVerifyingPlan(plans[0] ?? null);
   };
 
   // Filter plans based on search query

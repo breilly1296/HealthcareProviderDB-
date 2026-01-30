@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { Bookmark, X, ArrowRight } from 'lucide-react';
 
 export function WelcomeBackBanner() {
     const [savedUrl, setSavedUrl] = useState<string | null>(null);
@@ -15,20 +16,6 @@ export function WelcomeBackBanner() {
         }
     }, []);
 
-    // Parse URL to extract friendly display text
-    const getDisplayText = (url: string): { planId?: string; zip?: string } => {
-        try {
-            const urlObj = new URL(url);
-            const params = new URLSearchParams(urlObj.search);
-            return {
-                planId: params.get('planId') || undefined,
-                zip: params.get('zip') || undefined,
-            };
-        } catch {
-            return {};
-        }
-    };
-
     const handleDismiss = () => {
         setIsDismissed(true);
     };
@@ -37,79 +24,29 @@ export function WelcomeBackBanner() {
         return null;
     }
 
-    const { planId, zip } = getDisplayText(savedUrl);
-    const hasDetails = planId || zip;
-
     return (
-        <div className="mb-6 p-4 bg-primary-50 dark:bg-gray-800 border border-primary-200 dark:border-gray-700 rounded-lg shadow-sm">
-            <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                        <svg
-                            className="w-5 h-5 text-primary-600 dark:text-primary-400"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+        <div className="bg-blue-600/10 border-b border-blue-500/20">
+            <div className="container-wide py-2.5">
+                <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <Bookmark className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">Welcome back!</span>
+                        <Link
+                            href={savedUrl}
+                            className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
                         >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
-                            />
-                        </svg>
-                        <h3 className="font-semibold text-gray-900 dark:text-gray-100">Welcome back!</h3>
+                            Resume your previous search
+                            <ArrowRight className="w-3.5 h-3.5" />
+                        </Link>
                     </div>
-                    <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
-                        {hasDetails ? (
-                            <>
-                                Resume searching
-                                {planId && <span className="font-medium"> for {planId}</span>}
-                                {zip && <span className="font-medium"> in {zip}</span>}?
-                            </>
-                        ) : (
-                            'Resume your previous search?'
-                        )}
-                    </p>
-                    <Link
-                        href={savedUrl}
-                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors"
+                    <button
+                        onClick={handleDismiss}
+                        className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors p-1"
+                        aria-label="Dismiss"
                     >
-                        Load Saved Profile
-                        <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M9 5l7 7-7 7"
-                            />
-                        </svg>
-                    </Link>
+                        <X className="w-4 h-4" />
+                    </button>
                 </div>
-                <button
-                    onClick={handleDismiss}
-                    className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
-                    aria-label="Dismiss"
-                >
-                    <svg
-                        className="w-5 h-5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M6 18L18 6M6 6l12 12"
-                        />
-                    </svg>
-                </button>
             </div>
         </div>
     );

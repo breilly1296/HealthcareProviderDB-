@@ -39,16 +39,16 @@ const colorStyles = {
 
 export function WhyItMattersSection() {
   return (
-    <section className="py-12 md:py-16 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800">
+    <section className="py-8 md:py-12 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800">
       <div className="container-wide">
-        <h2 className="text-2xl md:text-3xl font-bold text-center text-gray-900 dark:text-white mb-4">
+        <h2 className="text-2xl md:text-3xl font-bold text-center text-gray-900 dark:text-white mb-3">
           Why This Matters
         </h2>
-        <p className="text-lg text-gray-600 dark:text-gray-300 text-center max-w-2xl mx-auto mb-10">
+        <p className="text-base text-gray-600 dark:text-gray-300 text-center max-w-2xl mx-auto mb-6">
           Insurance directories are notoriously unreliable, leaving patients with unexpected bills
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 max-w-4xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 max-w-4xl mx-auto">
           {statistics.map((stat) => {
             const styles = colorStyles[stat.color];
             return (
