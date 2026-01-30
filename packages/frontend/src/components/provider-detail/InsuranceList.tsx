@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import Link from 'next/link';
-import { CheckCircle, HelpCircle, Search, ChevronDown, ChevronUp, MessageSquarePlus } from 'lucide-react';
+import { CheckCircle, HelpCircle, Search, ChevronDown, ChevronUp, MessageSquarePlus, X, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { verificationApi } from '@/lib/api';
 
 interface InsurancePlan {
   id: string;
@@ -15,6 +15,7 @@ interface InsurancePlan {
 interface InsuranceListProps {
   plans?: InsurancePlan[];
   npi?: string;
+  providerName?: string;
 }
 
 // Sample data for demo
@@ -26,14 +27,130 @@ const samplePlans: InsurancePlan[] = [
 
 const INITIAL_DISPLAY_COUNT = 5;
 
-function PlanCard({ plan, npi }: { plan: InsurancePlan; npi?: string }) {
-  const isAccepted = plan.status === 'accepted';
-  const verifyUrl = npi && plan.planId
-    ? `/verify?npi=${npi}&planId=${encodeURIComponent(plan.planId)}`
-    : `/verify?npi=${npi || ''}`;
+interface VerificationModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  plan: InsurancePlan | null;
+  npi: string;
+  providerName: string;
+}
+
+function VerificationModal({ isOpen, onClose, plan, npi, providerName }: VerificationModalProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!isOpen || !plan) return null;
+
+  const handleVerify = async (acceptsInsurance: boolean) => {
+    if (!plan.planId) {
+      setError('Plan ID is missing');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      await verificationApi.submit({
+        npi,
+        planId: plan.planId,
+        acceptsInsurance,
+      });
+      setSubmitted(true);
+    } catch (err) {
+      setError('Failed to submit verification. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleClose = () => {
+    setSubmitted(false);
+    setError(null);
+    onClose();
+  };
 
   return (
-    <div className="flex items-center justify-between py-3 px-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg group">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/50" onClick={handleClose} />
+
+      {/* Modal */}
+      <div className="relative bg-white dark:bg-slate-800 rounded-xl shadow-xl max-w-md w-full p-6">
+        <button
+          onClick={handleClose}
+          className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        {submitted ? (
+          <div className="text-center py-4">
+            <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Thank You!</h3>
+            <p className="text-slate-600 dark:text-slate-400 mb-4">
+              Your verification helps improve data accuracy for everyone.
+            </p>
+            <button
+              onClick={handleClose}
+              className="px-6 py-2 bg-[#137fec] hover:bg-[#0d6edb] text-white font-medium rounded-lg transition-colors"
+            >
+              Done
+            </button>
+          </div>
+        ) : (
+          <>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
+              Verify Insurance Acceptance
+            </h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+              Does <strong className="text-slate-900 dark:text-white">{providerName}</strong> accept{' '}
+              <strong className="text-slate-900 dark:text-white">{plan.name}</strong>?
+            </p>
+
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-400">
+                {error}
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <button
+                onClick={() => handleVerify(true)}
+                disabled={isSubmitting}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 text-green-700 dark:text-green-400 font-medium rounded-lg border border-green-200 dark:border-green-800 transition-colors disabled:opacity-50"
+              >
+                <ThumbsUp className="w-5 h-5" />
+                {isSubmitting ? 'Submitting...' : 'Yes, they accept this plan'}
+              </button>
+              <button
+                onClick={() => handleVerify(false)}
+                disabled={isSubmitting}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-700 dark:text-red-400 font-medium rounded-lg border border-red-200 dark:border-red-800 transition-colors disabled:opacity-50"
+              >
+                <ThumbsDown className="w-5 h-5" />
+                {isSubmitting ? 'Submitting...' : "No, they don't accept this plan"}
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 dark:text-slate-400 text-center mt-4">
+              Your contribution helps others avoid surprise bills
+            </p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PlanCard({ plan, onVerify }: { plan: InsurancePlan; onVerify: (plan: InsurancePlan) => void }) {
+  const isAccepted = plan.status === 'accepted';
+
+  return (
+    <div className="flex items-center justify-between py-3 px-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
       <div className="flex items-center gap-3 min-w-0 flex-1">
         {isAccepted ? (
           <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
@@ -44,13 +161,12 @@ function PlanCard({ plan, npi }: { plan: InsurancePlan; npi?: string }) {
       </div>
 
       <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-        <Link
-          href={verifyUrl}
-          onClick={(e) => e.stopPropagation()}
-          className="text-xs text-slate-400 hover:text-[#137fec] dark:text-slate-500 dark:hover:text-[#137fec] opacity-0 group-hover:opacity-100 transition-opacity"
+        <button
+          onClick={() => onVerify(plan)}
+          className="text-xs text-[#137fec] hover:text-[#0d6edb] font-medium transition-colors"
         >
           Verify
-        </Link>
+        </button>
         <span
           className={`text-xs font-medium px-2.5 py-1 rounded-full ${
             isAccepted
@@ -66,12 +182,27 @@ function PlanCard({ plan, npi }: { plan: InsurancePlan; npi?: string }) {
   );
 }
 
-export function InsuranceList({ plans = samplePlans, npi }: InsuranceListProps) {
+export function InsuranceList({ plans = samplePlans, npi, providerName = 'This provider' }: InsuranceListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
+  const [verifyingPlan, setVerifyingPlan] = useState<InsurancePlan | null>(null);
 
   const verifiedCount = plans.filter(p => p.status === 'accepted').length;
-  const verifyUrl = npi ? `/verify?npi=${npi}` : '/verify';
+
+  const handleVerify = (plan: InsurancePlan) => {
+    setVerifyingPlan(plan);
+  };
+
+  const handleCloseModal = () => {
+    setVerifyingPlan(null);
+  };
+
+  const handleOpenGeneralVerify = () => {
+    // Open modal with first plan or a general verification
+    if (plans.length > 0) {
+      setVerifyingPlan(plans[0]);
+    }
+  };
 
   // Filter plans based on search query
   const filteredPlans = useMemo(() => {
@@ -120,7 +251,7 @@ export function InsuranceList({ plans = samplePlans, npi }: InsuranceListProps) 
       <div className="space-y-2">
         {displayedPlans.length > 0 ? (
           displayedPlans.map(plan => (
-            <PlanCard key={plan.id} plan={plan} npi={npi} />
+            <PlanCard key={plan.id} plan={plan} onVerify={handleVerify} />
           ))
         ) : (
           <p className="text-sm text-slate-500 dark:text-slate-400 py-4 text-center">
@@ -151,17 +282,26 @@ export function InsuranceList({ plans = samplePlans, npi }: InsuranceListProps) 
 
       {/* Verification CTA */}
       <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-700">
-        <Link
-          href={verifyUrl}
+        <button
+          onClick={handleOpenGeneralVerify}
           className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#137fec] hover:bg-[#0d6edb] text-white font-medium rounded-lg transition-colors"
         >
           <MessageSquarePlus className="w-5 h-5" />
           Verify Insurance Acceptance
-        </Link>
+        </button>
         <p className="text-xs text-slate-500 dark:text-slate-400 text-center mt-3">
           Help others by confirming if this provider accepts your insurance
         </p>
       </div>
+
+      {/* Verification Modal */}
+      <VerificationModal
+        isOpen={!!verifyingPlan}
+        onClose={handleCloseModal}
+        plan={verifyingPlan}
+        npi={npi || ''}
+        providerName={providerName}
+      />
     </div>
   );
 }
