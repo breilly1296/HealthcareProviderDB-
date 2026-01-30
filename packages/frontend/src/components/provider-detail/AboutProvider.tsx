@@ -6,14 +6,12 @@ interface AboutProviderProps {
   entityType?: string | null;
   acceptsNewPatients?: boolean | null;
   languages?: string[] | null;
-  organizationName?: string | null;
 }
 
 export function AboutProvider({
   entityType,
   acceptsNewPatients,
   languages,
-  organizationName,
 }: AboutProviderProps) {
   // Determine practice type
   const practiceType = entityType === 'ORGANIZATION'

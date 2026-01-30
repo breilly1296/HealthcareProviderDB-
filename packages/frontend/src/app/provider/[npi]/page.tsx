@@ -142,7 +142,6 @@ export default function ProviderDetailPage() {
               entityType={provider.entityType}
               acceptsNewPatients={provider.acceptsNewPatients}
               languages={provider.languages}
-              organizationName={provider.organizationName}
             />
 
             {/* Insurance Plans */}
