@@ -24,14 +24,14 @@ function FactorRow({ label, value, max }: FactorRowProps) {
 
   return (
     <div className="flex items-center gap-4">
-      <span className="w-28 text-sm text-gray-600 flex-shrink-0">{label}</span>
-      <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+      <span className="w-28 text-sm text-slate-600 dark:text-slate-400 flex-shrink-0">{label}</span>
+      <div className="flex-1 h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
         <div
           className="h-full bg-[#137fec] rounded-full transition-all duration-500"
           style={{ width: `${percentage}%` }}
         />
       </div>
-      <span className="w-16 text-sm font-medium text-gray-900 text-right">
+      <span className="w-16 text-sm font-medium text-slate-900 dark:text-white text-right">
         {value}/{max} pts
       </span>
     </div>
@@ -56,8 +56,8 @@ export function ScoreBreakdown({ breakdown }: ScoreBreakdownProps) {
   const totalPercentage = (total / maxTotal) * 100;
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-      <h2 className="text-lg font-semibold text-gray-900 mb-5">Score Breakdown</h2>
+    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+      <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-5">Score Breakdown</h2>
 
       <div className="space-y-4">
         <FactorRow label="Data Source" value={factors.dataSource} max={factors.dataSourceMax} />
@@ -67,16 +67,16 @@ export function ScoreBreakdown({ breakdown }: ScoreBreakdownProps) {
       </div>
 
       {/* Total */}
-      <div className="mt-6 pt-4 border-t border-gray-100">
+      <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-700">
         <div className="flex items-center gap-4">
-          <span className="w-28 text-sm font-medium text-gray-900 flex-shrink-0">Total</span>
-          <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden">
+          <span className="w-28 text-sm font-medium text-slate-900 dark:text-white flex-shrink-0">Total</span>
+          <div className="flex-1 h-3 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
             <div
               className="h-full bg-gradient-to-r from-[#137fec] to-[#0d5bb5] rounded-full transition-all duration-500"
               style={{ width: `${totalPercentage}%` }}
             />
           </div>
-          <span className="w-20 text-sm font-bold text-gray-900 text-right">
+          <span className="w-20 text-sm font-bold text-slate-900 dark:text-white text-right">
             {total}/{maxTotal} total
           </span>
         </div>

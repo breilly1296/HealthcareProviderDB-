@@ -53,7 +53,7 @@ export function ProviderHeroCard({ provider, confidenceScore }: ProviderHeroCard
     : null;
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 md:p-8">
+    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 md:p-8">
       <div className="flex flex-col md:flex-row md:items-center gap-6 md:gap-8">
         {/* Left section: Avatar and Info */}
         <div className="flex items-start gap-4 flex-1">
@@ -65,7 +65,7 @@ export function ProviderHeroCard({ provider, confidenceScore }: ProviderHeroCard
           {/* Provider Info */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <h1 className="text-xl md:text-2xl font-bold text-gray-900 truncate">
+              <h1 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white truncate">
                 {provider.displayName}
               </h1>
               {isVerified && (
@@ -75,10 +75,10 @@ export function ProviderHeroCard({ provider, confidenceScore }: ProviderHeroCard
 
             <p className="text-[#137fec] font-medium mb-3">{specialty}</p>
 
-            <div className="space-y-1.5 text-sm text-gray-600">
+            <div className="space-y-1.5 text-sm text-slate-600 dark:text-slate-300">
               {provider.organizationName && (
                 <div className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                  <MapPin className="w-4 h-4 text-slate-400 dark:text-slate-500 flex-shrink-0" />
                   <span>{provider.organizationName}</span>
                 </div>
               )}
@@ -92,7 +92,7 @@ export function ProviderHeroCard({ provider, confidenceScore }: ProviderHeroCard
 
               {provider.phone && (
                 <div className="flex items-center gap-2">
-                  <Phone className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                  <Phone className="w-4 h-4 text-slate-400 dark:text-slate-500 flex-shrink-0" />
                   <a
                     href={`tel:${provider.phone}`}
                     className="hover:text-[#137fec] transition-colors"

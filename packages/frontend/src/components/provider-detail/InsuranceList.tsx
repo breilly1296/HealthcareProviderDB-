@@ -24,27 +24,27 @@ function PlanCard({ plan }: { plan: InsurancePlan }) {
   const isAccepted = plan.status === 'accepted';
 
   return (
-    <div className="flex items-center justify-between py-3 px-4 bg-gray-50 rounded-lg">
+    <div className="flex items-center justify-between py-3 px-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
       <div className="flex items-center gap-3">
         {isAccepted ? (
           <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
         ) : (
-          <HelpCircle className="w-5 h-5 text-gray-400 flex-shrink-0" />
+          <HelpCircle className="w-5 h-5 text-slate-400 dark:text-slate-500 flex-shrink-0" />
         )}
-        <span className="font-medium text-gray-900">{plan.name}</span>
+        <span className="font-medium text-slate-900 dark:text-white">{plan.name}</span>
       </div>
 
       <div className="flex items-center gap-3">
         <span
           className={`text-xs font-medium px-2.5 py-1 rounded-full ${
             isAccepted
-              ? 'bg-green-100 text-green-700'
-              : 'bg-gray-200 text-gray-600'
+              ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+              : 'bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-300'
           }`}
         >
           {isAccepted ? 'Accepted' : 'Unknown'}
         </span>
-        <span className="text-sm text-gray-500">{plan.confidence}%</span>
+        <span className="text-sm text-slate-500 dark:text-slate-400">{plan.confidence}%</span>
       </div>
     </div>
   );
@@ -54,10 +54,10 @@ export function InsuranceList({ plans = samplePlans }: InsuranceListProps) {
   const verifiedCount = plans.filter(p => p.status === 'accepted').length;
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
       <div className="mb-5">
-        <h2 className="text-lg font-semibold text-gray-900">Insurance Acceptance</h2>
-        <p className="text-sm text-gray-500 mt-1">{verifiedCount} verified plans</p>
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Insurance Acceptance</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{verifiedCount} verified plans</p>
       </div>
 
       <div className="space-y-3">

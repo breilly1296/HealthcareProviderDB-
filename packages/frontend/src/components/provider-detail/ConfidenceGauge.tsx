@@ -33,7 +33,7 @@ export function ConfidenceGauge({ score, size = 140, showLink = true }: Confiden
             cy={size / 2}
             r={radius}
             fill="none"
-            stroke="#e5e7eb"
+            className="stroke-slate-200 dark:stroke-slate-700"
             strokeWidth={strokeWidth}
           />
           {/* Progress arc */}
@@ -53,11 +53,11 @@ export function ConfidenceGauge({ score, size = 140, showLink = true }: Confiden
 
         {/* Center text */}
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-3xl font-bold text-gray-900">{score}%</span>
+          <span className="text-3xl font-bold text-slate-900 dark:text-white">{score}%</span>
         </div>
       </div>
 
-      <p className="mt-2 text-sm font-medium text-gray-600">Confidence Score</p>
+      <p className="mt-2 text-sm font-medium text-slate-600 dark:text-slate-400">Confidence Score</p>
 
       {showLink && (
         <button className="mt-1 text-xs text-[#137fec] hover:underline">
