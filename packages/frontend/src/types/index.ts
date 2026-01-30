@@ -236,6 +236,18 @@ export interface CarrierGroup {
 }
 
 /**
+ * Plan acceptance preview for search results
+ */
+export interface PlanAcceptancePreview {
+  id: number;
+  planId: string | null;
+  planName: string | null;
+  issuerName: string | null;
+  acceptanceStatus: string;
+  confidenceScore: number;
+}
+
+/**
  * Provider display type (with computed displayName)
  */
 export interface ProviderDisplay {
@@ -258,6 +270,9 @@ export interface ProviderDisplay {
   specialtyCategory: string | null;
   npiStatus: string;
   displayName: string;
+  // Optional fields for search results with plan data
+  confidenceScore?: number | null;
+  planAcceptances?: PlanAcceptancePreview[];
 }
 
 /**

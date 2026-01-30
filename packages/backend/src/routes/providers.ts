@@ -63,28 +63,56 @@ router.get(
     res.json({
       success: true,
       data: {
-        providers: result.providers.map((p) => ({
-          id: p.npi,
-          npi: p.npi,
-          entityType: p.entityType,
-          firstName: p.firstName,
-          lastName: p.lastName,
-          middleName: null,
-          credential: p.credential,
-          organizationName: p.organizationName,
-          addressLine1: p.addressLine1,
-          addressLine2: p.addressLine2,
-          city: p.city,
-          state: p.state,
-          zip: p.zipCode,
-          phone: p.phone,
-          // Map backend fields to frontend expected names
-          taxonomyCode: p.specialtyCode,
-          taxonomyDescription: p.specialty,
-          specialtyCategory: null, // Let frontend use taxonomyDescription for display
-          npiStatus: 'ACTIVE',
-          displayName: getProviderDisplayName(p),
-        })),
+        providers: result.providers.map((p) => {
+          // Get highest confidence score from accepted plans
+          // Type assertion needed because Prisma include types aren't reflected in service return type
+          const providerWithPlans = p as typeof p & {
+            planAcceptances?: Array<{
+              id: number;
+              planId: string | null;
+              acceptanceStatus: string;
+              confidenceScore: number;
+              plan?: { planId: string; planName: string | null; issuerName: string | null } | null;
+            }>;
+          };
+          const acceptedPlans = providerWithPlans.planAcceptances || [];
+          const highestConfidence = acceptedPlans.length > 0
+            ? Math.max(...acceptedPlans.map((pa) => pa.confidenceScore))
+            : null;
+
+          return {
+            id: p.npi,
+            npi: p.npi,
+            entityType: p.entityType,
+            firstName: p.firstName,
+            lastName: p.lastName,
+            middleName: null,
+            credential: p.credential,
+            organizationName: p.organizationName,
+            addressLine1: p.addressLine1,
+            addressLine2: p.addressLine2,
+            city: p.city,
+            state: p.state,
+            zip: p.zipCode,
+            phone: p.phone,
+            // Map backend fields to frontend expected names
+            taxonomyCode: p.specialtyCode,
+            taxonomyDescription: p.specialty,
+            specialtyCategory: null,
+            npiStatus: 'ACTIVE',
+            displayName: getProviderDisplayName(p),
+            // Include confidence and plan data for card preview
+            confidenceScore: highestConfidence,
+            planAcceptances: acceptedPlans.map((pa) => ({
+              id: pa.id,
+              planId: pa.planId,
+              planName: pa.plan?.planName || null,
+              issuerName: pa.plan?.issuerName || null,
+              acceptanceStatus: pa.acceptanceStatus,
+              confidenceScore: pa.confidenceScore,
+            })),
+          };
+        }),
         pagination: buildPaginationMeta(result.total, result.page, result.limit),
       },
     });

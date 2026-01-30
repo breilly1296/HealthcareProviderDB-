@@ -235,6 +235,22 @@ export async function searchProviders(params: ProviderSearchParams): Promise<Pro
       take,
       skip,
       orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }, { organizationName: 'asc' }],
+      include: {
+        planAcceptances: {
+          where: { acceptanceStatus: 'ACCEPTED' },
+          orderBy: { confidenceScore: 'desc' },
+          take: 5, // Limit for preview - top 5 by confidence
+          include: {
+            plan: {
+              select: {
+                planId: true,
+                planName: true,
+                issuerName: true,
+              },
+            },
+          },
+        },
+      },
     }),
     prisma.provider.count({ where }),
   ]);

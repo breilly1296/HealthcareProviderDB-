@@ -13,7 +13,8 @@ import {
   InsuranceList,
 } from '@/components/provider-detail';
 
-interface ProviderWithPlans extends ProviderDisplay {
+// Provider with full plan acceptance data (from detail API)
+interface ProviderWithPlans extends Omit<ProviderDisplay, 'planAcceptances'> {
   planAcceptances: PlanAcceptanceDisplay[];
 }
 

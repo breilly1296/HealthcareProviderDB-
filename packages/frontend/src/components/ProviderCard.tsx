@@ -7,20 +7,9 @@ import { getSpecialtyDisplay } from '@/lib/provider-utils';
 import { LocationIcon, PhoneIcon, ChevronRightIcon } from '@/components/icons';
 import { CheckCircle, BadgeCheck } from 'lucide-react';
 
-interface PlanAcceptance {
-  planName?: string;
-  issuerName?: string;
-  status?: string;
-}
-
 interface ProviderCardProps {
   provider: ProviderDisplay;
-  confidenceScore?: number;
   showConfidence?: boolean;
-  lastVerifiedAt?: Date | null;
-  planId?: string;
-  planName?: string;
-  planAcceptances?: PlanAcceptance[];
 }
 
 // Helper to format phone numbers
@@ -89,10 +78,12 @@ function getConfidenceColor(score: number): { bg: string; bar: string; text: str
  */
 function ProviderCardComponent({
   provider,
-  confidenceScore,
   showConfidence = true,
-  planAcceptances = [],
 }: ProviderCardProps) {
+  // Get confidence and plan data from provider object
+  const confidenceScore = provider.confidenceScore ?? null;
+  const planAcceptances = provider.planAcceptances ?? [];
+
   // Memoize computed specialty
   const specialty = useMemo(
     () => getSpecialtyDisplay(provider.specialtyCategory, provider.taxonomyDescription),
@@ -119,15 +110,16 @@ function ProviderCardComponent({
   );
 
   // Confidence display
-  const hasConfidence = showConfidence && confidenceScore !== undefined && confidenceScore > 0;
+  const hasConfidence = showConfidence && confidenceScore !== null && confidenceScore > 0;
   const isVerified = (confidenceScore ?? 0) >= 70;
-  const confidenceColors = hasConfidence ? getConfidenceColor(confidenceScore!) : null;
+  const confidenceColors = hasConfidence && confidenceScore !== null ? getConfidenceColor(confidenceScore) : null;
 
-  // Get top accepted plans for preview
+  // Get top accepted plans for preview (already filtered by backend, but double-check)
   const acceptedPlans = planAcceptances
-    .filter(p => p.status === 'ACCEPTED')
+    .filter(p => p.acceptanceStatus === 'ACCEPTED')
     .slice(0, 3);
-  const remainingPlansCount = Math.max(0, planAcceptances.filter(p => p.status === 'ACCEPTED').length - 3);
+  const totalAcceptedCount = planAcceptances.filter(p => p.acceptanceStatus === 'ACCEPTED').length;
+  const remainingPlansCount = Math.max(0, totalAcceptedCount - 3);
 
   return (
     <Link href={`/provider/${provider.npi}`}>
@@ -251,9 +243,9 @@ function arePropsEqual(prevProps: ProviderCardProps, nextProps: ProviderCardProp
   if (prevProps.provider.city !== nextProps.provider.city) return false;
   if (prevProps.provider.state !== nextProps.provider.state) return false;
   if (prevProps.provider.zip !== nextProps.provider.zip) return false;
-  if (prevProps.confidenceScore !== nextProps.confidenceScore) return false;
+  if (prevProps.provider.confidenceScore !== nextProps.provider.confidenceScore) return false;
   if (prevProps.showConfidence !== nextProps.showConfidence) return false;
-  if (prevProps.planAcceptances?.length !== nextProps.planAcceptances?.length) return false;
+  if (prevProps.provider.planAcceptances?.length !== nextProps.provider.planAcceptances?.length) return false;
   return true;
 }
 
