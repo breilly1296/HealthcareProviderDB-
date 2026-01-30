@@ -69,7 +69,7 @@ export function ProviderHeroCard({ provider, confidenceScore, verificationCount 
   ].filter(Boolean).join(', ');
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 md:p-8">
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-stone-200 dark:border-gray-700 p-6 md:p-8">
       <div className="flex flex-col md:flex-row md:items-start gap-6 md:gap-8">
         {/* Left section: Avatar and Info */}
         <div className="flex items-start gap-4 flex-1">
@@ -81,7 +81,7 @@ export function ProviderHeroCard({ provider, confidenceScore, verificationCount 
           {/* Provider Info */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <h1 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white truncate">
+              <h1 className="text-xl md:text-2xl font-bold text-stone-800 dark:text-white truncate">
                 {provider.displayName}
               </h1>
               {isVerified && (
@@ -93,16 +93,16 @@ export function ProviderHeroCard({ provider, confidenceScore, verificationCount 
 
             {/* Organization name if different */}
             {provider.organizationName && provider.entityType !== 'ORGANIZATION' && (
-              <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+              <p className="text-sm text-stone-600 dark:text-gray-400 mb-2">
                 {provider.organizationName}
               </p>
             )}
 
             {/* Address */}
-            <div className="space-y-1 text-sm text-slate-600 dark:text-slate-300 mb-3">
+            <div className="space-y-1 text-sm text-stone-600 dark:text-gray-300 mb-3">
               {streetAddress && (
                 <div className="flex items-start gap-2">
-                  <MapPin className="w-4 h-4 text-slate-400 dark:text-slate-500 flex-shrink-0 mt-0.5" />
+                  <MapPin className="w-4 h-4 text-stone-400 dark:text-gray-500 flex-shrink-0 mt-0.5" />
                   <div>
                     <p>{streetAddress}</p>
                     {cityStateZip && <p>{cityStateZip}</p>}
@@ -116,9 +116,9 @@ export function ProviderHeroCard({ provider, confidenceScore, verificationCount 
               {provider.phone && (
                 <a
                   href={`tel:${provider.phone}`}
-                  className="inline-flex items-center gap-2 text-slate-600 dark:text-slate-300 hover:text-[#137fec] dark:hover:text-[#137fec] transition-colors"
+                  className="inline-flex items-center gap-2 text-stone-600 dark:text-gray-300 hover:text-[#137fec] dark:hover:text-[#137fec] transition-colors"
                 >
-                  <Phone className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                  <Phone className="w-4 h-4 text-stone-400 dark:text-gray-500" />
                   <span className="font-medium">{formatPhone(provider.phone)}</span>
                 </a>
               )}
@@ -137,7 +137,7 @@ export function ProviderHeroCard({ provider, confidenceScore, verificationCount 
             </div>
 
             {/* NPI - subtle below */}
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-3">
+            <p className="text-xs text-stone-400 dark:text-gray-500 mt-3">
               NPI: {provider.npi}
             </p>
           </div>

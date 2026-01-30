@@ -104,8 +104,8 @@ function SearchResultsDisplay({
     <div aria-live="polite">
       {/* Results count */}
       <div className="mb-4">
-        <p className="text-gray-600 dark:text-gray-300">
-          Found <strong className="text-gray-900 dark:text-white">{pagination?.total || 0}</strong> providers
+        <p className="text-stone-600 dark:text-gray-300">
+          Found <strong className="text-stone-800 dark:text-white">{pagination?.total || 0}</strong> providers
           {state && ` in ${state}`}
           {cities && ` in ${cities.split(',').join(', ')}`}
         </p>
@@ -204,10 +204,10 @@ function SearchPageContent() {
         <div className="mb-8">
           <div className="flex items-start justify-between gap-4 mb-4">
             <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-2">
+              <h1 className="text-3xl md:text-4xl font-bold text-stone-800 dark:text-white mb-2">
                 Find Healthcare Providers
               </h1>
-              <p className="text-xl text-gray-600 dark:text-gray-300">
+              <p className="text-xl text-stone-600 dark:text-gray-300">
                 Search for providers by specialty, location, and more.
               </p>
             </div>

@@ -54,7 +54,7 @@ export function WhyItMattersSection() {
             return (
               <div
                 key={stat.label}
-                className={`text-center p-6 rounded-xl shadow-sm ${styles.bg} border ${styles.border}`}
+                className={`text-center p-6 rounded-xl shadow-sm ${styles.bg} border border-stone-200 dark:border-transparent ${styles.border}`}
               >
                 <div className={`text-4xl font-bold ${styles.text}`}>{stat.value}</div>
                 <div className="text-stone-700 dark:text-gray-300 mt-2 font-medium">{stat.label}</div>

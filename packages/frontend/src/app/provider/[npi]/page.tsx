@@ -78,18 +78,18 @@ export default function ProviderDetailPage() {
   })) || [];
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+    <div className="min-h-screen bg-stone-100 dark:bg-gray-900">
       <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-6">
         {/* Breadcrumb */}
         <nav className="mb-6">
           <Link
             href="/search"
-            className="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 hover:text-[#137fec] transition-colors"
+            className="inline-flex items-center gap-2 text-sm text-stone-600 dark:text-gray-400 hover:text-[#137fec] transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Search</span>
-            <span className="text-slate-400 dark:text-slate-600">&gt;</span>
-            <span className="text-slate-900 dark:text-white font-medium">Provider Details</span>
+            <span className="text-stone-400 dark:text-gray-600">&gt;</span>
+            <span className="text-stone-800 dark:text-white font-medium">Provider Details</span>
           </Link>
         </nav>
 
@@ -102,14 +102,14 @@ export default function ProviderDetailPage() {
 
         {/* Error State */}
         {error && !loading && (
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-12 text-center">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-stone-200 dark:border-gray-700 p-12 text-center">
             <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
               <span className="text-2xl">!</span>
             </div>
-            <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">
+            <h2 className="text-xl font-semibold text-stone-800 dark:text-white mb-2">
               Provider Not Found
             </h2>
-            <p className="text-slate-500 dark:text-slate-400 mb-6">{error}</p>
+            <p className="text-stone-500 dark:text-gray-400 mb-6">{error}</p>
             <div className="flex justify-center gap-4">
               <button
                 onClick={fetchProvider}
@@ -119,7 +119,7 @@ export default function ProviderDetailPage() {
               </button>
               <Link
                 href="/search"
-                className="bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-900 dark:text-white px-6 py-2.5 rounded-lg font-medium transition-colors"
+                className="bg-stone-100 dark:bg-gray-700 hover:bg-stone-200 dark:hover:bg-gray-600 text-stone-800 dark:text-white px-6 py-2.5 rounded-lg font-medium transition-colors"
               >
                 Back to Search
               </Link>

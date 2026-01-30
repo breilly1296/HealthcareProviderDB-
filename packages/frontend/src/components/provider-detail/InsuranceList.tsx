@@ -151,20 +151,20 @@ function VerificationModal({ isOpen, onClose, plan, npi, providerName, onVerifie
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50" onClick={resetAndClose} />
-      <div className="relative bg-white dark:bg-slate-800 rounded-xl shadow-xl max-w-md w-full p-6">
+      <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full p-6">
         <button
           onClick={resetAndClose}
-          className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+          className="absolute top-4 right-4 text-stone-400 hover:text-stone-600 dark:hover:text-gray-300"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
+        <h3 className="text-lg font-bold text-stone-800 dark:text-white mb-1">
           Verify Insurance Acceptance
         </h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">
-          Does <strong className="text-slate-900 dark:text-white">{providerName}</strong> accept{' '}
-          <strong className="text-slate-900 dark:text-white">{plan.name}</strong>?
+        <p className="text-sm text-stone-500 dark:text-gray-400 mb-5">
+          Does <strong className="text-stone-800 dark:text-white">{providerName}</strong> accept{' '}
+          <strong className="text-stone-800 dark:text-white">{plan.name}</strong>?
         </p>
 
         {/* Yes/No Buttons */}
@@ -197,7 +197,7 @@ function VerificationModal({ isOpen, onClose, plan, npi, providerName, onVerifie
 
         {/* Date Selector */}
         <div className="mt-4">
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">When did you verify this? (optional)</p>
+          <p className="text-xs text-stone-500 dark:text-gray-400 mb-2">When did you verify this? (optional)</p>
           <div className="flex flex-wrap gap-1.5">
             {DATE_OPTIONS.map(({ value, label }) => (
               <button
@@ -207,7 +207,7 @@ function VerificationModal({ isOpen, onClose, plan, npi, providerName, onVerifie
                 className={`px-3 py-1 text-xs rounded-full border transition-all disabled:opacity-50 ${
                   verificationDate === value
                     ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-transparent text-slate-500 dark:text-slate-400 border-slate-300 dark:border-slate-600 hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400'
+                    : 'bg-transparent text-stone-500 dark:text-gray-400 border-stone-300 dark:border-gray-600 hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400'
                 }`}
               >
                 {label}
@@ -222,7 +222,7 @@ function VerificationModal({ isOpen, onClose, plan, npi, providerName, onVerifie
             <button
               onClick={() => setShowNoteField(true)}
               disabled={isLoading}
-              className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-[#137fec] transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 text-xs text-stone-500 dark:text-gray-400 hover:text-[#137fec] transition-colors disabled:opacity-50"
             >
               <MessageSquare className="w-3.5 h-3.5" />
               Add a note (optional)
@@ -234,10 +234,10 @@ function VerificationModal({ isOpen, onClose, plan, npi, providerName, onVerifie
                 onChange={(e) => setNote(e.target.value.slice(0, 200))}
                 placeholder="Optional: When did you verify? Any details?"
                 disabled={isLoading}
-                className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#137fec] focus:border-transparent resize-none disabled:opacity-50"
+                className="w-full px-3 py-2 text-sm bg-stone-50 dark:bg-gray-700/50 border border-stone-200 dark:border-gray-600 rounded-lg text-stone-800 dark:text-white placeholder-stone-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#137fec] focus:border-transparent resize-none disabled:opacity-50"
                 rows={2}
               />
-              <p className="text-xs text-slate-400 dark:text-slate-500 text-right mt-1">
+              <p className="text-xs text-stone-400 dark:text-gray-500 text-right mt-1">
                 {note.length}/200
               </p>
             </div>
@@ -245,18 +245,18 @@ function VerificationModal({ isOpen, onClose, plan, npi, providerName, onVerifie
         </div>
 
         {/* Divider */}
-        <div className="border-t border-slate-100 dark:border-slate-700 mt-4 pt-4">
+        <div className="border-t border-stone-100 dark:border-gray-700 mt-4 pt-4">
           {/* I'm not sure button */}
           <button
             onClick={handleSkip}
             disabled={isLoading}
-            className="w-full flex items-center justify-center gap-1.5 px-4 py-2 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-1.5 px-4 py-2 text-sm text-stone-500 dark:text-gray-400 hover:text-stone-700 dark:hover:text-gray-300 border border-stone-200 dark:border-gray-600 rounded-lg hover:bg-stone-50 dark:hover:bg-gray-700/30 transition-colors disabled:opacity-50"
           >
             I'm not sure
           </button>
         </div>
 
-        <p className="text-xs text-slate-500 dark:text-slate-400 text-center mt-4">
+        <p className="text-xs text-stone-500 dark:text-gray-400 text-center mt-4">
           Your contribution helps others avoid surprise bills
         </p>
       </div>
@@ -278,14 +278,14 @@ function PlanRow({ plan, onVerify, showConfidence, isLast, indented = false, sho
   const isAccepted = plan.status === 'accepted';
 
   return (
-    <div className={`flex items-center justify-between py-2.5 ${!isLast ? 'border-b border-slate-100 dark:border-slate-700/50' : ''} ${indented ? 'pl-7' : ''}`}>
+    <div className={`flex items-center justify-between py-2.5 ${!isLast ? 'border-b border-stone-100 dark:border-gray-700/50' : ''} ${indented ? 'pl-7' : ''}`}>
       <div className="flex items-center gap-2.5 min-w-0 flex-1">
         {isAccepted ? (
           <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
         ) : (
-          <HelpCircle className="w-4 h-4 text-slate-400 dark:text-slate-500 flex-shrink-0" />
+          <HelpCircle className="w-4 h-4 text-stone-400 dark:text-gray-500 flex-shrink-0" />
         )}
-        <span className="text-sm text-slate-700 dark:text-slate-200 truncate">{plan.name}</span>
+        <span className="text-sm text-stone-700 dark:text-gray-200 truncate">{plan.name}</span>
       </div>
 
       <div className="flex items-center gap-2 flex-shrink-0 ml-2">
@@ -308,7 +308,7 @@ function PlanRow({ plan, onVerify, showConfidence, isLast, indented = false, sho
           </span>
         )}
         {showConfidence && (
-          <span className="text-xs text-slate-500 dark:text-slate-400 w-8 text-right">{plan.confidence}%</span>
+          <span className="text-xs text-stone-500 dark:text-gray-400 w-8 text-right">{plan.confidence}%</span>
         )}
       </div>
     </div>
@@ -330,19 +330,19 @@ function CarrierGroupSection({ group, isExpanded, onToggle, onVerify, showConfid
   const acceptedCount = group.plans.filter(p => p.status === 'accepted').length;
 
   return (
-    <div className="border-b border-slate-200 dark:border-slate-700 last:border-b-0">
+    <div className="border-b border-stone-200 dark:border-gray-700 last:border-b-0">
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between py-3 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors -mx-2 px-2 rounded"
+        className="w-full flex items-center justify-between py-3 hover:bg-stone-50 dark:hover:bg-gray-700/30 transition-colors -mx-2 px-2 rounded"
       >
         <div className="flex items-center gap-2">
           {shouldExpand ? (
-            <ChevronDown className="w-4 h-4 text-slate-400" />
+            <ChevronDown className="w-4 h-4 text-stone-400" />
           ) : (
-            <ChevronRight className="w-4 h-4 text-slate-400" />
+            <ChevronRight className="w-4 h-4 text-stone-400" />
           )}
-          <span className="font-medium text-slate-900 dark:text-white">{group.displayName}</span>
-          <span className="text-sm text-slate-500 dark:text-slate-400">
+          <span className="font-medium text-stone-800 dark:text-white">{group.displayName}</span>
+          <span className="text-sm text-stone-500 dark:text-gray-400">
             ({group.plans.length} {group.plans.length === 1 ? 'plan' : 'plans'})
           </span>
         </div>
@@ -487,30 +487,30 @@ export function InsuranceList({
   const totalGroupedPlans = groups.reduce((sum, g) => sum + g.plans.length, 0) + singlePlans.length;
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-stone-200 dark:border-gray-700 p-6">
       {/* Header */}
       <div className="mb-4">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Insurance Acceptance</h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{verifiedCount} accepted plans</p>
+        <h2 className="text-lg font-semibold text-stone-800 dark:text-white">Insurance Acceptance</h2>
+        <p className="text-sm text-stone-500 dark:text-gray-400 mt-1">{verifiedCount} accepted plans</p>
       </div>
 
       {/* Search Input */}
       {plans.length > 5 && (
         <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 dark:text-gray-500" />
           <input
             type="text"
             placeholder="Search your insurance plan..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-lg text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#137fec] focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2.5 bg-stone-50 dark:bg-gray-700/50 border border-stone-200 dark:border-gray-600 rounded-lg text-sm text-stone-800 dark:text-white placeholder-stone-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#137fec] focus:border-transparent"
           />
         </div>
       )}
 
       {/* Results count when filtering */}
       {hasSearch && (
-        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+        <p className="text-xs text-stone-500 dark:text-gray-400 mb-3">
           Showing {totalGroupedPlans} of {plans.length} plans
         </p>
       )}
@@ -535,21 +535,21 @@ export function InsuranceList({
 
             {/* Single Plans (Other Plans) */}
             {singlePlans.length > 0 && (
-              <div className={groups.length > 0 ? 'mt-4 pt-4 border-t border-slate-200 dark:border-slate-700' : ''}>
+              <div className={groups.length > 0 ? 'mt-4 pt-4 border-t border-stone-200 dark:border-gray-700' : ''}>
                 {groups.length > 0 && singlePlans.length > 5 ? (
                   // Collapsible "Other Plans" section for 6+ plans
                   <>
                     <button
                       onClick={() => setOtherPlansExpanded(!otherPlansExpanded)}
-                      className="w-full flex items-center justify-between py-2 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors -mx-2 px-2 rounded mb-1"
+                      className="w-full flex items-center justify-between py-2 hover:bg-stone-50 dark:hover:bg-gray-700/30 transition-colors -mx-2 px-2 rounded mb-1"
                     >
                       <div className="flex items-center gap-2">
                         {otherPlansExpanded || hasSearch ? (
-                          <ChevronDown className="w-4 h-4 text-slate-400" />
+                          <ChevronDown className="w-4 h-4 text-stone-400" />
                         ) : (
-                          <ChevronRight className="w-4 h-4 text-slate-400" />
+                          <ChevronRight className="w-4 h-4 text-stone-400" />
                         )}
-                        <span className="text-sm font-medium text-slate-500 dark:text-slate-400">
+                        <span className="text-sm font-medium text-stone-500 dark:text-gray-400">
                           Other Plans ({singlePlans.length})
                         </span>
                       </div>
@@ -575,7 +575,7 @@ export function InsuranceList({
                   // Regular display for 5 or fewer plans
                   <>
                     {groups.length > 0 && (
-                      <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">Other Plans</p>
+                      <p className="text-sm font-medium text-stone-500 dark:text-gray-400 mb-2">Other Plans</p>
                     )}
                     {singlePlans.map((plan, idx) => (
                       <PlanRow
@@ -594,15 +594,15 @@ export function InsuranceList({
             )}
           </>
         ) : (
-          <p className="text-sm text-slate-500 dark:text-slate-400 py-4 text-center">
+          <p className="text-sm text-stone-500 dark:text-gray-400 py-4 text-center">
             No plans match "{searchQuery}"
           </p>
         )}
       </div>
 
       {/* Verification CTA */}
-      <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-700">
-        <p className="text-sm text-slate-600 dark:text-slate-400 text-center mb-3">
+      <div className="mt-6 pt-4 border-t border-stone-100 dark:border-gray-700">
+        <p className="text-sm text-stone-600 dark:text-gray-400 text-center mb-3">
           {formatLastVerified(lastVerifiedAt)}
         </p>
 
@@ -615,14 +615,14 @@ export function InsuranceList({
         </button>
 
         {verificationCount > 0 && (
-          <p className="flex items-center justify-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 text-center mt-3">
+          <p className="flex items-center justify-center gap-1.5 text-xs text-stone-500 dark:text-gray-400 text-center mt-3">
             <Users className="w-3.5 h-3.5" />
             Join {verificationCount} {verificationCount === 1 ? 'person' : 'people'} who verified this provider
           </p>
         )}
 
         {verificationCount === 0 && (
-          <p className="text-xs text-slate-500 dark:text-slate-400 text-center mt-3">
+          <p className="text-xs text-stone-500 dark:text-gray-400 text-center mt-3">
             Be the first to verify this provider's insurance acceptance
           </p>
         )}
