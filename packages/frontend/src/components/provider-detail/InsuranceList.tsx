@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { CheckCircle, HelpCircle, Search, ChevronDown, ChevronUp, MessageSquarePlus, X, ThumbsUp, ThumbsDown, Users } from 'lucide-react';
+import { CheckCircle, HelpCircle, Search, ChevronDown, ChevronRight, MessageSquarePlus, X, ThumbsUp, ThumbsDown, Users } from 'lucide-react';
 import { verificationApi } from '@/lib/api';
 
 interface InsurancePlan {
@@ -28,7 +28,45 @@ const samplePlans: InsurancePlan[] = [
   { id: '3', name: 'UnitedHealthcare Choice', status: 'unknown', confidence: 45 },
 ];
 
-const INITIAL_DISPLAY_COUNT = 5;
+// Known carrier families for grouping
+const CARRIER_PATTERNS: { pattern: RegExp; family: string; displayName: string }[] = [
+  { pattern: /^aetna/i, family: 'aetna', displayName: 'Aetna' },
+  { pattern: /^emblem\s*health/i, family: 'emblemhealth', displayName: 'EmblemHealth' },
+  { pattern: /^empire\s*(blue\s*cross|bcbs)/i, family: 'empire', displayName: 'Empire Blue Cross Blue Shield' },
+  { pattern: /^(blue\s*cross|bcbs)/i, family: 'bluecross', displayName: 'Blue Cross Blue Shield' },
+  { pattern: /^health\s*first/i, family: 'healthfirst', displayName: 'Healthfirst' },
+  { pattern: /^united\s*health/i, family: 'united', displayName: 'UnitedHealthcare' },
+  { pattern: /^cigna/i, family: 'cigna', displayName: 'Cigna' },
+  { pattern: /^humana/i, family: 'humana', displayName: 'Humana' },
+  { pattern: /^kaiser/i, family: 'kaiser', displayName: 'Kaiser Permanente' },
+  { pattern: /^anthem/i, family: 'anthem', displayName: 'Anthem' },
+  { pattern: /^fidelis/i, family: 'fidelis', displayName: 'Fidelis Care' },
+  { pattern: /^medicare/i, family: 'medicare', displayName: 'Medicare' },
+  { pattern: /^medicaid/i, family: 'medicaid', displayName: 'Medicaid' },
+  { pattern: /^oscar/i, family: 'oscar', displayName: 'Oscar Health' },
+  { pattern: /^molina/i, family: 'molina', displayName: 'Molina Healthcare' },
+  { pattern: /^horizon/i, family: 'horizon', displayName: 'Horizon' },
+  { pattern: /^oxford/i, family: 'oxford', displayName: 'Oxford' },
+  { pattern: /^amerihealth/i, family: 'amerihealth', displayName: 'AmeriHealth' },
+  { pattern: /^tricare/i, family: 'tricare', displayName: 'TRICARE' },
+];
+
+function getCarrierFamily(planName: string): { family: string; displayName: string } {
+  for (const { pattern, family, displayName } of CARRIER_PATTERNS) {
+    if (pattern.test(planName)) {
+      return { family, displayName };
+    }
+  }
+  // Default: use the first word as the family
+  const firstWord = planName.split(/[\s-]/)[0] || planName;
+  return { family: firstWord.toLowerCase(), displayName: firstWord };
+}
+
+interface CarrierGroup {
+  family: string;
+  displayName: string;
+  plans: InsurancePlan[];
+}
 
 interface VerificationModalProps {
   isOpen: boolean;
@@ -76,10 +114,7 @@ function VerificationModal({ isOpen, onClose, plan, npi, providerName }: Verific
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
       <div className="absolute inset-0 bg-black/50" onClick={handleClose} />
-
-      {/* Modal */}
       <div className="relative bg-white dark:bg-slate-800 rounded-xl shadow-xl max-w-md w-full p-6">
         <button
           onClick={handleClose}
@@ -149,47 +184,96 @@ function VerificationModal({ isOpen, onClose, plan, npi, providerName }: Verific
   );
 }
 
-interface PlanCardProps {
+interface PlanRowProps {
   plan: InsurancePlan;
   onVerify: (plan: InsurancePlan) => void;
   showConfidence: boolean;
   isLast: boolean;
+  indented?: boolean;
 }
 
-function PlanCard({ plan, onVerify, showConfidence, isLast }: PlanCardProps) {
+function PlanRow({ plan, onVerify, showConfidence, isLast, indented = false }: PlanRowProps) {
   const isAccepted = plan.status === 'accepted';
 
   return (
-    <div className={`flex items-center justify-between py-3 ${!isLast ? 'border-b border-slate-100 dark:border-slate-700' : ''}`}>
-      <div className="flex items-center gap-3 min-w-0 flex-1">
+    <div className={`flex items-center justify-between py-2.5 ${!isLast ? 'border-b border-slate-100 dark:border-slate-700/50' : ''} ${indented ? 'pl-7' : ''}`}>
+      <div className="flex items-center gap-2.5 min-w-0 flex-1">
         {isAccepted ? (
-          <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+          <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
         ) : (
-          <HelpCircle className="w-5 h-5 text-slate-400 dark:text-slate-500 flex-shrink-0" />
+          <HelpCircle className="w-4 h-4 text-slate-400 dark:text-slate-500 flex-shrink-0" />
         )}
-        <span className="font-medium text-slate-900 dark:text-white truncate">{plan.name}</span>
+        <span className="text-sm text-slate-700 dark:text-slate-200 truncate">{plan.name}</span>
       </div>
 
-      <div className="flex items-center gap-3 flex-shrink-0 ml-2">
+      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
         <button
           onClick={() => onVerify(plan)}
-          className="px-3 py-1 text-xs font-medium text-[#137fec] border border-[#137fec] rounded-md hover:bg-[#137fec] hover:text-white transition-colors"
+          className="px-2.5 py-0.5 text-xs font-medium text-[#137fec] border border-[#137fec] rounded hover:bg-[#137fec] hover:text-white transition-colors"
         >
           Verify
         </button>
-        <span
-          className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-            isAccepted
-              ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-              : 'bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-300'
-          }`}
-        >
-          {isAccepted ? 'Accepted' : 'Unknown'}
-        </span>
         {showConfidence && (
-          <span className="text-sm text-slate-500 dark:text-slate-400 w-10 text-right">{plan.confidence}%</span>
+          <span className="text-xs text-slate-500 dark:text-slate-400 w-8 text-right">{plan.confidence}%</span>
         )}
       </div>
+    </div>
+  );
+}
+
+interface CarrierGroupSectionProps {
+  group: CarrierGroup;
+  isExpanded: boolean;
+  onToggle: () => void;
+  onVerify: (plan: InsurancePlan) => void;
+  showConfidence: boolean;
+  forceExpand?: boolean;
+}
+
+function CarrierGroupSection({ group, isExpanded, onToggle, onVerify, showConfidence, forceExpand }: CarrierGroupSectionProps) {
+  const shouldExpand = forceExpand || isExpanded;
+  const acceptedCount = group.plans.filter(p => p.status === 'accepted').length;
+
+  return (
+    <div className="border-b border-slate-200 dark:border-slate-700 last:border-b-0">
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between py-3 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors -mx-2 px-2 rounded"
+      >
+        <div className="flex items-center gap-2">
+          {shouldExpand ? (
+            <ChevronDown className="w-4 h-4 text-slate-400" />
+          ) : (
+            <ChevronRight className="w-4 h-4 text-slate-400" />
+          )}
+          <span className="font-medium text-slate-900 dark:text-white">{group.displayName}</span>
+          <span className="text-sm text-slate-500 dark:text-slate-400">
+            ({group.plans.length} {group.plans.length === 1 ? 'plan' : 'plans'})
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {acceptedCount > 0 && (
+            <span className="text-xs text-green-600 dark:text-green-400">
+              {acceptedCount} accepted
+            </span>
+          )}
+        </div>
+      </button>
+
+      {shouldExpand && (
+        <div className="pb-2">
+          {group.plans.map((plan, idx) => (
+            <PlanRow
+              key={plan.id}
+              plan={plan}
+              onVerify={onVerify}
+              showConfidence={showConfidence}
+              isLast={idx === group.plans.length - 1}
+              indented
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -219,7 +303,7 @@ export function InsuranceList({
   mainConfidenceScore
 }: InsuranceListProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [verifyingPlan, setVerifyingPlan] = useState<InsurancePlan | null>(null);
 
   const verifiedCount = plans.filter(p => p.status === 'accepted').length;
@@ -236,27 +320,69 @@ export function InsuranceList({
     setVerifyingPlan(plans[0] ?? null);
   };
 
-  // Sort plans alphabetically and filter based on search query
+  const toggleGroup = (family: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(family)) {
+        next.delete(family);
+      } else {
+        next.add(family);
+      }
+      return next;
+    });
+  };
+
+  // Filter plans based on search query
   const filteredPlans = useMemo(() => {
-    let sorted = [...plans].sort((a, b) => a.name.localeCompare(b.name));
-    if (!searchQuery.trim()) return sorted;
+    if (!searchQuery.trim()) return plans;
     const query = searchQuery.toLowerCase();
-    return sorted.filter(p => p.name.toLowerCase().includes(query));
+    return plans.filter(p => p.name.toLowerCase().includes(query));
   }, [plans, searchQuery]);
 
+  // Group plans by carrier family
+  const { groups, singlePlans } = useMemo(() => {
+    const familyMap = new Map<string, CarrierGroup>();
+
+    for (const plan of filteredPlans) {
+      const { family, displayName } = getCarrierFamily(plan.name);
+      const existing = familyMap.get(family);
+      if (existing) {
+        existing.plans.push(plan);
+      } else {
+        familyMap.set(family, { family, displayName, plans: [plan] });
+      }
+    }
+
+    // Separate into groups (2+ plans) and singles
+    const groups: CarrierGroup[] = [];
+    const singlePlans: InsurancePlan[] = [];
+
+    for (const group of familyMap.values()) {
+      if (group.plans.length >= 2) {
+        // Sort plans within group alphabetically
+        group.plans.sort((a, b) => a.name.localeCompare(b.name));
+        groups.push(group);
+      } else {
+        singlePlans.push(...group.plans);
+      }
+    }
+
+    // Sort groups by display name
+    groups.sort((a, b) => a.displayName.localeCompare(b.displayName));
+    // Sort single plans alphabetically
+    singlePlans.sort((a, b) => a.name.localeCompare(b.name));
+
+    return { groups, singlePlans };
+  }, [filteredPlans]);
+
   // Determine if we should show individual confidence scores
-  // Hide if all scores are the same as the main score
   const showIndividualConfidence = useMemo(() => {
     if (mainConfidenceScore === undefined) return true;
     return plans.some(p => p.confidence !== mainConfidenceScore);
   }, [plans, mainConfidenceScore]);
 
-  // Determine which plans to display
   const hasSearch = searchQuery.trim().length > 0;
-  const shouldCollapse = !hasSearch && !isExpanded && filteredPlans.length > INITIAL_DISPLAY_COUNT;
-  const displayedPlans = shouldCollapse
-    ? filteredPlans.slice(0, INITIAL_DISPLAY_COUNT)
-    : filteredPlans;
+  const totalGroupedPlans = groups.reduce((sum, g) => sum + g.plans.length, 0) + singlePlans.length;
 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
@@ -267,7 +393,7 @@ export function InsuranceList({
       </div>
 
       {/* Search Input */}
-      {plans.length > INITIAL_DISPLAY_COUNT && (
+      {plans.length > 5 && (
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
           <input
@@ -283,22 +409,45 @@ export function InsuranceList({
       {/* Results count when filtering */}
       {hasSearch && (
         <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-          Showing {filteredPlans.length} of {plans.length} plans
+          Showing {totalGroupedPlans} of {plans.length} plans
         </p>
       )}
 
-      {/* Plan list */}
-      <div className="divide-y-0">
-        {displayedPlans.length > 0 ? (
-          displayedPlans.map((plan, idx) => (
-            <PlanCard
-              key={plan.id}
-              plan={plan}
-              onVerify={handleVerify}
-              showConfidence={showIndividualConfidence}
-              isLast={idx === displayedPlans.length - 1}
-            />
-          ))
+      {/* Grouped Plan List */}
+      <div>
+        {totalGroupedPlans > 0 ? (
+          <>
+            {/* Carrier Groups */}
+            {groups.map(group => (
+              <CarrierGroupSection
+                key={group.family}
+                group={group}
+                isExpanded={expandedGroups.has(group.family)}
+                onToggle={() => toggleGroup(group.family)}
+                onVerify={handleVerify}
+                showConfidence={showIndividualConfidence}
+                forceExpand={hasSearch}
+              />
+            ))}
+
+            {/* Single Plans (Other Plans) */}
+            {singlePlans.length > 0 && (
+              <div className={groups.length > 0 ? 'mt-4 pt-4 border-t border-slate-200 dark:border-slate-700' : ''}>
+                {groups.length > 0 && (
+                  <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">Other Plans</p>
+                )}
+                {singlePlans.map((plan, idx) => (
+                  <PlanRow
+                    key={plan.id}
+                    plan={plan}
+                    onVerify={handleVerify}
+                    showConfidence={showIndividualConfidence}
+                    isLast={idx === singlePlans.length - 1}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         ) : (
           <p className="text-sm text-slate-500 dark:text-slate-400 py-4 text-center">
             No plans match "{searchQuery}"
@@ -306,29 +455,8 @@ export function InsuranceList({
         )}
       </div>
 
-      {/* Show more/less button */}
-      {!hasSearch && filteredPlans.length > INITIAL_DISPLAY_COUNT && (
-        <button
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="mt-3 w-full flex items-center justify-center gap-1 py-2 text-sm font-medium text-[#137fec] hover:text-[#0d6edb] transition-colors"
-        >
-          {isExpanded ? (
-            <>
-              Show less
-              <ChevronUp className="w-4 h-4" />
-            </>
-          ) : (
-            <>
-              Show all {filteredPlans.length} plans
-              <ChevronDown className="w-4 h-4" />
-            </>
-          )}
-        </button>
-      )}
-
       {/* Verification CTA */}
       <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-700">
-        {/* Last verified info */}
         <p className="text-sm text-slate-600 dark:text-slate-400 text-center mb-3">
           {formatLastVerified(lastVerifiedAt)}
         </p>
@@ -341,7 +469,6 @@ export function InsuranceList({
           Verify Insurance Acceptance
         </button>
 
-        {/* Social proof */}
         {verificationCount > 0 && (
           <p className="flex items-center justify-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 text-center mt-3">
             <Users className="w-3.5 h-3.5" />
