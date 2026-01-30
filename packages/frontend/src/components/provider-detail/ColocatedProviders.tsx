@@ -26,15 +26,16 @@ export function ColocatedProviders({ npi }: ColocatedProvidersProps) {
     setError(null);
     try {
       const result = await providerApi.getColocated(npi, { limit: 10 });
-      setColocatedProviders(result.providers);
-      setLocation(result.location);
-      setColocatedTotal(result.pagination.total);
+      setColocatedProviders(result.providers || []);
+      setLocation(result.location || null);
+      setColocatedTotal(result.pagination?.total ?? 0);
       setFetched(true);
     } catch (err) {
       // Use standardized error handling
       logError('ColocatedProviders.fetchColocatedProviders', err);
       const appError = toAppError(err);
       setError(getUserMessage(appError));
+      setFetched(true); // Mark as fetched even on error to stop showing skeleton
     } finally {
       setLoading(false);
     }
@@ -58,10 +59,16 @@ export function ColocatedProviders({ npi }: ColocatedProvidersProps) {
     return () => observer.disconnect();
   }, [npi, fetched]);
 
+  // Don't render anything if fetched and no colocated providers (or error)
+  // This keeps the page clean instead of showing an empty section
+  if (fetched && !loading && (error || colocatedTotal === 0)) {
+    return null;
+  }
+
   return (
     <div ref={sectionRef}>
-      {/* Loading state */}
-      {(loading || (!fetched && !error)) && (
+      {/* Loading state - only show when actively loading */}
+      {loading && (
         <div className="card !p-4 sm:!p-6" role="status" aria-label="Loading colocated providers">
           <span className="sr-only">Loading other providers at this location...</span>
           <h2 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white mb-4">
@@ -74,49 +81,6 @@ export function ColocatedProviders({ npi }: ColocatedProvidersProps) {
                 <Shimmer className="h-4 w-1/2" />
               </div>
             ))}
-          </div>
-        </div>
-      )}
-
-      {/* Error state */}
-      {!loading && error && (
-        <div className="card !p-4 sm:!p-6">
-          <h2 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white mb-4">
-            Other Providers at This Location
-          </h2>
-          <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-            <div className="flex items-start gap-3">
-              <svg className="w-5 h-5 text-yellow-600 dark:text-yellow-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <div>
-                <p className="text-sm text-yellow-800 dark:text-yellow-200">{error}</p>
-                <button
-                  onClick={() => { setFetched(false); fetchColocatedProviders(); }}
-                  className="text-sm font-medium text-yellow-700 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-300 mt-2"
-                >
-                  Try again
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Zero colocated providers */}
-      {!loading && !error && fetched && colocatedTotal === 0 && (
-        <div className="card !p-4 sm:!p-6">
-          <h2 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white mb-4">
-            Other Providers at This Location
-          </h2>
-          <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg text-center">
-            <svg className="w-10 h-10 text-gray-400 dark:text-gray-500 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            <p className="text-gray-600 dark:text-gray-300 font-medium">
-              This is the only provider at this location
-            </p>
           </div>
         </div>
       )}
