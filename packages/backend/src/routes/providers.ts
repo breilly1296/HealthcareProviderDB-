@@ -10,7 +10,7 @@ import {
   getCitiesByState,
 } from '../services/providerService';
 import { enrichAcceptanceWithConfidence } from '../services/confidenceService';
-import { getColocatedProviders } from '../services/locationService';
+import { getColocatedProviders, getLocationDisplayName } from '../services/locationService';
 import { paginationSchema, npiParamSchema } from '../schemas/commonSchemas';
 import { buildPaginationMeta, sendSuccess } from '../utils/responseHelpers';
 import { cacheGet, cacheSet, generateSearchCacheKey } from '../utils/cache';
@@ -295,7 +295,10 @@ router.get(
     res.json({
       success: true,
       data: {
-        location: result.location,
+        location: result.location ? {
+          ...result.location,
+          displayName: getLocationDisplayName(result.location),
+        } : null,
         providers: result.providers.map((p) => ({
           id: p.npi,
           npi: p.npi,

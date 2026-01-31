@@ -7,6 +7,9 @@ import {
   addAndCondition,
 } from './utils';
 
+// Re-export getLocationDisplayName from enrichment service for convenience
+export { getLocationDisplayName } from './locationEnrichment';
+
 export interface LocationSearchParams {
   search?: string;
   state?: string;

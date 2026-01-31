@@ -7,6 +7,7 @@ import {
   getLocationById,
   getLocationStatsByState,
   getHealthSystems,
+  getLocationDisplayName,
 } from '../services/locationService';
 import { getProviderDisplayName } from '../services/providerService';
 import { paginationSchema, stateQuerySchema } from '../schemas/commonSchemas';
@@ -57,7 +58,10 @@ router.get(
     res.json({
       success: true,
       data: {
-        locations: result.locations,
+        locations: result.locations.map((loc) => ({
+          ...loc,
+          displayName: getLocationDisplayName(loc),
+        })),
         pagination: buildPaginationMeta(result.total, result.page, result.limit),
       },
     });
@@ -116,7 +120,12 @@ router.get(
       throw AppError.notFound(`Location with ID ${locationId} not found`);
     }
 
-    sendSuccess(res, { location: result.location });
+    sendSuccess(res, {
+      location: {
+        ...result.location,
+        displayName: getLocationDisplayName(result.location),
+      },
+    });
   })
 );
 
@@ -144,7 +153,10 @@ router.get(
     res.json({
       success: true,
       data: {
-        location: result.location,
+        location: {
+          ...result.location,
+          displayName: getLocationDisplayName(result.location),
+        },
         providers: result.providers.map((p) => ({
           id: p.npi,
           npi: p.npi,
