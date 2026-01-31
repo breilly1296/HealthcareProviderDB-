@@ -1,5 +1,4 @@
 import { Request, Response, NextFunction } from 'express';
-import { randomUUID } from 'crypto';
 
 /**
  * Request log entry structure
@@ -71,28 +70,16 @@ export { logger };
 const logBuffer: RequestLogEntry[] = [];
 const MAX_BUFFER_SIZE = 1000;
 
-// Extend Express Request to include requestId
-declare global {
-  namespace Express {
-    interface Request {
-      requestId: string;
-    }
-  }
-}
+// Note: req.id is provided by requestId middleware
 
 /**
  * Request logging middleware
- * - Generates unique request ID for correlation
  * - Tracks API usage without logging PII
- * - Adds X-Request-ID header to responses
+ * - Uses req.id from requestId middleware for correlation
  */
 export function requestLogger(req: Request, res: Response, next: NextFunction): void {
-  // Generate unique request ID
-  const requestId = req.headers['x-request-id'] as string || randomUUID();
-  req.requestId = requestId;
-
-  // Add request ID to response headers for client-side correlation
-  res.setHeader('X-Request-ID', requestId);
+  // Use request ID from requestId middleware
+  const requestId = req.id;
 
   const startTime = Date.now();
 

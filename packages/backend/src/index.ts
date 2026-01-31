@@ -7,6 +7,7 @@ import routes from './routes';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { defaultRateLimiter } from './middleware/rateLimiter';
 import { requestLogger } from './middleware/requestLogger';
+import requestIdMiddleware from './middleware/requestId';
 
 // Load environment variables
 dotenv.config();
@@ -30,6 +31,9 @@ if (process.env.NODE_ENV === 'development') {
 // Trust proxy for Cloud Run (required for correct client IP in rate limiting)
 // Set to 1 to trust only the first proxy (Cloud Run's load balancer)
 app.set('trust proxy', 1);
+
+// Request ID middleware for log correlation (must be early in the chain)
+app.use(requestIdMiddleware);
 
 // Security middleware with strict CSP for JSON API
 // This backend serves only JSON responses (no HTML), so we use a restrictive policy
