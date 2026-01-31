@@ -74,9 +74,9 @@ app.use(cors({
   credentials: true,
 }));
 
-// Body parsing
-app.use(express.json({ limit: '10kb' }));
-app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+// Body parsing with size limits to prevent large payload attacks
+app.use(express.json({ limit: '100kb' }));
+app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 
 // Health check endpoint - BEFORE rate limiter so monitoring tools aren't blocked
 app.get('/health', async (req: Request, res: Response) => {

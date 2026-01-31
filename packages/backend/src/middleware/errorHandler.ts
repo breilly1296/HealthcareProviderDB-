@@ -114,6 +114,19 @@ export function errorHandler(
     return;
   }
 
+  // Handle payload too large errors (413)
+  if (err.name === 'PayloadTooLargeError' || (err as { type?: string }).type === 'entity.too.large') {
+    res.status(413).json({
+      success: false,
+      error: {
+        message: 'Request payload too large',
+        code: 'PAYLOAD_TOO_LARGE',
+        statusCode: 413,
+      },
+    });
+    return;
+  }
+
   // Handle Prisma errors
   if (err.name === 'PrismaClientKnownRequestError') {
     const prismaError = err as unknown as { code: string; meta?: Record<string, unknown> };
