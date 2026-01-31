@@ -13,6 +13,8 @@ import {
 import { enrichAcceptanceWithConfidence } from '../services/confidenceService';
 import { npiParamSchema, planIdParamSchema } from '../schemas/commonSchemas';
 import { sendSuccess } from '../utils/responseHelpers';
+import { invalidateSearchCache } from '../utils/cache';
+import logger from '../utils/logger';
 
 const router = Router();
 
@@ -46,6 +48,8 @@ const recentQuerySchema = z.object({
 /**
  * POST /api/v1/verify
  * Submit a new verification with full confidence breakdown
+ *
+ * Note: Invalidates search cache to ensure fresh data is returned.
  */
 router.post(
   '/',
@@ -58,6 +62,12 @@ router.post(
       ...body,
       sourceIp: req.ip,
       userAgent: req.get('User-Agent'),
+    });
+
+    // Invalidate search cache to ensure fresh data
+    // Run async but don't block the response
+    invalidateSearchCache().catch((err) => {
+      logger.warn({ err }, 'Failed to invalidate search cache after verification');
     });
 
     res.status(201).json({

@@ -10,6 +10,7 @@ import { requestLogger } from './middleware/requestLogger';
 import requestIdMiddleware from './middleware/requestId';
 import httpLogger from './middleware/httpLogger';
 import logger from './utils/logger';
+import { getCacheStats } from './utils/cache';
 
 // Load environment variables
 dotenv.config();
@@ -89,6 +90,8 @@ app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 
 // Health check endpoint - BEFORE rate limiter so monitoring tools aren't blocked
 app.get('/health', async (req: Request, res: Response) => {
+  const cacheStats = getCacheStats();
+
   const health = {
     status: 'ok' as 'ok' | 'degraded',
     timestamp: new Date().toISOString(),
@@ -101,6 +104,15 @@ app.get('/health', async (req: Request, res: Response) => {
     },
     checks: {
       database: 'unknown' as 'healthy' | 'unhealthy' | 'unknown',
+    },
+    cache: {
+      hits: cacheStats.hits,
+      misses: cacheStats.misses,
+      size: cacheStats.size,
+      mode: cacheStats.mode,
+      hitRate: cacheStats.hits + cacheStats.misses > 0
+        ? `${((cacheStats.hits / (cacheStats.hits + cacheStats.misses)) * 100).toFixed(1)}%`
+        : '0%',
     },
   };
 

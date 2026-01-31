@@ -13,6 +13,8 @@ import { enrichAcceptanceWithConfidence } from '../services/confidenceService';
 import { getColocatedProviders } from '../services/locationService';
 import { paginationSchema, npiParamSchema } from '../schemas/commonSchemas';
 import { buildPaginationMeta, sendSuccess } from '../utils/responseHelpers';
+import { cacheGet, cacheSet, generateSearchCacheKey } from '../utils/cache';
+import logger from '../utils/logger';
 
 const router = Router();
 
@@ -38,12 +40,53 @@ const plansQuerySchema = z.object({
 /**
  * GET /api/v1/providers/search
  * Search providers with filters
+ *
+ * Caching: Results are cached for 5 minutes to improve performance.
+ * Cache is invalidated when new verifications are submitted.
  */
 router.get(
   '/search',
   searchRateLimiter,
   asyncHandler(async (req, res) => {
     const query = searchQuerySchema.parse(req.query);
+
+    // Generate cache key from search params
+    const cacheKey = generateSearchCacheKey({
+      state: query.state,
+      city: query.city,
+      cities: query.cities,
+      zipCode: query.zipCode,
+      healthSystem: query.healthSystem,
+      specialty: query.specialty,
+      name: query.name,
+      npi: query.npi,
+      entityType: query.entityType,
+      insurancePlanId: query.insurancePlanId,
+      page: query.page,
+      limit: query.limit,
+    });
+
+    // Check cache first
+    interface CachedSearchResult {
+      providers: Array<Record<string, unknown>>;
+      pagination: ReturnType<typeof buildPaginationMeta>;
+    }
+
+    const cachedResult = await cacheGet<CachedSearchResult>(cacheKey);
+
+    if (cachedResult) {
+      logger.debug({ cacheKey }, 'Search cache hit');
+      res.setHeader('X-Cache', 'HIT');
+      res.json({
+        success: true,
+        data: cachedResult,
+      });
+      return;
+    }
+
+    // Cache miss - query database
+    logger.debug({ cacheKey }, 'Search cache miss');
+    res.setHeader('X-Cache', 'MISS');
 
     const result = await searchProviders({
       state: query.state,
@@ -60,61 +103,69 @@ router.get(
       limit: query.limit,
     });
 
+    // Transform result for response
+    const responseData = {
+      providers: result.providers.map((p) => {
+        // Get highest confidence score from accepted plans
+        // Type assertion needed because Prisma include types aren't reflected in service return type
+        const providerWithPlans = p as typeof p & {
+          planAcceptances?: Array<{
+            id: number;
+            planId: string | null;
+            acceptanceStatus: string;
+            confidenceScore: number;
+            plan?: { planId: string; planName: string | null; issuerName: string | null } | null;
+          }>;
+        };
+        const acceptedPlans = providerWithPlans.planAcceptances || [];
+        const highestConfidence = acceptedPlans.length > 0
+          ? Math.max(...acceptedPlans.map((pa) => pa.confidenceScore))
+          : null;
+
+        return {
+          id: p.npi,
+          npi: p.npi,
+          entityType: p.entityType,
+          firstName: p.firstName,
+          lastName: p.lastName,
+          middleName: null,
+          credential: p.credential,
+          organizationName: p.organizationName,
+          addressLine1: p.addressLine1,
+          addressLine2: p.addressLine2,
+          city: p.city,
+          state: p.state,
+          zip: p.zipCode,
+          phone: p.phone,
+          // Map backend fields to frontend expected names
+          taxonomyCode: p.specialtyCode,
+          taxonomyDescription: p.specialty,
+          specialtyCategory: null,
+          npiStatus: 'ACTIVE',
+          displayName: getProviderDisplayName(p),
+          // Include confidence and plan data for card preview
+          confidenceScore: highestConfidence,
+          planAcceptances: acceptedPlans.map((pa) => ({
+            id: pa.id,
+            planId: pa.planId,
+            planName: pa.plan?.planName || null,
+            issuerName: pa.plan?.issuerName || null,
+            acceptanceStatus: pa.acceptanceStatus,
+            confidenceScore: pa.confidenceScore,
+          })),
+        };
+      }),
+      pagination: buildPaginationMeta(result.total, result.page, result.limit),
+    };
+
+    // Only cache if we have results
+    if (result.providers.length > 0) {
+      await cacheSet(cacheKey, responseData, 300); // 5 minute TTL
+    }
+
     res.json({
       success: true,
-      data: {
-        providers: result.providers.map((p) => {
-          // Get highest confidence score from accepted plans
-          // Type assertion needed because Prisma include types aren't reflected in service return type
-          const providerWithPlans = p as typeof p & {
-            planAcceptances?: Array<{
-              id: number;
-              planId: string | null;
-              acceptanceStatus: string;
-              confidenceScore: number;
-              plan?: { planId: string; planName: string | null; issuerName: string | null } | null;
-            }>;
-          };
-          const acceptedPlans = providerWithPlans.planAcceptances || [];
-          const highestConfidence = acceptedPlans.length > 0
-            ? Math.max(...acceptedPlans.map((pa) => pa.confidenceScore))
-            : null;
-
-          return {
-            id: p.npi,
-            npi: p.npi,
-            entityType: p.entityType,
-            firstName: p.firstName,
-            lastName: p.lastName,
-            middleName: null,
-            credential: p.credential,
-            organizationName: p.organizationName,
-            addressLine1: p.addressLine1,
-            addressLine2: p.addressLine2,
-            city: p.city,
-            state: p.state,
-            zip: p.zipCode,
-            phone: p.phone,
-            // Map backend fields to frontend expected names
-            taxonomyCode: p.specialtyCode,
-            taxonomyDescription: p.specialty,
-            specialtyCategory: null,
-            npiStatus: 'ACTIVE',
-            displayName: getProviderDisplayName(p),
-            // Include confidence and plan data for card preview
-            confidenceScore: highestConfidence,
-            planAcceptances: acceptedPlans.map((pa) => ({
-              id: pa.id,
-              planId: pa.planId,
-              planName: pa.plan?.planName || null,
-              issuerName: pa.plan?.issuerName || null,
-              acceptanceStatus: pa.acceptanceStatus,
-              confidenceScore: pa.confidenceScore,
-            })),
-          };
-        }),
-        pagination: buildPaginationMeta(result.total, result.page, result.limit),
-      },
+      data: responseData,
     });
   })
 );
