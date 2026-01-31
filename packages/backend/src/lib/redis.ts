@@ -18,6 +18,7 @@
  */
 
 import Redis from 'ioredis';
+import logger from '../utils/logger';
 
 // Singleton state
 let redisClient: Redis | null = null;
@@ -38,12 +39,12 @@ export function getRedisClient(): Redis | null {
 
   const redisUrl = process.env.REDIS_URL;
   if (!redisUrl) {
-    console.log('[Redis] REDIS_URL not configured - Redis features disabled');
+    logger.info('REDIS_URL not configured - Redis features disabled');
     return null;
   }
 
   try {
-    console.log('[Redis] Initializing connection...');
+    logger.info('Initializing Redis connection');
 
     redisClient = new Redis(redisUrl, {
       // Connection settings
@@ -54,11 +55,11 @@ export function getRedisClient(): Redis | null {
       // Retry strategy with exponential backoff
       retryStrategy: (times) => {
         if (times > 5) {
-          console.error(`[Redis] Max reconnection attempts (${times}) reached, giving up`);
+          logger.error({ attempts: times }, 'Redis max reconnection attempts reached, giving up');
           return null; // Stop retrying
         }
         const delay = Math.min(times * 200, 3000);
-        console.log(`[Redis] Reconnecting in ${delay}ms (attempt ${times})...`);
+        logger.info({ delay, attempt: times }, 'Redis reconnecting');
         return delay;
       },
 
@@ -69,38 +70,36 @@ export function getRedisClient(): Redis | null {
 
     // Connection event handlers
     redisClient.on('connect', () => {
-      console.log('[Redis] TCP connection established');
+      logger.info('Redis TCP connection established');
     });
 
     redisClient.on('ready', () => {
       isConnected = true;
-      console.log('[Redis] Ready - accepting commands');
+      logger.info('Redis ready - accepting commands');
     });
 
     redisClient.on('error', (err) => {
-      // Only log once per error type to avoid spam
-      console.error('[Redis] Error:', err.message);
+      logger.error({ err }, 'Redis error');
       isConnected = false;
     });
 
     redisClient.on('close', () => {
-      console.warn('[Redis] Connection closed');
+      logger.warn('Redis connection closed');
       isConnected = false;
     });
 
     redisClient.on('reconnecting', (delay: number) => {
-      console.log(`[Redis] Reconnecting in ${delay}ms...`);
+      logger.info({ delay }, 'Redis reconnecting');
     });
 
     redisClient.on('end', () => {
-      console.log('[Redis] Connection ended');
+      logger.info('Redis connection ended');
       isConnected = false;
     });
 
     return redisClient;
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[Redis] Failed to initialize client:', message);
+    logger.error({ error }, 'Failed to initialize Redis client');
     redisClient = null;
     return null;
   }
@@ -134,12 +133,12 @@ export function getRedisStatus(): {
  */
 export async function closeRedisConnection(): Promise<void> {
   if (redisClient) {
-    console.log('[Redis] Closing connection...');
+    logger.info('Closing Redis connection');
     try {
       await redisClient.quit();
-      console.log('[Redis] Connection closed gracefully');
+      logger.info('Redis connection closed gracefully');
     } catch (error) {
-      console.error('[Redis] Error during shutdown, forcing disconnect');
+      logger.error({ error }, 'Redis error during shutdown, forcing disconnect');
       redisClient.disconnect();
     }
     redisClient = null;

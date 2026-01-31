@@ -7,6 +7,7 @@ import {
   cleanWhereClause,
   addAndCondition,
 } from './utils';
+import logger from '../utils/logger';
 
 /**
  * Common medical prefixes and suffixes to strip from name searches
@@ -181,7 +182,7 @@ export async function searchProviders(params: ProviderSearchParams): Promise<Pro
 
   // Debug logging for insurance plan filter
   if (insurancePlanId) {
-    console.log('[Provider Search] Insurance plan filter:', { insurancePlanId });
+    logger.debug({ insurancePlanId }, 'Provider search with insurance plan filter');
   }
 
   const where: Prisma.ProviderWhereInput = { AND: [] };

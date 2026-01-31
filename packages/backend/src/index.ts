@@ -8,6 +8,8 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { defaultRateLimiter } from './middleware/rateLimiter';
 import { requestLogger } from './middleware/requestLogger';
 import requestIdMiddleware from './middleware/requestId';
+import httpLogger from './middleware/httpLogger';
+import logger from './utils/logger';
 
 // Load environment variables
 dotenv.config();
@@ -34,6 +36,9 @@ app.set('trust proxy', 1);
 
 // Request ID middleware for log correlation (must be early in the chain)
 app.use(requestIdMiddleware);
+
+// HTTP request logging with pino
+app.use(httpLogger);
 
 // Security middleware with strict CSP for JSON API
 // This backend serves only JSON responses (no HTML), so we use a restrictive policy
@@ -69,7 +74,7 @@ app.use(cors({
       callback(null, true);
     } else {
       // Log blocked CORS attempts for monitoring
-      console.warn(`[CORS] Blocked request from origin: ${origin}`);
+      logger.warn({ origin }, 'CORS blocked request from origin');
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -166,27 +171,26 @@ app.use(errorHandler);
 
 // Start server
 const server = app.listen(PORT, () => {
-  console.log(`
-╔════════════════════════════════════════════════════════════╗
-║           HealthcareProviderDB API v1.0.0                  ║
-╠════════════════════════════════════════════════════════════╣
-║  Server:     http://localhost:${PORT}                         ║
-║  Health:     http://localhost:${PORT}/health                  ║
-║  API Docs:   http://localhost:${PORT}/                        ║
-║  Environment: ${(process.env.NODE_ENV || 'development').padEnd(42)}║
-╚════════════════════════════════════════════════════════════╝
-  `);
+  logger.info({
+    port: PORT,
+    environment: process.env.NODE_ENV || 'development',
+    urls: {
+      server: `http://localhost:${PORT}`,
+      health: `http://localhost:${PORT}/health`,
+      docs: `http://localhost:${PORT}/`,
+    },
+  }, 'HealthcareProviderDB API v1.0.0 started');
 });
 
 // Graceful shutdown with timeout protection
 const SHUTDOWN_TIMEOUT_MS = 10000;
 
 const shutdown = async (signal: string) => {
-  console.log(`\n${signal} received. Shutting down gracefully...`);
+  logger.info({ signal }, 'Shutdown signal received, shutting down gracefully');
 
   // Set a timeout to force exit if graceful shutdown takes too long
   const forceExitTimer = setTimeout(() => {
-    console.error('Graceful shutdown timed out, forcing exit');
+    logger.error('Graceful shutdown timed out, forcing exit');
     process.exit(1);
   }, SHUTDOWN_TIMEOUT_MS);
 
@@ -198,16 +202,16 @@ const shutdown = async (signal: string) => {
         else resolve();
       });
     });
-    console.log('HTTP server closed');
+    logger.info('HTTP server closed');
 
     // Then disconnect from database
     await prisma.$disconnect();
-    console.log('Database disconnected');
+    logger.info('Database disconnected');
 
     clearTimeout(forceExitTimer);
     process.exit(0);
   } catch (error) {
-    console.error('Error during shutdown:', error);
+    logger.error({ error }, 'Error during shutdown');
     clearTimeout(forceExitTimer);
     process.exit(1);
   }

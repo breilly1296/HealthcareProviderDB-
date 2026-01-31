@@ -7,6 +7,7 @@ import {
   CAPTCHA_FALLBACK_WINDOW_MS,
   RATE_LIMIT_CLEANUP_INTERVAL_MS,
 } from '../config/constants';
+import logger from '../utils/logger';
 
 /**
  * CAPTCHA Verification Middleware (Google reCAPTCHA v3)
@@ -55,7 +56,7 @@ if (process.env.NODE_ENV !== 'development' && process.env.NODE_ENV !== 'test') {
   const failModeDescription = CAPTCHA_FAIL_MODE === 'open'
     ? 'requests allowed with fallback rate limiting if Google API fails'
     : 'requests blocked if Google API fails';
-  console.log(`[CAPTCHA] Fail mode: ${CAPTCHA_FAIL_MODE} (${failModeDescription})`);
+  logger.info({ failMode: CAPTCHA_FAIL_MODE, description: failModeDescription }, 'CAPTCHA fail mode configured');
 }
 
 // Fallback rate limiting when CAPTCHA fails (much stricter than normal)
@@ -123,10 +124,10 @@ export async function verifyCaptcha(req: Request, res: Response, next: NextFunct
 
   // Skip if CAPTCHA not configured (but log warning)
   if (!RECAPTCHA_SECRET) {
-    console.warn('[CAPTCHA] Not configured - RECAPTCHA_SECRET_KEY missing. Skipping verification.', {
+    logger.warn({
       endpoint: req.path,
       method: req.method,
-    });
+    }, 'CAPTCHA not configured - RECAPTCHA_SECRET_KEY missing, skipping verification');
     return next();
   }
 
@@ -159,24 +160,24 @@ export async function verifyCaptcha(req: Request, res: Response, next: NextFunct
     const data = (await response.json()) as RecaptchaResponse;
 
     if (!data.success) {
-      console.warn('[CAPTCHA] Verification failed', {
+      logger.warn({
         ip: clientIp,
         errors: data['error-codes'],
         action: data.action,
         endpoint: req.path,
-      });
+      }, 'CAPTCHA verification failed');
       return next(AppError.badRequest('CAPTCHA verification failed'));
     }
 
     // reCAPTCHA v3 returns a score (0.0 - 1.0)
     if (data.score !== undefined && data.score < CAPTCHA_MIN_SCORE) {
-      console.warn('[CAPTCHA] Low score - possible bot', {
+      logger.warn({
         ip: clientIp,
         score: data.score,
         threshold: CAPTCHA_MIN_SCORE,
         action: data.action,
         endpoint: req.path,
-      });
+      }, 'CAPTCHA low score - possible bot');
       return next(AppError.forbidden('Request blocked due to suspicious activity'));
     }
 
@@ -187,21 +188,20 @@ export async function verifyCaptcha(req: Request, res: Response, next: NextFunct
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     const isTimeout = error instanceof Error && error.name === 'AbortError';
 
-    console.error('[CAPTCHA] Google API error - CAPTCHA verification unavailable', {
+    logger.error({
       ip: clientIp,
       error: errorMessage,
       isTimeout,
       failMode: CAPTCHA_FAIL_MODE,
       endpoint: req.path,
-      timestamp: new Date().toISOString(),
-    });
+    }, 'CAPTCHA Google API error - verification unavailable');
 
     if (CAPTCHA_FAIL_MODE === 'closed') {
       // FAIL-CLOSED: Block all requests when Google API unavailable
-      console.warn('[CAPTCHA] FAIL-CLOSED: Blocking request due to API unavailability', {
+      logger.warn({
         ip: clientIp,
         endpoint: req.path,
-      });
+      }, 'CAPTCHA FAIL-CLOSED: Blocking request due to API unavailability');
       return next(AppError.serviceUnavailable(
         'Security verification temporarily unavailable. Please try again in a few minutes.'
       ));
@@ -217,23 +217,23 @@ export async function verifyCaptcha(req: Request, res: Response, next: NextFunct
     res.setHeader('X-Fallback-RateLimit-Reset', Math.ceil(fallbackResult.resetAt / 1000));
 
     if (!fallbackResult.allowed) {
-      console.warn('[CAPTCHA] FAIL-OPEN: Fallback rate limit exceeded', {
+      logger.warn({
         ip: clientIp,
         limit: CAPTCHA_FALLBACK_MAX_REQUESTS,
         window: '1 hour',
         endpoint: req.path,
-      });
+      }, 'CAPTCHA FAIL-OPEN: Fallback rate limit exceeded');
       return next(AppError.tooManyRequests(
         'Too many requests while security verification is unavailable. Please try again later.'
       ));
     }
 
-    console.warn('[CAPTCHA] FAIL-OPEN: Allowing request with fallback rate limiting', {
+    logger.warn({
       ip: clientIp,
       remaining: fallbackResult.remaining,
       limit: CAPTCHA_FALLBACK_MAX_REQUESTS,
       endpoint: req.path,
-    });
+    }, 'CAPTCHA FAIL-OPEN: Allowing request with fallback rate limiting');
 
     next();
   }

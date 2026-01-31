@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { timingSafeEqual } from 'crypto';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { cleanupExpiredVerifications, getExpirationStats } from '../services/verificationService';
+import logger from '../utils/logger';
 
 const router = Router();
 
@@ -17,7 +18,7 @@ function adminAuthMiddleware(req: Request, res: Response, next: NextFunction) {
 
   // If ADMIN_SECRET is not configured, disable admin endpoints gracefully
   if (!adminSecret) {
-    console.warn('[Admin] ADMIN_SECRET not configured - admin endpoints disabled');
+    logger.warn('ADMIN_SECRET not configured - admin endpoints disabled');
     res.status(503).json({
       success: false,
       error: {
@@ -66,14 +67,14 @@ router.post(
     const dryRun = req.query.dryRun === 'true';
     const batchSize = parseInt(req.query.batchSize as string) || 1000;
 
-    console.log(`[Admin] Cleanup expired verifications - dryRun: ${dryRun}, batchSize: ${batchSize}`);
+    logger.info({ dryRun, batchSize }, 'Admin cleanup expired verifications started');
 
     const result = await cleanupExpiredVerifications({
       dryRun,
       batchSize,
     });
 
-    console.log(`[Admin] Cleanup complete:`, result);
+    logger.info({ result }, 'Admin cleanup complete');
 
     res.json({
       success: true,

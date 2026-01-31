@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction, RequestHandler } from 'express';
+import logger from '../utils/logger';
 
 /**
  * Custom application error with status code
@@ -76,12 +77,12 @@ export function errorHandler(
   _next: NextFunction
 ): void {
   // Log error
-  console.error(`[${new Date().toISOString()}] Error:`, {
-    message: err.message,
-    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+  logger.error({
+    requestId: req.id,
+    err,
     path: req.path,
     method: req.method,
-  });
+  }, 'Request error');
 
   // Handle AppError
   if (err instanceof AppError) {

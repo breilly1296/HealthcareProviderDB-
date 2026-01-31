@@ -32,6 +32,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { getRedisClient, isRedisConnected } from '../lib/redis';
+import logger from '../utils/logger';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -168,7 +169,7 @@ function createRedisRateLimiter(options: RateLimiterOptions): RateLimiterMiddlew
 
     // If Redis is not connected, fail open (allow request with warning)
     if (!redis || !isRedisConnected()) {
-      console.warn(`[RateLimit:${name}] Redis unavailable, allowing request (fail-open)`);
+      logger.warn({ limiter: name }, 'Rate limiter Redis unavailable, allowing request (fail-open)');
       res.setHeader('X-RateLimit-Status', 'degraded');
       next();
       return;
@@ -202,7 +203,7 @@ function createRedisRateLimiter(options: RateLimiterOptions): RateLimiterMiddlew
 
       if (!results) {
         // Transaction failed, fail open
-        console.warn(`[RateLimit:${name}] Redis transaction failed, allowing request`);
+        logger.warn({ limiter: name }, 'Rate limiter Redis transaction failed, allowing request');
         res.setHeader('X-RateLimit-Status', 'degraded');
         next();
         return;
@@ -234,8 +235,7 @@ function createRedisRateLimiter(options: RateLimiterOptions): RateLimiterMiddlew
       next();
     } catch (error) {
       // Redis error - fail open to prioritize availability
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error(`[RateLimit:${name}] Redis error, allowing request:`, errorMessage);
+      logger.error({ limiter: name, error }, 'Rate limiter Redis error, allowing request');
       res.setHeader('X-RateLimit-Status', 'degraded');
       next();
     }
@@ -266,10 +266,10 @@ export function createRateLimiter(options: RateLimiterOptions): RateLimiterMiddl
   // Only log mode selection once per limiter
   if (!limiterModes.has(name)) {
     if (redis) {
-      console.log(`[RateLimit] "${name}" using Redis (distributed mode)`);
+      logger.info({ limiter: name, mode: 'redis' }, 'Rate limiter using Redis (distributed mode)');
       limiterModes.set(name, 'redis');
     } else {
-      console.log(`[RateLimit] "${name}" using in-memory (single-instance mode)`);
+      logger.info({ limiter: name, mode: 'memory' }, 'Rate limiter using in-memory (single-instance mode)');
       limiterModes.set(name, 'memory');
     }
   }

@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import pinoLogger from '../utils/logger';
 
 /**
  * Request log entry structure
@@ -19,51 +20,6 @@ interface RequestLogEntry {
 }
 
 /**
- * Structured logger for production environments
- * Outputs JSON logs that Cloud Run/Cloud Logging can parse automatically
- */
-const logger = {
-  info: (entry: RequestLogEntry) => {
-    if (process.env.NODE_ENV === 'production') {
-      // Structured JSON for cloud logging (GCP Cloud Logging, etc.)
-      console.log(JSON.stringify({
-        severity: 'INFO',
-        ...entry,
-      }));
-    } else {
-      // Colored console output for development
-      const statusColor = entry.statusCode >= 400 ? '\x1b[31m' : '\x1b[32m';
-      const resetColor = '\x1b[0m';
-      const rateLimitTag = entry.rateLimited ? ' [RATE LIMITED]' : '';
-      console.log(
-        `[${entry.requestId.slice(0, 8)}] ${statusColor}${entry.method}${resetColor} ${entry.path} - ${statusColor}${entry.statusCode}${resetColor} (${entry.responseTimeMs}ms)${rateLimitTag}`
-      );
-    }
-  },
-  warn: (message: string, data?: Record<string, unknown>) => {
-    if (process.env.NODE_ENV === 'production') {
-      console.log(JSON.stringify({ severity: 'WARNING', message, ...data }));
-    } else {
-      console.warn(`\x1b[33m[WARN]\x1b[0m ${message}`, data || '');
-    }
-  },
-  error: (message: string, error?: unknown, data?: Record<string, unknown>) => {
-    const errorDetails = error instanceof Error
-      ? { errorMessage: error.message, stack: error.stack }
-      : { errorMessage: String(error) };
-
-    if (process.env.NODE_ENV === 'production') {
-      console.log(JSON.stringify({ severity: 'ERROR', message, ...errorDetails, ...data }));
-    } else {
-      console.error(`\x1b[31m[ERROR]\x1b[0m ${message}`, errorDetails, data || '');
-    }
-  },
-};
-
-// Export logger for use in other modules
-export { logger };
-
-/**
  * In-memory log buffer for aggregation (development/debugging only)
  * In production, logs go to Cloud Logging via stdout
  */
@@ -78,8 +34,8 @@ const MAX_BUFFER_SIZE = 1000;
  * - Uses req.id from requestId middleware for correlation
  */
 export function requestLogger(req: Request, res: Response, next: NextFunction): void {
-  // Use request ID from requestId middleware
-  const requestId = req.id;
+  // Use request ID from requestId middleware (cast to string for type safety with pino-http)
+  const requestId = String(req.id);
 
   const startTime = Date.now();
 
@@ -116,8 +72,8 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
     // Add to buffer (for stats endpoint)
     addLogEntry(logEntry);
 
-    // Log to stdout (picked up by Cloud Logging in production)
-    logger.info(logEntry);
+    // Log to stdout using pino (picked up by Cloud Logging in production)
+    pinoLogger.info(logEntry, 'Request completed');
 
     // Call original end
     return originalEnd.apply(this, args);
