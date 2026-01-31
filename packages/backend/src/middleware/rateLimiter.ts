@@ -38,14 +38,11 @@ import logger from '../utils/logger';
 // TYPE DEFINITIONS
 // ============================================================================
 
-interface RateLimitEntry {
-  count: number;
-  resetAt: number;
-}
-
-interface RateLimitStore {
-  [key: string]: RateLimitEntry;
-}
+/**
+ * Sliding window store: Map of client keys to arrays of request timestamps.
+ * Each timestamp represents when a request was made within the current window.
+ */
+type SlidingWindowStore = Map<string, number[]>;
 
 interface RateLimiterOptions {
   windowMs: number;
@@ -62,24 +59,60 @@ type RateLimiterMiddleware = (req: Request, res: Response, next: NextFunction) =
 // IN-MEMORY RATE LIMITER (fallback for single-instance deployments)
 // ============================================================================
 
-// In-memory rate limit store
-const memoryStores: Map<string, RateLimitStore> = new Map();
+/**
+ * In-memory sliding window rate limit stores.
+ *
+ * SLIDING WINDOW ALGORITHM:
+ * ─────────────────────────
+ * Unlike fixed windows which reset at specific intervals (allowing burst attacks
+ * at window boundaries), sliding windows track individual request timestamps.
+ *
+ * For each request:
+ * 1. Filter out timestamps older than (now - windowMs)
+ * 2. Count remaining timestamps in the window
+ * 3. If count < maxRequests, add current timestamp and allow request
+ * 4. If count >= maxRequests, reject request
+ *
+ * Example with 10 req/hour limit:
+ * - Fixed window: User sends 10 requests at 12:59, window resets at 13:00,
+ *   user sends 10 more = 20 requests in 2 minutes (vulnerability)
+ * - Sliding window: Each request is tracked individually, so the 11th request
+ *   within ANY 60-minute period is rejected (secure)
+ *
+ * Trade-off: Sliding windows use more memory (O(n) per client where n = maxRequests)
+ * but provide more accurate rate limiting.
+ */
+const memoryStores: Map<string, SlidingWindowStore> = new Map();
 
 // Cleanup old entries periodically (every minute)
 setInterval(() => {
   const now = Date.now();
-  memoryStores.forEach((store) => {
-    Object.keys(store).forEach((key) => {
-      if (store[key].resetAt < now) {
-        delete store[key];
+  memoryStores.forEach((store, storeName) => {
+    // Get the window duration for this store (stored in limiter options)
+    // For cleanup, we use a conservative 1 hour max to catch most cases
+    const maxWindowMs = 60 * 60 * 1000; // 1 hour
+
+    store.forEach((timestamps, clientKey) => {
+      // Filter out timestamps older than the max window
+      const validTimestamps = timestamps.filter(ts => ts > now - maxWindowMs);
+
+      if (validTimestamps.length === 0) {
+        // No valid timestamps, remove the client entry entirely
+        store.delete(clientKey);
+      } else if (validTimestamps.length < timestamps.length) {
+        // Update with filtered timestamps
+        store.set(clientKey, validTimestamps);
       }
     });
   });
 }, 60000);
 
 /**
- * Create an in-memory rate limiter (process-local).
- * Used when Redis is not available.
+ * Create an in-memory rate limiter using sliding window algorithm.
+ * Used when Redis is not available (single-instance deployments).
+ *
+ * This implementation mirrors the Redis sliding window approach but stores
+ * timestamps in memory instead of Redis sorted sets.
  */
 function createInMemoryRateLimiter(options: RateLimiterOptions): RateLimiterMiddleware {
   const {
@@ -93,7 +126,7 @@ function createInMemoryRateLimiter(options: RateLimiterOptions): RateLimiterMidd
 
   const storeName = name || `${windowMs}-${maxRequests}`;
   if (!memoryStores.has(storeName)) {
-    memoryStores.set(storeName, {});
+    memoryStores.set(storeName, new Map());
   }
   const store = memoryStores.get(storeName)!;
 
@@ -103,31 +136,31 @@ function createInMemoryRateLimiter(options: RateLimiterOptions): RateLimiterMidd
       return;
     }
 
-    const key = keyGenerator(req);
+    const clientKey = keyGenerator(req);
     const now = Date.now();
+    const windowStart = now - windowMs;
 
-    // Get or create entry
-    let entry = store[key];
-    if (!entry || entry.resetAt < now) {
-      entry = {
-        count: 0,
-        resetAt: now + windowMs,
-      };
-      store[key] = entry;
-    }
+    // Get existing timestamps for this client, or initialize empty array
+    let timestamps = store.get(clientKey) || [];
 
-    entry.count++;
+    // Sliding window: filter out timestamps outside the current window
+    timestamps = timestamps.filter(ts => ts > windowStart);
 
-    // Set rate limit headers
-    const remaining = Math.max(0, maxRequests - entry.count);
-    const resetTimestamp = Math.ceil(entry.resetAt / 1000);
-    const retryAfterSeconds = Math.ceil((entry.resetAt - now) / 1000);
+    // Count requests in current window
+    const requestCount = timestamps.length;
+
+    // Calculate rate limit headers
+    // For sliding window, "reset" is approximately when the oldest request expires
+    const oldestTimestamp = timestamps.length > 0 ? Math.min(...timestamps) : now;
+    const resetTimestamp = Math.ceil((oldestTimestamp + windowMs) / 1000);
+    const remaining = Math.max(0, maxRequests - requestCount);
+    const retryAfterSeconds = Math.ceil(windowMs / 1000);
 
     res.setHeader('X-RateLimit-Limit', maxRequests);
     res.setHeader('X-RateLimit-Remaining', remaining);
     res.setHeader('X-RateLimit-Reset', resetTimestamp);
 
-    if (entry.count > maxRequests) {
+    if (requestCount >= maxRequests) {
       res.setHeader('Retry-After', retryAfterSeconds);
       res.status(429).json({
         error: 'Too many requests',
@@ -136,6 +169,10 @@ function createInMemoryRateLimiter(options: RateLimiterOptions): RateLimiterMidd
       });
       return;
     }
+
+    // Add current request timestamp to the window
+    timestamps.push(now);
+    store.set(clientKey, timestamps);
 
     next();
   };
