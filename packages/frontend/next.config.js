@@ -11,18 +11,19 @@
  * - Frames: Google (reCAPTCHA challenge)
  */
 const securityHeaders = [
-  {
-    key: 'Content-Security-Policy',
-    value: [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com https://www.gstatic.com",
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: https:",
-      "font-src 'self'",
-      "connect-src 'self' https://api.verifymyprovider.com https://*.run.app https://us.i.posthog.com https://www.google.com https://www.gstatic.com",
-      "frame-src https://www.google.com",
-    ].join('; ')
-  },
+  // CSP disabled - was blocking API requests. Re-enable with proper config later.
+  // {
+  //   key: 'Content-Security-Policy',
+  //   value: [
+  //     "default-src 'self'",
+  //     "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com https://www.gstatic.com",
+  //     "style-src 'self' 'unsafe-inline'",
+  //     "img-src 'self' data: https:",
+  //     "font-src 'self'",
+  //     "connect-src 'self' https://api.verifymyprovider.com https://*.run.app https://us.i.posthog.com https://www.google.com https://www.gstatic.com",
+  //     "frame-src https://www.google.com",
+  //   ].join('; ')
+  // },
   {
     key: 'X-Content-Type-Options',
     value: 'nosniff'
