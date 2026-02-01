@@ -19,7 +19,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https:",
       "font-src 'self'",
-      "connect-src 'self' https://api.verifymyprovider.com https://verifymyprovider-backend-741434145252.us-central1.run.app https://www.google.com",
+      "connect-src 'self' https://api.verifymyprovider.com https://*.run.app https://us.i.posthog.com https://www.google.com https://www.gstatic.com",
       "frame-src https://www.google.com",
     ].join('; ')
   },
