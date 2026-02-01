@@ -1,12 +1,113 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { InsuranceCardData, InsuranceCardExtractionResponse } from '@/types/insurance';
+import type { InsuranceCardDataWithConfidence, InsuranceCardExtractionResponse, ExtractionConfidence } from '@/types/insurance';
 import { useError } from '@/context/ErrorContext';
+
+/**
+ * Confidence level indicator component
+ */
+function ConfidenceIndicator({ confidence, score }: { confidence: ExtractionConfidence; score: number }) {
+  const configs = {
+    high: {
+      label: 'High Confidence',
+      color: 'text-green-600 dark:text-green-400',
+      bgColor: 'bg-green-100 dark:bg-green-900/30',
+      barColor: 'bg-green-500',
+    },
+    medium: {
+      label: 'Medium Confidence',
+      color: 'text-yellow-600 dark:text-yellow-400',
+      bgColor: 'bg-yellow-100 dark:bg-yellow-900/30',
+      barColor: 'bg-yellow-500',
+    },
+    low: {
+      label: 'Low Confidence',
+      color: 'text-red-600 dark:text-red-400',
+      bgColor: 'bg-red-100 dark:bg-red-900/30',
+      barColor: 'bg-red-500',
+    },
+  };
+
+  const config = configs[confidence];
+
+  return (
+    <div className={`rounded-lg px-3 py-2 ${config.bgColor}`}>
+      <div className="flex items-center justify-between mb-1">
+        <span className={`text-sm font-medium ${config.color}`}>{config.label}</span>
+        <span className={`text-xs ${config.color}`}>{Math.round(score * 100)}%</span>
+      </div>
+      <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-1.5">
+        <div
+          className={`h-1.5 rounded-full ${config.barColor}`}
+          style={{ width: `${Math.round(score * 100)}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Suggestions component for improving extraction
+ */
+function ExtractionSuggestions({ suggestions }: { suggestions: string[] }) {
+  if (!suggestions || suggestions.length === 0) return null;
+
+  return (
+    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+      <div className="flex items-start gap-2">
+        <svg
+          className="w-5 h-5 text-blue-500 dark:text-blue-400 mt-0.5 flex-shrink-0"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
+        </svg>
+        <div>
+          <p className="font-medium text-blue-800 dark:text-blue-200 text-sm mb-1">Tips for better results</p>
+          <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
+            {suggestions.map((suggestion, index) => (
+              <li key={index} className="flex items-start gap-1">
+                <span className="text-blue-400 dark:text-blue-500">•</span>
+                {suggestion}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Card side indicator
+ */
+function CardSideIndicator({ side }: { side?: 'front' | 'back' | 'both' | 'unknown' }) {
+  if (!side || side === 'unknown') return null;
+
+  const labels = {
+    front: 'Front of Card',
+    back: 'Back of Card',
+    both: 'Both Sides',
+  };
+
+  return (
+    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+      {labels[side]}
+    </span>
+  );
+}
 
 export default function InsuranceCardUploader() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [extractedData, setExtractedData] = useState<InsuranceCardData | null>(null);
+  const [extractedData, setExtractedData] = useState<InsuranceCardDataWithConfidence | null>(null);
+  const [extractionResponse, setExtractionResponse] = useState<InsuranceCardExtractionResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -18,18 +119,19 @@ export default function InsuranceCardUploader() {
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      setValidationError('Please select an image file');
+      setValidationError('Please select an image file (JPEG, PNG, WebP, or GIF)');
       return;
     }
 
     // Validate file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
-      setValidationError('Image size must be less than 10MB');
+      setValidationError('Image size must be less than 10MB. Try taking a new photo at lower resolution.');
       return;
     }
 
     setValidationError(null);
     setExtractedData(null);
+    setExtractionResponse(null);
 
     // Convert to base64
     const reader = new FileReader();
@@ -55,12 +157,14 @@ export default function InsuranceCardUploader() {
       });
 
       const result: InsuranceCardExtractionResponse = await response.json();
+      setExtractionResponse(result);
 
       if (result.success && result.data) {
         setExtractedData(result.data);
       } else {
-        // Show API errors globally using the error banner
-        showErrorToast(new Error(result.error || 'Failed to extract insurance data'));
+        // Show user-friendly error message
+        const errorMessage = result.userMessage || result.error || 'Failed to extract insurance data';
+        showErrorToast(new Error(errorMessage));
       }
     } catch (err) {
       // Show network/unexpected errors globally
@@ -73,6 +177,7 @@ export default function InsuranceCardUploader() {
   const handleReset = () => {
     setSelectedImage(null);
     setExtractedData(null);
+    setExtractionResponse(null);
     setValidationError(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -115,6 +220,7 @@ export default function InsuranceCardUploader() {
             </svg>
             <p className="text-gray-600 dark:text-gray-300 mb-2">Click to upload or drag and drop</p>
             <p className="text-sm text-gray-500 dark:text-gray-400">PNG, JPG, WebP or GIF (max 10MB)</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">Your image will be processed securely and not stored</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -158,7 +264,7 @@ export default function InsuranceCardUploader() {
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     />
                   </svg>
-                  Extracting...
+                  Scanning card...
                 </>
               ) : (
                 <>
@@ -211,17 +317,68 @@ export default function InsuranceCardUploader() {
         </div>
       )}
 
+      {/* Extraction Failed with Suggestions */}
+      {extractionResponse && !extractionResponse.success && extractionResponse.suggestions && (
+        <div className="mb-6 space-y-4">
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 text-yellow-500 dark:text-yellow-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                />
+              </svg>
+              <div>
+                <p className="font-medium text-yellow-800 dark:text-yellow-200">
+                  {extractionResponse.userMessage || 'Could not extract insurance information'}
+                </p>
+              </div>
+            </div>
+          </div>
+          <ExtractionSuggestions suggestions={extractionResponse.suggestions} />
+        </div>
+      )}
+
       {/* Extracted Data */}
       {extractedData && (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
           <div className="bg-green-50 dark:bg-green-900/30 border-b border-green-100 dark:border-green-800 px-6 py-4">
-            <div className="flex items-center gap-2">
-              <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              <h3 className="font-semibold text-green-800 dark:text-green-200">Insurance Data Extracted</h3>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <h3 className="font-semibold text-green-800 dark:text-green-200">Insurance Data Extracted</h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <CardSideIndicator side={extractionResponse?.metadata?.cardType} />
+              </div>
             </div>
           </div>
+
+          {/* Confidence Indicator */}
+          {extractionResponse?.metadata && (
+            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+              <ConfidenceIndicator
+                confidence={extractionResponse.metadata.confidence}
+                score={extractionResponse.metadata.confidenceScore}
+              />
+              {extractionResponse.metadata.fieldsExtracted > 0 && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                  {extractionResponse.metadata.fieldsExtracted} of {extractionResponse.metadata.totalFields} fields extracted
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Suggestions for medium/low confidence */}
+          {extractionResponse?.suggestions && extractionResponse.suggestions.length > 0 && (
+            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+              <ExtractionSuggestions suggestions={extractionResponse.suggestions} />
+            </div>
+          )}
 
           <div className="p-6 space-y-6">
             {/* Plan Information */}
@@ -361,6 +518,13 @@ export default function InsuranceCardUploader() {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Manual Correction Note */}
+          <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700/50 border-t border-gray-100 dark:border-gray-700">
+            <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+              Please verify the extracted information. You can manually correct any errors when searching for providers.
+            </p>
           </div>
         </div>
       )}
