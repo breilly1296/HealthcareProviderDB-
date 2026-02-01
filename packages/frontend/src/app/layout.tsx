@@ -14,6 +14,7 @@ import { CompareProvider } from '@/context/CompareContext';
 import { ErrorProvider } from '@/context/ErrorContext';
 import { CompareBar } from '@/components/compare';
 import { GlobalErrorBanner } from '@/components/GlobalErrorBanner';
+import { Disclaimer } from '@/components/Disclaimer';
 
 // Script to prevent flash of wrong theme on page load
 const themeScript = `
@@ -94,6 +95,11 @@ function Footer() {
                   Privacy Policy
                 </Link>
               </li>
+              <li>
+                <Link href="/disclaimer" className="text-stone-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
+                  Data Disclaimer
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -118,14 +124,15 @@ function Footer() {
 
         <div className="border-t border-stone-300 dark:border-gray-700 mt-8 pt-8 text-center text-stone-500 dark:text-gray-400">
           <p>© {new Date().getFullYear()} VerifyMyProvider. All rights reserved.</p>
-          <p className="mt-2 text-sm">
-            Data sourced from CMS NPPES and community verifications.
-            Always confirm with providers directly.
+          <p className="mt-2 text-sm font-medium text-amber-700 dark:text-amber-400">
+            Data is crowdsourced and may not be accurate. Verify with providers directly.
           </p>
           <p className="mt-2 text-sm">
             <Link href="/terms" className="hover:text-primary-600 dark:hover:text-primary-400">Terms</Link>
             {' · '}
             <Link href="/privacy" className="hover:text-primary-600 dark:hover:text-primary-400">Privacy</Link>
+            {' · '}
+            <Link href="/disclaimer" className="hover:text-primary-600 dark:hover:text-primary-400">Disclaimer</Link>
           </p>
         </div>
       </div>
@@ -153,6 +160,7 @@ export default function RootLayout({
                     <ToastProvider />
                     <GlobalErrorBanner />
                     <Header />
+                    <Disclaimer variant="banner" />
                     <main className="flex-1 pb-20 md:pb-0">
                       {children}
                     </main>

@@ -18,6 +18,11 @@ import logger from '../utils/logger';
 
 const router = Router();
 
+/**
+ * Standard disclaimer for crowdsourced data accuracy
+ */
+const DATA_DISCLAIMER = 'This data is crowdsourced and may be inaccurate or outdated. Always verify insurance acceptance directly with the provider before scheduling an appointment.';
+
 // Validation schemas
 const searchQuerySchema = z.object({
   state: z.string().length(2).toUpperCase().optional(),
@@ -233,6 +238,7 @@ router.get(
           ),
         },
       },
+      disclaimer: DATA_DISCLAIMER,
     });
   })
 );
@@ -268,6 +274,7 @@ router.get(
         ),
         pagination: buildPaginationMeta(result.total, result.page, result.limit),
       },
+      disclaimer: DATA_DISCLAIMER,
     });
   })
 );

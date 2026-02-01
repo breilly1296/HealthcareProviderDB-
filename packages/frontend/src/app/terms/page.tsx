@@ -89,28 +89,59 @@ export default function TermsOfServicePage() {
 
             {/* User-Generated Content */}
             <div className="card mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
                 4. User-Generated Content
               </h2>
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
                 When you submit verifications or other content to our platform, you agree to:
               </p>
-              <ul className="list-disc pl-6 text-gray-600 space-y-2 mb-4">
+              <ul className="list-disc pl-6 text-gray-600 dark:text-gray-400 space-y-2 mb-4">
                 <li>Provide truthful and accurate information based on your actual experience</li>
                 <li>Not submit false, misleading, or spam content</li>
                 <li>Not impersonate others or misrepresent your experience</li>
-                <li>Grant us a license to display and use your submissions to improve our service</li>
+                <li>Grant us a perpetual, worldwide, royalty-free license to use, display, reproduce, and distribute your submissions</li>
+                <li>Represent that you have the right to submit the content</li>
               </ul>
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
                 We reserve the right to remove any content that violates these terms or appears
                 to be spam, abusive, or inaccurate.
               </p>
+
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mt-6 mb-3">
+                Indemnification for User Submissions
+              </h3>
+              <p className="text-gray-600 dark:text-gray-300">
+                You agree to indemnify and hold harmless VerifyMyProvider from any claims, damages,
+                or expenses arising from your submissions, including claims that your content
+                is false, defamatory, or infringes on third-party rights.
+              </p>
+            </div>
+
+            {/* Prohibited Uses */}
+            <div className="card mb-8">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                5. Prohibited Uses
+              </h2>
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
+                You agree NOT to:
+              </p>
+              <ul className="list-disc pl-6 text-gray-600 dark:text-gray-400 space-y-2">
+                <li>Submit false or misleading verification data</li>
+                <li>Use automated systems (bots, scrapers) to access our service without permission</li>
+                <li>Attempt to bypass rate limits or security measures</li>
+                <li>Scrape or bulk download provider data</li>
+                <li>Use our service for commercial purposes without authorization</li>
+                <li>Harass, abuse, or harm others through our platform</li>
+                <li>Interfere with or disrupt our service or servers</li>
+                <li>Impersonate any person or entity</li>
+                <li>Collect personal information about other users</li>
+              </ul>
             </div>
 
             {/* Limitation of Liability */}
             <div className="card mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                5. Limitation of Liability
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                6. Limitation of Liability
               </h2>
               <p className="text-gray-600 mb-4">
                 VerifyMyProvider is provided "as is" without warranties of any kind. We are not
@@ -129,8 +160,8 @@ export default function TermsOfServicePage() {
 
             {/* Right to Remove/Modify */}
             <div className="card mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                6. Content Moderation
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                7. Content Moderation
               </h2>
               <p className="text-gray-600 mb-4">
                 We reserve the right to:
@@ -145,8 +176,8 @@ export default function TermsOfServicePage() {
 
             {/* Data Attribution */}
             <div className="card mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                7. Data Sources & Attribution
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                8. Data Sources & Attribution
               </h2>
               <p className="text-gray-600 mb-4">
                 Provider information is sourced from the CMS National Plan and Provider Enumeration
@@ -161,8 +192,8 @@ export default function TermsOfServicePage() {
 
             {/* Changes to Terms */}
             <div className="card mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                8. Changes to These Terms
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                9. Changes to These Terms
               </h2>
               <p className="text-gray-600">
                 We may update these Terms of Service from time to time. Continued use of our
@@ -173,8 +204,8 @@ export default function TermsOfServicePage() {
 
             {/* Governing Law */}
             <div className="card mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                9. Governing Law
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                10. Governing Law
               </h2>
               <p className="text-gray-600">
                 These Terms of Service and any disputes arising from your use of VerifyMyProvider
@@ -186,9 +217,9 @@ export default function TermsOfServicePage() {
             </div>
 
             {/* Contact */}
-            <div className="card mb-8 bg-gray-50">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                10. Contact Us
+            <div className="card mb-8 bg-gray-50 dark:bg-gray-800">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                11. Contact Us
               </h2>
               <p className="text-gray-600 mb-4">
                 If you have questions about these Terms of Service, please contact us:

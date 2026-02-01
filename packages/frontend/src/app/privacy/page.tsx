@@ -78,22 +78,52 @@ export default function PrivacyPolicyPage() {
               </ul>
             </div>
 
+            {/* Insurance Card Scanning */}
+            <div className="card mb-8 border-l-4 border-l-blue-500">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                2. Insurance Card Scanning
+              </h2>
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
+                When you use our insurance card scanning feature:
+              </p>
+              <ul className="list-disc pl-6 text-gray-600 dark:text-gray-300 space-y-2 mb-4">
+                <li>
+                  <strong>Images are NOT stored:</strong> Card images are processed in memory only
+                  and immediately discarded after extraction
+                </li>
+                <li>
+                  <strong>AI processing:</strong> Images are sent to Anthropic's Claude API for text
+                  extraction; they do not retain images per their data policy
+                </li>
+                <li>
+                  <strong>Extracted text:</strong> Only the extracted plan information (plan name,
+                  network) is returned to your browser; we do not store member IDs or personal details
+                </li>
+              </ul>
+              <p className="text-gray-600 dark:text-gray-300 text-sm">
+                <strong>Your data stays private:</strong> We never see, store, or have access to your
+                insurance card images or member ID numbers after processing.
+              </p>
+            </div>
+
             {/* What We Don't Collect */}
             <div className="card mb-8 border-l-4 border-l-green-500">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                2. What We Don't Collect
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                3. What We Don't Collect
               </h2>
-              <p className="text-gray-600 mb-4">
-                We are committed to minimal data collection. We do <strong className="text-gray-900">NOT</strong> collect:
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
+                We are committed to minimal data collection. We do <strong className="text-gray-900 dark:text-white">NOT</strong> collect:
               </p>
-              <ul className="list-disc pl-6 text-gray-600 space-y-2">
+              <ul className="list-disc pl-6 text-gray-600 dark:text-gray-300 space-y-2">
                 <li>Personal health information (PHI) or medical records</li>
+                <li>Insurance card images (processed in memory only, never stored)</li>
+                <li>Member IDs or insurance account numbers</li>
                 <li>Social Security numbers or government IDs</li>
                 <li>Payment or financial information</li>
                 <li>Account passwords (we don't have user accounts yet)</li>
                 <li>Precise location data beyond IP-based city/region</li>
               </ul>
-              <p className="text-gray-600 mt-4">
+              <p className="text-gray-600 dark:text-gray-300 mt-4">
                 <strong>Note:</strong> VerifyMyProvider is not subject to HIPAA as we do not handle
                 protected health information.
               </p>
@@ -101,8 +131,8 @@ export default function PrivacyPolicyPage() {
 
             {/* How We Use Information */}
             <div className="card mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                3. How We Use Your Information
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                4. How We Use Your Information
               </h2>
               <p className="text-gray-600 mb-4">
                 We use the information we collect to:
@@ -119,8 +149,8 @@ export default function PrivacyPolicyPage() {
 
             {/* Cookies */}
             <div className="card mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                4. Cookies
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                5. Cookies
               </h2>
               <p className="text-gray-600 mb-4">
                 We use cookies for:
@@ -141,32 +171,55 @@ export default function PrivacyPolicyPage() {
 
             {/* Third Parties */}
             <div className="card mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                5. Third-Party Services
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                6. Third-Party Services
               </h2>
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
                 We use the following third-party services:
               </p>
 
               <div className="space-y-4">
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <h4 className="font-medium text-gray-900">PostHog (Analytics)</h4>
-                  <p className="text-gray-600 text-sm mt-1">
+                <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <h4 className="font-medium text-gray-900 dark:text-white">PostHog (Analytics)</h4>
+                  <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
                     Helps us understand how users interact with our site. Collects anonymized usage data.
                   </p>
                   <a href="https://posthog.com/privacy" target="_blank" rel="noopener noreferrer"
-                     className="text-primary-600 hover:text-primary-700 text-sm">
+                     className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 text-sm">
                     PostHog Privacy Policy →
                   </a>
                 </div>
 
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <h4 className="font-medium text-gray-900">Google Cloud Platform (Hosting)</h4>
-                  <p className="text-gray-600 text-sm mt-1">
+                <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <h4 className="font-medium text-gray-900 dark:text-white">Anthropic Claude (AI Processing)</h4>
+                  <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
+                    Used for insurance card text extraction. Images are processed in real-time and not stored.
+                    Anthropic does not use data from API calls for training.
+                  </p>
+                  <a href="https://www.anthropic.com/privacy" target="_blank" rel="noopener noreferrer"
+                     className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 text-sm">
+                    Anthropic Privacy Policy →
+                  </a>
+                </div>
+
+                <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <h4 className="font-medium text-gray-900 dark:text-white">Google reCAPTCHA (Bot Protection)</h4>
+                  <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
+                    Protects our verification forms from spam and abuse. Collects interaction data for risk analysis.
+                  </p>
+                  <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer"
+                     className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 text-sm">
+                    Google Privacy Policy →
+                  </a>
+                </div>
+
+                <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <h4 className="font-medium text-gray-900 dark:text-white">Google Cloud Platform (Hosting)</h4>
+                  <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
                     Our service is hosted on Google Cloud Run. Google may process server logs.
                   </p>
                   <a href="https://cloud.google.com/privacy" target="_blank" rel="noopener noreferrer"
-                     className="text-primary-600 hover:text-primary-700 text-sm">
+                     className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 text-sm">
                     Google Cloud Privacy →
                   </a>
                 </div>
@@ -175,8 +228,8 @@ export default function PrivacyPolicyPage() {
 
             {/* Data Retention */}
             <div className="card mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                6. Data Retention
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                7. Data Retention
               </h2>
               <p className="text-gray-600 mb-4">
                 Verification data is retained indefinitely to maintain the accuracy and history of
@@ -205,8 +258,8 @@ export default function PrivacyPolicyPage() {
 
             {/* Your Rights */}
             <div className="card mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                7. Your Rights
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                8. Your Rights
               </h2>
               <p className="text-gray-600 mb-4">
                 Depending on your location, you may have the right to:
@@ -224,8 +277,8 @@ export default function PrivacyPolicyPage() {
 
             {/* Security */}
             <div className="card mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                8. Security
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                9. Security
               </h2>
               <p className="text-gray-600">
                 We implement reasonable security measures to protect your information, including
@@ -236,8 +289,8 @@ export default function PrivacyPolicyPage() {
 
             {/* Children */}
             <div className="card mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                9. Children's Privacy
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                10. Children's Privacy
               </h2>
               <p className="text-gray-600">
                 Our service is not directed to children under 13. We do not knowingly collect
@@ -248,8 +301,8 @@ export default function PrivacyPolicyPage() {
 
             {/* Changes */}
             <div className="card mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                10. Changes to This Policy
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                11. Changes to This Policy
               </h2>
               <p className="text-gray-600">
                 We may update this Privacy Policy from time to time. We'll post the updated policy
@@ -259,9 +312,9 @@ export default function PrivacyPolicyPage() {
             </div>
 
             {/* Contact */}
-            <div className="card mb-8 bg-gray-50">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                11. Contact Us
+            <div className="card mb-8 bg-gray-50 dark:bg-gray-800">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                12. Contact Us
               </h2>
               <p className="text-gray-600 mb-4">
                 For privacy-related questions or to exercise your rights, contact us:

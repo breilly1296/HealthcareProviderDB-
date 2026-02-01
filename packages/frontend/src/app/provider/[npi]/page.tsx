@@ -13,6 +13,7 @@ import {
   AboutProvider,
   ColocatedProviders,
 } from '@/components/provider-detail';
+import { Disclaimer } from '@/components/Disclaimer';
 
 // Provider with full plan acceptance data (from detail API)
 interface ProviderWithPlans extends Omit<ProviderDisplay, 'planAcceptances'> {
@@ -136,6 +137,9 @@ export default function ProviderDetailPage() {
               confidenceScore={confidenceScore}
               verificationCount={verificationCount}
             />
+
+            {/* Data Accuracy Disclaimer */}
+            <Disclaimer variant="inline" showLearnMore={true} />
 
             {/* About This Provider */}
             <AboutProvider
