@@ -5,6 +5,7 @@ import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { cleanupExpiredVerifications, getExpirationStats } from '../services/verificationService';
 import { enrichLocationNames, getEnrichmentStats } from '../services/locationEnrichment';
 import { cacheClear, getCacheStats } from '../utils/cache';
+import prisma from '../lib/prisma';
 import logger from '../utils/logger';
 
 const router = Router();
@@ -112,7 +113,7 @@ router.get(
 
 /**
  * GET /api/v1/admin/health
- * Health check endpoint for monitoring
+ * Health check endpoint for monitoring with retention metrics
  *
  * Protected by X-Admin-Secret header
  */
@@ -122,6 +123,37 @@ router.get(
   asyncHandler(async (req, res) => {
     const cacheStats = getCacheStats();
 
+    // Get retention metrics
+    const sevenDaysFromNow = new Date();
+    sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+
+    const [
+      verificationLogTotal,
+      verificationLogExpiringSoon,
+      verificationLogOldest,
+      syncLogTotal,
+      syncLogOldest,
+      voteTotal,
+    ] = await Promise.all([
+      // Verification logs
+      prisma.verificationLog.count(),
+      prisma.verificationLog.count({
+        where: { expiresAt: { lte: sevenDaysFromNow } },
+      }),
+      prisma.verificationLog.findFirst({
+        orderBy: { createdAt: 'asc' },
+        select: { createdAt: true },
+      }),
+      // Sync logs
+      prisma.syncLog.count(),
+      prisma.syncLog.findFirst({
+        orderBy: { startedAt: 'asc' },
+        select: { startedAt: true },
+      }),
+      // Vote logs
+      prisma.voteLog.count(),
+    ]);
+
     res.json({
       success: true,
       data: {
@@ -129,6 +161,20 @@ router.get(
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
         cache: cacheStats,
+        retention: {
+          verificationLogs: {
+            total: verificationLogTotal,
+            expiringIn7Days: verificationLogExpiringSoon,
+            oldestRecord: verificationLogOldest?.createdAt?.toISOString() || null,
+          },
+          syncLogs: {
+            total: syncLogTotal,
+            oldestRecord: syncLogOldest?.startedAt?.toISOString() || null,
+          },
+          voteLogs: {
+            total: voteTotal,
+          },
+        },
       },
     });
   })
@@ -253,6 +299,199 @@ router.get(
     res.json({
       success: true,
       data: stats,
+    });
+  })
+);
+
+// ============================================================================
+// Log Retention Cleanup Endpoints
+// ============================================================================
+
+/**
+ * POST /api/v1/admin/cleanup/sync-logs
+ * Clean up sync_logs older than 90 days
+ *
+ * Protected by X-Admin-Secret header
+ * Designed to be called by Cloud Scheduler daily
+ *
+ * Query params:
+ *   - dryRun: If 'true', only return what would be deleted (default: false)
+ *   - retentionDays: Number of days to retain (default: 90)
+ */
+router.post(
+  '/cleanup/sync-logs',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    const dryRun = req.query.dryRun === 'true';
+    const retentionDays = parseInt(req.query.retentionDays as string) || 90;
+
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
+
+    logger.info(
+      { dryRun, retentionDays, cutoffDate: cutoffDate.toISOString() },
+      'Admin sync_logs cleanup started'
+    );
+
+    if (dryRun) {
+      // Count records that would be deleted
+      const count = await prisma.syncLog.count({
+        where: {
+          startedAt: { lt: cutoffDate },
+        },
+      });
+
+      logger.info({ count, dryRun: true }, 'Admin sync_logs cleanup dry run complete');
+
+      res.json({
+        success: true,
+        data: {
+          dryRun: true,
+          recordsToDelete: count,
+          olderThan: cutoffDate.toISOString(),
+          message: `Dry run complete. ${count} sync_logs records would be deleted.`,
+        },
+      });
+    } else {
+      // Actually delete the records
+      const result = await prisma.syncLog.deleteMany({
+        where: {
+          startedAt: { lt: cutoffDate },
+        },
+      });
+
+      logger.info(
+        {
+          action: 'sync_logs_cleanup',
+          deletedCount: result.count,
+          olderThan: cutoffDate.toISOString(),
+        },
+        'Admin sync_logs cleanup complete'
+      );
+
+      res.json({
+        success: true,
+        data: {
+          dryRun: false,
+          deletedCount: result.count,
+          olderThan: cutoffDate.toISOString(),
+          message: `Cleanup complete. ${result.count} sync_logs records deleted.`,
+        },
+      });
+    }
+  })
+);
+
+/**
+ * GET /api/v1/admin/retention/stats
+ * Get comprehensive retention statistics for all log types
+ *
+ * Protected by X-Admin-Secret header
+ */
+router.get(
+  '/retention/stats',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    const now = new Date();
+    const sevenDaysFromNow = new Date(now);
+    sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+    const thirtyDaysFromNow = new Date(now);
+    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+
+    // Sync log retention boundary (90 days ago)
+    const syncLogCutoff = new Date(now);
+    syncLogCutoff.setDate(syncLogCutoff.getDate() - 90);
+
+    const [
+      // Verification logs
+      verificationLogTotal,
+      verificationLogExpiring7Days,
+      verificationLogExpiring30Days,
+      verificationLogOldest,
+      verificationLogNewest,
+      // Sync logs
+      syncLogTotal,
+      syncLogOldOlderThan90Days,
+      syncLogOldest,
+      syncLogNewest,
+      // Plan acceptance (with expiration)
+      planAcceptanceTotal,
+      planAcceptanceExpiring7Days,
+      planAcceptanceExpiring30Days,
+      // Votes
+      voteTotal,
+    ] = await Promise.all([
+      // Verification logs
+      prisma.verificationLog.count(),
+      prisma.verificationLog.count({
+        where: { expiresAt: { lte: sevenDaysFromNow } },
+      }),
+      prisma.verificationLog.count({
+        where: { expiresAt: { lte: thirtyDaysFromNow } },
+      }),
+      prisma.verificationLog.findFirst({
+        orderBy: { createdAt: 'asc' },
+        select: { createdAt: true },
+      }),
+      prisma.verificationLog.findFirst({
+        orderBy: { createdAt: 'desc' },
+        select: { createdAt: true },
+      }),
+      // Sync logs
+      prisma.syncLog.count(),
+      prisma.syncLog.count({
+        where: { startedAt: { lt: syncLogCutoff } },
+      }),
+      prisma.syncLog.findFirst({
+        orderBy: { startedAt: 'asc' },
+        select: { startedAt: true },
+      }),
+      prisma.syncLog.findFirst({
+        orderBy: { startedAt: 'desc' },
+        select: { startedAt: true },
+      }),
+      // Plan acceptances
+      prisma.providerPlanAcceptance.count(),
+      prisma.providerPlanAcceptance.count({
+        where: { expiresAt: { lte: sevenDaysFromNow } },
+      }),
+      prisma.providerPlanAcceptance.count({
+        where: { expiresAt: { lte: thirtyDaysFromNow } },
+      }),
+      // Votes
+      prisma.voteLog.count(),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        timestamp: now.toISOString(),
+        verificationLogs: {
+          total: verificationLogTotal,
+          expiringIn7Days: verificationLogExpiring7Days,
+          expiringIn30Days: verificationLogExpiring30Days,
+          oldestRecord: verificationLogOldest?.createdAt?.toISOString() || null,
+          newestRecord: verificationLogNewest?.createdAt?.toISOString() || null,
+          retentionPolicy: '6 months (TTL via expiresAt)',
+        },
+        syncLogs: {
+          total: syncLogTotal,
+          olderThan90Days: syncLogOldOlderThan90Days,
+          oldestRecord: syncLogOldest?.startedAt?.toISOString() || null,
+          newestRecord: syncLogNewest?.startedAt?.toISOString() || null,
+          retentionPolicy: '90 days (manual cleanup)',
+        },
+        planAcceptances: {
+          total: planAcceptanceTotal,
+          expiringIn7Days: planAcceptanceExpiring7Days,
+          expiringIn30Days: planAcceptanceExpiring30Days,
+          retentionPolicy: '6 months (TTL via expiresAt)',
+        },
+        voteLogs: {
+          total: voteTotal,
+          retentionPolicy: 'Follows plan acceptance TTL',
+        },
+      },
     });
   })
 );
