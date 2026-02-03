@@ -43,6 +43,12 @@ export function Header() {
             >
               Scan Card
             </Link>
+            <Link
+              href="/about"
+              className="hidden md:inline text-base font-medium text-stone-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+            >
+              About
+            </Link>
             <ThemeToggle />
             <Link
               href="/search"

@@ -76,6 +76,11 @@ function Footer() {
                   Confidence Scores
                 </Link>
               </li>
+              <li>
+                <Link href="/about" className="text-stone-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
+                  About Us
+                </Link>
+              </li>
             </ul>
           </div>
 
