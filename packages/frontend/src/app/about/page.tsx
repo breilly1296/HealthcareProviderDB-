@@ -103,7 +103,7 @@ export default function AboutPage() {
                     Brian is a healthcare entrepreneur and software engineer who has experienced firsthand the frustration of outdated provider directories. After spending weeks trying to find an endocrinologist who actually accepted his insurance—calling dozens of offices listed in his insurance company's directory only to find they'd stopped accepting that plan months ago—he decided to build a better solution.
                   </p>
                   <p className="text-gray-600 dark:text-gray-300">
-                    VerifyMyProvider is part of <a href="https://ownmyhealth.com" target="_blank" rel="noopener noreferrer" className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium">OwnMyHealth</a>, Brian's mission to empower patients with transparent, accurate healthcare information.
+                    VerifyMyProvider is part of <a href="https://ownmyhealth.io" target="_blank" rel="noopener noreferrer" className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium">OwnMyHealth</a>, Brian's mission to empower patients with transparent, accurate healthcare information.
                   </p>
                 </div>
               </div>

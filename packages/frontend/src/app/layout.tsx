@@ -117,7 +117,7 @@ function Footer() {
               Empowering patients with the information they need to make informed healthcare decisions.
             </p>
             <a
-              href="https://ownmyhealth.com"
+              href="https://ownmyhealth.io"
               target="_blank"
               rel="noopener noreferrer"
               className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium"
