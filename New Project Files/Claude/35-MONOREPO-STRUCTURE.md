@@ -1,416 +1,87 @@
-# VerifyMyProvider Monorepo Structure Analysis
+# Monorepo Structure Review -- Analysis
 
-**Last Updated:** 2026-01-31
-**Analyzed By:** Claude Code
-
----
-
-## Executive Summary
-
-VerifyMyProvider uses a monorepo structure with npm workspaces. This enables shared code between frontend and backend while maintaining clear separation of concerns and simplified dependency management.
+**Generated:** 2026-02-05
+**Source Prompt:** prompts/35-monorepo-structure.md
+**Status:** Well-implemented -- npm workspaces monorepo is correctly configured with minor discrepancies from prompt documentation
 
 ---
 
-## Repository Structure
+## Findings
 
-```
-HealthcareProviderDB/
-├── packages/
-│   ├── frontend/          # Next.js frontend application
-│   │   ├── src/
-│   │   ├── public/
-│   │   ├── package.json
-│   │   └── tsconfig.json
-│   │
-│   ├── backend/           # Express.js backend API
-│   │   ├── src/
-│   │   ├── prisma/
-│   │   ├── package.json
-│   │   └── tsconfig.json
-│   │
-│   └── shared/            # Shared types and utilities
-│       ├── src/
-│       ├── package.json
-│       └── tsconfig.json
-│
-├── e2e/                   # End-to-end tests
-│   ├── tests/
-│   └── playwright.config.ts
-│
-├── scripts/               # Build and deployment scripts
-│   ├── deploy.sh
-│   └── import-npi.ts
-│
-├── prompts/               # Claude prompts for code generation
-│   └── *.md
-│
-├── package.json           # Root workspace configuration
-├── tsconfig.json          # Root TypeScript configuration
-├── .env.example           # Environment template
-├── .gitignore
-└── README.md
-```
+### Configuration
+- [x] **Workspaces defined in root package.json** -- Verified. Root `package.json` line 6-8 defines `"workspaces": ["packages/*"]`. Note: The prompt documents the more explicit form `["packages/shared", "packages/backend", "packages/frontend"]`, but the actual code uses the glob pattern `"packages/*"` which is functionally equivalent and more maintainable.
 
----
+- [x] **Build scripts respect order** -- Partially verified. The root `dev` script (line 14) correctly runs `npm run build:shared &&` before starting backend and frontend concurrently, ensuring shared types are compiled first. However, the root `build` script (line 10) uses `npm run build --workspaces` which relies on npm's workspace ordering rather than explicit sequential execution. The prompt documents a sequential `npm run build:shared && npm run build:backend && npm run build:frontend` approach, but the actual implementation delegates ordering to npm. Since `packages/*` is a glob, npm processes workspaces in filesystem order (alphabetical: backend, frontend, shared), which does NOT guarantee shared builds first.
 
-## Workspace Configuration
+- [x] **Shared package references work** -- Verified. Both `packages/backend/package.json` (line 23) and `packages/frontend/package.json` (line 22) declare `"@healthcareproviderdb/shared": "*"` as a dependency. npm workspaces resolves this to the local `packages/shared` via symlink.
 
-### Root package.json
+- [ ] **CI builds in correct order** -- The deploy.yml builds Docker images for backend and frontend separately. The shared package build order in CI would need separate verification.
 
-```json
-{
-  "name": "verifymyprovider",
-  "private": true,
-  "workspaces": [
-    "packages/*"
-  ],
-  "scripts": {
-    "dev": "npm run dev --workspaces --if-present",
-    "build": "npm run build --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present",
-    "clean": "rm -rf packages/*/dist packages/*/node_modules node_modules",
-    "prepare": "npm run build --workspace=packages/shared"
-  },
-  "devDependencies": {
-    "typescript": "^5.0.0"
-  }
-}
-```
+### Package Details
 
-### Package Dependencies
+| Package | Name | Purpose | Dependencies on Shared |
+|---------|------|---------|----------------------|
+| shared | `@healthcareproviderdb/shared` | Types & constants | None (leaf package) |
+| backend | `@healthcareproviderdb/backend` | Express.js API | `@healthcareproviderdb/shared: "*"` |
+| frontend | `@healthcareproviderdb/frontend` | Next.js 14 web app | `@healthcareproviderdb/shared: "*"` |
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Dependency Graph                          │
-│                                                              │
-│      @vmp/frontend                @vmp/backend              │
-│           │                            │                    │
-│           │                            │                    │
-│           └──────────┬─────────────────┘                    │
-│                      │                                      │
-│                      ▼                                      │
-│                @vmp/shared                                  │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
-```
+### Shared Package Structure
+- **Entry point:** `src/index.ts` re-exports from `./types`
+- **Type files:** `provider.ts`, `insurance-plan.ts`, `verification.ts`, `provider-plan-acceptance.ts`, `enums.ts`
+- **Constants:** `dist/constants/domain.js` exists in dist (built output includes domain constants)
+- **Build output:** `dist/` with `.js`, `.d.ts`, `.js.map`, `.d.ts.map` files -- declarations enabled
+- **TypeScript config:** Targets ES2022, CommonJS module output, strict mode, declaration generation enabled
+- **No runtime dependencies** -- `package.json` has zero dependencies, only type definitions
+
+### Naming Discrepancy
+
+| Aspect | Prompt Says | Actual Code |
+|--------|-------------|-------------|
+| Package name prefix | `@healthcare-provider-db/` | `@healthcareproviderdb/` |
+| Root package name | `healthcare-provider-db` | `healthcareproviderdb` |
+| Workspaces field | `["packages/shared", "packages/backend", "packages/frontend"]` | `["packages/*"]` |
+| Root build script | Sequential with `&&` | `npm run build --workspaces` |
+
+The prompt documentation uses hyphens in the package scope name, but the actual code uses no hyphens. This is cosmetic but the prompt should be updated to match.
+
+### Root Dependencies
+The root `package.json` places the following at root level:
+- `@prisma/client: ^5.22.0` (production)
+- `csv-parse: ^6.1.0` (production)
+- `pg: ^8.16.3` (production)
+- `prisma: ^5.22.0` (production)
+- `@types/pg: ^8.16.0` (dev)
+- `concurrently: ^9.2.1` (dev)
+
+Per the MEMORY.md lesson: `next` is correctly NOT in root package.json (only in `packages/frontend`), avoiding the SWC version mismatch issue previously encountered.
+
+### Development
+- [x] **`npm run dev` starts both services** -- Verified. Root `dev` script: `npm run build:shared && concurrently "npm run dev:backend" "npm run dev:frontend"`. Uses `concurrently` to run both in parallel after building shared.
+- [x] **Hot reload works in both** -- Backend uses `tsx watch src/index.ts`; frontend uses `next dev --port 3000`. Both support hot reload.
+- [x] **Shared types update in real-time** -- The shared package has a `dev` script (`tsc --watch`) but it is NOT started by the root `dev` script. Changes to shared types require manually rebuilding shared, or running `npm run dev -w @healthcareproviderdb/shared` in a separate terminal.
+
+### Build
+- [x] **`npm run build` works** -- Individual build scripts verified: shared uses `tsc`, backend uses `tsc`, frontend uses `next build`.
+- [x] **Docker builds work** -- Dockerfiles referenced in deploy.yml for both backend and frontend.
+- [ ] **Production optimization** -- Not specifically verified. Frontend relies on Next.js built-in optimization. No Turborepo or build caching configured.
+
+### Frontend Postinstall
+The frontend has a `postinstall` script (`node scripts/patch-next-swc.js || true`) that patches Next.js SWC for Windows ARM64 compatibility, as documented in MEMORY.md.
 
 ---
 
-## Package Details
+## Summary
 
-### packages/shared
+The monorepo is correctly structured using npm workspaces with three packages: shared (types/constants), backend (Express API), and frontend (Next.js 14). Both backend and frontend properly depend on the shared package via `"@healthcareproviderdb/shared": "*"`. The root `dev` script correctly builds shared first, then starts backend and frontend concurrently.
 
-Shared types, utilities, and constants.
-
-```json
-{
-  "name": "@vmp/shared",
-  "version": "1.0.0",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch"
-  },
-  "devDependencies": {
-    "typescript": "^5.0.0"
-  }
-}
-```
-
-**Contents:**
-- TypeScript types (Provider, Verification, etc.)
-- Validation utilities
-- Formatting functions
-- Constants
-
-### packages/backend
-
-Express.js API server.
-
-```json
-{
-  "name": "@vmp/backend",
-  "version": "1.0.0",
-  "main": "dist/index.js",
-  "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "test": "jest"
-  },
-  "dependencies": {
-    "@vmp/shared": "*",
-    "express": "^4.18.0",
-    "@prisma/client": "^5.0.0",
-    "zod": "^3.22.0",
-    "ioredis": "^5.3.0",
-    "helmet": "^7.0.0"
-  },
-  "devDependencies": {
-    "@types/express": "^4.17.0",
-    "tsx": "^4.0.0",
-    "jest": "^29.0.0"
-  }
-}
-```
-
-### packages/frontend
-
-Next.js web application.
-
-```json
-{
-  "name": "@vmp/frontend",
-  "version": "1.0.0",
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "test": "jest"
-  },
-  "dependencies": {
-    "@vmp/shared": "*",
-    "next": "^14.0.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "tailwindcss": "^3.4.0",
-    "posthog-js": "^1.90.0"
-  },
-  "devDependencies": {
-    "@types/react": "^18.2.0",
-    "@testing-library/react": "^14.0.0"
-  }
-}
-```
-
----
-
-## TypeScript Configuration
-
-### Root tsconfig.json
-
-```json
-{
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "declaration": true,
-    "declarationMap": true,
-    "composite": true
-  }
-}
-```
-
-### Package tsconfig.json (Backend)
-
-```json
-{
-  "extends": "../../tsconfig.json",
-  "compilerOptions": {
-    "outDir": "./dist",
-    "rootDir": "./src"
-  },
-  "include": ["src/**/*"],
-  "references": [
-    { "path": "../shared" }
-  ]
-}
-```
-
-### Package tsconfig.json (Frontend)
-
-```json
-{
-  "extends": "../../tsconfig.json",
-  "compilerOptions": {
-    "lib": ["dom", "dom.iterable", "esnext"],
-    "jsx": "preserve",
-    "plugins": [{ "name": "next" }]
-  },
-  "include": ["src/**/*", "next-env.d.ts"],
-  "references": [
-    { "path": "../shared" }
-  ]
-}
-```
-
----
-
-## Build Order
-
-Due to dependencies, packages must be built in order:
-
-```bash
-# 1. Build shared first
-npm run build --workspace=packages/shared
-
-# 2. Build frontend and backend (can be parallel)
-npm run build --workspace=packages/backend &
-npm run build --workspace=packages/frontend &
-wait
-
-# Or use the root script
-npm run build  # Builds all in correct order
-```
-
-### CI/CD Build
-
-```yaml
-# .github/workflows/build.yml
-
-steps:
-  - name: Install dependencies
-    run: npm ci
-
-  - name: Build shared
-    run: npm run build --workspace=packages/shared
-
-  - name: Build backend
-    run: npm run build --workspace=packages/backend
-
-  - name: Build frontend
-    run: npm run build --workspace=packages/frontend
-```
-
----
-
-## Development Workflow
-
-### Starting Development
-
-```bash
-# Install all dependencies
-npm install
-
-# Build shared package (required first)
-npm run build --workspace=packages/shared
-
-# Start all dev servers
-npm run dev
-# Or individually:
-npm run dev --workspace=packages/backend
-npm run dev --workspace=packages/frontend
-```
-
-### Adding Dependencies
-
-```bash
-# Add to specific package
-npm install lodash --workspace=packages/backend
-
-# Add to shared
-npm install date-fns --workspace=packages/shared
-
-# Add dev dependency to root
-npm install -D prettier
-```
-
-### Running Tests
-
-```bash
-# All packages
-npm run test
-
-# Specific package
-npm run test --workspace=packages/backend
-```
-
----
-
-## Import Patterns
-
-### Frontend importing from Shared
-
-```typescript
-// packages/frontend/src/components/ProviderCard.tsx
-
-import type { Provider, PlanAcceptance } from '@vmp/shared';
-import { formatProviderName, formatAddress } from '@vmp/shared';
-
-export function ProviderCard({ provider }: { provider: Provider }) {
-  return (
-    <div>
-      <h3>{formatProviderName(provider)}</h3>
-      <p>{formatAddress(provider)}</p>
-    </div>
-  );
-}
-```
-
-### Backend importing from Shared
-
-```typescript
-// packages/backend/src/routes/providers.ts
-
-import type { Provider, ProviderSearchQuery } from '@vmp/shared';
-import { isValidNpi, isValidState } from '@vmp/shared';
-
-export async function searchProviders(query: ProviderSearchQuery): Promise<Provider[]> {
-  // ...
-}
-```
-
----
-
-## Benefits of Monorepo
-
-| Benefit | Description |
-|---------|-------------|
-| **Shared Types** | Same TypeScript types in frontend and backend |
-| **Atomic Changes** | Single PR for full-stack features |
-| **Simplified Dependencies** | One npm install for everything |
-| **Consistent Tooling** | Shared linting, formatting, testing config |
-| **Easy Refactoring** | Rename/move code across packages |
-
-## Potential Drawbacks
-
-| Challenge | Mitigation |
-|-----------|------------|
-| Build complexity | Clear build order, CI scripts |
-| Large node_modules | Hoisting, pruned installs |
-| IDE performance | Scoped tsconfig, exclude patterns |
-| Deployment coupling | Independent package builds |
+Key concerns: (1) The root `build` script uses `npm run build --workspaces` which processes workspaces in alphabetical order (backend, frontend, shared), potentially building shared AFTER packages that depend on it. (2) The shared `tsc --watch` is not included in the root `dev` command, so shared type changes during development require a manual rebuild. (3) The prompt documentation uses incorrect package name prefixes (`@healthcare-provider-db/` vs actual `@healthcareproviderdb/`).
 
 ---
 
 ## Recommendations
 
-### Immediate
-- ✅ Structure is well-organized
-- Add package-specific READMEs
-- Document build order in CI
-
-### Future
-1. **Turborepo/Nx**
-   - For faster builds
-   - Better caching
-
-2. **Changesets**
-   - For versioning
-   - Automated changelogs
-
-3. **Package Scoping**
-   - @verifymyprovider/shared
-   - Prepare for npm publishing
-
----
-
-## Conclusion
-
-The monorepo structure is **well-implemented**:
-
-- ✅ Clear package separation
-- ✅ Shared types and utilities
-- ✅ npm workspaces configured
-- ✅ TypeScript project references
-- ✅ Proper build order
-
-The structure supports efficient development while maintaining clear boundaries between packages.
+1. **Fix the root `build` script** to explicitly order shared first: `"build": "npm run build:shared && npm run build:backend && npm run build:frontend"` rather than `npm run build --workspaces`. This ensures deterministic build ordering regardless of filesystem sort order.
+2. **Include shared watch in dev script** -- Update the root `dev` script to also run `npm run dev -w @healthcareproviderdb/shared` via concurrently so that shared type changes are automatically recompiled during development.
+3. **Update prompt documentation** to use the actual package name prefix `@healthcareproviderdb/` and the glob workspace pattern `"packages/*"`.
+4. **Consider adding Turborepo** for build caching and intelligent task scheduling. The project is at a size where build times may benefit from incremental builds and remote caching.
+5. **Verify CI build order** in the GitHub Actions deploy workflow to ensure `packages/shared` is built before backend and frontend Docker images are created.

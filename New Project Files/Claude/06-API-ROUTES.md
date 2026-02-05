@@ -1,279 +1,163 @@
-# VerifyMyProvider API Routes Security Analysis
+# API Routes Security Review -- Analysis
 
-**Last Updated:** 2026-01-31
-**Analyzed By:** Claude Code
-
----
-
-## Executive Summary
-
-The API is well-structured with proper rate limiting, input validation, and CAPTCHA protection on write endpoints. All endpoints except admin are public by design (public data, anonymous verifications).
+**Generated:** 2026-02-05
+**Source Prompt:** prompts/06-api-routes.md
+**Status:** Strong implementation. All active routes verified with rate limiters, CAPTCHA, validation, and proper middleware chain. Minor discrepancies between the root `/` endpoint listing and actual routes.
 
 ---
 
-## Route Inventory
+## Findings
 
-### Provider Routes (`/api/v1/providers`)
+### Route Inventory Verification
 
-| Method | Path | Rate Limit | Auth | CAPTCHA | Status |
-|--------|------|------------|------|---------|--------|
-| GET | `/search` | 100/hr | Public | No | ✅ |
-| GET | `/cities` | 200/hr | Public | No | ✅ |
-| GET | `/:npi` | 200/hr | Public | No | ✅ |
-| GET | `/:npi/plans` | 200/hr | Public | No | ✅ |
-| GET | `/:npi/colocated` | 200/hr | Public | No | ✅ |
+#### Provider Routes (`/api/v1/providers`) -- `routes/providers.ts`
 
-**Implementation:**
-```typescript
-// packages/backend/src/routes/providers.ts
-router.get('/search', searchRateLimiter, asyncHandler(async (req, res) => {
-  const query = searchQuerySchema.parse(req.query);
-  const result = await searchProviders(query);
-  res.json({ success: true, data: result });
-}));
-```
+| Endpoint | Status | Details |
+|----------|--------|---------|
+| GET `/search` | Verified | `searchRateLimiter` (100/hr), Zod `searchQuerySchema`, caching (5 min TTL), `X-Cache` header |
+| GET `/cities` | Verified | `defaultRateLimiter` (200/hr), inline Zod schema (state: 2-char uppercase required) |
+| GET `/:npi` | Verified | `defaultRateLimiter` (200/hr), `npiParamSchema` validation (10-digit regex) |
 
----
+- Verified: `searchQuerySchema` merges with `paginationSchema` and includes `state`, `city`, `cities`, `zipCode`, `specialty`, `specialtyCategory`, `name`, `npi`, `entityType` -- matches prompt exactly.
+- Verified: `transformProvider()` maps DB shape to API shape, pulls address from primary `practice_locations`, includes all enrichment data (CMS details, hospitals, insurance networks, Medicare IDs, taxonomies).
+- Verified: Cache invalidation for search results happens asynchronously after verification submissions in `verify.ts`.
 
-### Verification Routes (`/api/v1/verify`)
+#### Plan Routes (`/api/v1/plans`) -- `routes/plans.ts`
 
-| Method | Path | Rate Limit | Auth | CAPTCHA | Status |
-|--------|------|------------|------|---------|--------|
-| POST | `/` | 10/hr | Public | ✅ Yes | ✅ |
-| POST | `/:verificationId/vote` | 10/hr | Public | ✅ Yes | ✅ |
-| GET | `/stats` | 200/hr | Public | No | ✅ |
-| GET | `/recent` | 200/hr | Public | No | ✅ |
-| GET | `/:npi/:planId` | 200/hr | Public | No | ✅ |
+| Endpoint | Status | Details |
+|----------|--------|---------|
+| GET `/search` | Verified | `searchRateLimiter` (100/hr), Zod `searchQuerySchema` |
+| GET `/grouped` | Verified | `defaultRateLimiter` (200/hr), inline Zod schema |
+| GET `/meta/issuers` | Verified | `defaultRateLimiter` (200/hr), `stateQuerySchema` |
+| GET `/meta/types` | Verified | `defaultRateLimiter` (200/hr), `stateQuerySchema.extend()` with `issuerName` |
+| GET `/:planId/providers` | Verified | `searchRateLimiter` (100/hr), `planIdParamSchema` + `paginationSchema` |
+| GET `/:planId` | Verified | `defaultRateLimiter` (200/hr), `planIdParamSchema` |
 
-**Implementation:**
-```typescript
-// packages/backend/src/routes/verify.ts
-router.post('/',
-  verificationRateLimiter,  // 10/hr per IP
-  verifyCaptcha,            // reCAPTCHA v3
-  asyncHandler(async (req, res) => {
-    const body = submitVerificationSchema.parse(req.body);
-    const result = await submitVerification({ ...body, sourceIp: req.ip });
-    res.status(201).json({ success: true, data: result });
-  })
-);
-```
+- Verified: `/:planId/providers` is defined BEFORE `/:planId` (line 121 vs line 174) to avoid route conflicts -- matches prompt note.
+- Verified: Search query parameters (`issuerName`, `planType`, `search`, `state`, `page`, `limit`) match prompt.
 
----
+#### Verification Routes (`/api/v1/verify`) -- `routes/verify.ts`
 
-### Location Routes (`/api/v1/locations`)
+| Endpoint | Status | Details |
+|----------|--------|---------|
+| POST `/` | Verified | `verificationRateLimiter` (10/hr), **`verifyCaptcha`**, Zod `submitVerificationSchema` |
+| POST `/:verificationId/vote` | Verified | `voteRateLimiter` (10/hr), **`verifyCaptcha`**, Zod `voteSchema` + `verificationIdParamSchema` |
+| GET `/stats` | Verified | `defaultRateLimiter` (200/hr), no Zod (no params needed) |
+| GET `/recent` | Verified | `defaultRateLimiter` (200/hr), Zod `recentQuerySchema` |
+| GET `/:npi/:planId` | Verified | `defaultRateLimiter` (200/hr), `pairParamsSchema` (npiParamSchema + planIdParamSchema) |
 
-| Method | Path | Rate Limit | Auth | CAPTCHA | Status |
-|--------|------|------------|------|---------|--------|
-| GET | `/health-systems` | 200/hr | Public | No | ✅ |
-| GET | `/:locationId` | 200/hr | Public | No | ✅ |
-| GET | `/:locationId/providers` | 200/hr | Public | No | ✅ |
+- Verified: CAPTCHA middleware (`verifyCaptcha`) is applied to both POST endpoints, placed after rate limiter but before the handler.
+- Verified: `captchaToken` accepted via `req.body.captchaToken` or `req.headers['x-captcha-token']` (line 134 of captcha.ts).
+- Verified: Skipped in development/test mode (line 121 of captcha.ts).
+- Verified: Verification body fields match prompt: `npi`, `planId`, `acceptsInsurance`, `acceptsNewPatients` (optional), `notes` (max 1000), `evidenceUrl` (optional URL), `submittedBy` (optional email), `captchaToken`.
+- Verified: Vote body fields match prompt: `vote` (enum "up"/"down"), `captchaToken`.
+- Verified: Cache invalidation runs async after POST `/` (line 69 of verify.ts).
 
----
+#### Admin Routes (`/api/v1/admin`) -- `routes/admin.ts`
 
-### Plan Routes (`/api/v1/plans`)
+| Endpoint | Status | Details |
+|----------|--------|---------|
+| POST `/cleanup-expired` | Verified | `adminAuthMiddleware`, supports `dryRun` and `batchSize` query params |
+| GET `/expiration-stats` | Verified | `adminAuthMiddleware` |
+| GET `/health` | Verified | `adminAuthMiddleware`, returns retention metrics |
+| POST `/cache/clear` | Verified | `adminAuthMiddleware`, returns deleted count |
+| GET `/cache/stats` | Verified | `adminAuthMiddleware`, includes calculated hit rate |
+| POST `/cleanup/sync-logs` | Verified | `adminAuthMiddleware`, supports `dryRun` and `retentionDays` params |
+| GET `/retention/stats` | Verified | `adminAuthMiddleware`, comprehensive retention stats |
 
-| Method | Path | Rate Limit | Auth | CAPTCHA | Status |
-|--------|------|------------|------|---------|--------|
-| GET | `/search` | 100/hr | Public | No | ✅ |
-| GET | `/:planId` | 200/hr | Public | No | ✅ |
-| GET | `/:planId/providers` | 200/hr | Public | No | ✅ |
+- Verified: All 7 admin endpoints use `adminAuthMiddleware`.
+- Verified: `adminAuthMiddleware` uses `timingSafeEqual` from `crypto` (line 2, 48 of admin.ts).
+- Verified: Returns 503 if `ADMIN_SECRET` not configured (line 27), 401 if wrong (line 51).
+- Verified: Length check before `timingSafeEqual` (line 46-47) is correct -- `timingSafeEqual` requires equal-length buffers.
 
----
+#### Location Routes (`/api/v1/locations`) -- DISABLED
 
-### Admin Routes (`/api/v1/admin`) - PROTECTED
+- Verified: `routes/locations.ts` file exists with 5 endpoints (`/search`, `/health-systems`, `/stats/:state`, `/:locationId`, `/:locationId/providers`).
+- Verified: Import is commented out in `routes/index.ts` (line 6: `// import locationsRouter from './locations';`).
+- Verified: Registration is commented out (line 14: `// router.use('/locations', locationsRouter);`).
+- Verified: TODO comment present: "locations route depends on old Location model - needs rewrite for practice_locations".
 
-| Method | Path | Rate Limit | Auth | Status |
-|--------|------|------------|------|--------|
-| GET | `/health` | None | X-Admin-Secret | ✅ |
-| POST | `/cleanup-expired` | None | X-Admin-Secret | ✅ |
-| GET | `/expiration-stats` | None | X-Admin-Secret | ✅ |
+#### Infrastructure Endpoints -- `index.ts`
 
-**Implementation:**
-```typescript
-// packages/backend/src/routes/admin.ts
-function adminAuthMiddleware(req, res, next) {
-  const adminSecret = process.env.ADMIN_SECRET;
-  if (!adminSecret) {
-    return res.status(503).json({ error: 'Admin not configured' });
-  }
+| Endpoint | Status | Details |
+|----------|--------|---------|
+| GET `/health` | Verified | No rate limiter (defined at line 92, before `defaultRateLimiter` at line 138). Includes DB check, cache stats, memory, uptime. |
+| GET `/` | Verified | After `defaultRateLimiter` (200/hr). Returns API info with endpoint directory. |
 
-  const providedSecret = req.headers['x-admin-secret'];
-  // Timing-safe comparison
-  const isValid = timingSafeEqual(
-    Buffer.from(String(providedSecret || '')),
-    Buffer.from(adminSecret)
-  );
+### Middleware Chain (Order) Verification
 
-  if (!isValid) throw AppError.unauthorized('Invalid admin secret');
-  next();
-}
-```
+Checking `packages/backend/src/index.ts` line by line:
 
----
+| Order | Middleware | Line | Status |
+|-------|-----------|------|--------|
+| 1 | `requestIdMiddleware` | 39 | Verified -- UUID generation via `crypto.randomUUID()` |
+| 2 | `httpLogger` (pino-http) | 42 | Verified -- Skips `/health` via autoLogging.ignore |
+| 3 | `helmet` | 46 | Verified -- Strict CSP for JSON API, all `'none'` directives |
+| 4 | `cors` | 67 | Verified -- Whitelist: verifymyprovider.com, Cloud Run, localhost (dev only) |
+| 5 | `express.json` | 88 | Verified -- 100kb limit |
+| 6 | `/health` endpoint | 92 | Verified -- Before rate limiter |
+| 7 | `defaultRateLimiter` | 138 | Verified -- 200 req/hr global |
+| 8 | `requestLogger` | 141 | Verified -- Usage tracking without PII |
+| 9 | `/api/v1/*` routes | 176 | Verified -- `app.use('/api/v1', routes)` |
+| 10 | `notFoundHandler` | 179 | Verified -- 404 handler |
+| 11 | `errorHandler` | 182 | Verified -- Global error handler |
 
-### Health Check (`/health`)
+All 11 middleware chain items match the prompt specification exactly.
 
-| Method | Path | Rate Limit | Auth | Status |
-|--------|------|------------|------|--------|
-| GET | `/health` | None | Public | ✅ |
+### Security Status Checklist
 
----
+| Item | Status | Details |
+|------|--------|---------|
+| Rate limiting on all endpoints | Verified | 4 tiers: search (100/hr), verify (10/hr), vote (10/hr), default (200/hr). Dual-mode: Redis (distributed) or in-memory (single-instance). Fail-open on Redis failure. |
+| CAPTCHA on POST verify and vote | Verified | reCAPTCHA v3 with score threshold (0.5). Fail-open with fallback rate limiting (3/hr) or fail-closed (configurable). |
+| Input validation (Zod) on all endpoints | Verified | All endpoints use Zod `.parse()`. GET `/verify/stats` has no params to validate -- acceptable. |
+| Error handling (asyncHandler + AppError) | Verified | All async handlers wrapped with `asyncHandler`. `errorHandler` catches ZodError, AppError, PrismaClientKnownRequestError, PayloadTooLargeError. |
+| Security headers (Helmet + CORS) | Verified | Strict CSP with all `'none'` directives. CORS whitelist. `crossOriginEmbedderPolicy`, `crossOriginOpenerPolicy`, `crossOriginResourcePolicy`, `referrerPolicy: no-referrer`. |
+| Request ID correlation | Verified | `crypto.randomUUID()`. Respects incoming `X-Request-ID` header for cross-service tracing. |
+| Body size limit | Verified | `express.json({ limit: '100kb' })` and `express.urlencoded({ limit: '100kb' })` at line 88-89. |
+| Admin auth (timing-safe) | Verified | `timingSafeEqual` with length pre-check. 503 when unconfigured, 401 when invalid. |
+| User authentication | Not implemented | All routes are public. Noted in prompt as expected. |
+| CSRF | Not needed | Correctly noted: not needed until auth is added. |
+| Locations route | Disabled | Pending practice_locations rewrite as noted. |
 
-## Security Analysis
+### Discrepancies Found
 
-### Rate Limiting ✅
+#### 1. Root `/` Endpoint Listing vs Actual Routes
 
-| Limiter | Limit | Window | Endpoints |
-|---------|-------|--------|-----------|
-| `verificationRateLimiter` | 10 req | 1 hour | POST /verify, POST /vote |
-| `searchRateLimiter` | 100 req | 1 hour | GET /search |
-| `defaultRateLimiter` | 200 req | 1 hour | All other GET endpoints |
+| Listed in `/` response | Actual route | Status |
+|------------------------|-------------|--------|
+| `GET /api/v1/providers/:npi/plans` | Does not exist | Issue |
+| `GET /api/v1/plans/meta/years` | Does not exist | Issue |
+| `GET /api/v1/plans/grouped` | Not listed in `/` response | Missing from listing |
+| `GET /api/v1/plans/:planId/providers` | Not listed in `/` response | Missing from listing |
+| `GET /api/v1/providers/cities` | Not listed in `/` response | Missing from listing |
 
-**Headers Returned:**
-- `X-RateLimit-Limit`
-- `X-RateLimit-Remaining`
-- `X-RateLimit-Reset`
-- `Retry-After` (on 429)
+The root endpoint at `index.ts` lines 144-173 lists `GET /api/v1/providers/:npi/plans` and `GET /api/v1/plans/meta/years` which do not exist in the codebase. Conversely, three actual routes (`/plans/grouped`, `/:planId/providers`, `/providers/cities`) are omitted from the listing.
 
----
+#### 2. Admin Endpoints Not Rate Limited Individually
 
-### Input Validation ✅
+Admin endpoints rely on `adminAuthMiddleware` but do not apply any route-level rate limiter (e.g., `defaultRateLimiter`). They do inherit the global `defaultRateLimiter` from `index.ts` line 138, but an attacker attempting to brute-force the `X-Admin-Secret` would only be subject to the global 200 req/hr limit.
 
-All endpoints use Zod schemas:
+#### 3. `batchSize` and `retentionDays` Not Zod-Validated in Admin Routes
 
-```typescript
-// NPI validation
-const npiParamSchema = z.object({
-  npi: z.string().length(10).regex(/^\d+$/),
-});
-
-// Search query validation
-const searchQuerySchema = z.object({
-  state: z.string().length(2).toUpperCase().optional(),
-  city: z.string().min(1).max(100).optional(),
-  specialty: z.string().min(1).max(200).optional(),
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-});
-
-// Verification validation
-const submitVerificationSchema = z.object({
-  npi: z.string().length(10).regex(/^\d+$/),
-  planId: z.string().min(1).max(100),
-  acceptsInsurance: z.boolean(),
-  notes: z.string().max(1000).optional(),
-  captchaToken: z.string().optional(),
-});
-```
+In `admin.ts`, the `cleanup-expired` endpoint parses `batchSize` with `parseInt()` (line 73) and `cleanup/sync-logs` parses `retentionDays` with `parseInt()` (line 260). These are not validated through Zod and could accept non-numeric or negative values (though `parseInt` would return `NaN` and fall back to the default via `|| 1000` / `|| 90`).
 
 ---
 
-### CAPTCHA Protection ✅
+## Summary
 
-Write endpoints require reCAPTCHA v3:
+The API route implementation is comprehensive and well-secured. All 18 active endpoints (3 provider, 6 plan, 5 verify, 7 admin) plus 2 infrastructure endpoints are correctly registered with appropriate rate limiters, validation, and middleware. The CAPTCHA integration on write endpoints is properly implemented with configurable fail-open/fail-closed behavior. The middleware chain order is correct, with health checks bypassing rate limiting. The only notable issues are the stale endpoint listing in the root `/` response, the lack of Zod validation on admin query parameters, and the absence of admin-specific rate limiting for secret brute-force protection.
 
-- `POST /api/v1/verify` - Submit verification
-- `POST /api/v1/verify/:id/vote` - Vote on verification
+## Recommendations
 
-**Configuration:**
-- Score threshold: 0.5
-- Fail mode: Open (allows with stricter rate limiting)
-- Fallback rate limit: 3/hour
+1. **Update the root `/` endpoint listing** (`index.ts` lines 144-173) to match actual routes. Remove `providers/:npi/plans` and `plans/meta/years` references. Add `plans/grouped`, `plans/:planId/providers`, and `providers/cities`.
 
----
+2. **Add a stricter rate limiter to admin routes** to protect against brute-force attacks on `X-Admin-Secret`. Consider a dedicated `adminRateLimiter` with something like 10 requests per hour per IP, independent of the global limiter.
 
-### Error Handling ✅
+3. **Apply Zod validation to admin query parameters** (`batchSize`, `retentionDays`, `dryRun`) for consistency with the rest of the codebase. Example: `z.coerce.number().int().min(1).max(10000).default(1000)` for batchSize.
 
-Consistent error response format:
+4. **Consider IP allowlisting for admin endpoints** as an additional layer of defense, as suggested in the prompt's questions. This could be implemented as middleware that checks `req.ip` against a configured allowlist.
 
-```json
-{
-  "success": false,
-  "error": {
-    "message": "Human-readable message",
-    "code": "ERROR_CODE",
-    "statusCode": 400
-  }
-}
-```
+5. **Decide on the disabled locations route** -- either delete `routes/locations.ts` to reduce code surface area, or prioritize the `practice_locations` rewrite. The dead code could cause confusion for future contributors.
 
-**Error Codes:**
-- `VALIDATION_ERROR` - Invalid input
-- `NOT_FOUND` - Resource not found
-- `TOO_MANY_REQUESTS` - Rate limited
-- `CAPTCHA_REQUIRED` - Missing CAPTCHA
-- `UNAUTHORIZED` - Invalid admin secret
-
----
-
-### Authentication ✅
-
-| Endpoint Type | Auth Method | Status |
-|---------------|-------------|--------|
-| Public (GET) | None | By design |
-| Public (POST) | CAPTCHA + Rate limit | ✅ |
-| Admin | X-Admin-Secret header | ✅ |
-| User accounts | Not implemented | By design (MVP) |
-
----
-
-## Security Checklist
-
-### Rate Limiting
-- [x] Verification: 10/hr per IP
-- [x] Voting: 10/hr per IP
-- [x] Search: 100/hr per IP
-- [x] Default: 200/hr per IP
-- [x] Headers returned
-- [x] Dual-mode (Redis + in-memory)
-
-### CAPTCHA
-- [x] reCAPTCHA v3 on verification
-- [x] reCAPTCHA v3 on voting
-- [x] Fail-open with fallback
-- [x] Score threshold configurable
-
-### Input Validation
-- [x] Zod schemas on all endpoints
-- [x] NPI format validation
-- [x] Pagination limits enforced
-- [x] String length limits
-
-### Admin Security
-- [x] X-Admin-Secret required
-- [x] Timing-safe comparison
-- [x] Graceful 503 if not configured
-
-### Error Handling
-- [x] asyncHandler wraps all routes
-- [x] No stack traces in production
-- [x] Consistent response format
-
----
-
-## Potential Improvements
-
-### Recommended
-1. **Request logging** - Log all requests with correlation IDs
-2. **API versioning** - Document deprecation policy
-3. **Response caching** - Cache provider details (short TTL)
-
-### Future
-1. **User authentication** - When accounts are added
-2. **API keys** - For B2B customers
-3. **Webhooks** - For verification notifications
-
----
-
-## Conclusion
-
-The API is well-secured for its current use case:
-
-- ✅ Rate limiting on all endpoints
-- ✅ CAPTCHA on write endpoints
-- ✅ Input validation everywhere
-- ✅ Admin endpoints protected
-- ✅ Consistent error handling
-
-No immediate security issues identified.
+6. **Consider adding caching to plan search results** similar to provider search caching. Currently only provider search uses the 5-minute cache TTL pattern.

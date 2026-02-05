@@ -42,17 +42,26 @@ priority: 3
 - [x] Request ID generation and correlation (X-Request-ID header)
 - [x] Response time tracking
 - [x] Rate limit info extraction and logging
-- [x] PII exclusion (no IP addresses, user agents in logs)
+- [x] PII exclusion in application logs (no IP addresses, user agents in request logs)
 - [x] In-memory buffer for statistics (last 20 logs)
 - [x] Production JSON format, development colored console
 
 **Privacy-Preserving Design:**
 ```typescript
-// From requestLogger.ts - explicitly excludes PII
-// No IP addresses logged
-// No user agents logged
-// No identifying information captured
+// From requestLogger.ts - explicitly excludes PII from application/request logs
+// No IP addresses in request logs
+// No user agents in request logs
+// No identifying information in structured logs
 ```
+
+**Important distinction — Application Logs vs Database Storage:**
+- **Application logs** (`requestLogger.ts`): Do NOT contain IP addresses or user agents
+- **Database audit tables**: DO store IPs for anti-abuse purposes:
+  - `VerificationLog.sourceIp` — stored for Sybil attack prevention (30-day duplicate check)
+  - `VerificationLog.userAgent` — stored for abuse analysis
+  - `VoteLog.sourceIp` — stored for vote deduplication (unique constraint)
+- **API responses**: PII is stripped before returning via `stripVerificationPII()` in `verificationService.ts`
+- This is intentional: IPs are needed for anti-abuse but are NOT exposed in logs or API responses
 
 ## Questions to Ask
 

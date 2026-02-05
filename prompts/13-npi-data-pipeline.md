@@ -2,21 +2,44 @@
 tags:
   - data
   - pipeline
-  - high
+  - implemented
 type: prompt
 priority: 2
+updated: 2026-02-05
 ---
 
 # NPI Data Pipeline Review
 
 ## Files to Review
-- `scripts/import-npi-direct.ts` (main import script)
+
+### Import Scripts (`scripts/`)
+- `scripts/import-npi-direct.ts` (main NPI import — batch 5000, direct PostgreSQL)
+- `scripts/import-npi.ts` (alternative NPI import)
+- `scripts/import-filtered-csv.ts` (filtered CSV import)
+- `scripts/import-csv-copy.ts` (PostgreSQL COPY-based import)
+- `scripts/import-csv-simple.ts` (simple CSV import)
 - `scripts/normalize-city-names.ts` (city name cleanup)
 - `scripts/cleanup-deactivated-providers.ts` (deactivated provider handling)
-- `scripts/backfill-verification-ttl.ts` (TTL backfill)
+- `scripts/backfill-verification-ttl.ts` / `.sql` (TTL backfill)
+- `scripts/backfill-specialty-fast.cjs` (specialty backfill)
 - `scripts/generate-cities-json.cjs` (city dropdown generation)
-- `src/taxonomy-mappings.ts` (specialty mappings - at root level)
-- NPI data files (if available locally)
+- `scripts/check-import-status.ts` (import status verification)
+- `scripts/verify-data-quality.ts` (data quality checks)
+- `scripts/clean-ny-data.ts` (NY-specific data cleanup)
+
+### Schema & Taxonomy
+- `src/taxonomy-mappings.ts` (specialty mappings — root level)
+- `packages/backend/prisma/schema.prisma` (Provider, practice_locations, provider_taxonomies, taxonomy_reference models)
+
+### Insurance Import
+- `packages/backend/src/scripts/importInsurancePlans.ts` (plan import pipeline)
+- `packages/backend/src/utils/insurancePlanParser.ts` (plan parsing/normalization)
+
+### Data Quality
+- `scripts/describe-tables.ts`, `scripts/list-tables.ts` (schema inspection)
+- `scripts/check-locations-table.ts` (location data inspection)
+
+**Note:** Provider location data is stored in `practice_locations` table (not a separate `Location` model). This is an embedded part of the provider record linked via `@@map("practice_locations")` in Prisma, not a separate entity.
 
 ## VerifyMyProvider NPI Architecture
 - **Source:** NPPES Data Dissemination (CMS)
@@ -57,10 +80,31 @@ priority: 2
 ### 3. Specialty Categories
 
 **Current Implementation:**
-- [ ] 48 specialty categories (expanded from 7)
-- [ ] 400+ taxonomy code mappings
-- [ ] Primary care, medical, surgical, mental health, etc.
-- [ ] Catch-all "Other" for unmapped taxonomies
+- [x] 48 specialty categories (expanded from 7)
+- [x] 400+ taxonomy code mappings in `src/taxonomy-mappings.ts`
+- [x] Primary care, medical, surgical, mental health, etc.
+- [x] Catch-all "Other" for unmapped taxonomies
+- [x] Database table: `taxonomy_reference` stores taxonomy code → specialty mapping
+- [x] Provider taxonomies: `provider_taxonomies` links providers to taxonomy codes (primary flag)
+
+**Database Schema:**
+```prisma
+model taxonomy_reference {
+  code             String  @id @db.VarChar(20)
+  specialization   String? @db.VarChar(200)
+  classification   String? @db.VarChar(200)
+  grouping         String? @db.VarChar(200)
+  specialtyCategory String? @map("specialty_category") @db.VarChar(100)
+}
+
+model provider_taxonomies {
+  id           Int     @id @default(autoincrement())
+  npi          String  @db.VarChar(10)
+  taxonomyCode String  @map("taxonomy_code") @db.VarChar(20)
+  isPrimary    Boolean @default(false) @map("is_primary")
+  // ... provider relation, indexes
+}
+```
 
 **Mapping Quality:**
 - [ ] All major specialties covered?
@@ -119,14 +163,22 @@ priority: 2
 ### 7. Organization Linking Research
 
 **Hypothesis Tested:**
-- [ ] Link doctors to hospitals via address matching
-- [ ] Example: 698 providers at "Cathedral Home for Children" address
-- [ ] Example: 350 providers at "Cheyenne VA Medical Center" address
+- [x] Link doctors to hospitals via address matching
+- [x] Example: 698 providers at "Cathedral Home for Children" address
+- [x] Example: 350 providers at "Cheyenne VA Medical Center" address
 
 **Reality Check:**
-- [ ] User's therapist NPI showed OLD address
-- [ ] NPI data is self-reported, rarely updated
-- [ ] **Decision:** Skip org linking for MVP
+- [x] User's therapist NPI showed OLD address
+- [x] NPI data is self-reported, rarely updated
+- [x] **Decision:** Skip org linking for MVP
+
+**Current State:**
+- `provider_hospitals` table exists for explicit hospital-provider links
+- `hospitals` table stores hospital data
+- Hospital analysis script: `packages/backend/scripts/analyze-health-systems.ts`
+- NYC-specific extraction: `packages/backend/scripts/extract-nyc-providers.ts`
+- Facility matching: `packages/backend/scripts/match-facilities.ts`
+- JSON data files: `scripts/nyu_langone_complete.json`, `scripts/mount_sinai_complete.json`, `scripts/nyc_healthcare_facilities.json`
 
 ### 8. NPI Registry API Integration
 

@@ -71,6 +71,10 @@ const DATA_SOURCE_SCORES: Record<string, number> = {
   // Legacy VerificationSource enum values
   CMS_DATA: 25,
   CARRIER_DATA: 20,
+  // Enrichment pipeline sources
+  NPPES_SYNC: 25,          // Official CMS data via NPPES API
+  CARRIER_SCRAPE: 20,      // Carrier website data
+  NETWORK_CROSSREF: 15,    // Inferred from network IDs
 };
 
 /**

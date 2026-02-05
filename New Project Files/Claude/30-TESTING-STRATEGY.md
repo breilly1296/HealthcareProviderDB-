@@ -1,596 +1,84 @@
-# VerifyMyProvider Testing Strategy Analysis
+# Testing Strategy — Analysis
 
-**Last Updated:** 2026-01-31
-**Analyzed By:** Claude Code
-
----
-
-## Executive Summary
-
-VerifyMyProvider employs a multi-layered testing strategy including unit tests, integration tests, and end-to-end tests. The testing stack uses Jest for backend, React Testing Library for frontend, and Playwright for E2E.
+**Generated:** 2026-02-05
+**Source Prompt:** prompts/30-testing-strategy.md
+**Status:** Partially Implemented -- Infrastructure is configured but test coverage is minimal
 
 ---
 
-## Testing Pyramid
-
-```
-                    ┌─────────────┐
-                    │    E2E      │  Playwright
-                    │   Tests     │  ~10 tests
-                    ├─────────────┤
-                    │ Integration │  Jest + Supertest
-                    │   Tests     │  ~50 tests
-                    ├─────────────┤
-                    │    Unit     │  Jest
-                    │   Tests     │  ~200 tests
-                    └─────────────┘
-```
-
----
-
-## Technology Stack
-
-| Layer | Technology | Purpose |
-|-------|------------|---------|
-| Unit Tests | Jest | Function/component testing |
-| Frontend Tests | React Testing Library | Component testing |
-| API Tests | Supertest | HTTP endpoint testing |
-| E2E Tests | Playwright | Full user flow testing |
-| Mocking | Jest mocks, MSW | External service mocking |
-| Coverage | c8/nyc | Code coverage reporting |
-
----
-
-## Test Structure
-
-```
-packages/
-├── backend/
-│   ├── src/
-│   └── tests/
-│       ├── unit/
-│       │   ├── services/
-│       │   ├── middleware/
-│       │   └── utils/
-│       ├── integration/
-│       │   ├── routes/
-│       │   └── database/
-│       └── setup.ts
-├── frontend/
-│   ├── src/
-│   └── __tests__/
-│       ├── components/
-│       ├── hooks/
-│       └── pages/
-└── e2e/
-    ├── tests/
-    └── playwright.config.ts
-```
-
----
-
-## Backend Unit Tests
-
-### Service Tests
-
-```typescript
-// packages/backend/tests/unit/services/confidenceScoring.test.ts
-
-import { calculateConfidenceScore } from '../../../src/services/confidenceScoring';
-
-describe('Confidence Scoring', () => {
-  describe('calculateConfidenceScore', () => {
-    it('returns 0 for no verifications', () => {
-      const score = calculateConfidenceScore({
-        verificationCount: 0,
-        lastVerifiedAt: null,
-        upvotes: 0,
-        downvotes: 0,
-        sources: []
-      });
-
-      expect(score).toBe(0);
-    });
-
-    it('returns high score for well-verified provider', () => {
-      const score = calculateConfidenceScore({
-        verificationCount: 10,
-        lastVerifiedAt: new Date(),
-        upvotes: 15,
-        downvotes: 1,
-        sources: ['INSURANCE_CARD', 'CROWDSOURCE']
-      });
-
-      expect(score).toBeGreaterThan(80);
-    });
-
-    it('penalizes old verifications', () => {
-      const recentScore = calculateConfidenceScore({
-        verificationCount: 5,
-        lastVerifiedAt: new Date(),
-        upvotes: 5,
-        downvotes: 0,
-        sources: ['CROWDSOURCE']
-      });
-
-      const oldScore = calculateConfidenceScore({
-        verificationCount: 5,
-        lastVerifiedAt: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000),
-        upvotes: 5,
-        downvotes: 0,
-        sources: ['CROWDSOURCE']
-      });
-
-      expect(recentScore).toBeGreaterThan(oldScore);
-    });
-  });
-});
-```
-
-### Middleware Tests
-
-```typescript
-// packages/backend/tests/unit/middleware/rateLimiter.test.ts
-
-import { createRateLimiter } from '../../../src/middleware/rateLimiter';
-
-describe('Rate Limiter', () => {
-  let mockReq: any;
-  let mockRes: any;
-  let mockNext: jest.Mock;
-
-  beforeEach(() => {
-    mockReq = { ip: '127.0.0.1' };
-    mockRes = {
-      setHeader: jest.fn(),
-      status: jest.fn().mockReturnThis(),
-      json: jest.fn()
-    };
-    mockNext = jest.fn();
-  });
-
-  it('allows requests under limit', async () => {
-    const limiter = createRateLimiter({
-      name: 'test',
-      windowMs: 60000,
-      maxRequests: 10
-    });
-
-    await limiter(mockReq, mockRes, mockNext);
-
-    expect(mockNext).toHaveBeenCalled();
-    expect(mockRes.setHeader).toHaveBeenCalledWith('X-RateLimit-Limit', 10);
-  });
-
-  it('blocks requests over limit', async () => {
-    const limiter = createRateLimiter({
-      name: 'test',
-      windowMs: 60000,
-      maxRequests: 1
-    });
-
-    await limiter(mockReq, mockRes, mockNext);
-    mockNext.mockClear();
-
-    await limiter(mockReq, mockRes, mockNext);
-
-    expect(mockNext).not.toHaveBeenCalled();
-    expect(mockRes.status).toHaveBeenCalledWith(429);
-  });
-});
-```
-
----
-
-## Backend Integration Tests
-
-### Route Tests
-
-```typescript
-// packages/backend/tests/integration/routes/providers.test.ts
-
-import request from 'supertest';
-import { app } from '../../../src/app';
-import { prisma } from '../../../src/lib/prisma';
-
-describe('Provider Routes', () => {
-  beforeAll(async () => {
-    // Seed test data
-    await prisma.provider.createMany({
-      data: [
-        {
-          npi: '1234567890',
-          entityType: 'INDIVIDUAL',
-          firstName: 'John',
-          lastName: 'Smith',
-          specialty: 'Cardiology',
-          addressLine1: '123 Test St',
-          city: 'Los Angeles',
-          state: 'CA',
-          zipCode: '90001'
-        }
-      ]
-    });
-  });
-
-  afterAll(async () => {
-    await prisma.provider.deleteMany();
-    await prisma.$disconnect();
-  });
-
-  describe('GET /api/v1/providers/search', () => {
-    it('returns providers matching state', async () => {
-      const response = await request(app)
-        .get('/api/v1/providers/search')
-        .query({ state: 'CA' });
-
-      expect(response.status).toBe(200);
-      expect(response.body.success).toBe(true);
-      expect(response.body.data).toHaveLength(1);
-      expect(response.body.data[0].npi).toBe('1234567890');
-    });
-
-    it('validates pagination limits', async () => {
-      const response = await request(app)
-        .get('/api/v1/providers/search')
-        .query({ limit: 500 });
-
-      expect(response.status).toBe(400);
-      expect(response.body.error.code).toBe('VALIDATION_ERROR');
-    });
-  });
-
-  describe('GET /api/v1/providers/:npi', () => {
-    it('returns provider by NPI', async () => {
-      const response = await request(app)
-        .get('/api/v1/providers/1234567890');
-
-      expect(response.status).toBe(200);
-      expect(response.body.data.firstName).toBe('John');
-    });
-
-    it('returns 404 for unknown NPI', async () => {
-      const response = await request(app)
-        .get('/api/v1/providers/0000000000');
-
-      expect(response.status).toBe(404);
-    });
-
-    it('validates NPI format', async () => {
-      const response = await request(app)
-        .get('/api/v1/providers/invalid');
-
-      expect(response.status).toBe(400);
-    });
-  });
-});
-```
-
-### Verification Tests
-
-```typescript
-// packages/backend/tests/integration/routes/verify.test.ts
-
-describe('Verification Routes', () => {
-  describe('POST /api/v1/verify', () => {
-    it('creates verification with valid data', async () => {
-      const response = await request(app)
-        .post('/api/v1/verify')
-        .send({
-          npi: '1234567890',
-          planId: 'BCBS_PPO_CA',
-          acceptsInsurance: true,
-          notes: 'Test verification'
-        });
-
-      expect(response.status).toBe(201);
-      expect(response.body.success).toBe(true);
-      expect(response.body.data.id).toBeDefined();
-    });
-
-    it('enforces rate limiting', async () => {
-      // Make 11 requests (limit is 10)
-      for (let i = 0; i < 11; i++) {
-        const response = await request(app)
-          .post('/api/v1/verify')
-          .send({
-            npi: '1234567890',
-            planId: `TEST_PLAN_${i}`,
-            acceptsInsurance: true
-          });
-
-        if (i < 10) {
-          expect(response.status).toBe(201);
-        } else {
-          expect(response.status).toBe(429);
-        }
-      }
-    });
-  });
-});
-```
-
----
-
-## Frontend Tests
-
-### Component Tests
-
-```typescript
-// packages/frontend/__tests__/components/ProviderCard.test.tsx
-
-import { render, screen } from '@testing-library/react';
-import { ProviderCard } from '../../src/components/providers/ProviderCard';
-
-const mockProvider = {
-  npi: '1234567890',
-  entityType: 'INDIVIDUAL',
-  firstName: 'John',
-  lastName: 'Smith',
-  specialty: 'Cardiology',
-  addressLine1: '123 Test St',
-  city: 'Los Angeles',
-  state: 'CA',
-  zipCode: '90001'
-};
-
-describe('ProviderCard', () => {
-  it('renders provider name', () => {
-    render(<ProviderCard provider={mockProvider} />);
-
-    expect(screen.getByText('John Smith')).toBeInTheDocument();
-  });
-
-  it('renders specialty', () => {
-    render(<ProviderCard provider={mockProvider} />);
-
-    expect(screen.getByText('Cardiology')).toBeInTheDocument();
-  });
-
-  it('renders address', () => {
-    render(<ProviderCard provider={mockProvider} />);
-
-    expect(screen.getByText(/123 Test St/)).toBeInTheDocument();
-    expect(screen.getByText(/Los Angeles, CA/)).toBeInTheDocument();
-  });
-});
-```
-
-### Hook Tests
-
-```typescript
-// packages/frontend/__tests__/hooks/useSearch.test.ts
-
-import { renderHook, act } from '@testing-library/react';
-import { useSearch } from '../../src/hooks/useSearch';
-
-// Mock fetch
-global.fetch = jest.fn();
-
-describe('useSearch', () => {
-  beforeEach(() => {
-    (fetch as jest.Mock).mockClear();
-  });
-
-  it('returns empty results initially', () => {
-    const { result } = renderHook(() => useSearch());
-
-    expect(result.current.results).toEqual([]);
-    expect(result.current.isLoading).toBe(false);
-  });
-
-  it('fetches results on search', async () => {
-    (fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({
-        success: true,
-        data: [{ npi: '1234567890' }]
-      })
-    });
-
-    const { result } = renderHook(() => useSearch());
-
-    await act(async () => {
-      await result.current.search({ state: 'CA' });
-    });
-
-    expect(result.current.results).toHaveLength(1);
-  });
-});
-```
-
----
-
-## E2E Tests
-
-### Playwright Configuration
-
-```typescript
-// e2e/playwright.config.ts
-
-import { defineConfig } from '@playwright/test';
-
-export default defineConfig({
-  testDir: './tests',
-  timeout: 30000,
-  retries: 2,
-  use: {
-    baseURL: 'http://localhost:3000',
-    screenshot: 'only-on-failure',
-    video: 'retain-on-failure'
-  },
-  projects: [
-    { name: 'chromium', use: { browserName: 'chromium' } },
-    { name: 'firefox', use: { browserName: 'firefox' } },
-    { name: 'webkit', use: { browserName: 'webkit' } }
-  ]
-});
-```
-
-### E2E Test Examples
-
-```typescript
-// e2e/tests/provider-search.spec.ts
-
-import { test, expect } from '@playwright/test';
-
-test.describe('Provider Search', () => {
-  test('can search for providers', async ({ page }) => {
-    await page.goto('/');
-
-    // Fill search form
-    await page.selectOption('[data-testid="state-select"]', 'CA');
-    await page.fill('[data-testid="city-input"]', 'Los Angeles');
-    await page.click('[data-testid="search-button"]');
-
-    // Wait for results
-    await expect(page.locator('[data-testid="provider-card"]')).toBeVisible();
-
-    // Check results
-    const cards = page.locator('[data-testid="provider-card"]');
-    await expect(cards).toHaveCount.greaterThan(0);
-  });
-
-  test('can view provider details', async ({ page }) => {
-    await page.goto('/providers/1234567890');
-
-    await expect(page.locator('h1')).toContainText('Dr.');
-    await expect(page.locator('[data-testid="specialty"]')).toBeVisible();
-  });
-});
-
-test.describe('Verification Flow', () => {
-  test('can submit verification', async ({ page }) => {
-    await page.goto('/providers/1234567890');
-
-    // Click verify button
-    await page.click('[data-testid="verify-button"]');
-
-    // Fill form
-    await page.fill('[data-testid="plan-search"]', 'Blue Cross');
-    await page.click('[data-testid="plan-option"]');
-    await page.click('[data-testid="accepts-yes"]');
-
-    // Submit
-    await page.click('[data-testid="submit-verification"]');
-
-    // Check success
-    await expect(page.locator('[data-testid="success-message"]')).toBeVisible();
-  });
-});
-```
-
----
-
-## Coverage Goals
-
-| Area | Current | Target |
-|------|---------|--------|
-| Backend Unit | 70% | 80% |
-| Backend Integration | 60% | 75% |
-| Frontend Components | 50% | 70% |
-| E2E Critical Paths | 100% | 100% |
-
-### Coverage Configuration
-
-```json
-// jest.config.js
-{
-  "collectCoverageFrom": [
-    "src/**/*.{ts,tsx}",
-    "!src/**/*.d.ts",
-    "!src/**/index.ts"
-  ],
-  "coverageThreshold": {
-    "global": {
-      "branches": 70,
-      "functions": 70,
-      "lines": 70,
-      "statements": 70
-    }
-  }
-}
-```
-
----
-
-## CI/CD Integration
-
-```yaml
-# .github/workflows/test.yml
-
-name: Test
-
-on: [push, pull_request]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 18
-
-      - run: npm ci
-
-      - name: Run unit tests
-        run: npm run test:unit
-
-      - name: Run integration tests
-        run: npm run test:integration
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test
-
-      - name: Run E2E tests
-        run: npm run test:e2e
-
-      - name: Upload coverage
-        uses: codecov/codecov-action@v3
-```
-
----
+## Findings
+
+### Setup
+- [x] **Jest configured for backend** -- `packages/backend/jest.config.js` exists with `ts-jest` preset, `node` environment, and roots in `<rootDir>/src`. Coverage collection configured for all `.ts` files excluding `.d.ts` and `index.ts`.
+- [x] **Jest configured for frontend** -- `packages/frontend/jest.config.js` exists with `jsdom` environment, Babel transform via `babel.config.jest.js`, `@/` path alias mapping, CSS mock via `__mocks__/styleMock.js`, and coverage collection for all `.ts`/`.tsx` files.
+- [x] **Playwright configured for E2E** -- `packages/frontend/playwright.config.ts` exists with `./e2e` test directory, Chromium-only project, webServer integration (dev/start), HTML+list reporters, trace/screenshot/video on failure, 30s test timeout.
+- [x] **CI pipeline runs E2E tests** -- `.github/workflows/playwright.yml` runs on push/PR to `main` for `packages/frontend/**` paths. Installs Chromium, builds shared + frontend, runs E2E, uploads report artifact.
+- [ ] **CI pipeline does NOT run unit tests** -- The `deploy.yml` workflow deploys directly without running Jest unit tests. No dedicated unit test CI workflow exists.
+- [ ] **Coverage reports not generated in CI** -- No CI step produces or uploads Jest coverage reports. Coverage can only be run locally via `npm run test:coverage`.
+
+### Backend Tests
+- [x] **Confidence service tests** -- `packages/backend/src/services/__tests__/confidenceService.test.ts` exists with 40+ tests across 8 describe blocks covering: data source scoring, recency decay, specialty-based decay rates, verification count, community agreement, overall score calculation, confidence level assignment, confidence level description, and metadata calculations. Uses `jest.useFakeTimers()` for deterministic date testing.
+- [ ] **Verification service tests** -- No test file found at `packages/backend/src/services/__tests__/verificationService.test.ts`. This is a critical gap given the service handles verification submission, Sybil prevention, consensus logic, voting, and TTL cleanup.
+- [ ] **Provider service tests** -- No test file found. `providerService.ts` is untested.
+- [ ] **Rate limiter tests** -- No test file at `packages/backend/src/middleware/__tests__/`. Both Redis and in-memory rate limiting modes are untested.
+- [ ] **CAPTCHA middleware tests** -- No test file at `packages/backend/src/middleware/__tests__/`.
+
+### Frontend Tests
+- [x] **Utility function tests (partial)** -- `packages/frontend/src/lib/__tests__/` contains 5 test files: `constants.test.ts`, `debounce.test.ts`, `errorUtils.test.ts`, `imagePreprocess.test.ts`, `insuranceCardSchema.test.ts`.
+- [ ] **SearchForm component tests** -- No `packages/frontend/src/components/__tests__/` directory exists.
+- [ ] **ProviderCard component tests** -- Not found.
+- [ ] **Hook tests (useProviderSearch)** -- No `packages/frontend/src/hooks/__tests__/` directory exists.
+
+### E2E Tests
+- [x] **Search flow (smoke)** -- `packages/frontend/e2e/smoke.spec.ts` contains 4 smoke tests: homepage loads, search page loads, basic search interaction, provider detail page loads. These are minimal smoke tests rather than full flow tests.
+- [ ] **Provider detail page (full)** -- Only a basic "loads or shows not found" test exists in the smoke spec.
+- [ ] **Verification submission** -- Not tested in E2E.
+- [ ] **Error handling** -- Not tested in E2E.
+
+### Test Infrastructure Details
+
+| Component | File | Status |
+|-----------|------|--------|
+| Backend Jest Config | `packages/backend/jest.config.js` | Configured |
+| Frontend Jest Config | `packages/frontend/jest.config.js` | Configured |
+| Playwright Config | `packages/frontend/playwright.config.ts` | Configured |
+| Backend test script | `npm run test:backend` | Works (delegates to Jest) |
+| Frontend test script | `npm run test:frontend` | Not defined in root; uses `npm run test -w frontend` |
+| E2E test script | `npm run test:e2e` | Defined in frontend package.json |
+| Root test script | `npm test` | Only runs backend tests |
+| CI unit tests | Not configured | Missing |
+| CI E2E tests | `.github/workflows/playwright.yml` | Configured |
+| CI deploy | `.github/workflows/deploy.yml` | No test gate |
+
+### Test Counts (Actual)
+
+| Category | Count | Files |
+|----------|-------|-------|
+| Backend unit tests | ~40 tests | 1 file (confidenceService.test.ts) |
+| Frontend unit tests | ~unknown | 5 files (lib/__tests__/) |
+| E2E tests | 4 tests | 1 file (smoke.spec.ts) |
+| **Total test files** | **7** | |
+
+## Summary
+
+The project has testing infrastructure properly configured across all three layers (Jest backend, Jest frontend, Playwright E2E) but the actual test coverage is thin. The backend has one comprehensive test file for the confidence scoring algorithm (~40 tests), the frontend has 5 utility test files, and there is a single E2E smoke test file with 4 basic page-load tests.
+
+Critical business logic in `verificationService.ts` (verification submission, Sybil prevention, consensus determination, voting, TTL cleanup) has zero test coverage. No route handlers, middleware, or React components are tested. The CI deploy pipeline does not gate on test passage -- it deploys directly on push to main.
 
 ## Recommendations
 
-### Immediate
-- ✅ Core testing infrastructure in place
-- Add more edge case tests
-- Improve coverage to 80%
+1. **Add unit test CI gate** -- Create a `.github/workflows/test.yml` that runs `npm run test:backend` and `npm run test:frontend` on every PR, blocking merge on failure. The deploy workflow should depend on test passage.
 
-### Future
-1. **Visual Regression Testing**
-   - Add Percy or Chromatic
-   - Catch UI regressions
+2. **Prioritize verificationService tests** -- This is the most critical untested code. Test `submitVerification` (validation, Sybil checks, consensus logic), `voteOnVerification` (duplicate prevention, count updates), and `cleanupExpiredVerifications` (TTL enforcement, dry run mode). Mock Prisma for isolation.
 
-2. **Performance Testing**
-   - Load testing with k6
-   - API benchmark tests
+3. **Add rate limiter tests** -- Test both Redis and in-memory modes, sliding window behavior, fail-open behavior, and the pre-configured limiter configurations.
 
-3. **Contract Testing**
-   - API contract tests with Pact
-   - Frontend-backend contract validation
+4. **Add admin route tests** -- Test `cleanup-expired`, `expiration-stats`, `health`, and `cache/clear` endpoints, including admin secret authentication (timing-safe comparison, 503 when unconfigured).
 
----
+5. **Expand E2E tests beyond smoke** -- The current E2E tests only verify pages load. Add tests for the full search-to-detail flow, verification submission form, comparison feature, and error states.
 
-## Conclusion
+6. **Add frontend component tests** -- Start with `CompareCheckbox`, `CompareBar`, and `CompareModal` since they have well-defined state management via `CompareContext`. The context's max-4 limit, add/remove/clear behavior, and sessionStorage persistence are all testable.
 
-Testing strategy is **well-structured**:
+7. **Add root `test:frontend` script** -- The root `package.json` only has `test` and `test:backend`. Add `test:frontend` to make running frontend tests discoverable.
 
-- ✅ Multi-layer testing pyramid
-- ✅ Jest + Supertest for backend
-- ✅ React Testing Library for frontend
-- ✅ Playwright for E2E
-- ✅ CI/CD integration
-
-The testing approach ensures code quality and catches regressions early.
+8. **Enable coverage reporting** -- Integrate coverage output into CI (e.g., upload to Codecov or similar). Set minimum coverage thresholds to prevent regression.

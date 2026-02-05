@@ -1,452 +1,434 @@
 # VerifyMyProvider Troubleshooting Guide
 
-**Last Updated:** 2026-01-31
-**Analyzed By:** Claude Code
+**Last Updated:** 2026-02-05
+**Generated From:** prompts/18-troubleshooting-doc.md
 
 ---
 
-## Common Issues
+## Table of Contents
 
-### 1. Rate Limit Exceeded (429)
-
-**Symptoms:**
-```json
-{
-  "success": false,
-  "error": {
-    "message": "Too many requests",
-    "code": "TOO_MANY_REQUESTS"
-  }
-}
-```
-
-**Headers:**
-```
-X-RateLimit-Limit: 10
-X-RateLimit-Remaining: 0
-X-RateLimit-Reset: 1706745600
-Retry-After: 3600
-```
-
-**Causes:**
-- Exceeded verification limit (10/hour)
-- Exceeded search limit (100/hour)
-- Using shared IP (VPN, corporate network)
-
-**Solutions:**
-1. Wait for rate limit reset (check `Retry-After` header)
-2. If using shared IP, contact support for allowlisting
-3. Implement exponential backoff in your client
+1. [Development Environment Issues](#1-development-environment-issues)
+   - [1.1 Next.js SWC on Windows ARM64 + Node 24](#11-nextjs-swc-on-windows-arm64--node-24)
+   - [1.2 OneDrive + node_modules Corruption](#12-onedrive--node_modules-corruption)
+   - [1.3 npm Workspaces Hoisting Conflicts](#13-npm-workspaces-hoisting-conflicts)
+2. [Database Issues](#2-database-issues)
+   - [2.1 Prisma Schema Conventions After db pull](#21-prisma-schema-conventions-after-db-pull)
+   - [2.2 Cloud SQL Connection Failures](#22-cloud-sql-connection-failures)
+3. [Backend / API Issues](#3-backend--api-issues)
+   - [3.1 Locations Route Returns 404](#31-locations-route-returns-404)
+   - [3.2 Admin Endpoints Return 503](#32-admin-endpoints-return-503)
+   - [3.3 Location Enrichment Endpoints Not Available](#33-location-enrichment-endpoints-not-available)
+   - [3.4 Rate Limiting False Positives](#34-rate-limiting-false-positives)
+   - [3.5 CAPTCHA Verification Failures](#35-captcha-verification-failures)
+4. [Deployment Issues](#4-deployment-issues)
+   - [4.1 Cloud Run Deployment Failures](#41-cloud-run-deployment-failures)
+   - [4.2 No Staging Environment](#42-no-staging-environment)
+5. [Data Quality Issues](#5-data-quality-issues)
+   - [5.1 City Name Typos in NPI Data](#51-city-name-typos-in-npi-data)
+   - [5.2 Stale Provider Addresses](#52-stale-provider-addresses)
 
 ---
 
-### 2. CAPTCHA Verification Failed (403)
+## 1. Development Environment Issues
 
-**Symptoms:**
-```json
-{
-  "success": false,
-  "error": {
-    "message": "Suspicious activity blocked",
-    "code": "CAPTCHA_FAILED"
-  }
-}
+### 1.1 Next.js SWC on Windows ARM64 + Node 24
+
+**Symptom:**
+When running `npm run dev` in the frontend package on Windows ARM64 with Node.js v24+, the following error appears:
+
+```
+Error: not a valid Win32 application
 ```
 
-**Causes:**
-- Invalid CAPTCHA token
-- CAPTCHA token expired (2 minutes lifetime)
-- Low CAPTCHA score (bot-like behavior)
-- Headless browser detected
+The error originates from Next.js attempting to load native SWC binaries (`.node` files) that are incompatible with the Node.js v24+ runtime on Windows ARM64.
 
-**Solutions:**
-1. Ensure CAPTCHA token is fresh (generate immediately before request)
-2. Use visible reCAPTCHA if score is consistently low
-3. Check browser for bot-detection issues
-4. Verify site key matches environment
+**Root Cause:**
+Next.js 14.x ships native SWC binaries and includes a hardcoded list of platforms in `knownDefaultWasmFallbackTriples` for which it auto-enables a WASM fallback. The `win32-arm64` platform (`aarch64-pc-windows-msvc`) is **not** in that list. Additionally, the code gates the WASM fallback behind a `useWasmBinary` condition, preventing automatic fallback even if the platform were listed.
 
----
+**Fix:**
+A postinstall script at `packages/frontend/scripts/patch-next-swc.js` automates two patches to `next/dist/build/swc/index.js`:
 
-### 3. CAPTCHA Not Configured (Degraded Mode)
+1. **Patch 1:** Adds `"aarch64-pc-windows-msvc"` to the `knownDefaultWasmFallbackTriples` array so Next.js recognizes Windows ARM64 as a platform needing WASM fallback.
+2. **Patch 2:** Changes the condition `unsupportedPlatform && useWasmBinary ||` to `unsupportedPlatform ||`, removing the `useWasmBinary` gate so the fallback engages automatically.
 
-**Symptoms:**
-- Requests succeed but with header:
-```
-X-Security-Degraded: captcha-unavailable
-```
+The script checks both the local `node_modules` path and the hoisted monorepo path. It is safe to run on non-ARM64 systems (the patch is harmless if the platform is not matched).
 
-**Causes:**
-- `RECAPTCHA_SECRET_KEY` not set
-- Google API temporarily unavailable
-
-**Solutions:**
-1. Set `RECAPTCHA_SECRET_KEY` environment variable
-2. If Google API is down, system uses fallback rate limiting (3/hr)
-
----
-
-### 4. Database Connection Failed
-
-**Symptoms:**
-```json
-{
-  "success": false,
-  "error": {
-    "message": "Database connection failed",
-    "code": "INTERNAL_ERROR"
-  }
-}
-```
-
-**Causes:**
-- Invalid `DATABASE_URL`
-- Cloud SQL instance down
-- Connection pool exhausted
-- Network connectivity issues
-
-**Solutions:**
-
-**Local Development:**
+**How to Apply:**
 ```bash
-# Check PostgreSQL is running
-pg_isready -h localhost -p 5432
-
-# Verify connection string
-psql $DATABASE_URL -c "SELECT 1"
+cd packages/frontend
+npm run postinstall
 ```
 
-**Production (Cloud Run):**
-```bash
-# Check Cloud SQL instance status
-gcloud sql instances describe verifymyprovider-db
+Or it runs automatically during `npm install` if the postinstall script is configured in `packages/frontend/package.json`.
 
-# Check Cloud Run logs
-gcloud logging read "resource.type=cloud_run_revision AND severity>=ERROR"
+**Verification:**
+After patching, `npm run dev` in the frontend package should start the Next.js dev server without the "not a valid Win32 application" error.
 
-# Verify secret is mounted
-gcloud run services describe verifymyprovider-backend --format="yaml" | grep DATABASE_URL
-```
+**Reference File:** `packages/frontend/scripts/patch-next-swc.js`
 
 ---
 
-### 5. Provider Not Found (404)
+### 1.2 OneDrive + node_modules Corruption
 
-**Symptoms:**
-```json
-{
-  "success": false,
-  "error": {
-    "message": "Provider not found",
-    "code": "NOT_FOUND"
-  }
-}
-```
+**Symptom:**
+Native `.node` binary files (such as SWC binaries, Prisma engines, or other native Node.js addons) fail to load with cryptic errors. Files may appear truncated or corrupted.
 
-**Causes:**
-- Invalid NPI number
-- NPI deactivated in NPPES
-- Data not yet imported
+**Root Cause:**
+OneDrive file sync can corrupt native binary files in `node_modules/`. This happens because OneDrive's sync mechanism may not correctly handle files that are being written while syncing, or it may alter file metadata in ways that break binary executables.
 
-**Solutions:**
-1. Verify NPI format (exactly 10 digits)
-2. Check NPI on NPPES website: https://npiregistry.cms.hhs.gov/
-3. Check if NPI import has completed:
-```sql
-SELECT * FROM sync_logs ORDER BY started_at DESC LIMIT 1;
-```
+**Workaround:**
+- Prefer WASM fallbacks over native binaries when available (e.g., the SWC WASM fallback described in section 1.1).
+- If corruption is suspected, delete `node_modules/` and reinstall:
+  ```bash
+  rm -rf node_modules packages/*/node_modules
+  npm install
+  ```
+- Consider adding `node_modules/` to OneDrive's exclusion list, or moving the project to a non-synced directory for development.
 
 ---
 
-### 6. Validation Error (400)
+### 1.3 npm Workspaces Hoisting Conflicts
 
-**Symptoms:**
-```json
-{
-  "success": false,
-  "error": {
-    "message": "Validation failed",
-    "code": "VALIDATION_ERROR",
-    "details": [
-      {"field": "npi", "message": "NPI must be exactly 10 digits"}
-    ]
-  }
-}
-```
+**Symptom:**
+SWC version mismatches, unexpected Next.js behavior, or build errors after installing dependencies. The frontend may pick up a different version of `next` than expected.
 
-**Common Validation Issues:**
+**Root Cause:**
+npm workspaces hoists dependencies to the root `node_modules/`. If `next` is listed in the root `package.json` (e.g., `next@^16.1.1`), it overrides the frontend workspace version (`next@^14.2.35`), causing SWC binary mismatches and API incompatibilities.
 
-| Field | Error | Fix |
-|-------|-------|-----|
-| npi | "Must be 10 digits" | Remove dashes/spaces |
-| state | "Must be 2-letter code" | Use "CA" not "California" |
-| limit | "Maximum 100" | Reduce pagination limit |
-| vote | "Must be 'up' or 'down'" | Use exact values |
+**Fix:**
+- **NEVER** put `next` in the root `package.json`.
+- Only shared dependencies belong at root: `prisma`, `csv-parse`, `pg`, and similar cross-workspace utilities.
+- If the wrong version is installed, remove and reinstall:
+  ```bash
+  # Remove next from root if present
+  npm uninstall next --workspace-root
+  # Clean reinstall
+  rm -rf node_modules packages/*/node_modules
+  npm install
+  ```
+
+**Verification:**
+Check the resolved version: `npm ls next` should show `next` only under `packages/frontend`.
 
 ---
 
-### 7. Admin Endpoint Unauthorized (401)
+## 2. Database Issues
 
-**Symptoms:**
-```json
-{
-  "success": false,
-  "error": {
-    "message": "Invalid admin secret",
-    "code": "UNAUTHORIZED"
-  }
-}
-```
+### 2.1 Prisma Schema Conventions After db pull
 
-**Causes:**
-- Missing `X-Admin-Secret` header
-- Incorrect secret value
-- Secret not configured on server
+**Symptom:**
+After running `prisma db pull`, model names are lowercase (e.g., `model providers` instead of `model Provider`) and field names use `snake_case`, which does not match TypeScript conventions.
 
-**Solutions:**
-```bash
-# Include header in request
-curl -H "X-Admin-Secret: YOUR_SECRET" \
-  https://api.verifymyprovider.com/api/v1/admin/health
+**Root Cause:**
+`prisma db pull` generates raw model and field names from the PostgreSQL table and column names, which are typically lowercase/snake_case.
 
-# Verify secret in Secret Manager
-gcloud secrets versions access latest --secret=ADMIN_SECRET
-```
+**Fix:**
+After every `prisma db pull`, manually update the schema:
 
----
+1. **Rename models** to PascalCase and add `@@map("table_name")`:
+   ```prisma
+   model Provider {
+     // fields...
+     @@map("providers")
+   }
+   ```
 
-### 8. Admin Endpoints Not Configured (503)
+2. **Rename fields** to camelCase and add `@map("column_name")`:
+   ```prisma
+   model Provider {
+     firstName String @map("first_name")
+     lastName  String @map("last_name")
+     // ...
+   }
+   ```
 
-**Symptoms:**
-```json
-{
-  "success": false,
-  "error": {
-    "message": "Admin endpoints not configured",
-    "code": "SERVICE_UNAVAILABLE"
-  }
-}
-```
+3. For application-generated TEXT primary keys (e.g., `verification_logs`, `vote_logs`), add `@default(cuid())`.
 
-**Cause:**
-- `ADMIN_SECRET` environment variable not set
-
-**Solution:**
-```bash
-# Create secret
-echo -n "your-secure-secret" | gcloud secrets create ADMIN_SECRET --data-file=-
-
-# Mount in Cloud Run
-gcloud run services update verifymyprovider-backend \
-  --set-secrets=ADMIN_SECRET=ADMIN_SECRET:latest
-```
+4. Run `npx prisma generate` after schema changes to regenerate the Prisma Client.
 
 ---
 
-### 9. CORS Errors
+### 2.2 Cloud SQL Connection Failures
 
-**Symptoms:**
-```
-Access to fetch at 'https://api...' from origin 'https://...' has been blocked by CORS policy
-```
+**Symptom:**
+Backend cannot connect to the database. Error messages referencing connection refused or timeout.
 
-**Causes:**
-- Frontend domain not in CORS allowlist
-- Missing CORS headers
+**Root Cause / Configuration:**
+Connection methods differ by environment:
 
-**Solutions:**
-```bash
-# Update CORS_ORIGIN environment variable
-gcloud run services update verifymyprovider-backend \
-  --set-env-vars=CORS_ORIGIN=https://verifymyprovider.com
-```
+| Environment | Method | Configuration |
+|---|---|---|
+| Local development | Direct TCP | `DATABASE_URL` in `.env` pointing to `localhost` or Cloud SQL public IP |
+| Cloud Run (production) | Cloud SQL Auth Proxy | Automatic unix socket via `CLOUD_SQL_CONNECTION_NAME` env var |
 
-For multiple origins:
+**Troubleshooting Steps:**
+
+1. **Local:** Verify `DATABASE_URL` in `.env` is correct and the database is accessible:
+   ```bash
+   npx prisma db pull   # Quick connectivity test
+   ```
+
+2. **Cloud Run:** Verify:
+   - The Cloud SQL connection is configured in the Cloud Run service settings.
+   - `CLOUD_SQL_CONNECTION_NAME` is set in the format `project:region:instance`.
+   - The service account has `roles/cloudsql.client` permission.
+
+---
+
+## 3. Backend / API Issues
+
+### 3.1 Locations Route Returns 404
+
+**Symptom:**
+Any request to `/api/v1/locations/*` returns a 404 error. Frontend pages that depend on location data do not function.
+
+**Root Cause:**
+The locations router is **commented out** in `packages/backend/src/routes/index.ts`:
+
 ```typescript
-// Backend configuration
-app.use(cors({
-  origin: ['https://verifymyprovider.com', 'https://www.verifymyprovider.com']
-}));
+// TODO: locations route depends on old Location model - needs rewrite for practice_locations
+// import locationsRouter from './locations';
+// ...
+// router.use('/locations', locationsRouter);
 ```
+
+The old `Location` model has been replaced by the `practice_locations` table, but the locations route has not been updated to use the new schema.
+
+**Status:** Disabled intentionally. Requires a rewrite of `routes/locations.ts` to work with the `practice_locations` table.
+
+**Workaround:** Provider location data is accessible through the provider detail endpoints (`/api/v1/providers/:npi`) which include associated practice locations.
+
+**Reference File:** `packages/backend/src/routes/index.ts` (lines 5-6, 14)
 
 ---
 
-### 10. Slow Queries
+### 3.2 Admin Endpoints Return 503
 
-**Symptoms:**
-- Search requests taking > 1 second
-- Timeout errors
+**Symptom:**
+All admin API calls (`/api/v1/admin/*`) return HTTP 503 with the response:
 
-**Diagnosis:**
-```sql
--- Check slow queries in PostgreSQL
-SELECT query, calls, mean_time, total_time
-FROM pg_stat_statements
-ORDER BY mean_time DESC
-LIMIT 10;
+```json
+{
+  "success": false,
+  "error": {
+    "message": "Admin endpoints not configured. Set ADMIN_SECRET environment variable to enable.",
+    "code": "ADMIN_NOT_CONFIGURED",
+    "statusCode": 503
+  }
+}
 ```
 
-**Common Causes:**
-1. Missing index on search field
-2. Large result sets without pagination
-3. Complex multi-table joins
+**Root Cause:**
+The `ADMIN_SECRET` environment variable is not set. The admin authentication middleware in `packages/backend/src/routes/admin.ts` checks for this variable and returns 503 if it is absent. This is **intentional** behavior that allows deployment in environments where admin access is not needed.
 
-**Solutions:**
-1. Verify indexes exist:
-```sql
-SELECT indexname, tablename FROM pg_indexes WHERE tablename = 'providers';
-```
+**Fix:**
+Set the `ADMIN_SECRET` environment variable:
 
-2. Add missing indexes:
-```sql
-CREATE INDEX idx_provider_specialty ON providers(specialty);
+```bash
+# In .env
+ADMIN_SECRET=your-secure-random-secret-here
 ```
 
-3. Enable pagination:
+For Cloud Run, set it via the Google Cloud Console or CLI:
+```bash
+gcloud run services update verifymyprovider-backend \
+  --set-secrets=ADMIN_SECRET=admin-secret:latest
 ```
-GET /providers/search?limit=20&page=1
+
+**Authentication:**
+Once configured, admin endpoints require the `X-Admin-Secret` header:
+```bash
+curl -H "X-Admin-Secret: your-secret" https://your-backend/api/v1/admin/health
 ```
+
+The middleware uses `timingSafeEqual` for constant-time secret comparison to prevent timing attacks.
+
+**Available Admin Endpoints:**
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/admin/health` | GET | Health check with retention metrics |
+| `/admin/cleanup-expired` | POST | Clean up expired verification records |
+| `/admin/expiration-stats` | GET | Verification expiration statistics |
+| `/admin/cache/clear` | POST | Clear all cached data |
+| `/admin/cache/stats` | GET | Cache hit/miss statistics |
+| `/admin/cleanup/sync-logs` | POST | Clean up sync logs older than retention period |
+| `/admin/retention/stats` | GET | Comprehensive retention statistics |
+
+**Reference File:** `packages/backend/src/routes/admin.ts` (lines 21-55)
 
 ---
 
-## Development Issues
+### 3.3 Location Enrichment Endpoints Not Available
 
-### Local Environment Setup
+**Symptom:**
+No admin endpoints exist for location enrichment (expected endpoints like `/admin/enrich-locations` are not registered).
 
-```bash
-# 1. Install dependencies
-npm install
+**Root Cause:**
+The location enrichment imports and endpoints are commented out in `packages/backend/src/routes/admin.ts`:
 
-# 2. Set up environment
-cp .env.example .env
-# Edit .env with local values
-
-# 3. Start PostgreSQL (Docker)
-docker run -d -p 5432:5432 \
-  -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=healthcare_providers \
-  postgres:15
-
-# 4. Run migrations
-cd packages/backend
-npx prisma migrate dev
-
-# 5. Start development servers
-npm run dev  # Root directory - starts both frontend and backend
+```typescript
+// TODO: locationEnrichment depends on old Location model - re-enable when practice_locations rewrite is done
+// import { enrichLocationNames, getEnrichmentStats } from '../services/locationEnrichment';
 ```
 
-### TypeScript Errors
-
-```bash
-# Rebuild shared package
-npm run build --workspace=packages/shared
-
-# Clear TypeScript cache
-rm -rf packages/*/dist packages/*/.tsbuildinfo
-
-# Rebuild all
-npm run build
+The section header remains at line 236-238:
+```
+// ============================================================================
+// Location Enrichment Endpoints
+// TODO: Disabled - depends on old Location model, needs rewrite for practice_locations
+// ============================================================================
 ```
 
-### Prisma Client Issues
+**Status:** Disabled intentionally. Will be re-enabled after the `practice_locations` rewrite is complete.
 
-```bash
-# Regenerate Prisma client
-cd packages/backend
-npx prisma generate
-
-# Reset database (development only!)
-npx prisma migrate reset
-```
+**Reference File:** `packages/backend/src/routes/admin.ts` (lines 6-7, 235-238)
 
 ---
 
-## Production Issues
+### 3.4 Rate Limiting False Positives
 
-### Cloud Run Deployment Failed
+**Symptom:**
+Legitimate users receive HTTP 429 (Too Many Requests) responses despite normal usage patterns.
 
-```bash
-# Check build logs
-gcloud builds list --limit=5
+**Root Cause / Considerations:**
 
-# View specific build
-gcloud builds log BUILD_ID
+1. **Shared IP addresses:** The rate limiter uses IP-based identification. Users behind corporate NATs, VPNs, or shared proxies share an IP address and collectively consume the rate limit.
 
-# Common issues:
-# - Dockerfile path incorrect
-# - Missing dependencies
-# - Build timeout (increase in cloudbuild.yaml)
-```
+2. **In-memory mode inconsistency:** Without Redis (`REDIS_URL` not set), each backend instance maintains independent counters. In multi-instance deployments, a user routed to different instances will have separate counters (potentially allowing more requests than intended), but sticky sessions could cause all requests to hit one instance.
 
-### Cloud SQL Connection Issues
+3. **Fail-open behavior:** If Redis becomes unavailable during operation, requests are **allowed** with a warning logged. This prioritizes availability over strict rate limiting.
 
-```bash
-# Test connection from local
-cloud_sql_proxy -instances=PROJECT:REGION:INSTANCE=tcp:5432
+**Troubleshooting:**
+- Check logs for rate limit warnings: look for rate limiter log entries.
+- Verify whether `REDIS_URL` is configured for distributed rate limiting.
+- Review the sliding window algorithm: unlike fixed windows, sliding windows track individual request timestamps, so limits are enforced smoothly without boundary bursts.
 
-# Check IAM permissions
-gcloud projects get-iam-policy PROJECT_ID \
-  --flatten="bindings[].members" \
-  --filter="bindings.role:cloudsql"
-```
+**Mitigation:**
+- Configure `REDIS_URL` for accurate distributed rate limiting across instances.
+- Consider implementing user-based rate limiting (requires authentication) as a future improvement.
 
-### Secret Manager Access
-
-```bash
-# List secrets
-gcloud secrets list
-
-# Check IAM for Cloud Run service account
-gcloud secrets get-iam-policy SECRET_NAME
-```
+**Reference File:** `packages/backend/src/middleware/rateLimiter.ts`
 
 ---
 
-## Monitoring Commands
+### 3.5 CAPTCHA Verification Failures
 
-### Check Service Health
+**Symptom:**
+Verification or vote submissions fail with CAPTCHA-related errors, or bots bypass CAPTCHA protection.
 
-```bash
-# Backend health
-curl https://api.verifymyprovider.com/health
+**Root Cause / Configuration:**
+The CAPTCHA middleware (Google reCAPTCHA v3) has two fail modes controlled by `CAPTCHA_FAIL_MODE`:
 
-# Admin health (with auth)
-curl -H "X-Admin-Secret: $SECRET" \
-  https://api.verifymyprovider.com/api/v1/admin/health
-```
+| Mode | Behavior | Risk |
+|---|---|---|
+| `open` (default) | Allows requests through when Google API fails; applies stricter fallback rate limiting (3 requests/hour vs normal 10) | Attackers could exploit Google outages |
+| `closed` | Blocks ALL requests when Google API fails | Legitimate users blocked during outages |
 
-### View Recent Logs
+**Troubleshooting Steps:**
 
-```bash
-# Cloud Run logs
-gcloud logging read "resource.type=cloud_run_revision" \
-  --limit=50 \
-  --format="table(timestamp, severity, textPayload)"
+1. **Verify `RECAPTCHA_SECRET_KEY` is set** in the environment. Without it, CAPTCHA validation cannot occur.
+2. **Check logs** for `[CAPTCHA] Google API error` messages indicating Google API outages.
+3. **Monitor** for high volumes of `FAIL-OPEN: Allowing request` log entries, which indicate the fallback rate limiter is active.
+4. **In development:** CAPTCHA logging is suppressed when `NODE_ENV` is `development` or `test`.
 
-# Error logs only
-gcloud logging read "resource.type=cloud_run_revision AND severity>=ERROR" \
-  --limit=20
-```
-
-### Check Database Status
-
-```sql
--- Connection count
-SELECT count(*) FROM pg_stat_activity;
-
--- Table sizes
-SELECT relname, pg_size_pretty(pg_relation_size(relid))
-FROM pg_stat_user_tables
-ORDER BY pg_relation_size(relid) DESC;
-
--- Recent sync status
-SELECT * FROM sync_logs ORDER BY started_at DESC LIMIT 5;
-```
+**Reference File:** `packages/backend/src/middleware/captcha.ts`
 
 ---
 
-## Getting Help
+## 4. Deployment Issues
 
-1. **Check logs** - Most issues have clear error messages
-2. **Verify configuration** - Environment variables, secrets
-3. **Test locally** - Reproduce before debugging production
-4. **Open issue** - https://github.com/verifymyprovider/issues
+### 4.1 Cloud Run Deployment Failures
+
+**Symptom:**
+GitHub Actions deployment workflow fails or Cloud Run services do not start.
+
+**Troubleshooting Steps:**
+
+1. **Check GitHub Actions logs:** The workflow is defined in `.github/workflows/deploy.yml` and triggers on push to `main` or manual dispatch.
+2. **Verify GCP credentials:** Ensure the service account has proper IAM roles (`roles/run.admin`, `roles/cloudsql.client`, `roles/iam.serviceAccountUser`).
+3. **Check environment variables:** Ensure all required secrets are configured in Cloud Run:
+   - `DATABASE_URL` or `CLOUD_SQL_CONNECTION_NAME`
+   - `RECAPTCHA_SECRET_KEY`
+   - `ADMIN_SECRET`
+   - `REDIS_URL` (optional, for distributed rate limiting)
+
+4. **Container build issues:** Both `packages/backend/Dockerfile` and `packages/frontend/Dockerfile` must build successfully. Test locally:
+   ```bash
+   docker build -t verifymyprovider-backend packages/backend/
+   docker build -t verifymyprovider-frontend packages/frontend/
+   ```
+
+---
+
+### 4.2 No Staging Environment
+
+**Symptom:**
+Changes pushed to `main` deploy directly to production without a pre-production testing step.
+
+**Root Cause:**
+The CI/CD pipeline (`.github/workflows/deploy.yml`) is configured to deploy on every push to `main`. There is no staging branch or environment configured.
+
+**Risk:** Bugs can reach production without pre-deployment validation.
+
+**Workaround:**
+- Test changes thoroughly in local development.
+- Use the `workflow_dispatch` trigger for manual deployments when additional caution is needed.
+- Consider adding a `staging` branch and separate Cloud Run services for pre-production testing.
+
+---
+
+## 5. Data Quality Issues
+
+### 5.1 City Name Typos in NPI Data
+
+**Symptom:**
+Provider search returns unexpected results or fails to match cities. City names in the database contain typos, trailing state codes, or trailing punctuation.
+
+**Root Cause:**
+NPI data from CMS is self-reported by providers and contains inconsistencies in city name formatting. Examples include:
+- `"JACKSONVILL"` instead of `"JACKSONVILLE"`
+- `"MIAMI FL"` with trailing state code
+- `"TAMPA,"` with trailing punctuation
+
+**Status:** A cleanup script exists but has not been run across all imported data.
+
+**Workaround:** Use fuzzy matching or LIKE queries when searching by city. The search endpoints may already handle some normalization.
+
+---
+
+### 5.2 Stale Provider Addresses
+
+**Symptom:**
+Provider address information is outdated. A provider may have moved to a new practice location but their NPI record still shows the old address.
+
+**Root Cause:**
+NPI data is self-reported by providers to CMS and is rarely updated. There is no automated mechanism to detect when a provider has changed their practice location.
+
+**Mitigation:**
+- The confidence scoring system (`packages/backend/src/services/confidenceService.ts`) accounts for data staleness through a recency score (0-30 points) that decays over time.
+- Specialty-specific freshness thresholds are applied:
+  - Mental health providers: 30 days (high turnover, 43% Medicaid acceptance)
+  - Primary care: 60 days (12% annual turnover)
+  - Specialists: 60 days
+  - Hospital-based: 90 days (more stable positions)
+- Community verification via the voting system helps identify stale data.
+- The `recommendReVerification` flag in the confidence result signals when data should be re-verified.
+
+---
+
+## Quick Reference: Environment Variables
+
+| Variable | Required | Default | Purpose |
+|---|---|---|---|
+| `DATABASE_URL` | Yes | - | PostgreSQL connection string |
+| `PORT` | No | `3001` | Backend server port |
+| `NODE_ENV` | No | `development` | Environment mode |
+| `CORS_ORIGIN` | No | `http://localhost:3000` | Allowed CORS origin |
+| `NEXT_PUBLIC_API_URL` | Yes (frontend) | - | Backend API base URL |
+| `RECAPTCHA_SECRET_KEY` | Production | - | Google reCAPTCHA v3 secret |
+| `CAPTCHA_FAIL_MODE` | No | `open` | `open` or `closed` |
+| `ADMIN_SECRET` | No | - | Admin endpoint authentication |
+| `REDIS_URL` | No | - | Redis for distributed rate limiting |
+| `CLOUD_SQL_CONNECTION_NAME` | Cloud Run | - | Cloud SQL proxy connection |
+| `GCP_PROJECT_ID` | Deployment | - | Google Cloud project ID |
+| `GCP_REGION` | Deployment | `us-central1` | Google Cloud region |

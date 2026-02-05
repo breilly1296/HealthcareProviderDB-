@@ -192,7 +192,8 @@ async function upsertAcceptance(
   planId: string,
   newStatus: 'ACCEPTED' | 'NOT_ACCEPTED',
   verificationId: string,
-  existingAcceptance: Awaited<ReturnType<typeof prisma.providerPlanAcceptance.findUnique>> | null
+  existingAcceptance: Awaited<ReturnType<typeof prisma.providerPlanAcceptance.findUnique>> | null,
+  locationId?: number
 ): Promise<NonNullable<Awaited<ReturnType<typeof prisma.providerPlanAcceptance.findUnique>>>> {
   if (existingAcceptance) {
     // Update existing acceptance
@@ -242,6 +243,7 @@ async function upsertAcceptance(
       data: {
         providerNpi,
         planId,
+        locationId: locationId ?? null,
         acceptanceStatus: 'PENDING',
         lastVerified: new Date(),
         verificationCount: 1,
@@ -271,6 +273,7 @@ async function upsertAcceptance(
 export interface SubmitVerificationInput {
   npi: string;
   planId: string;
+  locationId?: number;
 
   // Insurance acceptance
   acceptsInsurance: boolean;
@@ -314,6 +317,7 @@ export async function submitVerification(input: SubmitVerificationInput) {
   const {
     npi,
     planId,
+    locationId,
     acceptsInsurance,
     acceptsNewPatients,
     phoneReached,
@@ -333,14 +337,30 @@ export async function submitVerification(input: SubmitVerificationInput) {
   await checkSybilAttack(providerNpi, validPlanId, sourceIp, submittedBy);
 
   // Step 3: Get existing acceptance record for previousValue
-  const existingAcceptance = await prisma.providerPlanAcceptance.findUnique({
-    where: {
-      providerNpi_planId: {
+  // If locationId is provided, look for a location-specific record first
+  let existingAcceptance: Awaited<ReturnType<typeof prisma.providerPlanAcceptance.findUnique>> | null = null;
+
+  if (locationId) {
+    // Look for location-specific record
+    existingAcceptance = await prisma.providerPlanAcceptance.findFirst({
+      where: {
         providerNpi,
         planId: validPlanId,
+        locationId,
       },
-    },
-  });
+    });
+  }
+
+  if (!existingAcceptance) {
+    // Fall back to NPI-level (legacy) record
+    existingAcceptance = await prisma.providerPlanAcceptance.findFirst({
+      where: {
+        providerNpi,
+        planId: validPlanId,
+        locationId: locationId ?? null,
+      },
+    });
+  }
 
   const previousValue = existingAcceptance
     ? {
@@ -384,7 +404,8 @@ export async function submitVerification(input: SubmitVerificationInput) {
     validPlanId,
     newStatus,
     verification.id,
-    existingAcceptance
+    existingAcceptance,
+    locationId
   );
 
   return {

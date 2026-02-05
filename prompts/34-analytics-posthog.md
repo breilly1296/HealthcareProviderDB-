@@ -49,66 +49,65 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
 }
 ```
 
-### Event Tracking
+### Event Tracking (Privacy-Preserving)
+
+The actual implementation in `analytics.ts` is **deliberately privacy-preserving** — it sends only boolean indicators, NOT actual search values or provider identifiers.
 
 ```typescript
-// packages/frontend/src/lib/analytics.ts
-import posthog from 'posthog-js';
+// packages/frontend/src/lib/analytics.ts — ACTUAL implementation
+// Privacy: Only sends boolean indicators, not actual values
 
-// Track page views
-export function trackPageView(path: string) {
-  posthog.capture('$pageview', { path });
+export function trackSearch(props: SearchEventProps) {
+  posthog.capture('search', {
+    has_specialty_filter: !!props.specialty,
+    has_state_filter: !!props.state,
+    has_city_filter: !!(props.city || props.cities),
+    has_health_system_filter: !!props.healthSystem,
+    results_count: props.resultsCount,
+    has_results: props.resultsCount > 0,
+    mode: props.mode,
+    // NOT sending: specialty, state, city, cities, healthSystem
+  });
 }
 
-// Track search events
-export function trackSearch(params: {
-  state?: string;
-  city?: string;
-  specialty?: string;
-  resultCount: number;
-}) {
-  posthog.capture('provider_search', params);
+export function trackProviderView(props: ProviderViewEventProps) {
+  posthog.capture('provider_view', {
+    has_specialty: !!props.specialty,
+    // NOT sending: npi, specialty, provider_name
+  });
 }
 
-// Track provider views
-export function trackProviderView(npi: string, name: string) {
-  posthog.capture('provider_view', { npi, name });
+export function trackVerificationSubmit(_props: VerificationSubmitEventProps) {
+  // _props intentionally unused — only tracks that a submission occurred
+  posthog.capture('verification_submit', {});
 }
 
-// Track verification submissions
-export function trackVerification(npi: string, accepted: boolean) {
-  posthog.capture('verification_submit', { npi, accepted });
-}
-
-// Track comparison actions
-export function trackCompare(action: 'add' | 'remove' | 'view', count: number) {
-  posthog.capture('compare_action', { action, count });
+export function trackVerificationVote(props: VerificationVoteEventProps) {
+  posthog.capture('verification_vote', {
+    vote_type: props.voteType,
+    // NOT sending: verification_id, npi
+  });
 }
 ```
+
+Also provides `identifyUser()` and `resetUser()` for future account integration.
 
 ## Events Tracked
 
 ### Page Views
 | Event | Properties |
 |-------|------------|
-| `$pageview` | path |
-| `$pageleave` | path, duration |
+| `$pageleave` | (auto-captured via `capture_pageleave: true`) |
 
-### User Actions
-| Event | Properties | Purpose |
-|-------|------------|---------|
-| `provider_search` | state, city, specialty, resultCount | Understand search patterns |
-| `provider_view` | npi, name | Popular providers |
-| `verification_submit` | npi, accepted | Verification engagement |
-| `compare_action` | action, count | Comparison feature usage |
-| `filter_change` | filter, value | Filter preferences |
-| `insurance_card_upload` | success | OCR feature usage |
+**Note:** `capture_pageview` is set to `false` — page views are NOT auto-captured.
 
-### Errors
-| Event | Properties |
-|-------|------------|
-| `api_error` | endpoint, status, message |
-| `search_no_results` | filters |
+### User Actions (Privacy-Preserving)
+| Event | Properties Sent | Properties NOT Sent | Purpose |
+|-------|----------------|---------------------|---------|
+| `search` | has_specialty_filter, has_state_filter, has_city_filter, has_health_system_filter, results_count, has_results, mode | specialty, state, city, healthSystem | Search pattern analysis without knowing WHAT was searched |
+| `provider_view` | has_specialty | npi, specialty, provider_name | Provider detail engagement without identifying WHICH provider |
+| `verification_submit` | *(empty)* | npi, plan_id, accepts_insurance | Only that a verification occurred |
+| `verification_vote` | vote_type | verification_id, npi | Vote direction only |
 
 ## Configuration
 
@@ -130,17 +129,23 @@ posthog.init(key, {
 
 ## Privacy Considerations
 
-### What IS Tracked
-- Page views
-- Search queries (no results, just params)
-- Feature usage (verification, compare)
-- Error events
+### What IS Tracked (Boolean/Aggregate Only)
+- Whether search filters were used (boolean: `has_specialty_filter`, not the actual specialty)
+- Result counts (number, not what was returned)
+- That a verification was submitted (no details about which provider/plan)
+- Vote direction (up/down, not which verification)
+- Page leave events (auto-captured)
 
 ### What is NOT Tracked
-- Personal information (names, emails)
-- Health information
-- Insurance details
-- Provider-specific data beyond NPI
+- Provider NPIs, names, specialties
+- Search filter values (state, city, specialty names)
+- Insurance plan details
+- Verification acceptance status
+- Personal information (names, emails, IPs)
+- Health information of any kind
+
+### Design Philosophy
+The analytics implementation follows a "maximum utility, minimum data" approach. Functions accept full event data (NPI, plan ID, etc.) as typed parameters but deliberately discard identifiable information before sending to PostHog. This means the type signatures serve as documentation of what COULD be tracked, while the implementation ensures only aggregate/boolean data is actually sent.
 
 ### User Consent
 - [ ] Cookie consent banner
@@ -169,23 +174,27 @@ posthog.init(key, {
 ## Checklist
 
 ### Setup
-- [x] PostHogProvider created
-- [x] Provider in layout
-- [ ] Environment variables configured
-- [ ] Tracking verified working
+- [x] PostHogProvider created (`components/PostHogProvider.tsx`)
+- [x] Provider in layout (`app/layout.tsx`)
+- [x] Environment variables in deploy.yml (`NEXT_PUBLIC_POSTHOG_KEY` as build arg)
+- [ ] Tracking verified working in PostHog dashboard
 
 ### Event Tracking
-- [ ] Page views
-- [ ] Search events
-- [ ] Provider views
-- [ ] Verification submissions
-- [ ] Compare actions
-- [ ] Error events
+- [x] Search events — privacy-preserving (boolean indicators only)
+- [x] Provider view events — privacy-preserving (no NPI sent)
+- [x] Verification submit events — privacy-preserving (empty payload)
+- [x] Verification vote events — vote direction only
+- [x] User identity functions ready for future accounts (`identifyUser`, `resetUser`)
+- [ ] Compare actions — not currently tracked in `analytics.ts`
+- [ ] Error events — not currently tracked in `analytics.ts`
+- [ ] Insurance card upload events — not currently tracked in `analytics.ts`
 
 ### Privacy
-- [ ] No PII captured
-- [ ] Cookie consent
-- [ ] Privacy policy updated
+- [x] No PII captured (only booleans and counts)
+- [x] No healthcare data captured (specialties, plans stripped)
+- [x] `autocapture` not explicitly disabled in PostHogProvider (consider adding)
+- [ ] Cookie consent banner
+- [ ] Privacy policy updated to mention PostHog
 - [ ] Opt-out mechanism
 
 ### Analysis

@@ -362,6 +362,7 @@ export async function apiFetch<T>(
 export interface VerificationSubmission {
   npi: string;
   planId: string;
+  locationId?: number;
   acceptsInsurance: boolean;
   acceptsNewPatients?: boolean;
   notes?: string;

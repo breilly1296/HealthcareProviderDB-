@@ -4,6 +4,7 @@ tags:
   - meta
 type: index
 priority: 1
+updated: 2026-02-05
 ---
 
 # VerifyMyProvider Prompts Index
@@ -12,42 +13,42 @@ Quick reference for all available prompts.
 
 ---
 
-## Security Audit Prompts (01-13)
+## Security & Architecture Prompts (01-13)
 
 | # | Prompt | Purpose | Priority |
 |---|--------|---------|----------|
-| 01 | [[01-database-schema]] | Schema security, indexes, RLS | Critical |
-| 02 | [[02-no-hipaa-compliance]] | Why no HIPAA needed | Critical |
-| 03 | [[03-authentication]] | Auth strategy (none → lightweight) | High |
-| 04 | [[04-csrf]] | CSRF protection planning | Medium |
-| 05 | [[05-audit-logging]] | What to log, what not to log | Medium |
-| 06 | [[06-api-routes]] | Route security, authorization | High |
-| 07 | [[07-input-validation]] | UUID, string validation | High |
-| 08 | [[08-rate-limiting]] | **CRITICAL** Spam vulnerability | Critical |
-| 09 | [[09-external-apis]] | FHIR, NPI Registry security | Medium |
-| 10 | [[10-frontend-structure]] | Next.js app, components | Medium |
-| 11 | [[11-environment-secrets]] | Secret management | Critical |
-| 12 | [[12-confidence-scoring]] | 0-100 algorithm | High |
-| 13 | [[13-npi-data-pipeline]] | Import scripts, data quality | High |
+| 01 | [[01-database-schema]] | 13 Prisma models, indexes, relationships | Critical |
+| 02 | [[02-no-hipaa-compliance]] | Why no HIPAA needed (public data only) | Critical |
+| 03 | [[03-authentication]] | Admin auth (X-Admin-Secret) + future strategy | High |
+| 04 | [[04-csrf]] | CSRF protection (not needed yet — no auth cookies) | Medium |
+| 05 | [[05-audit-logging]] | Structured logging, PII exclusion, DB audit trail | Medium |
+| 06 | [[06-api-routes]] | All API endpoints: providers, plans, verify, admin | High |
+| 07 | [[07-input-validation]] | Zod validation on all endpoints | High |
+| 08 | [[08-rate-limiting]] | Dual-mode (Redis/in-memory), sliding window, CAPTCHA | Critical |
+| 09 | [[09-external-apis]] | 5 APIs: reCAPTCHA, Claude, PostHog, NPI Registry, Redis | Medium |
+| 10 | [[10-frontend-structure]] | Next.js pages, 40+ components, state management | Medium |
+| 11 | [[11-environment-secrets]] | 20+ env vars, GCP Secret Manager, CI/CD injection | Critical |
+| 12 | [[12-confidence-scoring]] | 4-factor algorithm (25/30/25/20), specialty-aware | High |
+| 13 | [[13-npi-data-pipeline]] | Import scripts, taxonomy mapping, data quality | High |
 
 ---
 
 ## Documentation Prompts (14-25)
 
-| # | Prompt | Generates | Method |
+| # | Prompt | Generates | Status |
 |---|--------|-----------|--------|
-| 14 | [[14-strategy-doc]] | STRATEGY.md | Q&A |
-| 15 | [[15-deployment-guide]] | DEPLOYMENT.md | Code + Q&A |
-| 16 | [[16-architecture-doc]] | ARCHITECTURE.md | Code + Q&A |
-| 17 | [[17-api-reference-doc]] | API_REFERENCE.md | Code |
-| 18 | [[18-troubleshooting-doc]] | TROUBLESHOOTING.md | Q&A |
-| 19 | [[19-changelog-doc]] | CHANGELOG.md | Git + Q&A |
-| 20 | [[20-known-issues-doc]] | KNOWN_ISSUES.md | Code + Q&A |
-| 21 | [[21-security-vulnerabilities]] | SECURITY_VULNERABILITIES.md | Code + Q&A |
-| 22 | [[22-ecosystem-integration]] | ECOSYSTEM.md | Q&A |
-| 23 | [[23-data-quality-tracker]] | DATA_QUALITY.md | Code + Q&A |
-| 24 | [[24-development-workflow]] | DEV_WORKFLOW.md | Q&A |
-| 25 | [[25-progress-status]] | PROGRESS.md | Q&A |
+| 14 | [[14-strategy-doc]] | Business strategy | Template (Q&A) |
+| 15 | [[15-deployment-guide]] | Deployment guide | Populated — Docker, Cloud Run, CI/CD |
+| 16 | [[16-architecture-doc]] | Architecture doc | Populated — full-stack overview |
+| 17 | [[17-api-reference-doc]] | API reference | Populated — all endpoints cataloged |
+| 18 | [[18-troubleshooting-doc]] | Troubleshooting | Populated — known issues + workarounds |
+| 19 | [[19-changelog-doc]] | Changelog | Populated — Jan 2026 milestones |
+| 20 | [[20-known-issues-doc]] | Known issues | Populated — 14 known issues |
+| 21 | [[21-security-vulnerabilities]] | Security vulns | Accurate — 4 ZeroPath findings resolved |
+| 22 | [[22-ecosystem-integration]] | Ecosystem strategy | Template (Q&A) |
+| 23 | [[23-data-quality-tracker]] | Data quality | Populated — NPI, plans, verification quality |
+| 24 | [[24-development-workflow]] | Dev workflow | Accurate |
+| 25 | [[25-progress-status]] | Progress tracker | Template (Q&A) |
 
 ---
 
@@ -55,8 +56,39 @@ Quick reference for all available prompts.
 
 | # | Prompt | Purpose |
 |---|--------|---------|
-| 26 | [[26-full-security-audit]] | Run all security prompts |
-| 27 | [[27-full-doc-refresh]] | Generate all documentation |
+| 26 | [[26-full-security-audit]] | Run all security prompts (checklist + summary) |
+| 27 | [[27-captcha-integration]] | CAPTCHA implementation (reCAPTCHA v3) |
+
+---
+
+## Feature Prompts (28-43)
+
+| # | Prompt | Purpose | Status |
+|---|--------|---------|--------|
+| 28 | [[28-location-features]] | Location abstraction (practice_locations) | Needs rewrite (disabled) |
+| 29 | [[29-insurance-card-upload]] | Insurance card OCR via Claude AI | Accurate |
+| 30 | [[30-testing-strategy]] | Testing approach | Reference |
+| 31 | [[31-redis-caching]] | Redis caching strategy | Reference |
+| 32 | [[32-ttl-data-expiration]] | TTL and data expiration | Reference |
+| 33 | [[33-provider-comparison]] | Provider comparison feature | Reference |
+| 34 | [[34-analytics-posthog]] | PostHog analytics (privacy-preserving) | Updated |
+| 35 | [[35-monorepo-structure]] | npm workspace monorepo | Reference |
+| 36 | [[36-sybil-attack-prevention]] | 4-layer anti-spam (all implemented) | Updated |
+| 37 | [[37-error-handling]] | AppError class + asyncHandler | Accurate |
+| 38 | [[38-admin-endpoints]] | Admin endpoints reference | Reference |
+| 39 | [[39-insurance-plans]] | Insurance plans feature (end-to-end) | **New** |
+| 40 | [[40-docker-cicd]] | Docker + CI/CD pipeline | **New** |
+| 41 | [[41-frontend-data-fetching]] | React Query, API client, state management | **New** |
+| 42 | [[42-provider-detail-page]] | Provider detail page architecture | **New** |
+| 43 | [[43-search-architecture]] | Search flow (frontend + backend) | **New** |
+
+---
+
+## Standalone Research
+
+| Location | Prompt | Purpose |
+|----------|--------|---------|
+| `Hospital Data Pull/` | [[28-hospital-analysis-prompt]] | NYC hospital affiliation research task |
 
 ---
 
@@ -64,23 +96,31 @@ Quick reference for all available prompts.
 
 ### New to the Project?
 1. Start with [[16-architecture-doc]] to understand the system
-2. Read [[15-deployment-guide]] for GCP setup
-3. Check [[20-known-issues-doc]] for current bugs
+2. Read [[01-database-schema]] for the data model
+3. Check [[20-known-issues-doc]] for current limitations
+4. Read [[15-deployment-guide]] for setup instructions
 
 ### Running a Security Audit?
-1. **URGENT:** Check [[08-rate-limiting]] - critical vulnerability
-2. Use [[26-full-security-audit]] for comprehensive review
-3. Or run individual prompts 01-13 as needed
-4. Update [[21-security-vulnerabilities]] with findings
+1. Use [[26-full-security-audit]] for comprehensive review
+2. Or run individual prompts 01-13 as needed
+3. Check [[21-security-vulnerabilities]] for resolved findings
+4. Check [[36-sybil-attack-prevention]] for anti-spam layers
+
+### Understanding a Feature?
+1. **Search flow:** [[43-search-architecture]]
+2. **Provider detail:** [[42-provider-detail-page]]
+3. **Insurance plans:** [[39-insurance-plans]]
+4. **Data fetching:** [[41-frontend-data-fetching]]
+5. **Confidence scoring:** [[12-confidence-scoring]]
 
 ### Updating Documentation?
-1. Use [[27-full-doc-refresh]] for complete refresh
-2. Or run individual prompts 14-25 as needed
+1. Run individual prompts 14-25 as needed
+2. All doc prompts have context and questions pre-populated
 
 ### Troubleshooting?
 1. Check [[18-troubleshooting-doc]] for known solutions
-2. Check [[20-known-issues-doc]] for known bugs
-3. Check [[24-development-workflow]] for golden rule reminder
+2. Check [[20-known-issues-doc]] for known limitations
+3. Check [[24-development-workflow]] for dev environment setup
 
 ---
 
@@ -88,11 +128,9 @@ Quick reference for all available prompts.
 
 ### In Claude Code
 Best for prompts that scan code:
-- 01-13 (security audits)
-- 16-architecture-doc
-- 17-api-reference-doc
-- 20-known-issues-doc
-- 23-data-quality-tracker
+- 01-13 (security & architecture audits)
+- 39-43 (feature deep-dives)
+- 16-architecture-doc, 17-api-reference-doc
 
 ### In Claude.ai
 Best for Q&A prompts:
@@ -101,11 +139,6 @@ Best for Q&A prompts:
 - 22-ecosystem-integration
 - 24-development-workflow
 - 25-progress-status
-
-### Either Works
-Mixed prompts that need both:
-- 15-deployment-guide
-- 21-security-vulnerabilities
 
 ---
 
@@ -116,7 +149,7 @@ Mixed prompts that need both:
 | HIPAA | Required | NOT required |
 | Encryption | PHI at rest | Not needed |
 | Compliance | Complex | Simple |
-| Auth | Full accounts | None → Lightweight |
+| Auth | Full accounts | Admin-only (no user auth yet) |
 | Data Type | Private health | Public provider data |
 
 ---
@@ -124,8 +157,9 @@ Mixed prompts that need both:
 ## Prompt Maintenance
 
 These prompts should be updated when:
-- New security areas need coverage
-- New document types needed
-- Prompt format improvements identified
-- VerifyMyProvider architecture changes significantly
-- Security vulnerabilities discovered or resolved
+- New features are added or existing features change significantly
+- Security vulnerabilities are discovered or resolved
+- Architecture changes (new services, database changes, etc.)
+- New external API integrations are added
+
+**Last full audit:** 2026-02-05 (see `PROMPT-AUDIT-REPORT.md`)

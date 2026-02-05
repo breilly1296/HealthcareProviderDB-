@@ -22,6 +22,7 @@ const router = Router();
 const submitVerificationSchema = npiParamSchema.merge(planIdParamSchema).extend({
   acceptsInsurance: z.boolean(),
   acceptsNewPatients: z.boolean().optional(),
+  locationId: z.number().int().positive().optional(),
   notes: z.string().max(1000).optional(),
   evidenceUrl: z.string().url().max(500).optional(),
   submittedBy: z.string().email().max(200).optional(),

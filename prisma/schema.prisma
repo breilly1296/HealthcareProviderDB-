@@ -30,6 +30,7 @@ model Provider {
   primary_taxonomy_code    String?                    @db.VarChar(20)
   primary_specialty        String?                    @db.VarChar(200)
   specialty_category       String?                    @db.VarChar(100)
+  nppes_last_synced        DateTime?                  @db.Timestamptz(6)
   practice_locations       practice_locations[]
   provider_cms_details     provider_cms_details?
   provider_hospitals       provider_hospitals[]
@@ -38,6 +39,7 @@ model Provider {
   providerPlanAcceptances  ProviderPlanAcceptance[]
   provider_taxonomies      provider_taxonomies[]
   verificationLogs         VerificationLog[]
+  dataQualityAudits        DataQualityAudit[]
 
   @@index([specialty_category], map: "idx_providers_category")
   @@index([credential], map: "idx_providers_credential")
@@ -60,22 +62,25 @@ model hospitals {
 }
 
 model practice_locations {
-  id            Int      @id @default(autoincrement())
-  npi           String   @db.VarChar(10)
-  address_type  String?  @default("practice") @db.VarChar(10)
-  address_line1 String?  @db.VarChar(200)
-  address_line2 String?  @db.VarChar(200)
-  city          String?  @db.VarChar(100)
-  state         String?  @db.VarChar(2)
-  zip_code      String?  @db.VarChar(10)
-  phone         String?  @db.VarChar(20)
-  fax           String?  @db.VarChar(20)
-  providers     Provider @relation(fields: [npi], references: [npi], onDelete: NoAction, onUpdate: NoAction)
+  id                      Int                      @id @default(autoincrement())
+  npi                     String                   @db.VarChar(10)
+  address_type            String?                  @default("practice") @db.VarChar(10)
+  address_line1           String?                  @db.VarChar(200)
+  address_line2           String?                  @db.VarChar(200)
+  city                    String?                  @db.VarChar(100)
+  state                   String?                  @db.VarChar(2)
+  zip_code                String?                  @db.VarChar(10)
+  phone                   String?                  @db.VarChar(20)
+  fax                     String?                  @db.VarChar(20)
+  address_hash            String?                  @map("address_hash") @db.VarChar(64)
+  providers               Provider                 @relation(fields: [npi], references: [npi], onDelete: NoAction, onUpdate: NoAction)
+  providerPlanAcceptances ProviderPlanAcceptance[]
 
   @@index([city], map: "idx_locations_city")
   @@index([npi], map: "idx_locations_npi")
   @@index([state], map: "idx_locations_state")
   @@index([zip_code], map: "idx_locations_zip")
+  @@index([address_hash], map: "idx_locations_address_hash")
 }
 
 model provider_cms_details {
@@ -174,24 +179,27 @@ model InsurancePlan {
 }
 
 model ProviderPlanAcceptance {
-  id                 Int              @id @default(autoincrement())
-  providerNpi        String?          @map("npi") @db.VarChar(10)
-  planId             String?          @map("plan_id") @db.VarChar(50)
-  acceptanceStatus   String           @default("UNKNOWN") @map("acceptance_status") @db.VarChar(20)
-  confidenceScore    Int              @default(0) @map("confidence_score")
-  lastVerified       DateTime?        @map("last_verified") @db.Timestamptz(6)
-  verificationCount  Int              @default(0) @map("verification_count")
-  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt          DateTime         @default(now()) @map("updated_at") @db.Timestamptz(6)
-  expiresAt          DateTime?        @map("expires_at") @db.Timestamptz(6)
-  provider           Provider?        @relation(fields: [providerNpi], references: [npi], onUpdate: NoAction)
-  insurancePlan      InsurancePlan?   @relation(fields: [planId], references: [planId], onUpdate: NoAction)
+  id                 Int                @id @default(autoincrement())
+  providerNpi        String?            @map("npi") @db.VarChar(10)
+  planId             String?            @map("plan_id") @db.VarChar(50)
+  locationId         Int?               @map("location_id")
+  acceptanceStatus   String             @default("UNKNOWN") @map("acceptance_status") @db.VarChar(20)
+  confidenceScore    Int                @default(0) @map("confidence_score")
+  lastVerified       DateTime?          @map("last_verified") @db.Timestamptz(6)
+  verificationCount  Int                @default(0) @map("verification_count")
+  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime           @default(now()) @map("updated_at") @db.Timestamptz(6)
+  expiresAt          DateTime?          @map("expires_at") @db.Timestamptz(6)
+  provider           Provider?          @relation(fields: [providerNpi], references: [npi], onUpdate: NoAction)
+  insurancePlan      InsurancePlan?     @relation(fields: [planId], references: [planId], onUpdate: NoAction)
+  location           practice_locations? @relation(fields: [locationId], references: [id], onUpdate: NoAction)
 
   @@unique([providerNpi, planId])
   @@index([acceptanceStatus], map: "idx_ppa_acceptance_status")
   @@index([confidenceScore], map: "idx_ppa_confidence_score")
   @@index([expiresAt], map: "idx_ppa_expires_at")
   @@index([lastVerified], map: "idx_ppa_last_verified")
+  @@index([locationId], map: "idx_ppa_location_id")
   @@map("provider_plan_acceptance")
 }
 
@@ -259,6 +267,27 @@ model SyncLog {
   @@map("sync_logs")
 }
 
+model DataQualityAudit {
+  id             Int       @id @default(autoincrement())
+  npi            String    @db.VarChar(10)
+  auditType      String    @map("audit_type") @db.VarChar(50)
+  severity       String    @db.VarChar(20)
+  field          String?   @db.VarChar(100)
+  currentValue   String?   @map("current_value")
+  expectedValue  String?   @map("expected_value")
+  details        String?
+  resolved       Boolean   @default(false)
+  resolvedAt     DateTime? @map("resolved_at") @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  provider       Provider  @relation(fields: [npi], references: [npi], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([npi], map: "idx_dqa_npi")
+  @@index([severity], map: "idx_dqa_severity")
+  @@index([auditType], map: "idx_dqa_audit_type")
+  @@index([resolved], map: "idx_dqa_resolved")
+  @@map("data_quality_audit")
+}
+
 enum AcceptanceStatus {
   ACCEPTED
   NOT_ACCEPTED
@@ -273,6 +302,9 @@ enum VerificationSource {
   PHONE_CALL
   CROWDSOURCE
   AUTOMATED
+  NPPES_SYNC
+  CARRIER_SCRAPE
+  NETWORK_CROSSREF
 }
 
 enum VerificationType {

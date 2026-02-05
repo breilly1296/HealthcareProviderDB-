@@ -254,9 +254,9 @@ HAVING SUM(CASE WHEN new_value->>'accepted' = 'true' THEN 1 ELSE 0 END) > 0
 
 ### Verification Windows
 - [x] Sybil prevention indexes
-- [ ] 30-day window check implemented
-- [ ] Duplicate IP check
-- [ ] Duplicate email check
+- [x] 30-day window check implemented — `checkSybilAttack()` in `verificationService.ts`
+- [x] Duplicate IP check — blocks same IP from verifying same NPI+plan within 30 days
+- [x] Duplicate email check — blocks same email (`submittedBy`) from verifying same NPI+plan within 30 days
 
 ### Monitoring
 - [ ] Suspicious pattern queries
@@ -265,9 +265,7 @@ HAVING SUM(CASE WHEN new_value->>'accepted' = 'true' THEN 1 ELSE 0 END) > 0
 
 ## Questions to Ask
 
-1. **Is the 30-day window check implemented?**
-   - In verificationService.ts?
-   - Enforced consistently?
+1. ~~**Is the 30-day window check implemented?**~~ **YES** — `checkSybilAttack()` in `verificationService.ts` checks both IP and email within `SYBIL_PREVENTION_WINDOW_MS` (30 days). Also strips PII from API responses via `stripVerificationPII()`.
 
 2. **What happens with VPN/proxy usage?**
    - Detect proxy IPs?
@@ -298,7 +296,7 @@ HAVING SUM(CASE WHEN new_value->>'accepted' = 'true' THEN 1 ELSE 0 END) > 0
 | Rate Limiting | ✅ | 10/hr verify, 10/hr vote |
 | CAPTCHA | ✅ | reCAPTCHA v3 |
 | Vote Dedup | ✅ | 1 vote per IP |
-| Verification Window | ⚠️ | 30-day check |
+| Verification Window | ✅ | 30-day IP + email check |
 
 ## Metrics (Last 24h)
 - Verifications blocked (rate limit): X

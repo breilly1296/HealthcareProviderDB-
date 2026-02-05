@@ -25,6 +25,7 @@ interface ProviderHeroCardProps {
   provider: Provider;
   confidenceScore: number;
   verificationCount?: number;
+  nppesLastSynced?: string | null;
 }
 
 function getInitials(name: string): string {
@@ -56,7 +57,7 @@ function getGoogleMapsUrl(provider: Provider): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(parts)}`;
 }
 
-export function ProviderHeroCard({ provider, confidenceScore, verificationCount = 0 }: ProviderHeroCardProps) {
+export function ProviderHeroCard({ provider, confidenceScore, verificationCount = 0, nppesLastSynced }: ProviderHeroCardProps) {
   const initials = getInitials(provider.displayName);
   const specialty = provider.specialty || provider.specialtyCategory || provider.taxonomyDescription || 'Healthcare Provider';
   const isVerified = confidenceScore >= 70;
@@ -136,10 +137,30 @@ export function ProviderHeroCard({ provider, confidenceScore, verificationCount 
               )}
             </div>
 
-            {/* NPI - subtle below */}
-            <p className="text-xs text-stone-400 dark:text-gray-500 mt-3">
-              NPI: {provider.npi}
-            </p>
+            {/* NPI and NPPES sync - subtle below */}
+            <div className="flex items-center gap-3 mt-3">
+              <p className="text-xs text-stone-400 dark:text-gray-500">
+                NPI: {provider.npi}
+              </p>
+              {nppesLastSynced ? (
+                (() => {
+                  const syncDate = new Date(nppesLastSynced);
+                  const daysSince = Math.floor((Date.now() - syncDate.getTime()) / (1000 * 60 * 60 * 24));
+                  const isStale = daysSince > 90;
+                  return (
+                    <span className={`inline-flex items-center gap-1 text-xs ${isStale ? 'text-yellow-500' : 'text-stone-400 dark:text-gray-500'}`}>
+                      {isStale && <span className="w-1.5 h-1.5 rounded-full bg-yellow-500" />}
+                      CMS verified: {syncDate.toLocaleDateString()}
+                    </span>
+                  );
+                })()
+              ) : (
+                <span className="inline-flex items-center gap-1 text-xs text-stone-400 dark:text-gray-500">
+                  <span className="w-1.5 h-1.5 rounded-full bg-stone-300 dark:bg-gray-600" />
+                  Not yet synced with CMS
+                </span>
+              )}
+            </div>
           </div>
         </div>
 

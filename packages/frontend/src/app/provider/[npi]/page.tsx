@@ -20,6 +20,18 @@ interface ProviderWithPlans extends Omit<ProviderDisplay, 'planAcceptances'> {
   planAcceptances: PlanAcceptanceDisplay[];
   acceptsNewPatients?: boolean | null;
   languages?: string[] | null;
+  nppesLastSynced?: string | null;
+  locations?: Array<{
+    id: number;
+    address_type?: string | null;
+    address_line1?: string | null;
+    address_line2?: string | null;
+    city?: string | null;
+    state?: string | null;
+    zip_code?: string | null;
+    phone?: string | null;
+    fax?: string | null;
+  }>;
 }
 
 export default function ProviderDetailPage() {
@@ -69,13 +81,23 @@ export default function ProviderDetailPage() {
     return new Date(p.lastVerifiedAt) > new Date(latest) ? p.lastVerifiedAt : latest;
   }, null as string | null);
 
-  // Transform plan acceptances for InsuranceList - use calculated confidence per plan
+  // Transform plan acceptances for InsuranceList - full status mapping
+  const statusMap: Record<string, 'accepted' | 'not_accepted' | 'pending' | 'unknown'> = {
+    ACCEPTED: 'accepted',
+    NOT_ACCEPTED: 'not_accepted',
+    PENDING: 'pending',
+    UNKNOWN: 'unknown',
+  };
+
   const insurancePlans = provider?.planAcceptances?.map(p => ({
     id: p.id,
     planId: p.planId,
     name: p.plan?.planName || p.plan?.issuerName || 'Unknown Plan',
-    status: (p.acceptanceStatus === 'ACCEPTED' ? 'accepted' : 'unknown') as 'accepted' | 'unknown',
+    status: statusMap[p.acceptanceStatus] || 'unknown',
     confidence: p.confidence?.score ?? p.confidenceScore ?? 0,
+    locationId: p.locationId ?? undefined,
+    location: p.location ?? undefined,
+    lastVerifiedAt: p.lastVerifiedAt,
   })) || [];
 
   return (
@@ -136,6 +158,7 @@ export default function ProviderDetailPage() {
               provider={provider}
               confidenceScore={confidenceScore}
               verificationCount={verificationCount}
+              nppesLastSynced={provider.nppesLastSynced}
             />
 
             {/* Data Accuracy Disclaimer */}
@@ -156,6 +179,7 @@ export default function ProviderDetailPage() {
               lastVerifiedAt={lastVerifiedAt}
               verificationCount={verificationCount}
               mainConfidenceScore={confidenceScore}
+              locations={provider.locations}
             />
 
             {/* Other Providers at This Location */}

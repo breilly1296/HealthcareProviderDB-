@@ -185,6 +185,7 @@ export interface PlanAcceptanceDisplay {
   id: string;
   providerId: string;
   planId: string;
+  locationId?: number | null;
   acceptanceStatus: AcceptanceStatusDisplay;
   acceptsNewPatients: boolean | null;
   confidenceScore: number;
@@ -200,6 +201,13 @@ export interface PlanAcceptanceDisplay {
     state: string | null;
     carrier: string | null;
   };
+  location?: {
+    id: number;
+    addressLine1?: string | null;
+    city?: string | null;
+    state?: string | null;
+    zipCode?: string | null;
+  } | null;
   confidence?: {
     score: number;
     level: ConfidenceLevelDisplay;
@@ -270,6 +278,7 @@ export interface ProviderDisplay {
   specialtyCategory: string | null;
   npiStatus: string;
   displayName: string;
+  nppesLastSynced?: string | null;
   // Optional fields for search results with plan data
   confidenceScore?: number | null;
   planAcceptances?: PlanAcceptancePreview[];

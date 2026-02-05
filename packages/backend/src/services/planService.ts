@@ -326,6 +326,16 @@ export async function getProvidersForPlan(
             },
           },
         },
+        location: {
+          select: {
+            id: true,
+            address_line1: true,
+            city: true,
+            state: true,
+            zip_code: true,
+            phone: true,
+          },
+        },
       },
     }),
     prisma.providerPlanAcceptance.count({ where }),
@@ -352,6 +362,8 @@ export async function getProvidersForPlan(
         confidenceScore: a.confidenceScore,
         lastVerified: a.lastVerified,
         verificationCount: a.verificationCount,
+        locationId: a.locationId,
+        location: a.location,
       };
     });
 

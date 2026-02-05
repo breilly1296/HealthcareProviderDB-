@@ -1,16 +1,35 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { CheckCircle, HelpCircle, Search, ChevronDown, ChevronRight, MessageSquarePlus, X, ThumbsUp, ThumbsDown, Users, Loader2, MessageSquare } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, HelpCircle, Search, ChevronDown, ChevronRight, MessageSquarePlus, X, ThumbsUp, ThumbsDown, Users, Loader2, MessageSquare, MapPin } from 'lucide-react';
 import { verificationApi } from '@/lib/api';
 import toast from 'react-hot-toast';
+
+type PlanStatus = 'accepted' | 'not_accepted' | 'pending' | 'unknown';
 
 interface InsurancePlan {
   id: string;
   planId?: string;
   name: string;
-  status: 'accepted' | 'unknown';
+  status: PlanStatus;
   confidence: number;
+  locationId?: number;
+  location?: {
+    id: number;
+    addressLine1?: string | null;
+    city?: string | null;
+    state?: string | null;
+    zipCode?: string | null;
+  } | null;
+  lastVerifiedAt?: string | null;
+}
+
+interface ProviderLocation {
+  id: number;
+  address_line1?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip_code?: string | null;
 }
 
 interface InsuranceListProps {
@@ -20,6 +39,7 @@ interface InsuranceListProps {
   lastVerifiedAt?: string | null;
   verificationCount?: number;
   mainConfidenceScore?: number;
+  locations?: ProviderLocation[];
 }
 
 // Sample data for demo
@@ -69,6 +89,67 @@ interface CarrierGroup {
   plans: InsurancePlan[];
 }
 
+// ============================================================================
+// Data Freshness Badge
+// ============================================================================
+
+function DataFreshnessBadge({ dateString }: { dateString: string | null | undefined }) {
+  if (!dateString) {
+    return (
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium text-stone-400 dark:text-gray-500 bg-stone-100 dark:bg-gray-700/50 rounded" title="Never verified">
+        <span className="w-1.5 h-1.5 rounded-full bg-stone-300 dark:bg-gray-600" />
+      </span>
+    );
+  }
+
+  const date = new Date(dateString);
+  const diffDays = Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
+
+  let color: string;
+  let dotColor: string;
+
+  if (diffDays < 30) {
+    color = 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20';
+    dotColor = 'bg-green-500';
+  } else if (diffDays < 90) {
+    color = 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20';
+    dotColor = 'bg-yellow-500';
+  } else {
+    color = 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20';
+    dotColor = 'bg-red-500';
+  }
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium ${color} rounded`}
+      title={`Last verified: ${date.toLocaleDateString()}`}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
+    </span>
+  );
+}
+
+// ============================================================================
+// Status Icon
+// ============================================================================
+
+function StatusIcon({ status }: { status: PlanStatus }) {
+  switch (status) {
+    case 'accepted':
+      return <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />;
+    case 'not_accepted':
+      return <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />;
+    case 'pending':
+      return <Clock className="w-4 h-4 text-yellow-500 flex-shrink-0" />;
+    default:
+      return <HelpCircle className="w-4 h-4 text-stone-400 dark:text-gray-500 flex-shrink-0" />;
+  }
+}
+
+// ============================================================================
+// Verification Modal
+// ============================================================================
+
 interface VerificationModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -115,6 +196,7 @@ function VerificationModal({ isOpen, onClose, plan, npi, providerName, onVerifie
       await verificationApi.submit({
         npi,
         planId: plan.planId,
+        locationId: plan.locationId,
         acceptsInsurance,
         notes: fullNote || undefined,
       });
@@ -264,6 +346,10 @@ function VerificationModal({ isOpen, onClose, plan, npi, providerName, onVerifie
   );
 }
 
+// ============================================================================
+// Plan Row
+// ============================================================================
+
 interface PlanRowProps {
   plan: InsurancePlan;
   onVerify: (plan: InsurancePlan) => void;
@@ -275,20 +361,25 @@ interface PlanRowProps {
 }
 
 function PlanRow({ plan, onVerify, showConfidence, isLast, indented = false, showAcceptedBadge = false, recentlyVerified = false }: PlanRowProps) {
-  const isAccepted = plan.status === 'accepted';
-
   return (
     <div className={`flex items-center justify-between py-2.5 ${!isLast ? 'border-b border-stone-100 dark:border-gray-700/50' : ''} ${indented ? 'pl-7' : ''}`}>
       <div className="flex items-center gap-2.5 min-w-0 flex-1">
-        {isAccepted ? (
-          <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-        ) : (
-          <HelpCircle className="w-4 h-4 text-stone-400 dark:text-gray-500 flex-shrink-0" />
-        )}
+        <StatusIcon status={plan.status} />
         <span className="text-sm text-stone-700 dark:text-gray-200 truncate">{plan.name}</span>
+        {/* Location badge for location-specific plans */}
+        {plan.locationId && plan.location && (
+          <span
+            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] text-stone-400 dark:text-gray-500 bg-stone-50 dark:bg-gray-700/50 rounded"
+            title={`${plan.location.city}, ${plan.location.state}`}
+          >
+            <MapPin className="w-2.5 h-2.5" />
+            {plan.location.city}
+          </span>
+        )}
       </div>
 
       <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+        <DataFreshnessBadge dateString={plan.lastVerifiedAt} />
         {recentlyVerified ? (
           <span className="flex items-center gap-1 px-2.5 py-0.5 text-xs font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded">
             <CheckCircle className="w-3 h-3" />
@@ -302,9 +393,19 @@ function PlanRow({ plan, onVerify, showConfidence, isLast, indented = false, sho
             Verify
           </button>
         )}
-        {showAcceptedBadge && isAccepted && (
+        {showAcceptedBadge && plan.status === 'accepted' && (
           <span className="px-2 py-0.5 text-xs font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 rounded">
             Accepted
+          </span>
+        )}
+        {plan.status === 'not_accepted' && (
+          <span className="px-2 py-0.5 text-xs font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded">
+            Not Accepted
+          </span>
+        )}
+        {plan.status === 'pending' && (
+          <span className="px-2 py-0.5 text-xs font-medium text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 rounded">
+            Pending
           </span>
         )}
         {showConfidence && (
@@ -314,6 +415,10 @@ function PlanRow({ plan, onVerify, showConfidence, isLast, indented = false, sho
     </div>
   );
 }
+
+// ============================================================================
+// Carrier Group Section
+// ============================================================================
 
 interface CarrierGroupSectionProps {
   group: CarrierGroup;
@@ -328,6 +433,7 @@ interface CarrierGroupSectionProps {
 function CarrierGroupSection({ group, isExpanded, onToggle, onVerify, showConfidence, forceExpand, recentlyVerifiedPlans }: CarrierGroupSectionProps) {
   const shouldExpand = forceExpand || isExpanded;
   const acceptedCount = group.plans.filter(p => p.status === 'accepted').length;
+  const notAcceptedCount = group.plans.filter(p => p.status === 'not_accepted').length;
 
   return (
     <div className="border-b border-stone-200 dark:border-gray-700 last:border-b-0">
@@ -346,11 +452,18 @@ function CarrierGroupSection({ group, isExpanded, onToggle, onVerify, showConfid
             ({group.plans.length})
           </span>
         </div>
-        {acceptedCount > 0 && (
-          <span className="text-xs text-green-600 dark:text-green-400 flex-shrink-0 ml-2">
-            {acceptedCount} accepted
-          </span>
-        )}
+        <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+          {acceptedCount > 0 && (
+            <span className="text-xs text-green-600 dark:text-green-400">
+              {acceptedCount} accepted
+            </span>
+          )}
+          {notAcceptedCount > 0 && (
+            <span className="text-xs text-red-600 dark:text-red-400">
+              {notAcceptedCount} not accepted
+            </span>
+          )}
+        </div>
       </button>
 
       {shouldExpand && (
@@ -372,6 +485,10 @@ function CarrierGroupSection({ group, isExpanded, onToggle, onVerify, showConfid
   );
 }
 
+// ============================================================================
+// Helpers
+// ============================================================================
+
 function formatLastVerified(dateString: string | null | undefined): string {
   if (!dateString) return 'No verifications yet';
 
@@ -388,21 +505,51 @@ function formatLastVerified(dateString: string | null | undefined): string {
   return `Last verified: ${date.toLocaleDateString()}`;
 }
 
+function formatLocationLabel(loc: ProviderLocation): string {
+  const parts = [loc.city, loc.state].filter(Boolean);
+  if (loc.address_line1) {
+    return `${loc.address_line1}${parts.length > 0 ? `, ${parts.join(', ')}` : ''}`;
+  }
+  return parts.join(', ') || `Location #${loc.id}`;
+}
+
+// ============================================================================
+// Main Component
+// ============================================================================
+
 export function InsuranceList({
   plans = samplePlans,
   npi,
   providerName = 'This provider',
   lastVerifiedAt,
   verificationCount = 0,
-  mainConfidenceScore
+  mainConfidenceScore,
+  locations = [],
 }: InsuranceListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [verifyingPlan, setVerifyingPlan] = useState<InsurancePlan | null>(null);
   const [otherPlansExpanded, setOtherPlansExpanded] = useState(false);
   const [recentlyVerifiedPlans, setRecentlyVerifiedPlans] = useState<Set<string>>(new Set());
+  const [selectedLocationId, setSelectedLocationId] = useState<number | 'all'>('all');
 
-  const verifiedCount = plans.filter(p => p.status === 'accepted').length;
+  const acceptedCount = plans.filter(p => p.status === 'accepted').length;
+  const notAcceptedCount = plans.filter(p => p.status === 'not_accepted').length;
+  const pendingCount = plans.filter(p => p.status === 'pending').length;
+
+  // Check if we have location-specific plan data
+  const hasLocationSpecificPlans = useMemo(() => {
+    return plans.some(p => p.locationId != null);
+  }, [plans]);
+
+  // Unique locations that have plan acceptance data
+  const locationsWithPlans = useMemo(() => {
+    if (!hasLocationSpecificPlans) return [];
+    const locIds = new Set(plans.filter(p => p.locationId != null).map(p => p.locationId!));
+    return locations.filter(l => locIds.has(l.id));
+  }, [plans, locations, hasLocationSpecificPlans]);
+
+  const showLocationFilter = locationsWithPlans.length >= 2;
 
   const handleVerify = (plan: InsurancePlan) => {
     setVerifyingPlan(plan);
@@ -432,12 +579,25 @@ export function InsuranceList({
     });
   };
 
-  // Filter plans based on search query
+  // Filter plans based on search query and location
   const filteredPlans = useMemo(() => {
-    if (!searchQuery.trim()) return plans;
-    const query = searchQuery.toLowerCase();
-    return plans.filter(p => p.name.toLowerCase().includes(query));
-  }, [plans, searchQuery]);
+    let filtered = plans;
+
+    // Location filter
+    if (selectedLocationId !== 'all') {
+      filtered = filtered.filter(p =>
+        p.locationId === selectedLocationId || p.locationId == null
+      );
+    }
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(p => p.name.toLowerCase().includes(query));
+    }
+
+    return filtered;
+  }, [plans, searchQuery, selectedLocationId]);
 
   // Group plans by carrier family
   const { groups, singlePlans } = useMemo(() => {
@@ -484,13 +644,39 @@ export function InsuranceList({
   const hasSearch = searchQuery.trim().length > 0;
   const totalGroupedPlans = groups.reduce((sum, g) => sum + g.plans.length, 0) + singlePlans.length;
 
+  // Status summary line
+  const statusParts: string[] = [];
+  if (acceptedCount > 0) statusParts.push(`${acceptedCount} accepted`);
+  if (notAcceptedCount > 0) statusParts.push(`${notAcceptedCount} not accepted`);
+  if (pendingCount > 0) statusParts.push(`${pendingCount} pending`);
+  const statusSummary = statusParts.join(', ') || `${plans.length} plans`;
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-stone-200 dark:border-gray-700 p-4 sm:p-6">
       {/* Header */}
       <div className="mb-4">
         <h2 className="text-lg font-semibold text-stone-800 dark:text-white">Insurance Acceptance</h2>
-        <p className="text-sm text-stone-500 dark:text-gray-400 mt-1">{verifiedCount} accepted plans</p>
+        <p className="text-sm text-stone-500 dark:text-gray-400 mt-1">{statusSummary}</p>
       </div>
+
+      {/* Location Filter */}
+      {showLocationFilter && (
+        <div className="mb-4">
+          <label className="text-xs text-stone-500 dark:text-gray-400 mb-1.5 block">Filter by office location</label>
+          <select
+            value={selectedLocationId}
+            onChange={(e) => setSelectedLocationId(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
+            className="w-full px-3 py-2 bg-stone-50 dark:bg-gray-700/50 border border-stone-200 dark:border-gray-600 rounded-lg text-sm text-stone-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#137fec] focus:border-transparent"
+          >
+            <option value="all">All Locations</option>
+            {locationsWithPlans.map(loc => (
+              <option key={loc.id} value={loc.id}>
+                {formatLocationLabel(loc)}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Search Input */}
       {plans.length > 5 && (

@@ -16,17 +16,24 @@ priority: 2
 - `packages/frontend/src/` (frontend - Next.js app)
 
 ## Current Admin Authentication (Implemented Jan 2026)
-The admin routes (`/api/v1/admin/*`) use a simple header-based authentication:
+The admin routes (`/api/v1/admin/*`) use header-based authentication via `adminAuthMiddleware`:
 ```typescript
-// In routes/admin.ts
+// In routes/admin.ts - uses timing-safe comparison
 const adminSecret = process.env.ADMIN_SECRET;
-if (!adminSecret) return res.status(503).json({ error: 'Admin not configured' });
-if (req.headers['x-admin-secret'] !== adminSecret) return res.status(401).json({ error: 'Unauthorized' });
+if (!adminSecret) return res.status(503).json({ ... code: 'ADMIN_NOT_CONFIGURED' });
+// Uses crypto.timingSafeEqual to prevent timing attacks
+const isValid = providedBuffer.length === secretBuffer.length && timingSafeEqual(providedBuffer, secretBuffer);
 ```
-Protected endpoints:
-- `POST /api/v1/admin/cleanup-expired` - Delete expired records
-- `GET /api/v1/admin/expiration-stats` - View expiration statistics
-- `GET /api/v1/admin/health` - Admin health check
+Protected endpoints (7 total):
+- `POST /api/v1/admin/cleanup-expired` — Delete expired verification records (dryRun, batchSize params)
+- `GET /api/v1/admin/expiration-stats` — View verification expiration statistics
+- `GET /api/v1/admin/health` — Admin health check with retention metrics (uptime, cache stats, log counts)
+- `POST /api/v1/admin/cache/clear` — Clear all cached data (for post-import refresh)
+- `GET /api/v1/admin/cache/stats` — Cache statistics with hit rate
+- `POST /api/v1/admin/cleanup/sync-logs` — Clean up sync_logs older than N days (dryRun, retentionDays params)
+- `GET /api/v1/admin/retention/stats` — Comprehensive retention stats for all log types (verification, sync, plan acceptance, vote)
+
+**Note:** Location enrichment endpoints are disabled (depend on old Location model — see prompt 28).
 
 ## VerifyMyProvider Auth Architecture
 - **Current State:** NO authentication (all endpoints public/anonymous)

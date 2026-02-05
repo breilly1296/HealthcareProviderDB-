@@ -180,6 +180,20 @@ const PROVIDER_INCLUDE = {
   provider_hospitals: true,
   provider_insurance: true,
   provider_medicare: true,
+  providerPlanAcceptances: {
+    include: {
+      insurancePlan: true,
+      location: {
+        select: {
+          id: true,
+          address_line1: true,
+          city: true,
+          state: true,
+          zip_code: true,
+        },
+      },
+    },
+  },
 } as const;
 
 /**

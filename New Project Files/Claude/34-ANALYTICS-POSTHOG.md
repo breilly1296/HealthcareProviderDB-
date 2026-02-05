@@ -1,417 +1,82 @@
-# VerifyMyProvider PostHog Analytics Analysis
+# PostHog Analytics Integration -- Analysis
 
-**Last Updated:** 2026-01-31
-**Analyzed By:** Claude Code
-
----
-
-## Executive Summary
-
-VerifyMyProvider uses PostHog for privacy-focused product analytics. The integration tracks anonymous usage patterns to improve the product without collecting personally identifiable information.
+**Generated:** 2026-02-05
+**Source Prompt:** prompts/34-analytics-posthog.md
+**Status:** Partially Implemented -- Core privacy-preserving tracking is solid, but event wiring and consent controls are incomplete
 
 ---
 
-## Configuration
+## Findings
 
-### Environment Variables
+### Setup
+- [x] **PostHogProvider created** (`packages/frontend/src/components/PostHogProvider.tsx`) -- Verified. Initializes `posthog-js` client-side only (guarded by `typeof window !== 'undefined'`), wraps children with `PHProvider`, and includes a `PostHogPageview` component for manual pageview tracking on route changes.
+- [x] **Provider in layout** (`packages/frontend/src/app/layout.tsx`) -- Verified at line 160. `<PostHogProvider>` wraps all application content inside a `<Suspense>` boundary. This is the correct Next.js App Router pattern.
+- [x] **Environment variables in deploy.yml** -- Verified. `.github/workflows/deploy.yml` line 119 passes `NEXT_PUBLIC_POSTHOG_KEY` as a Docker build arg from GitHub Secrets.
+- [ ] **Tracking verified working in PostHog dashboard** -- Cannot verify from code alone. Requires manual confirmation.
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `NEXT_PUBLIC_POSTHOG_KEY` | No | PostHog project API key |
-| `NEXT_PUBLIC_POSTHOG_HOST` | No | PostHog host (default: cloud) |
+### Event Tracking
+- [x] **Search events -- privacy-preserving** -- Verified in `analytics.ts` lines 50-64. Sends only `has_specialty_filter`, `has_state_filter`, `has_city_filter`, `has_health_system_filter`, `results_count`, `has_results`, `mode`. Does NOT send actual filter values.
+- [x] **Provider view events -- privacy-preserving** -- Verified in `analytics.ts` lines 70-78. Sends only `has_specialty`. Does NOT send `npi`, `specialty`, or `provider_name`.
+- [x] **Verification submit events -- privacy-preserving** -- Verified in `analytics.ts` lines 84-93. Sends empty payload `{}`. The `_props` parameter is intentionally unused. Only tracks that a submission occurred.
+- [x] **Verification vote events -- vote direction only** -- Verified in `analytics.ts` lines 99-107. Sends only `vote_type` ('up'/'down'). Does NOT send `verification_id` or `npi`.
+- [x] **User identity functions ready** -- Verified. `identifyUser()` and `resetUser()` are defined (lines 112-125) for future account integration.
+- [ ] **Compare actions** -- Not tracked in `analytics.ts`.
+- [ ] **Error events** -- Not tracked in `analytics.ts`.
+- [ ] **Insurance card upload events** -- Not tracked in `analytics.ts`.
 
-### Initialization
+### Privacy
+- [x] **No PII captured** -- Verified. All four event functions strip identifiable data before sending to PostHog. Type signatures accept full data but implementations discard sensitive fields.
+- [x] **No healthcare data captured** -- Verified. Specialties, plan details, and NPI numbers are never sent.
+- [x] **Pageview tracking is manual** -- `capture_pageview: false` is set in the PostHog init config (PostHogProvider.tsx line 15). A `PostHogPageview` component manually captures `$pageview` events on route changes.
 
-```typescript
-// packages/frontend/src/lib/analytics.ts
+#### Discrepancies Between Prompt and Actual Code
 
-import posthog from 'posthog-js';
+| Setting | Prompt Says | Actual Code |
+|---------|-------------|-------------|
+| `api_host` | `https://app.posthog.com` | `https://us.i.posthog.com` |
+| `autocapture` | Listed under "Privacy Settings" as `false` (checklist says "not explicitly disabled") | **`true`** (line 18) |
+| `disable_session_recording` | `true` | Not set at all |
+| `persistence` | `'localStorage'` | `'localStorage'` (matches) |
+| Pageview tracking | Only `$pageleave` auto-captured | PostHogPageview component ALSO manually captures `$pageview` on every route change, including search params in the URL |
 
-export function initAnalytics() {
-  const apiKey = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+- [!] **`autocapture: true` is a privacy concern** -- With `autocapture` enabled, PostHog automatically captures click events, form submissions, and other DOM interactions. This could inadvertently capture sensitive text content (e.g., provider names, NPI numbers displayed in UI elements). The prompt's checklist acknowledges this is "not explicitly disabled" but the actual code actively enables it.
 
-  if (!apiKey) {
-    console.log('[Analytics] PostHog not configured');
-    return;
-  }
+- [!] **PostHogPageview sends full URL including search params** -- Lines 32-36 of PostHogProvider.tsx construct `$current_url` from `pathname + searchParams.toString()`. If search parameters contain provider-identifying information (e.g., `?npi=1234567890&specialty=Cardiology`), these get sent to PostHog as part of the pageview event, undermining the privacy-preserving design of the custom event functions.
 
-  if (typeof window === 'undefined') {
-    return;
-  }
+- [ ] **Cookie consent banner** -- Not implemented. No consent banner component found anywhere in `packages/frontend/src`.
+- [ ] **Privacy policy updated to mention PostHog** -- Cannot verify from code; requires reviewing the privacy policy page content.
+- [ ] **Opt-out mechanism** -- Not implemented.
 
-  posthog.init(apiKey, {
-    api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://app.posthog.com',
+### Actual Usage in Components
+- **`trackVerificationSubmit`** -- Used in `VerificationButton.tsx` (line 5 import, line 90 call).
+- **`trackSearch`** -- Defined but NOT imported/used by any component.
+- **`trackProviderView`** -- Defined but NOT imported/used by any component.
+- **`trackVerificationVote`** -- Defined but NOT imported/used by any component.
 
-    // Privacy settings
-    autocapture: false,           // Don't auto-capture clicks
-    capture_pageview: true,       // Track page views
-    capture_pageleave: true,      // Track page exits
-    disable_session_recording: true,  // No session replays
-
-    // Persistence
-    persistence: 'localStorage',  // or 'cookie'
-    persistence_name: 'vmp_ph',
-
-    // Performance
-    loaded: (posthog) => {
-      if (process.env.NODE_ENV === 'development') {
-        posthog.debug();
-      }
-    }
-  });
-}
-```
-
-### Provider Wrapper
-
-```typescript
-// packages/frontend/src/app/providers.tsx
-
-'use client';
-
-import { useEffect } from 'react';
-import { usePathname, useSearchParams } from 'next/navigation';
-import posthog from 'posthog-js';
-import { initAnalytics } from '@/lib/analytics';
-
-export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
-  useEffect(() => {
-    initAnalytics();
-  }, []);
-
-  useEffect(() => {
-    // Track page views on route change
-    if (pathname) {
-      posthog.capture('$pageview', {
-        $current_url: `${pathname}${searchParams.toString() ? '?' + searchParams.toString() : ''}`
-      });
-    }
-  }, [pathname, searchParams]);
-
-  return <>{children}</>;
-}
-```
+### Analysis
+- [ ] Dashboard created -- Cannot verify.
+- [ ] Key metrics defined -- Cannot verify.
+- [ ] Funnels set up -- Cannot verify.
+- [ ] Alerts configured -- Cannot verify.
 
 ---
 
-## Privacy Principles
+## Summary
 
-### What We Track
+The PostHog analytics implementation demonstrates a thoughtful privacy-preserving design at the `analytics.ts` level -- functions accept full event data as typed parameters but deliberately strip all identifiable information before sending to PostHog. However, this careful approach is partially undermined by two issues in `PostHogProvider.tsx`: (1) `autocapture: true` allows PostHog to automatically capture DOM interactions which may contain sensitive content, and (2) the `PostHogPageview` component sends the full URL including search parameters to PostHog, potentially leaking provider/plan identifiers.
 
-| Data Type | Tracked | Purpose |
-|-----------|---------|---------|
-| Page views | ✅ Yes | Feature usage |
-| Search events | ✅ Yes | Search optimization |
-| Verification events | ✅ Yes | Conversion tracking |
-| Error events | ✅ Yes | Bug detection |
+Only 1 of 4 tracking functions (`trackVerificationSubmit`) is actually wired into a component. The other three (`trackSearch`, `trackProviderView`, `trackVerificationVote`) are defined but never called, meaning most of the designed event tracking is not yet operational.
 
-### What We DON'T Track
-
-| Data Type | Tracked | Reason |
-|-----------|---------|--------|
-| Provider NPIs | ❌ No | Not needed |
-| Insurance plan IDs | ❌ No | Privacy |
-| IP addresses | ❌ No | PostHog anonymizes |
-| User PII | ❌ No | No accounts |
-| Click coordinates | ❌ No | Autocapture disabled |
-
----
-
-## Event Catalog
-
-### Search Events
-
-```typescript
-// Search performed
-posthog.capture('search', {
-  has_state: !!state,
-  has_city: !!city,
-  has_specialty: !!specialty,
-  has_name: !!name,
-  result_count: results.length,
-  page: page
-});
-
-// Search filters changed
-posthog.capture('search_filter', {
-  filter_type: 'specialty',
-  has_results: results.length > 0
-});
-```
-
-### Provider Events
-
-```typescript
-// Provider detail viewed
-posthog.capture('provider_view', {
-  has_plans: planAcceptance.length > 0,
-  has_location: !!locationId
-});
-
-// Provider added to compare
-posthog.capture('compare_add', {
-  compare_count: compareList.length
-});
-
-// Compare page viewed
-posthog.capture('compare_view', {
-  provider_count: npis.length
-});
-```
-
-### Verification Events
-
-```typescript
-// Verification form opened
-posthog.capture('verification_start');
-
-// Insurance card scanned
-posthog.capture('card_scan', {
-  success: !!result.planName
-});
-
-// Verification submitted
-posthog.capture('verification_submit', {
-  accepts_insurance: acceptsInsurance,
-  has_notes: !!notes,
-  source: 'crowdsource'
-});
-
-// Vote cast
-posthog.capture('vote', {
-  vote_type: vote  // 'up' or 'down'
-});
-```
-
-### Error Events
-
-```typescript
-// API error
-posthog.capture('error', {
-  error_type: 'api',
-  error_code: response.error.code,
-  endpoint: endpoint
-});
-
-// Client error
-posthog.capture('error', {
-  error_type: 'client',
-  error_message: error.message
-});
-```
-
----
-
-## Implementation Examples
-
-### Search Component
-
-```typescript
-// packages/frontend/src/components/search/SearchForm.tsx
-
-export function SearchForm({ onSearch }: Props) {
-  const handleSubmit = async (query: SearchQuery) => {
-    // Track search event (without specific terms)
-    posthog.capture('search', {
-      has_state: !!query.state,
-      has_city: !!query.city,
-      has_specialty: !!query.specialty,
-      has_name: !!query.name
-    });
-
-    const results = await onSearch(query);
-
-    // Track results (count only)
-    posthog.capture('search_results', {
-      result_count: results.length,
-      has_results: results.length > 0
-    });
-  };
-
-  // ...
-}
-```
-
-### Verification Form
-
-```typescript
-// packages/frontend/src/components/verification/VerificationForm.tsx
-
-export function VerificationForm({ npi }: Props) {
-  useEffect(() => {
-    posthog.capture('verification_start');
-  }, []);
-
-  const handleSubmit = async (data: FormData) => {
-    try {
-      await api.submitVerification(data);
-
-      posthog.capture('verification_submit', {
-        accepts_insurance: data.acceptsInsurance,
-        has_notes: !!data.notes
-      });
-    } catch (error) {
-      posthog.capture('verification_error', {
-        error_code: error.code
-      });
-    }
-  };
-
-  // ...
-}
-```
-
----
-
-## Feature Flags
-
-PostHog supports feature flags for gradual rollouts:
-
-```typescript
-// Check feature flag
-if (posthog.isFeatureEnabled('new_compare_view')) {
-  return <NewCompareView />;
-}
-
-// With fallback
-const showNewUI = posthog.getFeatureFlag('new_ui_version') === 'v2';
-```
-
-### Defined Flags
-
-| Flag | Purpose | Status |
-|------|---------|--------|
-| `insurance_card_ocr` | Enable card scanning | Active |
-| `provider_comparison` | Enable comparison | Active |
-| `new_search_ui` | New search interface | Testing |
-
----
-
-## Dashboards
-
-### Key Metrics
-
-| Metric | Definition |
-|--------|------------|
-| Daily Active Users | Unique visitors/day |
-| Search Conversion | Searches → Provider views |
-| Verification Rate | Provider views → Verifications |
-| Vote Engagement | Verifications viewed → Votes |
-
-### Funnel Analysis
-
-```
-Homepage Visit
-     ↓ 65%
-Search Performed
-     ↓ 70%
-Provider Detail Viewed
-     ↓ 40%
-Plan Status Checked
-     ↓ 15%
-Verification Submitted
-```
-
-### Feature Usage
-
-| Feature | Daily Usage |
-|---------|-------------|
-| Search | 1,000+ |
-| Provider View | 700+ |
-| Compare | 50+ |
-| Verify | 100+ |
-| Vote | 30+ |
-
----
-
-## GDPR Compliance
-
-### Cookie Consent
-
-```typescript
-// packages/frontend/src/components/CookieConsent.tsx
-
-export function CookieConsent() {
-  const [consent, setConsent] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    const stored = localStorage.getItem('analytics_consent');
-    if (stored !== null) {
-      setConsent(stored === 'true');
-    }
-  }, []);
-
-  const handleAccept = () => {
-    localStorage.setItem('analytics_consent', 'true');
-    setConsent(true);
-    initAnalytics();
-  };
-
-  const handleDecline = () => {
-    localStorage.setItem('analytics_consent', 'false');
-    setConsent(false);
-    posthog.opt_out_capturing();
-  };
-
-  if (consent !== null) return null;
-
-  return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4">
-      <p>We use analytics to improve the product.</p>
-      <div className="flex gap-2 mt-2">
-        <button onClick={handleAccept}>Accept</button>
-        <button onClick={handleDecline}>Decline</button>
-      </div>
-    </div>
-  );
-}
-```
-
-### Data Deletion
-
-```typescript
-// Reset user data
-posthog.reset();
-
-// Opt out
-posthog.opt_out_capturing();
-```
+No user consent mechanism (cookie banner, opt-out) exists, which is a compliance concern for GDPR and potentially other privacy regulations.
 
 ---
 
 ## Recommendations
 
-### Immediate
-- ✅ Basic analytics implemented
-- Add funnel analysis dashboard
-- Set up alerts for conversion drops
-
-### Future
-1. **A/B Testing**
-   - Test search UI variations
-   - Test CTA copy
-
-2. **Cohort Analysis**
-   - Track user retention
-   - Identify power users
-
-3. **Self-hosted PostHog**
-   - For more control
-   - HIPAA-adjacent compliance
-
----
-
-## Conclusion
-
-PostHog analytics is **well-implemented**:
-
-- ✅ Privacy-focused (no PII)
-- ✅ Key events tracked
-- ✅ Feature flags available
-- ✅ GDPR consent flow
-- ✅ Autocapture disabled
-
-The integration provides product insights while respecting user privacy.
+1. **Set `autocapture: false`** in `PostHogProvider.tsx` to prevent PostHog from automatically capturing click events that may contain sensitive healthcare information displayed in the UI.
+2. **Sanitize URLs in PostHogPageview** -- Either strip query parameters before sending `$pageview` events, or ensure search parameters never contain PII/PHI. Currently, search params are included verbatim.
+3. **Wire up the remaining tracking functions** -- `trackSearch`, `trackProviderView`, and `trackVerificationVote` are defined but not called from any component. Integrate them into the relevant search results page, provider detail page, and vote button components.
+4. **Implement a cookie consent banner** -- Required for GDPR compliance. Conditionally initialize PostHog only after user consent is obtained.
+5. **Add an opt-out mechanism** -- PostHog supports `posthog.opt_out_capturing()`. Expose this to users via a privacy settings UI.
+6. **Set `disable_session_recording: true`** explicitly in the PostHog config to prevent accidental enablement if session recording is turned on in the PostHog project settings.
+7. **Update the privacy policy** to disclose the use of PostHog analytics, what data is collected, and how users can opt out.

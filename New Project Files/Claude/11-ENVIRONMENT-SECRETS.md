@@ -1,304 +1,193 @@
-# VerifyMyProvider Environment & Secrets Analysis
+# Environment & Secrets Review -- Analysis
 
-**Last Updated:** 2026-01-31
-**Analyzed By:** Claude Code
-
----
-
-## Executive Summary
-
-Secrets are properly managed through environment variables and GCP Secret Manager. No hardcoded secrets found in the codebase.
+**Generated:** 2026-02-05
+**Source Prompt:** prompts/11-environment-secrets.md
+**Status:** Mostly Accurate -- prompt is comprehensive but contains inaccuracies around CAPTCHA env var configurability and missing variables
 
 ---
 
-## Environment Variables Inventory
+## Findings
 
-### Backend Configuration
+### Complete Environment Variable Inventory Verification
 
-| Variable | Required | Default | Purpose |
-|----------|----------|---------|---------|
-| `DATABASE_URL` | ✅ Yes | - | PostgreSQL connection string |
-| `PORT` | No | 3001 | Server port |
-| `NODE_ENV` | No | development | Environment mode |
-| `CORS_ORIGIN` | No | localhost:3000 | Allowed CORS origins |
+Each variable listed in the prompt was cross-referenced against actual `process.env` usage in source code.
 
-### Frontend Configuration
+#### Database
 
-| Variable | Required | Default | Purpose |
-|----------|----------|---------|---------|
-| `NEXT_PUBLIC_API_URL` | ✅ Yes | - | Backend API URL |
-| `NEXT_PUBLIC_POSTHOG_KEY` | No | - | PostHog analytics |
-| `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` | No | - | reCAPTCHA site key |
+| Variable | Prompt Says | Code Reality | Status |
+|----------|-------------|--------------|--------|
+| `DATABASE_URL` | Required, Backend (Prisma) | Used implicitly by Prisma Client in `lib/prisma.ts`. Not directly referenced via `process.env.DATABASE_URL` in code -- Prisma reads it automatically. Also set in `docker-compose.yml` and `deploy.yml` (Secret Manager). | Verified |
 
-### Security Secrets
+#### Server Configuration
 
-| Variable | Required | Storage | Purpose |
-|----------|----------|---------|---------|
-| `RECAPTCHA_SECRET_KEY` | Prod only | Secret Manager | CAPTCHA verification |
-| `ADMIN_SECRET` | Prod only | Secret Manager | Admin endpoint auth |
-| `ANTHROPIC_API_KEY` | No | Secret Manager | Insurance card OCR |
+| Variable | Prompt Says | Code Reality | Status |
+|----------|-------------|--------------|--------|
+| `PORT` | No, default `3001` | `process.env.PORT \|\| 3001` in `index.ts` line 19. Also set in `docker-compose.yml` as `8080`. | Verified |
+| `NODE_ENV` | No, default `development` | Used extensively: `index.ts` (CORS dev mode), `captcha.ts` (skip in dev/test), `prisma.ts` (log levels, dev singleton), `logger.ts` (pretty printing), `errorHandler.ts` (production error messages), `error.tsx` (dev details), `api.ts` (dev logging), `errorUtils.ts` (dev logging). | Verified |
+| `CORS_ORIGIN` | No, legacy | NOT found in backend source code via `process.env.CORS_ORIGIN`. It exists in `.env.example` and `docker-compose.yml` but is never read by the application. The backend uses hardcoded origins + `FRONTEND_URL`. | Issue |
+| `FRONTEND_URL` | No, Cloud Run | `process.env.FRONTEND_URL` in `index.ts` line 26, added to CORS whitelist. Set in `deploy.yml` via `secrets.FRONTEND_URL`. | Verified |
 
-### Optional Services
+#### Security -- CAPTCHA (Google reCAPTCHA v3)
 
-| Variable | Required | Purpose |
-|----------|----------|---------|
-| `REDIS_URL` | No | Distributed rate limiting |
+| Variable | Prompt Says | Code Reality | Status |
+|----------|-------------|--------------|--------|
+| `RECAPTCHA_SECRET_KEY` | Prod only | `process.env.RECAPTCHA_SECRET_KEY` in `captcha.ts` line 47. Skipped with warning if missing. | Verified |
+| `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` | Prod only, Frontend | NOT found anywhere in frontend source code. Zero references to `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` in `packages/frontend/src/`. Only referenced in docs and other prompt files. reCAPTCHA is NOT yet integrated into the frontend. | Issue |
+| `CAPTCHA_FAIL_MODE` | No, default `open` | `process.env.CAPTCHA_FAIL_MODE` in `captcha.ts` line 52. Correctly defaults to `'open'`. | Verified |
+| `CAPTCHA_MIN_SCORE` | No, default `0.5` | Prompt describes this as an environment variable. In reality, it is a **hardcoded constant** (`export const CAPTCHA_MIN_SCORE = 0.5;`) in `config/constants.ts` line 52. It is NOT read from `process.env`. | Issue |
+| `CAPTCHA_API_TIMEOUT_MS` | No, default `5000` | Prompt describes this as an environment variable. In reality, it is a **hardcoded constant** (`export const CAPTCHA_API_TIMEOUT_MS = 5 * MS_PER_SECOND;`) in `config/constants.ts` line 57. NOT read from `process.env`. | Issue |
+| `CAPTCHA_FALLBACK_MAX_REQUESTS` | No, default `3` | Prompt describes this as an environment variable. In reality, it is a **hardcoded constant** (`export const CAPTCHA_FALLBACK_MAX_REQUESTS = 3;`) in `config/constants.ts` line 62. NOT read from `process.env`. | Issue |
+| `CAPTCHA_FALLBACK_WINDOW_MS` | No, default `3600000` | Prompt describes this as an environment variable. In reality, it is a **hardcoded constant** (`export const CAPTCHA_FALLBACK_WINDOW_MS = MS_PER_HOUR;`) in `config/constants.ts` line 67. NOT read from `process.env`. | Issue |
 
-### GCP / Cloud Run
+#### Security -- Admin
 
-| Variable | Required | Purpose |
-|----------|----------|---------|
-| `GCP_PROJECT_ID` | Prod | GCP project ID |
-| `GCP_REGION` | Prod | Deployment region |
-| `CLOUD_SQL_CONNECTION_NAME` | Prod | Cloud SQL proxy |
+| Variable | Prompt Says | Code Reality | Status |
+|----------|-------------|--------------|--------|
+| `ADMIN_SECRET` | Prod only | `process.env.ADMIN_SECRET` in `admin.ts` line 22. Returns 503 if not set. Uses `timingSafeEqual` for comparison (line 48). | Verified |
 
-### CAPTCHA Configuration
+#### Caching -- Redis
 
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `CAPTCHA_FAIL_MODE` | open | open or closed |
-| `CAPTCHA_MIN_SCORE` | 0.5 | Minimum score (0-1) |
-| `CAPTCHA_API_TIMEOUT_MS` | 5000 | API timeout |
-| `CAPTCHA_FALLBACK_MAX_REQUESTS` | 3 | Fallback limit |
+| Variable | Prompt Says | Code Reality | Status |
+|----------|-------------|--------------|--------|
+| `REDIS_URL` | No | `process.env.REDIS_URL` in `redis.ts` lines 40 and 124. Returns null if not set, falling back to in-memory. | Verified |
 
----
+#### External APIs
 
-## .env.example Contents
+| Variable | Prompt Says | Code Reality | Status |
+|----------|-------------|--------------|--------|
+| `ANTHROPIC_API_KEY` | No | `process.env.ANTHROPIC_API_KEY` in `app/api/insurance-card/extract/route.ts` lines 35 and 316. Feature disabled if not set. | Verified |
 
-```bash
-# Root .env.example
+#### Analytics
 
-# Backend Configuration
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/healthcare_providers"
-PORT=3001
-NODE_ENV=development
-CORS_ORIGIN=http://localhost:3000
+| Variable | Prompt Says | Code Reality | Status |
+|----------|-------------|--------------|--------|
+| `NEXT_PUBLIC_POSTHOG_KEY` | No | `process.env.NEXT_PUBLIC_POSTHOG_KEY` in `PostHogProvider.tsx` line 10. Analytics disabled if not set. | Verified |
+| `NEXT_PUBLIC_POSTHOG_HOST` | No, default `https://app.posthog.com` | NOT found in source code. PostHog host is **hardcoded** as `'https://us.i.posthog.com'` in `PostHogProvider.tsx` line 14. The prompt says default is `https://app.posthog.com` but the actual hardcoded value is `https://us.i.posthog.com`. Neither value matches, and it is not configurable via env var. | Issue |
 
-# Frontend Configuration
-NEXT_PUBLIC_API_URL=http://localhost:3001/api/v1
+#### Frontend
 
-# NPI Data Source
-NPI_DATA_URL="https://download.cms.gov/nppes/NPI_Files.html"
+| Variable | Prompt Says | Code Reality | Status |
+|----------|-------------|--------------|--------|
+| `NEXT_PUBLIC_API_URL` | Required | `process.env.NEXT_PUBLIC_API_URL \|\| 'http://localhost:3001/api/v1'` in `lib/api.ts` line 17. Set as build arg in `deploy.yml` and `docker-compose.yml`. | Verified |
 
-# Security
-# RECAPTCHA_SECRET_KEY=your-recaptcha-secret-key
+#### GCP / Deployment
 
-# Docker / Cloud Run (Production)
-# GCP_PROJECT_ID=your-project-id
-# GCP_REGION=us-central1
-# CLOUD_SQL_CONNECTION_NAME=project:region:instance
-```
+| Variable | Prompt Says | Code Reality | Status |
+|----------|-------------|--------------|--------|
+| `GCP_PROJECT_ID` | CI/CD only | Used in `deploy.yml` as `${{ secrets.GCP_PROJECT_ID }}`. | Verified |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | CI/CD only | Used in `deploy.yml` line 35. | Verified |
+| `GCP_SERVICE_ACCOUNT` | CI/CD only | Used in `deploy.yml` line 36. | Verified |
+| `GCP_REGION` | CI/CD only | Hardcoded as `us-central1` in `deploy.yml` line 10 (not a secret). | Verified |
+| `NPI_DATA_URL` | No, reference only | Present in `.env.example` line 20. Not used in code. | Verified |
 
----
+#### Variables Found in Code but NOT in Prompt
 
-## Secret Manager Inventory (Production)
+| Variable | Where Used | Description |
+|----------|------------|-------------|
+| `LOG_LEVEL` | `packages/backend/src/utils/logger.ts` line 12 | Controls pino log level. Defaults to `'info'`. NOT listed in the prompt's environment variable inventory. |
+| `npm_package_version` | `packages/backend/src/index.ts` line 98 | Used in health check response. Auto-set by npm. Not a user-configurable env var. |
 
-| Secret Name | Purpose | Rotation |
-|-------------|---------|----------|
-| `DATABASE_URL` | PostgreSQL connection | Manual |
-| `ADMIN_SECRET` | Admin endpoint auth | Manual |
-| `RECAPTCHA_SECRET_KEY` | CAPTCHA verification | Manual |
-| `ANTHROPIC_API_KEY` | Insurance OCR (optional) | Manual |
+### Secret Storage Locations
 
----
+#### Local Development
+- [x] `.env` file at project root (gitignored) -- Verified. `.gitignore` contains `.env`, `.env.local`, `.env.*.local`.
+- [x] `.env.example` exists with placeholder values -- Verified. Contains DATABASE_URL, PORT, NODE_ENV, CORS_ORIGIN, NEXT_PUBLIC_API_URL, NPI_DATA_URL, commented RECAPTCHA_SECRET_KEY, GCP settings.
 
-## Security Scan Results
+#### Production (Cloud Run)
 
-### Hardcoded Secrets Check
+**Backend Cloud Run service (from deploy.yml):**
+- [x] `NODE_ENV=production` as env_var -- Verified at line 77
+- [x] `FRONTEND_URL=${{ secrets.FRONTEND_URL }}` as env_var -- Verified at line 78
+- [x] `DATABASE_URL=DATABASE_URL:latest` as secret -- Verified at line 80
+- [x] `--remove-secrets=ADMIN_SECRET` flag -- Verified at line 75
 
-```bash
-grep -r "sk-ant\|password.*=.*['\"]" packages/backend/src/ --include="*.ts"
-# Result: No matches found ✅
-```
+**Frontend Cloud Run service (from deploy.yml):**
+- [x] `NODE_ENV=production` as env_var -- Verified at line 145
+- [x] `NEXT_PUBLIC_API_URL` as build-arg -- Verified at line 118
+- [x] `NEXT_PUBLIC_POSTHOG_KEY` as build-arg -- Verified at line 119
+- [x] `ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest` as secret -- Verified at line 147
 
-### API Keys Check
+Warning: The prompt says `RECAPTCHA_SECRET_KEY` should be a production secret for the backend, but it is NOT configured in `deploy.yml`. The backend CAPTCHA middleware will log a warning and skip verification in production unless this is set separately.
 
-```bash
-grep -r "api[_-]?key.*=.*['\"]" packages/ --include="*.ts" --include="*.tsx"
-# Result: No hardcoded keys ✅
-```
+#### GitHub Actions Secrets
+- [x] `GCP_PROJECT_ID` -- Verified in deploy.yml
+- [x] `GCP_WORKLOAD_IDENTITY_PROVIDER` -- Verified in deploy.yml
+- [x] `GCP_SERVICE_ACCOUNT` -- Verified in deploy.yml
+- [x] `FRONTEND_URL` -- Verified in deploy.yml
+- [x] `NEXT_PUBLIC_POSTHOG_KEY` -- Verified in deploy.yml
 
-### Connection Strings Check
+#### GCP Secret Manager
+- [x] `DATABASE_URL` used by Backend Cloud Run -- Verified
+- [x] `ANTHROPIC_API_KEY` used by Frontend Cloud Run -- Verified
 
-```bash
-grep -r "postgresql://\|redis://" packages/ --include="*.ts"
-# Result: Only references to process.env ✅
-```
+### Docker Compose Verification
 
-### Git Check
+The `docker-compose.yml` sets:
+- `DATABASE_URL=postgresql://postgres:postgres@db:5432/healthcare_providers` -- local DB connection
+- `PORT=8080` for both backend and frontend containers
+- `NODE_ENV=production`
+- `CORS_ORIGIN=http://localhost:3000` -- set but never read by code (see issue above)
+- `NEXT_PUBLIC_API_URL=http://localhost:3001/api/v1` as build arg
 
-```bash
-git ls-files | grep -E "^\.env$|/\.env$"
-# Result: No .env files committed ✅
-```
+### Checklist Verification
 
----
+#### Secret Security
+- [x] No secrets hardcoded in source code -- Verified. All secrets come from env vars or Secret Manager.
+- [x] `.env` files in `.gitignore` -- Verified. `.env`, `.env.local`, `.env.*.local` all gitignored.
+- [x] `.env.example` exists with placeholder values -- Verified.
+- [x] Production secrets in GCP Secret Manager -- Verified for DATABASE_URL and ANTHROPIC_API_KEY.
+- [x] Timing-safe comparison for ADMIN_SECRET -- Verified. `admin.ts` uses `timingSafeEqual` from `crypto` module with buffer length check.
+- [x] CAPTCHA key validated server-side only -- Verified. `RECAPTCHA_SECRET_KEY` only used in backend `captcha.ts`.
+- [ ] Secret rotation procedure not documented -- Prompt correctly marks this as missing. (Note: a `docs/SECRET-ROTATION.md` file exists in the project, but the prompt was likely written before it.)
+- [ ] No automated secret scanning in CI -- Correctly marked as missing. No gitleaks/truffleHog in deploy.yml.
 
-## Code References
+#### Environment Configuration
+- [x] All env vars have sensible defaults for development -- Verified. PORT defaults to 3001, NODE_ENV to development, API_URL to localhost.
+- [x] Optional features degrade gracefully when env vars missing -- Verified for CAPTCHA (skips with warning), PostHog (disabled), Redis (falls back to in-memory), Anthropic (feature disabled), ADMIN_SECRET (returns 503).
+- [x] Production-specific values set via Cloud Run deployment -- Verified.
+- [x] `.env.example` is incomplete -- Prompt correctly identifies this. Missing: `ADMIN_SECRET`, `REDIS_URL`, `ANTHROPIC_API_KEY`, `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST`, `CAPTCHA_FAIL_MODE`, `FRONTEND_URL`, `LOG_LEVEL`.
 
-### Database URL Usage
-
-```typescript
-// prisma/schema.prisma
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")  // ✅ From environment
-}
-```
-
-### CAPTCHA Secret Usage
-
-```typescript
-// packages/backend/src/middleware/captcha.ts
-const RECAPTCHA_SECRET = process.env.RECAPTCHA_SECRET_KEY;  // ✅ From environment
-
-if (!RECAPTCHA_SECRET) {
-  console.warn('[CAPTCHA] Not configured');
-  return next();  // ✅ Graceful degradation
-}
-```
-
-### Admin Secret Usage
-
-```typescript
-// packages/backend/src/routes/admin.ts
-const adminSecret = process.env.ADMIN_SECRET;
-
-if (!adminSecret) {
-  return res.status(503).json({
-    error: 'Admin endpoints not configured'  // ✅ Graceful degradation
-  });
-}
-```
+#### CI/CD Secret Injection
+- [x] Workload Identity Federation (no long-lived keys) -- Verified in deploy.yml.
+- [x] Secrets passed via GitHub Actions secrets -- Verified.
+- [x] Build args for public frontend env vars -- Verified (NEXT_PUBLIC_API_URL, NEXT_PUBLIC_POSTHOG_KEY).
+- [x] Cloud Run Secret Manager for sensitive backend vars -- Verified.
+- [ ] No secret expiration/rotation alerts -- Correctly marked as missing.
 
 ---
 
-## Checklist
+## Summary
 
-### Secret Storage
-- [x] No secrets hardcoded in source code
-- [x] `.env` files in `.gitignore`
-- [x] `.env.example` documents required variables
-- [x] Production secrets in GCP Secret Manager
-- [ ] Secret rotation procedure documented
-- [ ] Access audit for Secret Manager
+The prompt provides a thorough and mostly accurate inventory of environment variables and secret management practices. However, there are several notable inaccuracies:
 
-### Environment Separation
-- [x] Development uses local `.env`
-- [x] Production uses Secret Manager
-- [x] Test environment separate from production
-- [ ] Staging environment configured
+1. **Four CAPTCHA settings described as environment variables are actually hardcoded constants** (`CAPTCHA_MIN_SCORE`, `CAPTCHA_API_TIMEOUT_MS`, `CAPTCHA_FALLBACK_MAX_REQUESTS`, `CAPTCHA_FALLBACK_WINDOW_MS`). The prompt implies these are configurable via env vars with defaults, but they are compile-time constants in `config/constants.ts`.
 
-### Validation
-- [x] Backend validates required env vars
-- [x] Graceful degradation for optional vars
-- [x] Clear error messages for missing vars
+2. **`NEXT_PUBLIC_RECAPTCHA_SITE_KEY` is not used anywhere in the frontend codebase.** reCAPTCHA client-side integration has not been implemented yet. The prompt lists it as if it exists.
 
----
+3. **`NEXT_PUBLIC_POSTHOG_HOST` is not used as an env var.** The PostHog host is hardcoded to `https://us.i.posthog.com`, not configurable, and the prompt's stated default (`https://app.posthog.com`) does not match the hardcoded value.
 
-## Cloud Run Secret Mounting
+4. **`CORS_ORIGIN` is never read by the application.** It exists in `.env.example` and `docker-compose.yml` but no `process.env.CORS_ORIGIN` reference exists in the backend source. The backend uses hardcoded allowed origins plus `FRONTEND_URL`.
 
-```yaml
-# Cloud Run service configuration
-spec:
-  template:
-    spec:
-      containers:
-        - env:
-            - name: DATABASE_URL
-              valueFrom:
-                secretKeyRef:
-                  name: DATABASE_URL
-                  key: latest
-            - name: ADMIN_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: ADMIN_SECRET
-                  key: latest
-            - name: RECAPTCHA_SECRET_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: RECAPTCHA_SECRET_KEY
-                  key: latest
-```
+5. **`LOG_LEVEL` is used in code but not documented in the prompt.**
 
----
-
-## GCP Secret Manager Commands
-
-```bash
-# List all secrets
-gcloud secrets list --project=verifymyprovider
-
-# View secret (careful!)
-gcloud secrets versions access latest --secret=ADMIN_SECRET
-
-# Create new secret
-gcloud secrets create NEW_SECRET --replication-policy="automatic"
-echo -n "secret-value" | gcloud secrets versions add NEW_SECRET --data-file=-
-
-# Grant access to Cloud Run service account
-gcloud secrets add-iam-policy-binding SECRET_NAME \
-  --member="serviceAccount:SERVICE_ACCOUNT@PROJECT.iam.gserviceaccount.com" \
-  --role="roles/secretmanager.secretAccessor"
-```
-
----
-
-## Common Issues
-
-### Missing Required Variable
-
-```
-Error: DATABASE_URL environment variable is not set
-Fix: Add to .env or mount from Secret Manager
-```
-
-### Wrong Format
-
-```
-Error: Invalid DATABASE_URL format
-Fix: postgresql://user:password@host:port/database
-```
-
-### Secret Not Mounted
-
-```
-Error: ADMIN_SECRET not configured
-Fix: Mount secret in Cloud Run service configuration
-```
+6. **`RECAPTCHA_SECRET_KEY` is not set in deploy.yml** for production, meaning CAPTCHA verification will be skipped in production with only a warning log.
 
 ---
 
 ## Recommendations
 
-### Immediate
-- [x] All production secrets in Secret Manager
-- [ ] Document secret rotation procedure
-- [ ] Set up access audit logging
+1. **Fix prompt: Remove CAPTCHA settings as env vars.** `CAPTCHA_MIN_SCORE`, `CAPTCHA_API_TIMEOUT_MS`, `CAPTCHA_FALLBACK_MAX_REQUESTS`, and `CAPTCHA_FALLBACK_WINDOW_MS` should either be described as hardcoded constants (current reality) or the code should be updated to read them from `process.env` with fallback defaults (if runtime configurability is desired).
 
-### Security
-- [ ] Enable Secret Manager audit logs
-- [ ] Review IAM permissions for secrets
-- [ ] Set up break-glass procedure
+2. **Fix prompt: Remove `NEXT_PUBLIC_RECAPTCHA_SITE_KEY`** until reCAPTCHA is actually integrated into the frontend. Alternatively, flag it as "planned but not implemented."
 
-### Monitoring
-- [ ] Alert on secret access failures
-- [ ] Monitor for exposed credentials
+3. **Fix prompt: Remove or correct `NEXT_PUBLIC_POSTHOG_HOST`.** The PostHog host is hardcoded, not configurable. If configurability is desired, update `PostHogProvider.tsx` to read from `process.env.NEXT_PUBLIC_POSTHOG_HOST`.
 
----
+4. **Fix prompt: Remove or flag `CORS_ORIGIN` as dead.** It is set in config files but never read by the application. Either remove it from `.env.example` and `docker-compose.yml`, or add `process.env.CORS_ORIGIN` reading to the backend.
 
-## Conclusion
+5. **Add `LOG_LEVEL` to the prompt inventory.** It is used in `logger.ts` and defaults to `'info'`.
 
-Secret management is **properly implemented**:
+6. **Add `RECAPTCHA_SECRET_KEY` to `deploy.yml` secrets** for production deployment, or document that CAPTCHA is intentionally disabled in production.
 
-- ✅ No hardcoded secrets in code
-- ✅ Environment variables for all secrets
-- ✅ .env files excluded from git
-- ✅ Secret Manager for production
-- ✅ Graceful degradation when secrets missing
+7. **Update `.env.example`** to include all environment variables: `ADMIN_SECRET`, `REDIS_URL`, `ANTHROPIC_API_KEY`, `NEXT_PUBLIC_POSTHOG_KEY`, `CAPTCHA_FAIL_MODE`, `FRONTEND_URL`, `LOG_LEVEL`. Remove `CORS_ORIGIN` if it is dead code.
 
-**Action items:**
-1. Document secret rotation procedure
-2. Set up access audit for Secret Manager
-3. Create break-glass procedure for emergencies
+8. **Consider adding automated secret scanning** (gitleaks or truffleHog) to the CI pipeline as a pre-commit hook or GitHub Action step.

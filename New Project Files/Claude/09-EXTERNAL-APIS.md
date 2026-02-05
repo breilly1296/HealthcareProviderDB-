@@ -1,418 +1,249 @@
-# VerifyMyProvider External APIs Analysis
+# External API Security Review -- Analysis
 
-**Last Updated:** 2026-01-31
-**Analyzed By:** Claude Code
-
----
-
-## Executive Summary
-
-VerifyMyProvider integrates with 4 external APIs: Google reCAPTCHA, NPPES (NPI Registry), Anthropic (insurance card OCR), and PostHog (analytics). All integrations follow security best practices.
+**Generated:** 2026-02-05
+**Source Prompt:** prompts/09-external-apis.md
+**Status:** All external APIs are properly integrated with appropriate security controls; some gaps in TLS, cost monitoring, and privacy compliance
 
 ---
 
-## External API Inventory
+## Findings
 
-| API | Purpose | Required | Environment |
-|-----|---------|----------|-------------|
-| Google reCAPTCHA v3 | Bot protection | Prod only | Backend |
-| NPPES Download | NPI data source | Yes | ETL pipeline |
-| Anthropic Claude | Insurance card OCR | Optional | Backend |
-| PostHog | Analytics | Optional | Frontend |
-| Redis | Distributed rate limiting | Optional | Backend |
+### 1. Google reCAPTCHA v3 API
 
----
+**File:** `packages/backend/src/middleware/captcha.ts`
 
-## Google reCAPTCHA v3
+- **API key stored in environment variable (not hardcoded):**
+  Verified. Line 47: `const RECAPTCHA_SECRET = process.env.RECAPTCHA_SECRET_KEY;`
 
-### Purpose
-Prevent bot submissions on verification and voting endpoints.
+- **Response validated (checks `success` and `score` fields):**
+  Verified. Lines 162-183: Checks `data.success` boolean, then checks `data.score < CAPTCHA_MIN_SCORE`. Both conditions produce distinct error responses with structured logging.
 
-### Integration
+- **Timeout prevents hanging on slow responses:**
+  Verified. Lines 149-151: Uses `AbortController` with `CAPTCHA_API_TIMEOUT_MS` (5 seconds from `constants.ts` line 57). Timeout abort is detected via `error.name === 'AbortError'` at line 189.
 
-```typescript
-// packages/backend/src/middleware/captcha.ts
+- **Fail-open mode with fallback rate limiting:**
+  Verified. Lines 210-237: When Google API fails and `CAPTCHA_FAIL_MODE=open`, the `checkFallbackRateLimit()` function applies a stricter 3/hour limit per IP (vs normal 10/hour). Appropriate headers are set: `X-Security-Degraded`, `X-Fallback-RateLimit-Limit`, `X-Fallback-RateLimit-Remaining`, `X-Fallback-RateLimit-Reset`.
 
-const RECAPTCHA_VERIFY_URL = 'https://www.google.com/recaptcha/api/siteverify';
+- **Fail-closed mode available:**
+  Verified. Lines 199-208: When `CAPTCHA_FAIL_MODE=closed`, returns 503 via `AppError.serviceUnavailable()`.
 
-export async function verifyCaptcha(req: Request, res: Response, next: NextFunction) {
-  const RECAPTCHA_SECRET = process.env.RECAPTCHA_SECRET_KEY;
+- **Skipped in development/test environments:**
+  Verified. Lines 121-123: Returns `next()` for `NODE_ENV=development` or `NODE_ENV=test`.
 
-  if (!RECAPTCHA_SECRET) {
-    console.warn('[CAPTCHA] Not configured - allowing request');
-    return next();
-  }
+- **Skipped when secret key not configured:**
+  Verified. Lines 126-132: Logs a warning and allows the request through.
 
-  const token = req.body.captchaToken;
-  if (!token) {
-    return next(AppError.badRequest('CAPTCHA token required'));
-  }
+- **Client IP sent to Google for risk assessment:**
+  Verified. Line 146: `remoteip: clientIp` included in the URLSearchParams body.
 
-  try {
-    const response = await fetch(RECAPTCHA_VERIFY_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        secret: RECAPTCHA_SECRET,
-        response: token,
-        remoteip: req.ip || ''
-      })
-    });
+- **No SSRF risk:**
+  Verified. The URL `https://www.google.com/recaptcha/api/siteverify` is a hardcoded constant at line 48. No user input influences the URL.
 
-    const data = await response.json();
+- **API key rotation procedure:**
+  Not documented. The prompt notes this as unchecked.
 
-    if (!data.success || data.score < CAPTCHA_MIN_SCORE) {
-      return next(AppError.forbidden('Verification failed'));
-    }
+- **Endpoint hardcoded constant:**
+  Verified. `RECAPTCHA_VERIFY_URL` is `'https://www.google.com/recaptcha/api/siteverify'` (line 48), not derived from user input or environment variables.
 
-    // Store score for logging
-    req.captchaScore = data.score;
-    next();
-  } catch (error) {
-    // Fail-open with fallback rate limiting
-    handleCaptchaFailure(req, res, next, error);
-  }
-}
-```
+- **Token source:**
+  Verified. Line 134: Token is read from `req.body.captchaToken` or `req.headers['x-captcha-token']`, providing flexibility for different client implementations.
 
-### Configuration
+### 2. Anthropic Claude API (Insurance Card Extraction)
 
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `RECAPTCHA_SECRET_KEY` | Required | Google secret key |
-| `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` | Required | Frontend site key |
-| `CAPTCHA_MIN_SCORE` | 0.5 | Minimum passing score |
-| `CAPTCHA_FAIL_MODE` | open | Behavior on API failure |
-| `CAPTCHA_API_TIMEOUT_MS` | 5000 | Request timeout |
+**File:** `packages/frontend/src/app/api/insurance-card/extract/route.ts`
 
-### Error Handling
-- **Fail-open**: Allow with stricter rate limit (3/hr vs 10/hr)
-- **Fail-closed**: Block all requests (configurable)
+- **API key stored securely:**
+  Verified. Line 34-36: `new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })`. The prompt states the key is in Cloud Run Secret Manager.
 
----
+- **Images processed server-side only:**
+  Verified. This is a Next.js API route (`export async function POST(request: NextRequest)`), so the image is sent to the server and the Claude API call happens server-side. The `ANTHROPIC_API_KEY` is never exposed to the client.
 
-## NPPES NPI Registry
+- **Images not stored permanently:**
+  Verified. The image is received as base64, preprocessed in memory, sent to Claude, and the response is returned. No file system writes or database storage of the image data.
 
-### Purpose
-Source of provider data (names, addresses, specialties).
+- **File size validated (max 10MB):**
+  Verified. Lines 26-27: `MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024` and `MAX_BASE64_LENGTH = Math.ceil(MAX_IMAGE_SIZE_BYTES * 1.37)`. Check at line 279 rejects with 413 if exceeded.
 
-### Data Source
+- **File type validated (image/* only):**
+  Verified. Lines 43-77: `detectMediaType()` uses magic byte detection to identify PNG, JPEG, WebP, and GIF. Only these image types are accepted. Base64 format validation at lines 296-303 ensures valid base64 characters.
 
-```bash
-# NPI data download location
-NPI_DATA_URL="https://download.cms.gov/nppes/NPI_Files.html"
+- **Rate limited (10 extractions/hour per IP):**
+  Verified. Lines 28-29: `RATE_LIMIT_PER_HOUR = 10`. Lines 229-254: Uses the frontend's `checkRateLimit()` function from `packages/frontend/src/lib/rateLimit.ts` with 1-hour window.
 
-# Monthly full file (~8GB compressed)
-# Weekly delta files (~100MB)
-```
+- **Feature disabled gracefully if API key not configured:**
+  Verified. Lines 316-323: If `ANTHROPIC_API_KEY` is not set, returns 500 with a user-friendly message suggesting manual entry.
 
-### ETL Pipeline
+- **Response parsed through Zod schema:**
+  Verified. `parseInsuranceCardResponse()` from `packages/frontend/src/lib/insuranceCardSchema.ts` uses `InsuranceCardDataSchema` (a comprehensive Zod schema with 22+ fields) to validate and parse the Claude response. This prevents malformed or unexpected data from reaching the frontend.
 
-```typescript
-// packages/backend/src/etl/npiImport.ts
+- **No retry logic on API failure:**
+  Partially addressed. Lines 378-403: There IS retry logic, but only for low-confidence results (below `RETRY_CONFIDENCE_THRESHOLD = 0.3`), using an alternative prompt. However, there is no retry on transient API errors (network timeout, 5xx responses).
 
-export async function importNpiData(filePath: string) {
-  // 1. Download from NPPES
-  const zipFile = await downloadNpiFile();
+- **Cost monitoring:**
+  Not implemented. The prompt notes this as unchecked. Each extraction is a Claude Haiku 4.5 API call with image input and up to 1500 output tokens. No spend tracking or alerting exists.
 
-  // 2. Extract CSV
-  const csvPath = await extractZip(zipFile);
+- **Prompt injection risk:**
+  Low risk. The Claude API receives image data with a fixed extraction prompt. The prompts are defined as constants (`PRIMARY_EXTRACTION_PROMPT`, `ALTERNATIVE_EXTRACTION_PROMPT`) in the schema module. User-controlled text is not injected into the prompt.
 
-  // 3. Stream and parse
-  const parser = fs.createReadStream(csvPath)
-    .pipe(csv.parse({ columns: true }));
+- **Error handling:**
+  Verified. Lines 499-536: Comprehensive error handling distinguishes `SyntaxError` (400), `Anthropic.APIError` (503), and generic errors (500). All return user-friendly messages with suggestions.
 
-  // 4. Batch insert to database
-  let batch: Provider[] = [];
-  for await (const record of parser) {
-    const provider = transformNpiRecord(record);
-    batch.push(provider);
+- **Image preprocessing:**
+  Verified. Lines 326-355: Images are preprocessed using the `sharp` library for resize, compression, and optional contrast enhancement. Preprocessing failures are caught and the original image is used as fallback.
 
-    if (batch.length >= BATCH_SIZE) {
-      await prisma.provider.createMany({
-        data: batch,
-        skipDuplicates: true
-      });
-      batch = [];
-    }
-  }
+### 3. PostHog Analytics API
 
-  // 5. Log completion
-  await prisma.syncLog.create({
-    data: {
-      syncType: 'NPI_FULL',
-      status: 'COMPLETED',
-      recordsProcessed: count
-    }
-  });
-}
-```
+**File:** `packages/frontend/src/components/PostHogProvider.tsx`, `packages/frontend/src/lib/analytics.ts`
 
-### Schedule
-- **Monthly**: Full data refresh (all ~2.1M providers)
-- **Weekly**: Delta updates (new/changed providers)
+- **Public API key (safe to expose):**
+  Verified. Line 10 of PostHogProvider.tsx: `process.env.NEXT_PUBLIC_POSTHOG_KEY`. PostHog public keys are designed to be client-visible.
 
----
+- **Autocapture disabled (explicit events only):**
+  Issue. The prompt states autocapture is disabled, but PostHogProvider.tsx line 18 shows `autocapture: true`. This contradicts the prompt's checklist item. With autocapture enabled, PostHog will automatically capture clicks, form submissions, and other DOM interactions, which could inadvertently capture sensitive healthcare-related UI elements.
 
-## Anthropic Claude (Insurance Card OCR)
+- **No PII tracked (no names, emails, health data):**
+  Verified. `packages/frontend/src/lib/analytics.ts` implements privacy-preserving event tracking:
+  - `trackSearch()` (lines 50-64): Sends only boolean indicators (`has_specialty_filter`, `has_state_filter`, etc.) and result count. Does NOT send actual search values.
+  - `trackProviderView()` (lines 70-78): Sends only `has_specialty` boolean. Does NOT send NPI, provider name, or specialty.
+  - `trackVerificationSubmit()` (lines 84-93): Sends NO data at all -- only that a submission occurred.
+  - `trackVerificationVote()` (lines 99-107): Sends only `vote_type`. Does NOT send verification ID or NPI.
 
-### Purpose
-Extract plan information from uploaded insurance card photos.
+- **No session recording enabled:**
+  Verified. No `enable_recording_console_log` or `session_recording` configuration in PostHog init.
 
-### Integration
+- **Only initialized in browser environment:**
+  Verified. PostHogProvider.tsx line 9: `if (typeof window !== 'undefined')`. analytics.ts functions also check `if (typeof window === 'undefined') return;`.
 
-```typescript
-// packages/backend/src/services/insuranceCardOcr.ts
+- **Cookie consent banner:**
+  Not implemented. The prompt notes this as unchecked. PostHog sets cookies and uses localStorage (`persistence: 'localStorage'` at line 17) without user consent.
 
-import Anthropic from '@anthropic-ai/sdk';
+- **User opt-out mechanism:**
+  Not implemented. No `posthog.opt_out_capturing()` call or UI toggle exists.
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY
-});
+- **PostHog host:**
+  Warning. PostHogProvider.tsx line 14 uses `api_host: 'https://us.i.posthog.com'` which is a hardcoded PostHog cloud URL. The prompt mentions `NEXT_PUBLIC_POSTHOG_HOST` as an option, but the code uses a hardcoded string instead of an environment variable.
 
-export async function extractInsuranceInfo(imageBase64: string) {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw AppError.serviceUnavailable('OCR not configured');
-  }
+- **Pageview tracking:**
+  Verified. Lines 26-41: `PostHogPageview` component captures `$pageview` events on route changes using `usePathname()` and `useSearchParams()`. Manual pageview capture is used (`capture_pageview: false`) with URL construction.
 
-  const response = await anthropic.messages.create({
-    model: 'claude-3-haiku-20240307',
-    max_tokens: 1024,
-    messages: [{
-      role: 'user',
-      content: [
-        {
-          type: 'image',
-          source: {
-            type: 'base64',
-            media_type: 'image/jpeg',
-            data: imageBase64
-          }
-        },
-        {
-          type: 'text',
-          text: `Extract insurance information from this card image.
-                 Return JSON with: planName, carrier, planType (HMO/PPO/etc).
-                 Do NOT extract member ID, group number, or personal info.`
-        }
-      ]
-    }]
-  });
+- **Search params in pageview URL:**
+  Warning. Line 33: `searchParams.toString()` is appended to the pageview URL. If search parameters contain sensitive data (e.g., provider NPIs, plan IDs), these would be sent to PostHog as part of the URL.
 
-  return parseOcrResponse(response);
-}
-```
+### 4. NPI Registry API (CMS NPPES)
 
-### Privacy Safeguards
-- Only extracts plan name, carrier, plan type
-- Does NOT store member ID, group number
-- Image not persisted after processing
-- Explicit prompt to exclude PII
+- **Public API -- no key management needed:**
+  Verified. The prompt confirms this is a public API used only for batch import scripts, not live API calls.
 
-### Configuration
+- **Bulk data downloaded, not queried in real-time:**
+  Verified. The prompt states usage is via `scripts/import-npi-direct.ts` for direct PostgreSQL insertion from CSV downloads.
 
-| Variable | Required | Purpose |
-|----------|----------|---------|
-| `ANTHROPIC_API_KEY` | No | Claude API key |
+- **No SSRF risk:**
+  Verified. The CMS NPPES URL is a constant, not user-influenced.
 
----
+### 5. Redis (Distributed Rate Limiting and Caching)
 
-## PostHog Analytics
+**Files:** `packages/backend/src/lib/redis.ts`, `packages/backend/src/utils/cache.ts`
 
-### Purpose
-Anonymous usage analytics for product improvement.
+- **Connection string stored in environment variable:**
+  Verified. `redis.ts` line 40: `const redisUrl = process.env.REDIS_URL;`
 
-### Frontend Integration
+- **Graceful fallback to in-memory:**
+  Verified. `redis.ts` line 41-44: If `REDIS_URL` not configured, returns null. Callers (rateLimiter.ts, cache.ts) check for null and use in-memory alternatives.
 
-```typescript
-// packages/frontend/src/app/providers.tsx
+- **Fail-open behavior:**
+  Verified. Both the rate limiter and cache module handle Redis errors gracefully -- the rate limiter allows requests with degraded headers, and the cache falls back to in-memory.
 
-import posthog from 'posthog-js';
+- **Retry strategy:**
+  Verified. `redis.ts` lines 56-64: Exponential backoff with `maxRetriesPerRequest: 3`, up to 5 reconnection attempts, delays capped at 3 seconds.
 
-if (process.env.NEXT_PUBLIC_POSTHOG_KEY) {
-  posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
-    api_host: 'https://app.posthog.com',
-    capture_pageview: true,
-    capture_pageleave: true,
-    autocapture: false,  // Disabled for privacy
-    persistence: 'localStorage'
-  });
-}
-```
+- **Connection event logging:**
+  Verified. Lines 72-98: Events logged include `connect`, `ready`, `error`, `close`, `reconnecting`, and `end`.
 
-### Tracked Events
+- **Graceful shutdown:**
+  Verified. `closeRedisConnection()` at lines 134-148 attempts `quit()` first, falls back to `disconnect()`.
 
-```typescript
-// Search performed
-posthog.capture('search', {
-  hasState: !!state,
-  hasCity: !!city,
-  hasSpecialty: !!specialty,
-  resultCount: results.length
-});
+- **TLS not configured:**
+  Issue. The prompt notes TLS is needed for production Memorystore. The `new Redis(redisUrl, {...})` configuration at lines 49-69 does not include any TLS settings. If `REDIS_URL` uses a `rediss://` scheme, ioredis will use TLS automatically, but there is no explicit TLS configuration or certificate pinning.
 
-// Verification submitted
-posthog.capture('verification_submitted', {
-  acceptsInsurance: true  // No NPI or plan info
-});
+- **No authentication configured:**
+  Warning. The prompt notes reliance on network security. If the Redis instance is on a VPC (Cloud Memorystore), network-level security may suffice, but no Redis AUTH password is configured in code.
 
-// Provider compared
-posthog.capture('provider_compare', {
-  providerCount: 3
-});
-```
+- **Connection pooling limits not set:**
+  Warning. No `maxConnections` or similar pool configuration. ioredis defaults to a single connection, which is appropriate for the current use case but should be reviewed at scale.
 
-### Privacy
-- No PII captured
-- No provider NPIs in analytics
-- Anonymous distinct IDs
-- Cookie consent required (EU)
+- **Cache response data not validated:**
+  Warning. In `cache.ts`, `cacheGet()` at line 97 does `JSON.parse(value) as T` with a type assertion but no runtime validation. Corrupted or tampered cache entries would be passed through without validation.
 
-### Configuration
+### 6. Cross-Cutting: SSRF Risk Assessment
 
-| Variable | Required | Purpose |
-|----------|----------|---------|
-| `NEXT_PUBLIC_POSTHOG_KEY` | No | PostHog project key |
+- Verified. No user input constructs external API URLs anywhere in the codebase:
+  - reCAPTCHA URL: hardcoded constant
+  - Anthropic API: SDK with fixed endpoint
+  - PostHog: hardcoded in code (not even from env var)
+  - NPI Registry: hardcoded constant in scripts
+  - `evidenceUrl` in verifications: stored but never fetched server-side
+
+### 7. Cross-Cutting: API Key Management
+
+| Key | Storage | Verified |
+|-----|---------|----------|
+| `RECAPTCHA_SECRET_KEY` | Env var / Secret Manager | Yes -- used in captcha.ts |
+| `ANTHROPIC_API_KEY` | Cloud Run Secret Manager | Yes -- used in extract/route.ts |
+| `NEXT_PUBLIC_POSTHOG_KEY` | Build-time arg | Yes -- used in PostHogProvider.tsx |
+| `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` | Build-time arg | Assumed (frontend reCAPTCHA widget) |
+| `ADMIN_SECRET` | Cloud Run env | Not reviewed (out of scope) |
+| `REDIS_URL` | Cloud Run env | Yes -- used in redis.ts |
+| `DATABASE_URL` | Cloud Run Secret Manager | Not reviewed (out of scope) |
+
+- **Key rotation:**
+  Not documented or automated for any key. All rotation is manual.
+
+### 8. Cross-Cutting: Response Validation
+
+- **reCAPTCHA:**
+  Verified. Response is typed as `RecaptchaResponse` interface and both `success` boolean and `score` number are explicitly checked.
+
+- **Claude API:**
+  Verified. Response is parsed through a Zod schema (`InsuranceCardDataSchema`) with 22+ fields, each with proper type constraints. Parse failures are handled gracefully with user-friendly error messages.
+
+- **PostHog:**
+  Verified. Client-side SDK -- no response validation needed.
+
+- **Redis:**
+  Warning. Connection errors are handled, but cached data retrieved via `JSON.parse()` has no runtime schema validation.
 
 ---
 
-## Redis (Optional)
+## Summary
 
-### Purpose
-Distributed rate limiting for multi-instance deployments.
+All five external API integrations (Google reCAPTCHA v3, Anthropic Claude, PostHog, NPI Registry, Redis) are implemented with appropriate security controls. API keys are stored in environment variables or Secret Manager, responses are validated where it matters most (reCAPTCHA and Claude), and failure modes are well-designed with graceful degradation. The privacy-preserving analytics implementation in `analytics.ts` is particularly well done -- it sends only boolean indicators rather than actual healthcare data.
 
-### Integration
+Key strengths:
+- CAPTCHA has configurable fail-open/fail-closed with stricter fallback rate limiting
+- Claude API route has five layers of protection (rate limiting, type validation, size validation, base64 validation, API key check)
+- Analytics functions explicitly strip PII before sending events
+- Redis connection has comprehensive event logging and retry logic
 
-```typescript
-// packages/backend/src/middleware/rateLimiter.ts
-
-import Redis from 'ioredis';
-
-let redis: Redis | null = null;
-
-if (process.env.REDIS_URL) {
-  redis = new Redis(process.env.REDIS_URL, {
-    maxRetriesPerRequest: 3,
-    retryStrategy: (times) => Math.min(times * 100, 3000)
-  });
-}
-
-export async function checkRateLimit(key: string, limit: number, windowMs: number) {
-  if (!redis) {
-    return checkInMemoryRateLimit(key, limit, windowMs);
-  }
-
-  const now = Date.now();
-  const windowStart = now - windowMs;
-
-  // Sliding window with sorted set
-  const multi = redis.multi();
-  multi.zremrangebyscore(key, 0, windowStart);
-  multi.zadd(key, now, `${now}-${Math.random()}`);
-  multi.zcard(key);
-  multi.pexpire(key, windowMs);
-
-  const results = await multi.exec();
-  const count = results?.[2]?.[1] as number;
-
-  return {
-    allowed: count <= limit,
-    remaining: Math.max(0, limit - count),
-    resetAt: now + windowMs
-  };
-}
-```
-
-### Configuration
-
-| Variable | Required | Purpose |
-|----------|----------|---------|
-| `REDIS_URL` | No | Redis connection string |
-
-### Fallback
-If Redis unavailable, falls back to in-memory rate limiting with warning header.
-
----
-
-## API Security Summary
-
-| API | Auth Method | Secret Storage | Fail Mode |
-|-----|-------------|----------------|-----------|
-| reCAPTCHA | API Key | Secret Manager | Open |
-| NPPES | None (public) | - | Retry |
-| Anthropic | API Key | Secret Manager | Error |
-| PostHog | Project Key | Env var | Silent |
-| Redis | Connection URL | Secret Manager | Fallback |
-
----
-
-## Error Handling Patterns
-
-### Graceful Degradation
-
-```typescript
-// Pattern used across all optional APIs
-async function callExternalApi() {
-  if (!API_KEY) {
-    console.warn('[API] Not configured - feature disabled');
-    return null;
-  }
-
-  try {
-    const result = await apiCall();
-    return result;
-  } catch (error) {
-    console.error('[API] Call failed:', error.message);
-    // Return graceful fallback
-    return handleFailure(error);
-  }
-}
-```
-
-### Timeout Configuration
-
-```typescript
-// All external calls have timeouts
-const controller = new AbortController();
-const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
-
-try {
-  const response = await fetch(url, { signal: controller.signal });
-  return response.json();
-} finally {
-  clearTimeout(timeout);
-}
-```
+The most notable gaps are the PostHog autocapture discrepancy, missing TLS for Redis, absence of cost monitoring for Claude API, and lack of cookie consent and user opt-out mechanisms for analytics.
 
 ---
 
 ## Recommendations
 
-### Immediate
-- ✅ All APIs properly integrated
-- Add circuit breaker for Anthropic API
-- Consider caching reCAPTCHA site verify responses
+1. **Disable PostHog autocapture.** The prompt claims `autocapture: false` but the code has `autocapture: true` in `PostHogProvider.tsx` line 18. Autocapture can inadvertently capture clicks on healthcare-related UI elements (provider names, insurance details, NPI numbers). Change to `autocapture: false` and rely on the explicit event tracking already implemented in `analytics.ts`.
 
-### Monitoring
-1. Track API response times
-2. Alert on high error rates
-3. Monitor API costs (Anthropic, PostHog)
+2. **Configure Redis TLS for production.** Add explicit TLS configuration when connecting to Cloud Memorystore or any production Redis instance. At minimum, use `rediss://` scheme in `REDIS_URL` or add `tls: {}` to the ioredis options.
 
-### Future
-1. Add API versioning for NPPES changes
-2. Consider backup OCR provider
-3. Evaluate self-hosted analytics (Plausible)
+3. **Implement cost monitoring for Claude API.** Each insurance card extraction uses Claude Haiku 4.5 with image input. Add tracking of API call count and estimated cost (perhaps via PostHog or a simple counter) and set up alerts for unusual spikes. Consider adding a daily/monthly extraction cap as a safety valve.
 
----
+4. **Implement cookie consent and user opt-out for PostHog.** This is increasingly required by privacy regulations (GDPR, CCPA). Add a consent banner and honor opt-out via `posthog.opt_out_capturing()`. Consider delaying PostHog initialization until consent is granted.
 
-## Conclusion
+5. **Use environment variable for PostHog host.** Replace the hardcoded `'https://us.i.posthog.com'` with `process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com'` for flexibility (e.g., if self-hosting PostHog in the future).
 
-External API integrations are **well-implemented**:
+6. **Add retry logic for transient Claude API errors.** The route retries on low-confidence results but not on network errors or 5xx responses. A single retry with a short delay (e.g., 1 second) for transient errors would improve reliability.
 
-- ✅ Proper error handling and timeouts
-- ✅ Graceful degradation for optional APIs
-- ✅ Secrets in environment/Secret Manager
-- ✅ Privacy-conscious analytics
-- ✅ Fallback for distributed systems
+7. **Sanitize search params from pageview URLs.** In `PostHogPageview`, consider stripping or hashing sensitive query parameters (NPI, planId) before sending to PostHog, consistent with the privacy-preserving approach in `analytics.ts`.
 
-No security concerns identified.
+8. **Document API key rotation procedures.** Create a runbook for rotating each external API key, including the Google reCAPTCHA secret, Anthropic API key, and PostHog project key. Consider automating rotation via Cloud Secret Manager versioning.
+
+9. **Add runtime validation for Redis cache data.** When reading cached search results via `cacheGet()`, consider validating the structure before returning to callers, to protect against cache corruption.

@@ -77,11 +77,13 @@ Verification record:
 - [ ] **VerifyMyProvider** - NOT HIPAA-covered (acceptance verification)
 
 ### 5. Compliance We DO Need
-- [ ] Terms of Service (user-generated content)
-- [ ] Privacy Policy (what data we collect, how we use it)
-- [ ] Data accuracy disclaimers (crowdsourced data may be wrong)
-- [ ] CMS Terms of Use (NPI Registry data usage)
-- [ ] Basic security (HTTPS, rate limiting, CSRF)
+- [x] Terms of Service — `app/terms/page.tsx` implemented
+- [x] Privacy Policy — `app/privacy/page.tsx` implemented
+- [x] Data accuracy disclaimers — `app/disclaimer/page.tsx` + `Disclaimer.tsx` component
+- [ ] CMS Terms of Use (NPI Registry data usage) — not explicitly documented
+- [x] Basic security (HTTPS, rate limiting, CAPTCHA) — all implemented
+
+**Note on Insurance Card Upload:** The insurance card extraction feature processes card images via Claude AI but does NOT store them permanently. Images are processed server-side and discarded. This does not introduce PHI since no card data is linked to user identity. However, the privacy policy should mention this feature.
 
 ### 6. Benefits of No HIPAA
 - [ ] Faster iteration (no compliance review per change)

@@ -1,324 +1,179 @@
-# VerifyMyProvider Rate Limiting & CAPTCHA Analysis
+# Rate Limiting Review -- Analysis
 
-**Last Updated:** 2026-01-31
-**Analyzed By:** Claude Code
-
----
-
-## Executive Summary
-
-Rate limiting and CAPTCHA are fully implemented (Tier 1 + Tier 2 complete). The system uses dual-mode rate limiting (Redis or in-memory) with Google reCAPTCHA v3 for bot protection.
+**Generated:** 2026-02-05
+**Source Prompt:** prompts/08-rate-limiting.md
+**Status:** Tier 1 COMPLETE, Tier 2 PARTIALLY COMPLETE -- implementation is solid and matches prompt specifications
 
 ---
 
-## Implementation Status
+## Findings
 
-| Tier | Status | Components |
-|------|--------|------------|
-| Tier 1 | ✅ Complete | IP-based rate limiting |
-| Tier 2 | ✅ Complete | CAPTCHA protection |
-| Tier 3 | 🔄 Future | User account-based limits |
+### 1. Endpoints -- Rate Limiting Status
 
----
+- **POST /api/v1/verify** (submit verification):
+  Verified. `packages/backend/src/routes/verify.ts` line 56 applies `verificationRateLimiter` as the first middleware on the `POST /` route. The limiter is configured at 10 requests/hour per IP, matching the prompt specification.
 
-## Rate Limiting Architecture
+- **POST /api/v1/verify/:id/vote** (upvote/downvote):
+  Verified. `packages/backend/src/routes/verify.ts` line 90 applies `voteRateLimiter` on the `POST /:verificationId/vote` route. Configured at 10 requests/hour per IP, matching the prompt.
 
-### Dual-Mode Design
+- **GET /api/v1/providers/search** (provider search):
+  Verified. `packages/backend/src/routes/providers.ts` line 153 applies `searchRateLimiter` on the `GET /search` route. Configured at 100 requests/hour per IP, matching the prompt.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     Rate Limiter                             │
-│                                                              │
-│  ┌─────────────────┐    ┌─────────────────┐                │
-│  │   Redis Mode    │ OR │  In-Memory Mode  │                │
-│  │  (distributed)  │    │ (single-instance)│                │
-│  │                 │    │                  │                │
-│  │ - Sorted sets   │    │ - Map counters   │                │
-│  │ - Sliding window│    │ - Periodic cleanup│               │
-│  │ - Shared state  │    │ - Process-local  │                │
-│  └─────────────────┘    └─────────────────┘                │
-│                                                              │
-│  Fail-Open: If Redis unavailable, allow with warning        │
-└─────────────────────────────────────────────────────────────┘
-```
+- **GET /api/v1/providers/:npi** (provider detail):
+  Verified. `packages/backend/src/routes/providers.ts` line 251 applies `defaultRateLimiter` on the `GET /:npi` route. Configured at 200 requests/hour per IP, matching the prompt.
 
-### Configuration
+- **GET /api/v1/verify/stats** and **GET /api/v1/verify/recent**:
+  Verified. Both also apply `defaultRateLimiter` (200/hour), providing protection on read-only verification endpoints.
 
-```typescript
-// packages/backend/src/middleware/rateLimiter.ts
+- **GET /api/v1/providers/cities**:
+  Verified. Also uses `defaultRateLimiter` (200/hour).
 
-export const verificationRateLimiter = createRateLimiter({
-  name: 'verification',
-  windowMs: 60 * 60 * 1000, // 1 hour
-  maxRequests: 10,
-  message: "You've submitted too many verifications. Please try again in 1 hour.",
-});
+### 2. Dual-Mode Architecture
 
-export const voteRateLimiter = createRateLimiter({
-  name: 'vote',
-  windowMs: 60 * 60 * 1000,
-  maxRequests: 10,
-});
+- **Redis Mode (distributed):**
+  Verified. `createRedisRateLimiter()` in `rateLimiter.ts` (lines 189-280) implements a Redis-based sliding window using sorted sets. The key format is `ratelimit:{name}:{clientIP}`, matching the prompt. Request IDs use `{timestamp}-{random7chars}` for uniqueness within the sorted set. Key expiration is set via `EXPIRE` after each transaction.
 
-export const searchRateLimiter = createRateLimiter({
-  name: 'search',
-  windowMs: 60 * 60 * 1000,
-  maxRequests: 100,
-});
+- **In-Memory Mode (process-local):**
+  Verified. `createInMemoryRateLimiter()` in `rateLimiter.ts` (lines 117-179) implements the same sliding window algorithm using a `Map<string, number[]>`. Used automatically when `REDIS_URL` is not set.
 
-export const defaultRateLimiter = createRateLimiter({
-  name: 'default',
-  windowMs: 60 * 60 * 1000,
-  maxRequests: 200,
-});
-```
+- **Auto-selection factory:**
+  Verified. `createRateLimiter()` (lines 299-319) checks `getRedisClient()` and selects the appropriate implementation. Mode is logged once per limiter name.
 
----
+### 3. Sliding Window Algorithm
 
-## Rate Limit Assignments
+- **In-Memory implementation:**
+  Verified. Lines 141-175: Filters timestamps older than `now - windowMs`, counts remaining timestamps, rejects if count >= maxRequests, otherwise adds current timestamp. This correctly prevents the fixed-window boundary attack described in the prompt.
 
-| Endpoint | Limiter | Limit | Window |
-|----------|---------|-------|--------|
-| POST /verify | verificationRateLimiter | 10/hr | 1 hour |
-| POST /verify/:id/vote | voteRateLimiter | 10/hr | 1 hour |
-| GET /providers/search | searchRateLimiter | 100/hr | 1 hour |
-| GET /providers/:npi | defaultRateLimiter | 200/hr | 1 hour |
-| GET /providers/:npi/plans | defaultRateLimiter | 200/hr | 1 hour |
-| GET /verify/stats | defaultRateLimiter | 200/hr | 1 hour |
-| GET /health | None | Unlimited | - |
-| Admin endpoints | None | Protected by auth | - |
+- **Redis implementation:**
+  Verified. Lines 220-278: Uses a Redis `MULTI` transaction with `ZREMRANGEBYSCORE` (remove old entries), `ZADD` (add current request), `ZCARD` (count requests), and `EXPIRE` (auto-cleanup). The sorted set score is the timestamp.
 
----
+- **Boundary condition difference:**
+  The in-memory limiter checks `requestCount >= maxRequests` (line 163), while the Redis limiter checks `requestCount > maxRequests` (line 262). This is because the Redis implementation adds the current request to the sorted set BEFORE checking the count (via the atomic MULTI transaction), so the count already includes the current request. The in-memory implementation checks BEFORE adding. Both correctly allow exactly `maxRequests` requests per window.
 
-## CAPTCHA Implementation
+### 4. Rate Limit Headers
 
-### Google reCAPTCHA v3
+- **X-RateLimit-Limit:**
+  Verified in both modes. Set to `maxRequests`.
 
-```typescript
-// packages/backend/src/middleware/captcha.ts
+- **X-RateLimit-Remaining:**
+  Verified in both modes. Calculated as `max(0, maxRequests - requestCount)`.
 
-export async function verifyCaptcha(req, res, next) {
-  // Skip in development
-  if (process.env.NODE_ENV === 'development') return next();
+- **X-RateLimit-Reset:**
+  Verified in both modes. In-memory uses the oldest timestamp + windowMs; Redis uses `now + windowMs`.
 
-  // Skip if not configured
-  if (!RECAPTCHA_SECRET) {
-    console.warn('[CAPTCHA] Not configured');
-    return next();
-  }
+- **Retry-After on 429:**
+  Verified in both modes. Set to `Math.ceil(windowMs / 1000)` seconds.
 
-  const captchaToken = req.body.captchaToken;
-  if (!captchaToken) {
-    return next(AppError.badRequest('CAPTCHA token required'));
-  }
+- **429 Response Body:**
+  Verified. Returns JSON with `error`, `message`, and `retryAfter` fields.
 
-  // Verify with Google
-  const response = await fetch(RECAPTCHA_VERIFY_URL, {
-    method: 'POST',
-    body: new URLSearchParams({
-      secret: RECAPTCHA_SECRET,
-      response: captchaToken,
-      remoteip: req.ip,
-    }),
-  });
+### 5. Fail-Open Behavior
 
-  const data = await response.json();
+- **Redis unavailable at request time:**
+  Verified. Lines 207-213: If `!redis || !isRedisConnected()`, the request is allowed with `X-RateLimit-Status: degraded` header and a warning logged.
 
-  // Check score (0 = bot, 1 = human)
-  if (data.score < CAPTCHA_MIN_SCORE) {
-    return next(AppError.forbidden('Suspicious activity blocked'));
-  }
+- **Redis transaction failure:**
+  Verified. Lines 241-247: If `multi.exec()` returns null, the request is allowed with degraded header.
 
-  next();
-}
-```
+- **Redis error during operation:**
+  Verified. Lines 273-278: Catch block allows the request, sets degraded header, and logs the error.
 
-### Configuration
+- **In-memory NOT used as fallback mid-request:**
+  Verified. The documentation states this explicitly and the code confirms it -- once Redis mode is selected, a Redis failure results in fail-open, not a switch to in-memory.
 
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `RECAPTCHA_SECRET_KEY` | Required | Google secret key |
-| `CAPTCHA_FAIL_MODE` | `open` | Behavior on API failure |
-| `CAPTCHA_MIN_SCORE` | `0.5` | Minimum score (0-1) |
-| `CAPTCHA_API_TIMEOUT_MS` | `5000` | API timeout |
-| `CAPTCHA_FALLBACK_MAX_REQUESTS` | `3` | Fallback rate limit |
+### 6. Cleanup of Old Entries
 
-### Protected Endpoints
+- **In-memory cleanup:**
+  Verified. Lines 88-108: `setInterval` runs every 60 seconds (matching `RATE_LIMIT_CLEANUP_INTERVAL_MS`), iterating all stores and removing timestamps older than 1 hour. Empty client entries are deleted entirely.
 
-- `POST /api/v1/verify` - Submit verification
-- `POST /api/v1/verify/:id/vote` - Vote on verification
+- **Redis cleanup:**
+  Verified. Each request transaction includes `ZREMRANGEBYSCORE` to prune old entries, plus `EXPIRE` with `windowMs/1000 + 1` seconds to auto-delete idle keys.
 
----
+### 7. CAPTCHA Integration (Tier 2)
 
-## Fail Modes
+- **Applied to verification and vote endpoints:**
+  Verified. `packages/backend/src/routes/verify.ts` applies `verifyCaptcha` middleware AFTER the rate limiter on both `POST /` (line 57) and `POST /:verificationId/vote` (line 91). This ordering is correct: rate limiting runs first to block floods before incurring CAPTCHA API calls.
 
-### FAIL-OPEN (Default)
+- **reCAPTCHA v3 implementation:**
+  Verified. `packages/backend/src/middleware/captcha.ts` sends POST to `https://www.google.com/recaptcha/api/siteverify` with secret key, token, and client IP. Uses `AbortController` with 5-second timeout.
 
-When Google API is unavailable:
-1. Log warning
-2. Apply stricter fallback rate limit (3/hr instead of 10/hr)
-3. Set `X-Security-Degraded: captcha-unavailable` header
-4. Allow request if within fallback limit
+- **Score threshold:**
+  Verified. `CAPTCHA_MIN_SCORE` is 0.5 (from `constants.ts` line 52), matching the prompt specification.
 
-```typescript
-if (CAPTCHA_FAIL_MODE === 'open') {
-  const fallbackResult = checkFallbackRateLimit(clientIp);
-  if (!fallbackResult.allowed) {
-    return next(AppError.tooManyRequests('Fallback limit exceeded'));
-  }
-  res.setHeader('X-Security-Degraded', 'captcha-unavailable');
-  next();
-}
-```
+- **Fail-open mode:**
+  Verified. Default `CAPTCHA_FAIL_MODE=open` allows requests when Google API fails but applies stricter fallback rate limiting of 3 requests/hour per IP (`CAPTCHA_FALLBACK_MAX_REQUESTS` from `constants.ts` line 62).
 
-### FAIL-CLOSED
+- **Fail-closed mode:**
+  Verified. `CAPTCHA_FAIL_MODE=closed` blocks all requests with 503 when Google API is unavailable.
 
-When Google API is unavailable:
-1. Log error
-2. Block all requests
-3. Return 503 Service Unavailable
+- **Development/test skip:**
+  Verified. Lines 121-123: Skips in `development` and `test` environments. Also skips with a warning if `RECAPTCHA_SECRET_KEY` is not set.
 
-```typescript
-if (CAPTCHA_FAIL_MODE === 'closed') {
-  return next(AppError.serviceUnavailable(
-    'Security verification temporarily unavailable'
-  ));
-}
-```
+- **Fallback rate limit headers:**
+  Verified. When in fail-open mode, the response includes `X-Security-Degraded`, `X-Fallback-RateLimit-Limit`, `X-Fallback-RateLimit-Remaining`, and `X-Fallback-RateLimit-Reset`.
+
+### 8. Rate Limit Values
+
+| Endpoint | Prompt Spec | Actual | Match |
+|----------|------------|--------|-------|
+| POST /api/v1/verify | 10/hour | 10/hour | Yes |
+| POST /api/v1/verify/:id/vote | 10/hour | 10/hour | Yes |
+| GET /api/v1/providers/search | 100/hour | 100/hour | Yes |
+| GET /api/v1/providers/:npi | 200/hour | 200/hour | Yes |
+| CAPTCHA fallback | 3/hour | 3/hour | Yes |
+
+### 9. Skip Function Support
+
+- Verified. The `RateLimiterOptions` interface includes `skip?: (req: Request) => boolean` and both implementations check it at the start of each request.
+
+### 10. Attack Scenarios
+
+- **Competitor sabotage / Provider manipulation / Bot spam:**
+  Warning. IP-based rate limiting at 10/hour limits but does not fully prevent distributed attacks (multiple IPs). CAPTCHA provides additional defense. Tier 3 (user accounts, anomaly detection) would provide stronger protection.
+
+- **Vote manipulation:**
+  Warning. Votes are limited to 10/hour per IP, and CAPTCHA adds bot detection, but no per-verification vote deduplication beyond the existing Sybil prevention in the verification service.
+
+### 11. Monitoring and Alerts
+
+- **Rate limit hits logged:**
+  Partially verified. The Redis rate limiter logs warnings on fail-open scenarios and errors. However, successful 429 rejections are NOT explicitly logged with structured data -- they return the 429 response but do not emit a specific log entry for monitoring dashboards.
+
+- **Dashboard / alerting:**
+  Not implemented. The prompt lists this as unchecked items under section 8.
+
+### 12. Testing Strategy
+
+- Not implemented. The prompt lists all testing items (local testing, production testing, load testing, bypass for automated tests) as unchecked.
+
+### 13. Tier 3 Implementation
+
+- Not implemented. User account-based limits, anomaly detection, and evidence requirements are documented as future work requiring authentication (prompt 03).
 
 ---
 
-## Response Headers
+## Summary
 
-### Rate Limit Headers
+The rate limiting implementation is robust and well-architected. All Tier 1 objectives are met: four distinct rate limiters cover all API endpoints with appropriate limits, a dual-mode architecture supports both single-instance and distributed deployments, and the sliding window algorithm prevents boundary-burst attacks. Tier 2 CAPTCHA integration is properly wired into the verification and vote submission routes with configurable fail-open/fail-closed modes and stricter fallback rate limiting. The code quality is high with extensive documentation, proper TypeScript typing, and comprehensive error handling.
 
-```
-X-RateLimit-Limit: 10
-X-RateLimit-Remaining: 7
-X-RateLimit-Reset: 1706745600
-Retry-After: 3600  (on 429)
-```
-
-### Degraded Mode Headers
-
-```
-X-RateLimit-Status: degraded  (Redis unavailable)
-X-Security-Degraded: captcha-unavailable  (Google API down)
-X-Fallback-RateLimit-Limit: 3
-X-Fallback-RateLimit-Remaining: 2
-```
-
----
-
-## Attack Mitigation
-
-### Scenario 1: Bot Spam
-
-**Attack:** Script sends 1000 verifications/minute
-
-**Mitigation:**
-1. Rate limit: 10/hour per IP
-2. CAPTCHA: Bot score < 0.5 blocked
-3. Result: Max 10 verifications per IP
-
-### Scenario 2: VPN Rotation
-
-**Attack:** User rotates through 100 VPN IPs
-
-**Mitigation:**
-1. Each IP still limited to 10/hour
-2. CAPTCHA detects suspicious behavior
-3. Result: Costly attack, limited impact
-
-### Scenario 3: Google API Outage
-
-**Attack:** Exploit CAPTCHA outage
-
-**Mitigation:**
-1. Fail-open with 3/hour limit (vs normal 10)
-2. 70% reduction in throughput
-3. Result: Attack throttled, service available
-
----
-
-## Monitoring
-
-### Log Patterns
-
-```
-# Rate limit hit
-[RateLimit:verification] 429 Too Many Requests - IP: 1.2.3.4
-
-# CAPTCHA low score
-[CAPTCHA] Low score - possible bot: 0.3, IP: 1.2.3.4
-
-# Redis unavailable
-[RateLimit] Redis unavailable, allowing request (fail-open)
-
-# Google API error
-[CAPTCHA] Google API error - using fallback rate limiting
-```
-
-### Metrics to Track
-
-- Rate limit hits per endpoint
-- CAPTCHA pass/fail rate
-- Average CAPTCHA score
-- Redis connection failures
-- Google API errors
-
----
-
-## Checklist Status
-
-### Tier 1: IP-Based Rate Limiting ✅
-- [x] Custom rate limiter middleware
-- [x] Verification: 10/hr
-- [x] Voting: 10/hr
-- [x] Search: 100/hr
-- [x] Default: 200/hr
-- [x] Rate limit headers
-- [x] Dual-mode (Redis + in-memory)
-- [x] Fail-open behavior
-
-### Tier 2: CAPTCHA Protection ✅
-- [x] Google reCAPTCHA v3 integrated
-- [x] Score threshold: 0.5
-- [x] Protected endpoints: verify, vote
-- [x] Fail-open with fallback
-- [x] Fallback rate limit: 3/hr
-- [x] API timeout: 5 seconds
-
-### Tier 3: User-Based Limits (Future)
-- [ ] User accounts
-- [ ] Graduated limits by trust
-- [ ] IP allowlist for trusted
-- [ ] Anomaly detection
+Key strengths:
+- Atomic Redis transactions prevent race conditions in the distributed limiter
+- Fail-open behavior ensures availability even during Redis outages
+- CAPTCHA fallback rate limiting (3/hour vs 10/hour) mitigates the risk of CAPTCHA bypass
+- Middleware ordering (rate limit -> CAPTCHA -> handler) is correct and efficient
 
 ---
 
 ## Recommendations
 
-### Immediate
-1. ✅ All critical protections in place
-2. Add monitoring dashboard for rate limits
-3. Set up alerts for high rejection rates
+1. **Add structured logging for 429 rejections.** When a request is rate-limited (429 response), emit a structured log entry with the limiter name, client IP, and endpoint. This is critical for attack detection and the monitoring dashboard planned in section 8.
 
-### Future
-1. Implement user accounts for trusted verifiers
-2. Add fingerprinting (IP + User Agent)
-3. Build admin panel for blocklist management
+2. **Implement at least basic testing.** The prompt's testing checklist (section 9) is entirely unchecked. A simple integration test that hits an endpoint `maxRequests + 1` times and asserts a 429 on the last call would verify the rate limiter works end-to-end.
 
----
+3. **Consider logging rate-limited CAPTCHA fallback entries to Redis/database.** Currently the CAPTCHA fallback rate limiter is in-memory only, even when Redis is available. This means each Cloud Run instance has independent fallback counters.
 
-## Conclusion
+4. **Document rate limits in API responses or documentation.** The prompt notes (section 5, Tier 2) that API docs should document rate limits. This is still unchecked.
 
-The rate limiting and CAPTCHA implementation is **production-ready**:
+5. **Plan for Tier 3 anomaly detection.** With only IP-based limiting, a determined attacker using a botnet or VPN rotation could bypass the 10/hour verification limit. Fingerprinting and user-account-based limits (Tier 3) would significantly strengthen defenses.
 
-- ✅ Multi-layer protection (rate limit + CAPTCHA)
-- ✅ Graceful degradation (fail-open)
-- ✅ Horizontal scaling support (Redis mode)
-- ✅ Comprehensive headers for debugging
-- ✅ Configurable via environment variables
-
-The crowdsource verification system is protected against spam attacks.
+6. **Minor: Hardcoded 1-hour cleanup window in in-memory store.** The cleanup interval in lines 93-94 uses a hardcoded `maxWindowMs = 60 * 60 * 1000` rather than reading from the actual limiter configuration. This works because all current limiters use 1-hour windows, but would become incorrect if a limiter with a longer window were added.

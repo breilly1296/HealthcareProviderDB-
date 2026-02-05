@@ -23,9 +23,35 @@ priority: 1
 - `packages/backend/src/middleware/rateLimiter.ts` (rate limiter implementation)
 
 ## VerifyMyProvider Rate Limiting Strategy
-- **Current:** Tier 1 IP-based rate limiting IMPLEMENTED
-- **Implementation:** Custom middleware in `rateLimiter.ts`
-- **Next:** Tier 2 (fingerprinting, CAPTCHA) for additional protection
+- **Current:** Tier 1 IP-based rate limiting + CAPTCHA IMPLEMENTED
+- **Implementation:** Custom middleware in `rateLimiter.ts` (dual-mode: Redis or in-memory)
+- **CAPTCHA:** Google reCAPTCHA v3 on verification and voting endpoints (see `middleware/captcha.ts`)
+- **Next:** Tier 3 (user accounts, anomaly detection) for additional protection
+
+## Dual-Mode Architecture
+
+The rate limiter automatically selects its backend based on environment:
+
+### Redis Mode (distributed)
+- Enabled when `REDIS_URL` is set
+- Shared state across all Cloud Run instances
+- Uses **sorted sets** for sliding window algorithm
+- Key format: `ratelimit:{name}:{clientIP}`
+- Automatic key expiration after window passes
+- **Fail-open behavior:** If Redis becomes unavailable mid-operation, requests are ALLOWED with `X-RateLimit-Status: degraded` header and a warning logged
+
+### In-Memory Mode (process-local)
+- Fallback when `REDIS_URL` is not configured
+- Each Cloud Run instance maintains independent counters
+- Only safe for single-instance deployments
+- Cleanup of old entries runs every 60 seconds
+
+### Sliding Window Algorithm
+Unlike fixed windows (which allow burst attacks at window boundaries), the sliding window tracks individual request timestamps:
+1. Filter out timestamps older than `now - windowMs`
+2. Count remaining timestamps
+3. If count < maxRequests, add current timestamp and allow
+4. If count >= maxRequests, reject with 429
 
 ## Checklist
 
@@ -93,37 +119,23 @@ export const defaultRateLimiter = createRateLimiter({
 - [x] Automatic cleanup of old entries (every 60 seconds)
 - [x] Skip function support for bypassing limits when needed
 
-### 5. Tier 2 Implementation (Beta Launch)
+### 5. Tier 2 Implementation ✅ PARTIALLY COMPLETE
 
-**Fingerprinting (IP + User Agent + Canvas):**
+**CAPTCHA ✅ IMPLEMENTED:**
+- Google reCAPTCHA v3 on all verification and voting endpoints
+- Middleware: `packages/backend/src/middleware/captcha.ts`
+- Score threshold: `CAPTCHA_MIN_SCORE` (default 0.5)
+- Fail mode: `CAPTCHA_FAIL_MODE` (`open` = allow with fallback rate limiting, `closed` = block all)
+- Fallback: When reCAPTCHA API unavailable, `CAPTCHA_FALLBACK_MAX_REQUESTS` (default 3/hr per IP)
+- Applied to: `POST /api/v1/verify` and `POST /api/v1/verify/:id/vote`
+- Skipped in `NODE_ENV=test` and when `RECAPTCHA_SECRET_KEY` is not set
+
+**Fingerprinting — NOT YET IMPLEMENTED:**
 ```typescript
+// Future: Add device fingerprinting for VPN rotation detection
 import Fingerprint from 'express-fingerprint';
-
-app.use(Fingerprint({
-  parameters: [
-    Fingerprint.useragent,
-    Fingerprint.geoip,
-  ]
-}));
-
-const verifyLimiter = rateLimit({
-  keyGenerator: (req) => req.fingerprint.hash,
-  windowMs: 60 * 60 * 1000,
-  max: 5, // Tighter limit with fingerprinting
-});
+// ...
 ```
-
-**CAPTCHA After N Attempts:**
-```typescript
-import { hCaptcha } from 'hcaptcha';
-
-// If user hits rate limit, require CAPTCHA
-// Implementation in frontend + backend validation
-```
-
-**Questions:**
-- [ ] Which CAPTCHA service? (hCaptcha, reCAPTCHA, Cloudflare Turnstile?)
-- [ ] At what point trigger CAPTCHA? (after 3 attempts? 5?)
 
 ### 6. Tier 3 Implementation (Scale)
 
@@ -212,25 +224,30 @@ const verifyLimiter = rateLimit({
 ## Implementation Status
 
 **Tier 1 ✅ COMPLETE (January 2026):**
-- [x] Custom rate limiter middleware created
+- [x] Custom dual-mode rate limiter middleware (Redis + in-memory)
+- [x] Sliding window algorithm (not fixed window)
 - [x] IP-based limits on verification endpoints
 - [x] IP-based limits on vote endpoints
 - [x] IP-based limits on search endpoints
+- [x] Standard rate limit headers (X-RateLimit-Limit, Remaining, Reset)
+- [x] Retry-After on 429 responses
+- [x] Fail-open behavior when Redis unavailable
 - [x] Deployed to production
-- [x] Rate limiting verified working
 
-**Tier 2 - NEXT PRIORITIES:**
+**Tier 2 ✅ PARTIALLY COMPLETE:**
+- [x] Google reCAPTCHA v3 on verification and vote endpoints
+- [x] CAPTCHA fail-open/fail-closed modes
+- [x] CAPTCHA fallback rate limiting
 - [ ] Add fingerprinting (IP + User Agent)
 - [ ] Tighten limits based on observed traffic
-- [ ] Add monitoring/logging for rate limit hits
 - [ ] Document rate limits in API docs
 
 **Tier 3 - FUTURE (requires authentication):**
-- [ ] Add CAPTCHA integration
 - [ ] Implement allowlist for trusted IPs
 - [ ] Create admin panel to view blocked attempts
 - [ ] Run penetration test
 - [ ] User account-based limits
+- [ ] Anomaly detection
 
 ## Related Issues
 - [ ] Need authentication (03-authentication) for Tier 3

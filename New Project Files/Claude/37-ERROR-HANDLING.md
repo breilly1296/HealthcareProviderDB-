@@ -1,514 +1,175 @@
-# VerifyMyProvider Error Handling Analysis
+# Error Handling Review -- Analysis
 
-**Last Updated:** 2026-01-31
-**Analyzed By:** Claude Code
-
----
-
-## Executive Summary
-
-VerifyMyProvider implements consistent error handling through a custom `AppError` class and centralized error middleware. All API errors follow a standardized format with appropriate HTTP status codes.
+**Generated:** 2026-02-05
+**Source Prompt:** prompts/37-error-handling.md
+**Status:** Backend error handling is robust and well-structured. Frontend error files (ErrorContext, error boundary, errorUtils, api.ts) do not exist yet.
 
 ---
 
-## Error Architecture
+## Findings
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Error Handling Flow                       │
-│                                                              │
-│  Route Handler                                               │
-│       │                                                      │
-│       ├─── Validation Error (Zod) ──────────┐              │
-│       │                                      │              │
-│       ├─── Business Error (AppError) ───────┤              │
-│       │                                      │              │
-│       ├─── Database Error (Prisma) ─────────┤              │
-│       │                                      │              │
-│       └─── Unexpected Error (throw) ────────┤              │
-│                                              │              │
-│                                              ▼              │
-│                                   ┌──────────────────┐     │
-│                                   │ Error Middleware │     │
-│                                   │                  │     │
-│                                   │ • Classify error │     │
-│                                   │ • Format response│     │
-│                                   │ • Log if needed  │     │
-│                                   │ • Send to client │     │
-│                                   └──────────────────┘     │
-│                                              │              │
-│                                              ▼              │
-│                                   ┌──────────────────┐     │
-│                                   │ JSON Response    │     │
-│                                   │                  │     │
-│                                   │ { success: false,│     │
-│                                   │   error: {...} } │     │
-│                                   └──────────────────┘     │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
-```
+### Backend -- AppError Class
 
----
+- **Prompt specifies:** AppError with `statusCode`, `code`, `isOperational` fields and seven factory methods (`badRequest`, `unauthorized`, `forbidden`, `notFound`, `conflict`, `tooManyRequests`, `serviceUnavailable`).
+- **Actual implementation** (`packages/backend/src/middleware/errorHandler.ts` lines 7-57):
+  - All three fields present: `statusCode` (number), `isOperational` (boolean), `code` (optional string).
+  - Constructor signature differs from prompt: actual uses `(message, statusCode, options: { isOperational?, code? })` instead of `(message, statusCode, code?)`. This is functionally equivalent but more extensible.
+  - All seven factory methods from the prompt are present: `badRequest`, `unauthorized`, `forbidden`, `notFound`, `conflict`, `tooManyRequests`, `serviceUnavailable`.
+  - **Additional factory method** not in prompt: `static internal()` for 500 errors with `isOperational: false`. This is a sensible addition.
+  - Factory methods in the actual code accept an optional `code` parameter, while the prompt shows hardcoded codes (e.g., `'BAD_REQUEST'`). In the actual code, the code is passed through but defaults to `undefined` rather than a named constant. This means `err.code` may be `undefined` unless the caller explicitly supplies one.
 
-## AppError Class
+**Verdict:**
+- &#x2705; AppError class exists with factory methods
+- &#x26A0;&#xFE0F; Factory methods do not assign default error codes. Prompt shows `code: 'BAD_REQUEST'` for `badRequest()`, but actual code passes `code` through as optional. If callers do not supply a code string, the error response `code` field will be `undefined`.
 
-```typescript
-// packages/backend/src/utils/AppError.ts
+### Backend -- asyncHandler Wrapper
 
-export class AppError extends Error {
-  public readonly statusCode: number;
-  public readonly code: string;
-  public readonly isOperational: boolean;
-  public readonly details?: ValidationError[];
+- **Prompt specifies:** Function that wraps async handlers and forwards rejected promises to `next()`.
+- **Actual implementation** (lines 62-68): Matches exactly. Uses `Promise.resolve(fn(req, res, next)).catch(next)` pattern. Return type is typed as `RequestHandler` for better Express compatibility.
 
-  constructor(
-    message: string,
-    statusCode: number,
-    code: string,
-    details?: ValidationError[]
-  ) {
-    super(message);
-    this.statusCode = statusCode;
-    this.code = code;
-    this.isOperational = true;  // Distinguishes from programming errors
-    this.details = details;
+**Verdict:**
+- &#x2705; asyncHandler implemented correctly and used consistently across all 5 route files (providers, verify, admin, locations, plans).
 
-    Error.captureStackTrace(this, this.constructor);
-  }
+### Backend -- asyncHandler Usage Across Routes
 
-  // Factory methods for common errors
-  static badRequest(message: string, details?: ValidationError[]): AppError {
-    return new AppError(message, 400, 'BAD_REQUEST', details);
-  }
+Checked all route files for consistent usage:
 
-  static unauthorized(message: string = 'Unauthorized'): AppError {
-    return new AppError(message, 401, 'UNAUTHORIZED');
-  }
+| Route File | asyncHandler Used | AppError Used |
+|---|---|---|
+| `providers.ts` | Yes (3 handlers) | Yes (`AppError.notFound`) |
+| `verify.ts` | Yes (5 handlers) | Yes (`AppError.notFound`) |
+| `admin.ts` | Yes (7 handlers) | Yes (`AppError.unauthorized` in auth middleware) |
+| `locations.ts` | Yes (5 handlers) | Yes (`AppError.notFound`) |
+| `plans.ts` | Yes (6 handlers) | Yes (`AppError.notFound`) |
 
-  static forbidden(message: string = 'Forbidden'): AppError {
-    return new AppError(message, 403, 'FORBIDDEN');
-  }
+**Verdict:**
+- &#x2705; Every async route handler across all route files is wrapped in `asyncHandler`.
+- &#x2705; `AppError.notFound()` used consistently for missing resources.
 
-  static notFound(message: string = 'Not found'): AppError {
-    return new AppError(message, 404, 'NOT_FOUND');
-  }
+### Backend -- Global Error Handler
 
-  static tooManyRequests(message: string = 'Too many requests'): AppError {
-    return new AppError(message, 429, 'TOO_MANY_REQUESTS');
-  }
+- **Prompt specifies:** Handler for ZodError, AppError, and unexpected errors with generic message.
+- **Actual implementation** (lines 73-174): Handles **more** error types than the prompt specifies:
+  1. **AppError** (lines 88-98): Returns `err.statusCode`, `err.message`, `err.code`, plus `requestId`.
+  2. **ZodError** (lines 101-116): Returns 400 with `VALIDATION_ERROR` code and `details` array. Details format is slightly different from prompt: actual maps to `{ field, message }` instead of `{ path, message }`.
+  3. **PayloadTooLargeError** (lines 118-129): Returns 413 with `PAYLOAD_TOO_LARGE` code. Not in prompt.
+  4. **PrismaClientKnownRequestError** (lines 132-158): Handles `P2002` (unique constraint -> 409 DUPLICATE_ENTRY) and `P2025` (record not found -> 404). Not in prompt, but addresses one of the prompt's own questions ("Are there any unhandled error types? Prisma errors?").
+  5. **Default/unexpected** (lines 160-173): Returns 500 with generic message in production, actual error message in development.
 
-  static internal(message: string = 'Internal server error'): AppError {
-    return new AppError(message, 500, 'INTERNAL_ERROR');
-  }
+**Verdict:**
+- &#x2705; Global error handler exists and is comprehensive
+- &#x2705; ZodError handling present
+- &#x2705; Prisma errors handled (prompt identified this as a gap, but it is already implemented)
+- &#x2705; PayloadTooLargeError handled (extra coverage not in prompt)
 
-  static serviceUnavailable(message: string = 'Service unavailable'): AppError {
-    return new AppError(message, 503, 'SERVICE_UNAVAILABLE');
-  }
-}
-```
+### Backend -- Error Response Format
 
----
+- **Prompt specifies:** `{ success: false, error: { message, code, statusCode } }`
+- **Actual implementation:** The error response format is **mostly consistent but has a discrepancy**:
+  - AppError responses (line 89): `{ error: { message, code, statusCode, requestId } }` -- note **no `success: false`** wrapper.
+  - ZodError responses (line 103): `{ error: { message, code, statusCode, requestId, details } }` -- also **no `success: false`** wrapper.
+  - Prisma error responses: Same pattern, **no `success: false`**.
+  - Default 500 responses: **No `success: false`**.
+  - PayloadTooLargeError (line 121): **Has `success: false`** -- the only error branch that includes it.
+  - The `adminAuthMiddleware` 503 response (admin.ts line 27): **Has `success: false`**.
 
-## Error Middleware
+  Success responses consistently include `success: true`. Error responses from the global handler are **missing** the `success: false` field in most branches.
 
-```typescript
-// packages/backend/src/middleware/errorHandler.ts
+**Verdict:**
+- &#x26A0;&#xFE0F; Inconsistent `success` field in error responses. The prompt specifies `success: false` in all error responses. The actual global error handler omits it from AppError, ZodError, Prisma, and default branches. Only `PayloadTooLargeError` and the admin auth middleware include it.
+- &#x2705; Error responses include `requestId` (not specified in prompt, but a useful addition for debugging).
 
-import { Request, Response, NextFunction } from 'express';
-import { ZodError } from 'zod';
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
-import { AppError } from '../utils/AppError';
+### Backend -- No Stack Traces in Production
 
-interface ErrorResponse {
-  success: false;
-  error: {
-    message: string;
-    code: string;
-    statusCode: number;
-    details?: Array<{ field: string; message: string }>;
-  };
-}
+- **Prompt specifies:** No stack traces leaked in production.
+- **Actual implementation** (lines 160-173): In production (`NODE_ENV === 'production'`), the default 500 handler returns `'Internal server error'`. In development, it returns `err.message`. **No branch ever includes `err.stack` in the response.**
+- The `Error.captureStackTrace` call in AppError (line 23) only sets the stack on the Error object for logging/debugging purposes; it is never serialized into the JSON response.
 
-export function errorHandler(
-  err: Error,
-  req: Request,
-  res: Response<ErrorResponse>,
-  next: NextFunction
-) {
-  // Already handled
-  if (res.headersSent) {
-    return next(err);
-  }
+**Verdict:**
+- &#x2705; No stack traces in production responses. Verified across all error handler branches.
 
-  // Log error (except 4xx client errors)
-  if (!(err instanceof AppError) || err.statusCode >= 500) {
-    console.error('[Error]', {
-      message: err.message,
-      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
-      path: req.path,
-      method: req.method
-    });
-  }
+### Backend -- Error Logging
 
-  // Handle different error types
-  if (err instanceof AppError) {
-    return res.status(err.statusCode).json({
-      success: false,
-      error: {
-        message: err.message,
-        code: err.code,
-        statusCode: err.statusCode,
-        details: err.details
-      }
-    });
-  }
+- Errors are logged via `logger.error()` with structured context (`requestId`, `err`, `path`, `method`) on line 80-85.
+- The prompt's checklist marks "Error logging to monitoring service" as unchecked.
 
-  if (err instanceof ZodError) {
-    return res.status(400).json({
-      success: false,
-      error: {
-        message: 'Validation failed',
-        code: 'VALIDATION_ERROR',
-        statusCode: 400,
-        details: err.errors.map(e => ({
-          field: e.path.join('.'),
-          message: e.message
-        }))
-      }
-    });
-  }
+**Verdict:**
+- &#x2705; Errors are logged with structured context
+- &#x26A0;&#xFE0F; No external monitoring service integration (Sentry, Cloud Error Reporting) -- matches prompt's own assessment
 
-  if (err instanceof PrismaClientKnownRequestError) {
-    return handlePrismaError(err, res);
-  }
+### Backend -- 404 Not Found Handler
 
-  // Unknown error - don't expose details in production
-  return res.status(500).json({
-    success: false,
-    error: {
-      message: process.env.NODE_ENV === 'development'
-        ? err.message
-        : 'An unexpected error occurred',
-      code: 'INTERNAL_ERROR',
-      statusCode: 500
-    }
-  });
-}
+- **Not in prompt** but present in actual code (lines 179-188): A dedicated `notFoundHandler` for unmatched routes, returning `ROUTE_NOT_FOUND` code with the method and path.
 
-function handlePrismaError(
-  err: PrismaClientKnownRequestError,
-  res: Response<ErrorResponse>
-) {
-  switch (err.code) {
-    case 'P2002':  // Unique constraint violation
-      return res.status(409).json({
-        success: false,
-        error: {
-          message: 'Resource already exists',
-          code: 'CONFLICT',
-          statusCode: 409
-        }
-      });
+**Verdict:**
+- &#x2705; Additional coverage: unmatched routes get a proper JSON 404 response instead of Express's default HTML.
 
-    case 'P2025':  // Record not found
-      return res.status(404).json({
-        success: false,
-        error: {
-          message: 'Resource not found',
-          code: 'NOT_FOUND',
-          statusCode: 404
-        }
-      });
+### Backend -- Response Helpers
 
-    default:
-      return res.status(500).json({
-        success: false,
-        error: {
-          message: 'Database error',
-          code: 'DATABASE_ERROR',
-          statusCode: 500
-        }
-      });
-  }
-}
-```
+- `packages/backend/src/utils/responseHelpers.ts` provides `sendSuccess()`, `buildPaginationMeta()`, and `sendPaginatedSuccess()`.
+- These ensure consistent `{ success: true, data: ... }` format for success responses.
+- Used across routes (verify.ts, locations.ts, plans.ts, providers.ts).
+
+**Verdict:**
+- &#x2705; Response helpers exist and enforce consistent success format.
+
+### Frontend -- Error Handling Files
+
+The prompt references four frontend files:
+- `packages/frontend/src/lib/errorUtils.ts`
+- `packages/frontend/src/context/ErrorContext.tsx`
+- `packages/frontend/src/app/error.tsx`
+- `packages/frontend/src/lib/api.ts`
+
+**None of these files exist.** The `packages/frontend/src/` directory contains no `.ts` or `.tsx` files at all.
+
+**Verdict:**
+- &#x274C; Frontend error handling files do not exist. The `ErrorContext`, error boundary, `ApiError` class, and `fetchApi` wrapper described in the prompt are not implemented.
+
+### Error Codes Table
+
+The prompt lists 11 error codes. Here is verification of which are actually used:
+
+| Code | Status | Used In Code |
+|---|---|---|
+| `BAD_REQUEST` | 400 | Not directly -- factory exists but code not auto-assigned |
+| `VALIDATION_ERROR` | 400 | Yes (errorHandler.ts ZodError branch) |
+| `CAPTCHA_REQUIRED` | 400 | Not found in errorHandler.ts (may be in captcha middleware) |
+| `CAPTCHA_FAILED` | 400 | Not found in errorHandler.ts (may be in captcha middleware) |
+| `UNAUTHORIZED` | 401 | Factory exists; used in admin auth |
+| `FORBIDDEN` | 403 | Factory exists; no current usage found |
+| `NOT_FOUND` | 404 | Yes (Prisma P2025 branch, route notFoundHandler) |
+| `ROUTE_NOT_FOUND` | 404 | Yes (notFoundHandler, not in prompt's table) |
+| `CONFLICT` | 409 | Factory exists; `DUPLICATE_ENTRY` used for Prisma P2002 |
+| `DUPLICATE_ENTRY` | 409 | Yes (Prisma P2002 branch, not in prompt's table) |
+| `TOO_MANY_REQUESTS` | 429 | Factory exists; likely used by rate limiter middleware |
+| `PAYLOAD_TOO_LARGE` | 413 | Yes (not in prompt's table) |
+| `INTERNAL_ERROR` | 500 | Yes (default error branch) |
+| `SERVICE_UNAVAILABLE` | 503 | Factory exists; used as `ADMIN_NOT_CONFIGURED` in admin |
+
+**Verdict:**
+- &#x26A0;&#xFE0F; Error codes in actual code do not always match the prompt's table. Additional codes exist (`ROUTE_NOT_FOUND`, `DUPLICATE_ENTRY`, `PAYLOAD_TOO_LARGE`, `ADMIN_NOT_CONFIGURED`). Some listed codes like `CAPTCHA_REQUIRED` and `CAPTCHA_FAILED` may live in the captcha middleware rather than the error handler.
 
 ---
 
-## Async Handler Wrapper
+## Summary
 
-```typescript
-// packages/backend/src/utils/asyncHandler.ts
+The backend error handling implementation is more comprehensive than what the prompt describes. The `AppError` class, `asyncHandler` wrapper, and global `errorHandler` are all present and well-structured. The implementation goes beyond the prompt by handling Prisma-specific errors and payload-too-large errors, and includes a dedicated 404 handler for unmatched routes. All route files consistently use `asyncHandler` and `AppError`.
 
-import { Request, Response, NextFunction, RequestHandler } from 'express';
-
-type AsyncRequestHandler = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => Promise<any>;
-
-export function asyncHandler(fn: AsyncRequestHandler): RequestHandler {
-  return (req, res, next) => {
-    Promise.resolve(fn(req, res, next)).catch(next);
-  };
-}
-```
-
-### Usage in Routes
-
-```typescript
-// packages/backend/src/routes/providers.ts
-
-router.get('/:npi', defaultRateLimiter, asyncHandler(async (req, res) => {
-  const { npi } = npiParamSchema.parse(req.params);
-
-  const provider = await prisma.provider.findUnique({
-    where: { npi }
-  });
-
-  if (!provider) {
-    throw AppError.notFound('Provider not found');
-  }
-
-  res.json({ success: true, data: provider });
-}));
-```
-
----
-
-## Error Response Format
-
-### Standard Error
-
-```json
-{
-  "success": false,
-  "error": {
-    "message": "Provider not found",
-    "code": "NOT_FOUND",
-    "statusCode": 404
-  }
-}
-```
-
-### Validation Error
-
-```json
-{
-  "success": false,
-  "error": {
-    "message": "Validation failed",
-    "code": "VALIDATION_ERROR",
-    "statusCode": 400,
-    "details": [
-      {
-        "field": "npi",
-        "message": "NPI must be exactly 10 digits"
-      },
-      {
-        "field": "limit",
-        "message": "Maximum 100 results per page"
-      }
-    ]
-  }
-}
-```
-
----
-
-## Error Codes Reference
-
-| Code | Status | Description |
-|------|--------|-------------|
-| `VALIDATION_ERROR` | 400 | Invalid request data |
-| `BAD_REQUEST` | 400 | Malformed request |
-| `UNAUTHORIZED` | 401 | Authentication required |
-| `FORBIDDEN` | 403 | Permission denied |
-| `NOT_FOUND` | 404 | Resource not found |
-| `CONFLICT` | 409 | Resource already exists |
-| `TOO_MANY_REQUESTS` | 429 | Rate limit exceeded |
-| `INTERNAL_ERROR` | 500 | Server error |
-| `DATABASE_ERROR` | 500 | Database operation failed |
-| `SERVICE_UNAVAILABLE` | 503 | External service down |
-
----
-
-## Frontend Error Handling
-
-### API Client
-
-```typescript
-// packages/frontend/src/lib/api.ts
-
-interface ApiError {
-  message: string;
-  code: string;
-  statusCode: number;
-  details?: Array<{ field: string; message: string }>;
-}
-
-async function handleResponse<T>(response: Response): Promise<T> {
-  const data = await response.json();
-
-  if (!response.ok || !data.success) {
-    const error = new Error(data.error?.message || 'Request failed') as Error & {
-      code: string;
-      statusCode: number;
-      details?: Array<{ field: string; message: string }>;
-    };
-    error.code = data.error?.code || 'UNKNOWN_ERROR';
-    error.statusCode = data.error?.statusCode || response.status;
-    error.details = data.error?.details;
-    throw error;
-  }
-
-  return data.data;
-}
-```
-
-### Error Display Component
-
-```typescript
-// packages/frontend/src/components/ui/ErrorMessage.tsx
-
-interface ErrorMessageProps {
-  error: Error & { code?: string; details?: Array<{ field: string; message: string }> };
-}
-
-export function ErrorMessage({ error }: ErrorMessageProps) {
-  return (
-    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-      <p className="text-red-800 font-medium">{error.message}</p>
-
-      {error.details && (
-        <ul className="mt-2 text-sm text-red-700">
-          {error.details.map((detail, i) => (
-            <li key={i}>
-              <strong>{detail.field}:</strong> {detail.message}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-```
-
-### Form Error Handling
-
-```typescript
-// packages/frontend/src/components/VerificationForm.tsx
-
-export function VerificationForm() {
-  const [error, setError] = useState<Error | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-
-  const handleSubmit = async (data: FormData) => {
-    setError(null);
-    setFieldErrors({});
-
-    try {
-      await api.submitVerification(data);
-      toast.success('Verification submitted!');
-    } catch (err) {
-      const apiError = err as Error & { code?: string; details?: Array<{ field: string; message: string }> };
-
-      if (apiError.code === 'VALIDATION_ERROR' && apiError.details) {
-        // Map to field errors
-        const errors: Record<string, string> = {};
-        for (const detail of apiError.details) {
-          errors[detail.field] = detail.message;
-        }
-        setFieldErrors(errors);
-      } else {
-        setError(apiError);
-      }
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit}>
-      {error && <ErrorMessage error={error} />}
-
-      <Input
-        name="npi"
-        error={fieldErrors.npi}
-      />
-      {/* ... */}
-    </form>
-  );
-}
-```
-
----
-
-## Logging
-
-### Error Logging
-
-```typescript
-// Structured error logging
-console.error('[Error]', {
-  timestamp: new Date().toISOString(),
-  type: err.constructor.name,
-  message: err.message,
-  code: err instanceof AppError ? err.code : 'UNKNOWN',
-  statusCode: err instanceof AppError ? err.statusCode : 500,
-  path: req.path,
-  method: req.method,
-  ip: req.ip,
-  stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
-});
-```
-
-### Log Patterns
-
-```
-# Operational error (expected)
-[Error] { type: "AppError", code: "NOT_FOUND", path: "/api/v1/providers/9999999999" }
-
-# Validation error
-[Error] { type: "ZodError", code: "VALIDATION_ERROR", path: "/api/v1/verify" }
-
-# Unexpected error (requires attention)
-[Error] { type: "Error", code: "UNKNOWN", message: "Connection refused", path: "/api/v1/search" }
-```
-
----
+Two notable gaps exist:
+1. The `success: false` field is inconsistently included in error responses (most branches omit it).
+2. The entire frontend error handling layer (ErrorContext, error boundary, API error class) does not exist yet -- no frontend source files were found.
 
 ## Recommendations
 
-### Immediate
-- ✅ Error handling is comprehensive
-- Add error correlation IDs
-- Improve error logging structure
+1. **Add `success: false` to all error response branches** in `errorHandler.ts`. Currently only the `PayloadTooLargeError` branch and the admin auth middleware include it. For API consumer consistency, all error responses should include `success: false` at the top level.
 
-### Future
-1. **Error Monitoring**
-   - Integrate Sentry or similar
-   - Track error rates
+2. **Add default error codes to factory methods.** `AppError.badRequest("msg")` should default to `code: 'BAD_REQUEST'` rather than `undefined`. This ensures error responses always have a meaningful `code` field without requiring callers to remember to pass one.
 
-2. **Error Recovery**
-   - Retry transient failures
-   - Circuit breaker pattern
+3. **Build the frontend error handling layer.** The four files referenced by the prompt (`errorUtils.ts`, `ErrorContext.tsx`, `error.tsx`, `api.ts`) do not exist. When the frontend is implemented, these should be created to provide consistent error display, an error boundary for React crashes, and a typed API client with error handling.
 
-3. **User-Friendly Messages**
-   - Map technical errors to user messages
-   - Localization support
+4. **Document the additional error codes** (`ROUTE_NOT_FOUND`, `DUPLICATE_ENTRY`, `PAYLOAD_TOO_LARGE`, `ADMIN_NOT_CONFIGURED`) in the prompt's error codes table so API consumers have a complete reference.
 
----
+5. **Consider adding external error monitoring** (Sentry or Google Cloud Error Reporting) as noted in the prompt's own unchecked items. The structured logging via `logger.error()` is a good foundation, but a dedicated service would provide alerting, deduplication, and trend analysis.
 
-## Conclusion
-
-Error handling is **well-implemented**:
-
-- ✅ Custom AppError class
-- ✅ Centralized error middleware
-- ✅ Consistent JSON format
-- ✅ Zod validation errors
-- ✅ Prisma error mapping
-- ✅ Async handler wrapper
-- ✅ Frontend error display
-
-The error handling system provides clear, consistent feedback to API consumers.
+6. **Verify CAPTCHA error codes.** The prompt lists `CAPTCHA_REQUIRED` and `CAPTCHA_FAILED` but these were not found in `errorHandler.ts`. Confirm these are handled in the captcha middleware (`verifyCaptcha`) and that they follow the same response format.

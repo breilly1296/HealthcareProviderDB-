@@ -86,6 +86,31 @@ function transformProvider(p: Record<string, unknown>) {
       is_primary?: string | null;
       slot_number?: number | null;
     }>;
+    providerPlanAcceptances?: Array<{
+      id: number;
+      planId?: string | null;
+      locationId?: number | null;
+      acceptanceStatus: string;
+      confidenceScore: number;
+      lastVerified?: Date | null;
+      verificationCount: number;
+      expiresAt?: Date | null;
+      insurancePlan?: {
+        planId: string;
+        planName?: string | null;
+        issuerName?: string | null;
+        planType?: string | null;
+        state?: string | null;
+        carrier?: string | null;
+      } | null;
+      location?: {
+        id: number;
+        address_line1?: string | null;
+        city?: string | null;
+        state?: string | null;
+        zip_code?: string | null;
+      } | null;
+    }>;
     npi: string;
     entityType?: string | null;
     firstName?: string | null;
@@ -101,6 +126,7 @@ function transformProvider(p: Record<string, unknown>) {
     specialty_category?: string | null;
     deactivation_date?: string | null;
     enumerationDate?: string | null;
+    nppes_last_synced?: Date | null;
   };
 
   const loc = getPrimaryLocation(provider.practice_locations);
@@ -139,6 +165,33 @@ function transformProvider(p: Record<string, unknown>) {
     medicareIds: provider.provider_medicare || [],
     taxonomies: provider.provider_taxonomies || [],
     locations: provider.practice_locations || [],
+    nppesLastSynced: provider.nppes_last_synced || null,
+    // Plan acceptances with location data
+    planAcceptances: (provider.providerPlanAcceptances || []).map(pa => ({
+      id: pa.id,
+      planId: pa.planId,
+      locationId: pa.locationId,
+      acceptanceStatus: pa.acceptanceStatus,
+      confidenceScore: pa.confidenceScore,
+      lastVerifiedAt: pa.lastVerified,
+      verificationCount: pa.verificationCount,
+      expiresAt: pa.expiresAt,
+      plan: pa.insurancePlan ? {
+        planId: pa.insurancePlan.planId,
+        planName: pa.insurancePlan.planName,
+        issuerName: pa.insurancePlan.issuerName,
+        planType: pa.insurancePlan.planType,
+        state: pa.insurancePlan.state,
+        carrier: pa.insurancePlan.carrier,
+      } : null,
+      location: pa.location ? {
+        id: pa.location.id,
+        addressLine1: pa.location.address_line1,
+        city: pa.location.city,
+        state: pa.location.state,
+        zipCode: pa.location.zip_code,
+      } : null,
+    })),
   };
 }
 

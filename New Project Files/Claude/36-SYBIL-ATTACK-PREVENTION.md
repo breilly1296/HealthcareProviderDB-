@@ -1,388 +1,80 @@
-# VerifyMyProvider Sybil Attack Prevention Analysis
+# Sybil Attack Prevention -- Analysis
 
-**Last Updated:** 2026-01-31
-**Analyzed By:** Claude Code
-
----
-
-## Executive Summary
-
-Sybil attacks occur when a single actor creates multiple fake identities to manipulate a system. VerifyMyProvider employs multiple defense layers to prevent gaming of the crowdsourced verification system.
+**Generated:** 2026-02-05
+**Source Prompt:** prompts/36-sybil-attack-prevention.md
+**Status:** Fully Implemented -- All 4 prevention layers are in place and match the prompt specification
 
 ---
 
-## Attack Vectors
+## Findings
 
-### Potential Attacks
+### Layer 1: Rate Limiting (IP-based)
+- [x] **Verification: 10/hour per IP** -- Verified. `rateLimiter.ts` lines 340-344: `verificationRateLimiter` with `windowMs: 60 * 60 * 1000` and `maxRequests: 10`.
+- [x] **Voting: 10/hour per IP** -- Verified. `rateLimiter.ts` lines 351-355: `voteRateLimiter` with `windowMs: 60 * 60 * 1000` and `maxRequests: 10`.
+- [x] **Search: 100/hour per IP** -- Verified. `rateLimiter.ts` lines 362-366: `searchRateLimiter` with `windowMs: 60 * 60 * 1000` and `maxRequests: 100`.
+- [x] **Rate limit headers returned** -- Verified. All rate limiter implementations set `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` headers (lines 159-161 for in-memory, lines 258-260 for Redis).
+- [x] **Retry-After on 429** -- Verified. Both in-memory and Redis implementations set the `Retry-After` header when rate limit is exceeded.
+- [x] **Dual-mode: Redis + in-memory fallback** -- The rate limiter supports Redis (distributed) and in-memory (process-local) modes. Falls open if Redis becomes unavailable mid-request, prioritizing availability.
 
-| Attack | Goal | Impact |
-|--------|------|--------|
-| Spam verifications | Inflate acceptance status | False confidence |
-| Vote manipulation | Artificially boost/bury verifications | Skewed data |
-| Reputation gaming | Make fake data appear credible | User trust loss |
-| Competitive sabotage | Mark competitor as not accepting | Business harm |
+### Layer 2: CAPTCHA (Bot Detection)
+- [x] **Google reCAPTCHA v3** -- Verified. `captcha.ts` imports and uses reCAPTCHA v3 verification.
+- [x] **Score threshold: 0.5** -- Verified. `constants.ts` line 52: `CAPTCHA_MIN_SCORE = 0.5`.
+- [x] **Fallback rate limiting** -- Verified. `constants.ts` lines 62-67: `CAPTCHA_FALLBACK_MAX_REQUESTS = 3` (stricter than normal 10/hour) within `CAPTCHA_FALLBACK_WINDOW_MS = MS_PER_HOUR`.
+- [x] **Fail-open behavior with fallback** -- The captcha middleware supports configurable `CAPTCHA_FAIL_MODE` (open or closed). Default is fail-open with fallback rate limiting of 3 requests/hour -- much stricter than the normal 10/hour, providing meaningful protection even when Google's API is down.
 
----
+### Layer 3: Vote Deduplication (Database)
+- [x] **VoteLog table** -- Verified in Prisma schema (line 235). Model includes `id`, `verificationId`, `sourceIp`, `vote`, `createdAt`.
+- [x] **Unique constraint on (verificationId, sourceIp)** -- Verified. Schema line 243: `@@unique([verificationId, sourceIp])`. This enforces one vote per IP per verification at the database level.
+- [x] **Vote change allowed** -- Verified. `voteOnVerification()` in `verificationService.ts` (lines 453-493) checks for existing vote. If same direction, throws conflict error. If different direction, updates the vote and adjusts upvote/downvote counts in a transaction.
+- [x] **Duplicate prevention** -- Verified. Lines 454-457: If `existingVote.vote === vote`, throws `AppError.conflict('You have already voted on this verification')`.
+- [x] **Transactional vote updates** -- Both new vote creation (lines 496-514) and vote changes (lines 461-493) use `prisma.$transaction()` to ensure atomicity of the vote log update and verification counter adjustment.
+- [x] **Supporting indexes** -- Schema lines 244-245: `@@index([sourceIp])` and `@@index([verificationId])` on VoteLog for fast lookups.
 
-## Defense Layers
+### Layer 4: Verification Windows (Database)
+- [x] **Sybil prevention indexes** -- Verified. Schema lines 229-230:
+  - `@@index([providerNpi, planId, sourceIp, createdAt], map: "idx_vl_sybil_ip")` -- For fast IP-based duplicate checking.
+  - `@@index([providerNpi, planId, submittedBy, createdAt], map: "idx_vl_sybil_email")` -- For fast email-based duplicate checking.
+- [x] **30-day window check implemented** -- Verified. `checkSybilAttack()` function (lines 72-115) in `verificationService.ts`. Uses `SYBIL_PREVENTION_WINDOW_MS` from constants (confirmed as `30 * MS_PER_DAY` at `constants.ts` line 26).
+- [x] **Duplicate IP check** -- Verified. Lines 81-96: Queries for existing verification with same `providerNpi`, `planId`, `sourceIp`, and `createdAt >= cutoffDate`. Throws conflict error if found.
+- [x] **Duplicate email check** -- Verified. Lines 99-114: Queries for existing verification with same `providerNpi`, `planId`, `submittedBy`, and `createdAt >= cutoffDate`. Throws conflict error if found.
+- [x] **Integration in submitVerification** -- Verified. `submitVerification()` calls `checkSybilAttack()` at line 337 (Step 2), after validating provider/plan existence and before creating the verification log.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                  Sybil Defense Architecture                  │
-│                                                              │
-│  Layer 1: Rate Limiting                                      │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │ • 10 verifications per IP per hour                    │  │
-│  │ • 10 votes per IP per hour                            │  │
-│  │ • Distributed via Redis (multi-instance)              │  │
-│  └──────────────────────────────────────────────────────┘  │
-│                           │                                  │
-│  Layer 2: CAPTCHA                                           │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │ • reCAPTCHA v3 score-based                            │  │
-│  │ • Minimum score: 0.5                                  │  │
-│  │ • Blocks automated scripts                            │  │
-│  └──────────────────────────────────────────────────────┘  │
-│                           │                                  │
-│  Layer 3: Cooldowns                                         │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │ • 24-hour cooldown per IP + provider + plan          │  │
-│  │ • Prevents repeated submissions for same combo       │  │
-│  └──────────────────────────────────────────────────────┘  │
-│                           │                                  │
-│  Layer 4: Vote Deduplication                                │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │ • One vote per IP per verification                    │  │
-│  │ • Can change vote, not add more                       │  │
-│  └──────────────────────────────────────────────────────┘  │
-│                           │                                  │
-│  Layer 5: Confidence Algorithm                              │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │ • Logarithmic count scaling (diminishing returns)    │  │
-│  │ • Wilson score for votes (statistical confidence)    │  │
-│  │ • Source quality weighting                            │  │
-│  └──────────────────────────────────────────────────────┘  │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
-```
+### Additional Security Measures (Beyond Prompt Specification)
+- [x] **PII stripping from API responses** -- `stripVerificationPII()` function (lines 307-310) removes `sourceIp`, `userAgent`, and `submittedBy` from verification objects before returning them in API responses.
+- [x] **Select-based PII exclusion** -- `getRecentVerifications()` and `getVerificationsForPair()` use Prisma `select` to explicitly exclude `sourceIp`, `userAgent`, and `submittedBy` from database queries (lines 632-648, 717-729).
+- [x] **sourceIp required for voting** -- `voteOnVerification()` throws `AppError.badRequest` if `sourceIp` is not provided (lines 427-429), ensuring every vote has an IP for deduplication.
+- [x] **Confidence score update on vote** -- After a vote, the system recalculates the confidence score for the related acceptance record (lines 527-548), ensuring vote manipulation attempts are reflected in the overall scoring.
+- [x] **Consensus requirements** -- `determineAcceptanceStatus()` (lines 163-185) requires minimum 3 verifications (`MIN_VERIFICATIONS_FOR_CONSENSUS`), minimum confidence score (`MIN_CONFIDENCE_FOR_STATUS_CHANGE`), and a clear 2:1 majority ratio before changing acceptance status. This prevents a single attacker from unilaterally changing a provider's status.
+
+### Monitoring
+- [ ] **Suspicious pattern queries** -- SQL queries are documented in the prompt but not implemented as application code or scheduled jobs.
+- [ ] **Alerting on high volumes** -- Not implemented.
+- [ ] **Admin review queue** -- Not implemented.
 
 ---
 
-## Implementation Details
+## Summary
 
-### Layer 1: Rate Limiting
+All four Sybil attack prevention layers are fully implemented and match the prompt specification:
 
-```typescript
-// packages/backend/src/middleware/rateLimiter.ts
+| Layer | Status | Implementation |
+|-------|--------|---------------|
+| Rate Limiting | Fully implemented | Redis + in-memory dual-mode, 10/hr verify, 10/hr vote, 100/hr search |
+| CAPTCHA | Fully implemented | reCAPTCHA v3 with 0.5 score threshold, fail-open with 3/hr fallback |
+| Vote Deduplication | Fully implemented | Database unique constraint + application-level check with vote change support |
+| Verification Windows | Fully implemented | 30-day window for both IP and email, composite indexes for performance |
 
-export const verificationRateLimiter = createRateLimiter({
-  name: 'verification',
-  windowMs: 60 * 60 * 1000,  // 1 hour
-  maxRequests: 10,           // 10 per hour per IP
-  message: "You've submitted too many verifications. Please try again later."
-});
+The implementation goes beyond the prompt's requirements by also including PII stripping from API responses, consensus requirements for status changes (3+ verifications, 60+ confidence score, 2:1 majority), and transactional vote updates. The `checkSybilAttack()` function checks both IP and email within the 30-day window, providing dual protection against repeat submissions.
 
-export const voteRateLimiter = createRateLimiter({
-  name: 'vote',
-  windowMs: 60 * 60 * 1000,
-  maxRequests: 10
-});
-```
-
-### Layer 2: CAPTCHA
-
-```typescript
-// packages/backend/src/middleware/captcha.ts
-
-export async function verifyCaptcha(req, res, next) {
-  const score = await verifyWithGoogle(req.body.captchaToken, req.ip);
-
-  // Score < 0.5 likely indicates automated traffic
-  if (score < CAPTCHA_MIN_SCORE) {
-    return next(AppError.forbidden('Suspicious activity blocked'));
-  }
-
-  req.captchaScore = score;
-  next();
-}
-```
-
-### Layer 3: Cooldowns
-
-```typescript
-// packages/backend/src/services/verificationService.ts
-
-const COOLDOWN_HOURS = 24;
-
-async function checkCooldown(
-  providerNpi: string,
-  planId: string,
-  sourceIp: string
-): Promise<boolean> {
-  const cooldownStart = subHours(new Date(), COOLDOWN_HOURS);
-
-  const recentVerification = await prisma.verificationLog.findFirst({
-    where: {
-      providerNpi,
-      planId,
-      sourceIp,
-      createdAt: { gte: cooldownStart }
-    }
-  });
-
-  return recentVerification !== null;
-}
-
-export async function submitVerification(data: VerificationInput) {
-  // Check cooldown
-  const onCooldown = await checkCooldown(data.npi, data.planId, data.sourceIp);
-
-  if (onCooldown) {
-    throw AppError.tooManyRequests(
-      'You have already submitted a verification for this provider-plan combination recently.'
-    );
-  }
-
-  // Proceed with verification
-  // ...
-}
-```
-
-### Layer 4: Vote Deduplication
-
-```typescript
-// Database constraint
-model VoteLog {
-  id             String   @id @default(cuid())
-  verificationId String
-  sourceIp       String   @db.VarChar(50)
-  vote           String   // 'up' or 'down'
-
-  @@unique([verificationId, sourceIp])  // 👈 One vote per IP
-}
-
-// Service implementation
-export async function submitVote(
-  verificationId: string,
-  vote: 'up' | 'down',
-  sourceIp: string
-) {
-  // Upsert allows changing vote, not adding multiple
-  const existingVote = await prisma.voteLog.findUnique({
-    where: {
-      verificationId_sourceIp: { verificationId, sourceIp }
-    }
-  });
-
-  if (existingVote) {
-    // Update existing vote
-    await prisma.voteLog.update({
-      where: { id: existingVote.id },
-      data: { vote }
-    });
-
-    // Adjust counts
-    if (existingVote.vote !== vote) {
-      await updateVoteCounts(verificationId, existingVote.vote, vote);
-    }
-  } else {
-    // Create new vote
-    await prisma.voteLog.create({
-      data: { verificationId, sourceIp, vote }
-    });
-
-    await incrementVoteCount(verificationId, vote);
-  }
-}
-```
-
-### Layer 5: Confidence Algorithm Anti-Gaming
-
-```typescript
-// Logarithmic scaling prevents mass submission effectiveness
-function calculateCountScore(verificationCount: number): number {
-  // 1 verification = 10 points
-  // 10 verifications = 33 points
-  // 100 verifications = 66 points (diminishing returns!)
-
-  if (verificationCount === 0) return 0;
-  return Math.min(40, Math.round(Math.log2(verificationCount + 1) * 10));
-}
-
-// Wilson score accounts for sample size
-function calculateVotingScore(upvotes: number, downvotes: number): number {
-  const total = upvotes + downvotes;
-  if (total === 0) return 10;
-
-  // Statistical lower bound - small samples get lower scores
-  const z = 1.96;  // 95% confidence
-  const p = upvotes / total;
-  const n = total;
-
-  const wilson = (p + z*z/(2*n) - z * Math.sqrt((p*(1-p)+z*z/(4*n))/n)) / (1+z*z/n);
-
-  return Math.round(wilson * 20);
-}
-```
-
----
-
-## Database Indexes for Sybil Prevention
-
-```prisma
-model VerificationLog {
-  // ... fields
-
-  // Sybil prevention compound indexes
-  @@index([providerNpi, planId, sourceIp, createdAt])  // Cooldown check
-  @@index([sourceIp, createdAt])                        // Rate check
-}
-
-model VoteLog {
-  @@unique([verificationId, sourceIp])  // Vote deduplication
-  @@index([sourceIp])                    // Rate check
-}
-```
-
----
-
-## Attack Scenarios
-
-### Scenario 1: Mass Verification Spam
-
-**Attack:** Script submits 1000 verifications for one provider-plan
-
-**Defense:**
-1. Rate limit: Max 10/hour per IP ✅
-2. CAPTCHA: Bot score < 0.5 blocked ✅
-3. Cooldown: Same IP+provider+plan blocked for 24h ✅
-4. Confidence: Logarithmic scaling limits impact ✅
-
-**Result:** Max 10 verifications, spread over 24+ hours
-
-### Scenario 2: VPN IP Rotation
-
-**Attack:** User rotates through 100 VPN IPs
-
-**Defense:**
-1. Each IP still limited to 10/hour ✅
-2. CAPTCHA detects suspicious browser patterns ✅
-3. Cost of attack: High (100 IPs × time) ✅
-4. Confidence: Log scaling limits impact ✅
-
-**Result:** 1000 verifications max, but confidence only ~66 points (vs 40 for 10)
-
-### Scenario 3: Vote Manipulation
-
-**Attack:** Try to upvote verification 100 times
-
-**Defense:**
-1. Unique constraint: One vote per IP ✅
-2. Rate limit: 10 votes/hour per IP ✅
-3. Wilson score: Small samples get lower scores ✅
-
-**Result:** 1 vote per IP, statistical correction for small samples
-
-### Scenario 4: Competitive Sabotage
-
-**Attack:** Mark competitor as not accepting popular insurance
-
-**Defense:**
-1. Legitimate users can counter-verify ✅
-2. Voting allows community correction ✅
-3. Multiple verifications required for high confidence ✅
-4. Recency weighting favors fresh data ✅
-
-**Result:** Attack visible but correctable by community
-
----
-
-## Monitoring for Attacks
-
-### Log Patterns
-
-```
-# High verification rate from single IP
-[Sybil] High rate: IP 1.2.3.4 - 10 verifications in 1 hour
-
-# CAPTCHA score pattern
-[Sybil] Low CAPTCHA scores: IP 1.2.3.4 - avg 0.3 over 5 attempts
-
-# Cooldown violations
-[Sybil] Cooldown hit: IP 1.2.3.4 - provider 1234567890 - plan BCBS
-```
-
-### Alerts
-
-| Alert | Trigger | Action |
-|-------|---------|--------|
-| Rate limit spike | >100 429s/hour | Review IPs |
-| CAPTCHA failures | >10% low scores | Tighten threshold |
-| Verification patterns | Same IP, many providers | Manual review |
-
-### Monitoring Queries
-
-```sql
--- Suspicious verification patterns
-SELECT
-  source_ip,
-  COUNT(DISTINCT provider_npi) AS providers,
-  COUNT(*) AS verifications,
-  AVG(captcha_score) AS avg_score
-FROM verification_logs
-WHERE created_at > NOW() - INTERVAL '24 hours'
-GROUP BY source_ip
-HAVING COUNT(*) > 5
-ORDER BY COUNT(*) DESC;
-
--- Vote manipulation attempts
-SELECT
-  source_ip,
-  COUNT(*) AS vote_attempts,
-  COUNT(DISTINCT verification_id) AS unique_verifications
-FROM vote_logs
-WHERE created_at > NOW() - INTERVAL '24 hours'
-GROUP BY source_ip
-HAVING COUNT(*) > COUNT(DISTINCT verification_id) * 2;
-```
+The main gap is the monitoring layer: suspicious pattern queries, alerting, and admin review are documented but not implemented as application features.
 
 ---
 
 ## Recommendations
 
-### Immediate
-- ✅ Multi-layer defense implemented
-- Add real-time monitoring dashboard
-- Set up automated alerts
-
-### Future Enhancements
-
-1. **Device Fingerprinting**
-   - Track browser fingerprint
-   - Detect same device across IPs
-
-2. **Behavioral Analysis**
-   - Detect automated patterns
-   - Flag suspicious timing
-
-3. **Trusted Verifier Program**
-   - Track user accuracy
-   - Weight trusted users higher
-
-4. **IP Reputation**
-   - Check against known VPN/proxy lists
-   - Apply stricter limits
-
----
-
-## Conclusion
-
-Sybil attack prevention is **well-implemented**:
-
-- ✅ Rate limiting (IP-based)
-- ✅ CAPTCHA (bot detection)
-- ✅ Cooldowns (repeat prevention)
-- ✅ Vote deduplication
-- ✅ Statistical confidence scoring
-
-The multi-layer approach makes attacks expensive and limited in effectiveness.
+1. **Implement monitoring queries as a scheduled job or admin endpoint** -- The SQL queries documented in the prompt for detecting suspicious IPs and conflicting verifications should be implemented as either a cron job that logs/alerts or an admin API endpoint.
+2. **Add admin review queue** -- Flag verifications from IPs that are close to rate limits or have had CAPTCHA fallback applied. Provide an admin interface to review and moderate flagged content.
+3. **Consider VPN/proxy detection** -- The current system treats each IP independently. Services like MaxMind or IP2Location can identify VPN/proxy IPs for additional scoring or flagging.
+4. **Add logging for blocked Sybil attempts** -- When `checkSybilAttack()` throws a conflict error, log the attempt with IP and provider-plan details for later analysis. Currently the error is returned to the client but not logged server-side for monitoring purposes.
+5. **Consider browser fingerprinting** -- As a supplementary signal (not primary identifier), browser fingerprinting could help detect users rotating IPs while using the same device.
+6. **Document the `sourceIp` optional parameter** -- `checkSybilAttack()` accepts `sourceIp` as optional (`sourceIp?: string`), which means the IP check is skipped entirely if no IP is provided. While `voteOnVerification()` enforces IP presence, `submitVerification()` passes `sourceIp` from input which could theoretically be undefined. Consider making `sourceIp` required in `SubmitVerificationInput` or adding a validation check.

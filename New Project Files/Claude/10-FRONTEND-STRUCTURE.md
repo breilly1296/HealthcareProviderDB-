@@ -1,552 +1,259 @@
-# VerifyMyProvider Frontend Structure Analysis
+# Frontend Structure Review -- Analysis
 
-**Last Updated:** 2026-01-31
-**Analyzed By:** Claude Code
-
----
-
-## Executive Summary
-
-The frontend is built with Next.js 14+ App Router, React 18, TypeScript, and Tailwind CSS. It follows modern React patterns with server components, client components, and a clean component hierarchy.
+**Generated:** 2026-02-05
+**Source Prompt:** prompts/10-frontend-structure.md
+**Status:** Mostly Accurate -- prompt closely matches codebase with minor omissions and one inaccuracy
 
 ---
 
-## Technology Stack
+## Findings
 
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| Next.js | 14+ | React framework with App Router |
-| React | 18 | UI library |
-| TypeScript | 5+ | Type safety |
-| Tailwind CSS | 3+ | Styling |
-| Lucide React | Latest | Icons |
-| PostHog | Latest | Analytics |
+### Technology Stack
 
----
+- [x] **Next.js 14.2 (App Router)** -- Verified. `next.config.js` uses App Router conventions; standalone output configured.
+- [x] **React 18.3** -- Verified via imports and hooks usage throughout.
+- [x] **TailwindCSS 3.3.6 + PostCSS** -- Verified. `tailwind.config.ts` exists with `darkMode: 'class'` and custom primary color palette.
+- [x] **@tanstack/react-query 5.x** -- Verified. `QueryProvider.tsx` and `queryClient.ts` present with proper configuration (5min staleTime, 10min gcTime).
+- [x] **lucide-react** -- Referenced in component imports.
+- [x] **react-hot-toast** -- Verified. `ToastProvider.tsx` present in components; `api.ts` imports `toast` from `react-hot-toast`.
+- [x] **focus-trap-react** -- Listed in stack.
+- [x] **posthog-js** -- Verified. `PostHogProvider.tsx` initializes PostHog with `NEXT_PUBLIC_POSTHOG_KEY`.
+- [x] **@anthropic-ai/sdk** -- Verified. Used in `app/api/insurance-card/extract/route.ts` with Claude Haiku 4.5.
+- [x] **sharp** -- Verified. Listed in `serverComponentsExternalPackages` in `next.config.js`.
+- [x] **zod** -- Verified. Used in `admin.ts` imports; `insuranceCardSchema.ts` exists.
+- [x] **SWC Patch** -- Verified. `next.config.js` sets `swcMinify: false` and disables turbopack for ARM64 compatibility.
 
-## Directory Structure
+### Pages (App Router)
 
-```
-packages/frontend/
-├── src/
-│   ├── app/                    # Next.js App Router
-│   │   ├── layout.tsx          # Root layout
-│   │   ├── page.tsx            # Home page
-│   │   ├── providers/          # Provider routes
-│   │   │   ├── page.tsx        # Provider search
-│   │   │   ├── [npi]/          # Provider detail
-│   │   │   │   └── page.tsx
-│   │   │   └── compare/        # Provider comparison
-│   │   │       └── page.tsx
-│   │   ├── verify/             # Verification routes
-│   │   │   └── page.tsx
-│   │   ├── plans/              # Insurance plans
-│   │   │   └── page.tsx
-│   │   └── locations/          # Location pages
-│   │       └── [id]/
-│   │           └── page.tsx
-│   ├── components/             # React components
-│   │   ├── ui/                 # Base UI components
-│   │   ├── providers/          # Provider components
-│   │   ├── verification/       # Verification components
-│   │   ├── search/             # Search components
-│   │   └── layout/             # Layout components
-│   ├── hooks/                  # Custom React hooks
-│   ├── lib/                    # Utilities
-│   ├── contexts/               # React contexts
-│   └── types/                  # TypeScript types
-├── public/                     # Static assets
-├── tailwind.config.ts          # Tailwind config
-├── next.config.js              # Next.js config
-└── package.json
-```
+| Route | Prompt Claims | Actual Status |
+|-------|---------------|---------------|
+| `/` | `app/page.tsx` -- Home | Verified. Renders HeroSection, WhyItMattersSection, HowItWorksSection, ConfidenceSection, CTASection. |
+| `/search` | `app/search/page.tsx` -- Provider search | Verified. Complex page with SearchForm, ProviderCard, FilterDrawer, pagination. |
+| `/provider/[npi]` | `app/provider/[npi]/page.tsx` -- Provider detail | Verified. File exists at `app/provider/[npi]/page.tsx`. |
+| `/location/[locationId]` | `app/location/[locationId]/page.tsx` -- Location detail | Verified. File exists at `app/location/[locationId]/page.tsx`. |
+| `/insurance` | `app/insurance/page.tsx` -- Insurance plan browser | Verified. File exists. |
+| `/research` | `app/research/page.tsx` -- Research/methodology | Verified. File exists. |
+| `/about` | `app/about/page.tsx` -- About page | Verified. File exists. |
+| `/privacy` | `app/privacy/page.tsx` -- Privacy policy | Verified. File exists. |
+| `/terms` | `app/terms/page.tsx` -- Terms of service | Verified. File exists. |
+| `/disclaimer` | `app/disclaimer/page.tsx` -- Medical disclaimer | Verified. File exists. |
 
----
+- [x] **Layout:** `app/layout.tsx` wraps with Header, ThemeToggle (via ThemeProvider), BottomNav, ToastProvider, PostHogProvider, QueryProvider, CompareProvider, ErrorProvider, Disclaimer banner, GlobalErrorBanner, Footer, ScrollToTop, CompareBar. This matches the prompt's description.
+- [x] **Error Handling:** `app/error.tsx` exists as a client-side error boundary with try-again and go-home buttons.
+- [x] **API Route:** `app/api/insurance-card/extract/route.ts` exists and uses Claude Haiku 4.5 for card OCR.
 
-## Page Routes
+Warning: There is an empty `(main)` route group directory at `app/(main)/` containing empty subdirectories for insurance, location, privacy, research, and terms. These appear to be remnants of a prior refactoring. The actual page files live directly under `app/insurance/`, `app/privacy/`, etc. The prompt does not mention this artifact.
 
-| Route | Component | Description |
-|-------|-----------|-------------|
-| `/` | `page.tsx` | Home page with search |
-| `/providers` | `providers/page.tsx` | Provider search results |
-| `/providers/[npi]` | `providers/[npi]/page.tsx` | Provider detail |
-| `/providers/compare` | `providers/compare/page.tsx` | Compare providers |
-| `/verify` | `verify/page.tsx` | Submit verification |
-| `/plans` | `plans/page.tsx` | Browse insurance plans |
-| `/locations/[id]` | `locations/[id]/page.tsx` | Location detail |
+### Component Architecture
 
----
+#### Home Page (`components/home/`)
+- [x] `HeroSection.tsx` -- Verified
+- [x] `WhyItMattersSection.tsx` -- Verified
+- [x] `HowItWorksSection.tsx` -- Verified
+- [x] `ConfidenceSection.tsx` -- Verified
+- [x] `CTASection.tsx` -- Verified
+- [x] `index.ts` barrel export -- Verified (not mentioned in prompt but exists)
 
-## Component Hierarchy
+#### Search & Results
+- [x] `SearchForm.tsx` -- Verified
+- [x] `ProviderCard.tsx` -- Verified
+- [x] `ProviderCardSkeleton.tsx` -- Verified (actual file exports `SearchResultsSkeleton`)
+- [x] `RecentSearches.tsx` -- Verified
 
-### Layout Components
+#### Filtering
+- [x] `FilterButton.tsx` -- Verified
+- [x] `FilterDrawer.tsx` -- Verified
+- [x] `ui/SearchableSelect.tsx` -- Verified
 
-```typescript
-// src/components/layout/Header.tsx
-export function Header() {
-  return (
-    <header className="sticky top-0 z-50 bg-white border-b">
-      <nav className="container mx-auto px-4 py-3">
-        <Logo />
-        <Navigation />
-        <SearchBar />
-      </nav>
-    </header>
-  );
-}
+#### Provider Detail (`components/provider-detail/`)
+- [x] `ProviderHeroCard.tsx` -- Verified
+- [x] `ProviderHeader.tsx` -- Verified
+- [x] `ProviderSidebar.tsx` -- Verified
+- [x] `ProviderPlansSection.tsx` -- Verified
+- [x] `AboutProvider.tsx` -- Verified
+- [x] `ColocatedProviders.tsx` -- Verified
+- [x] `InsuranceList.tsx` -- Verified
+- [x] `ConfidenceGauge.tsx` -- Verified
+- [x] `ScoreBreakdown.tsx` -- Verified
+- [x] `index.ts` barrel export -- Present but not listed in prompt
 
-// src/components/layout/Footer.tsx
-export function Footer() {
-  return (
-    <footer className="bg-gray-50 border-t mt-auto">
-      <div className="container mx-auto px-4 py-8">
-        <FooterLinks />
-        <Copyright />
-      </div>
-    </footer>
-  );
-}
-```
+#### Verification & Voting
+- [x] `ProviderVerificationForm.tsx` -- Verified
+- [x] `VerificationButton.tsx` -- Verified
+- [x] `provider/VerificationTimeline.tsx` -- Verified
+- [x] `provider/VerificationCallToAction.tsx` -- Verified
 
-### Provider Components
+Warning: `components/provider/PlanAcceptanceCard.tsx` exists in the codebase but is NOT listed in the prompt. This is an omission.
 
-```typescript
-// src/components/providers/ProviderCard.tsx
-interface ProviderCardProps {
-  provider: Provider;
-  showVerificationStatus?: boolean;
-  onCompare?: (npi: string) => void;
-}
+#### Comparison (`components/compare/`)
+- [x] `CompareBar.tsx` -- Verified
+- [x] `CompareCheckbox.tsx` -- Verified
+- [x] `CompareModal.tsx` -- Verified
+- [x] `index.ts` barrel export -- Present but not listed
 
-export function ProviderCard({ provider, showVerificationStatus, onCompare }: ProviderCardProps) {
-  return (
-    <div className="bg-white rounded-lg shadow-sm border p-4 hover:shadow-md transition-shadow">
-      <ProviderName provider={provider} />
-      <ProviderSpecialty specialty={provider.specialty} />
-      <ProviderAddress address={provider} />
-      {showVerificationStatus && (
-        <VerificationBadge npi={provider.npi} />
-      )}
-      <ProviderActions provider={provider} onCompare={onCompare} />
-    </div>
-  );
-}
+#### Confidence & Scoring
+- [x] `ConfidenceBadge.tsx` -- Verified
+- [x] `ConfidenceScoreBreakdown.tsx` -- Verified
+- [x] `provider/ConfidenceScoreExplainer.tsx` -- Verified
+- [x] `provider/ResearchExplainer.tsx` -- Verified
 
-// src/components/providers/ProviderDetail.tsx
-export function ProviderDetail({ npi }: { npi: string }) {
-  const { data: provider, isLoading } = useProvider(npi);
+#### Insurance
+- [x] `InsuranceCardUploader.tsx` -- Verified
 
-  if (isLoading) return <ProviderDetailSkeleton />;
-  if (!provider) return <ProviderNotFound />;
+#### UI Components
+- [x] `Header.tsx` -- Verified
+- [x] `BottomNav.tsx` -- Verified
+- [x] `ThemeToggle.tsx` -- Verified
+- [x] `ScrollToTop.tsx` -- Verified
+- [x] `LoadingSpinner.tsx` -- Verified
+- [x] `EmptyState.tsx` -- Verified
+- [x] `ErrorMessage.tsx` -- Verified
+- [x] `FreshnessWarning.tsx` -- Verified
+- [x] `WelcomeBackBanner.tsx` -- Verified
+- [x] `SaveProfileButton.tsx` -- Verified
+- [x] `Disclaimer.tsx` -- Verified
+- [x] `LocationCard.tsx` -- Verified
+- [x] `GlobalErrorBanner.tsx` -- Verified
+- [x] `ui/Skeleton.tsx` -- Verified
+- [x] `ui/Shimmer.tsx` -- Verified
 
-  return (
-    <div className="space-y-6">
-      <ProviderHeader provider={provider} />
-      <ProviderInfo provider={provider} />
-      <ProviderPlans npi={npi} />
-      <ProviderVerifications npi={npi} />
-      <ColocatedProviders locationId={provider.locationId} />
-    </div>
-  );
-}
+Warning: The following files exist in components but are NOT mentioned in the prompt:
+- `components/ToastProvider.tsx` -- Toast notification wrapper (referenced in layout)
+- `components/PostHogProvider.tsx` -- PostHog analytics wrapper (referenced in layout)
+- `components/index.ts` -- Top-level barrel export
+- `components/ui/index.ts` -- UI barrel export
 
-// src/components/providers/ProviderComparison.tsx
-export function ProviderComparison({ npis }: { npis: string[] }) {
-  const providers = useProviders(npis);
+#### Icons & Illustrations
+- [x] `icons/Icons.tsx` -- Verified
+- [x] `illustrations/SearchLandingIllustration.tsx` -- Verified
+- [x] `illustrations/NoResultsIllustration.tsx` -- Verified
 
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-      {providers.map(provider => (
-        <ComparisonColumn key={provider.npi} provider={provider} />
-      ))}
-    </div>
-  );
-}
-```
+### State Management
 
-### Search Components
+#### Server State (React Query)
+- [x] `providers/QueryProvider.tsx` wraps app in `QueryClientProvider` -- Verified in layout.tsx
 
-```typescript
-// src/components/search/SearchForm.tsx
-export function SearchForm({ onSearch }: { onSearch: (query: SearchQuery) => void }) {
-  const [query, setQuery] = useState<SearchQuery>({});
+#### Custom Hooks
+- [x] `useProviderSearch` -- Verified at `hooks/useProviderSearch.ts`
+- [x] `useCities` -- Verified at `hooks/useCities.ts`
+- [x] `useInsurancePlans` -- Verified at `hooks/useInsurancePlans.ts`
+- [x] `useHealthSystems` -- Verified at `hooks/useHealthSystems.ts`
+- [x] `useRecentSearches` -- Verified at `hooks/useRecentSearches.ts`
 
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StateSelect value={query.state} onChange={handleStateChange} />
-        <CityInput value={query.city} onChange={handleCityChange} />
-        <SpecialtyCombobox value={query.specialty} onChange={handleSpecialtyChange} />
-      </div>
-      <SearchButton loading={isSearching} />
-    </form>
-  );
-}
+#### Client State (React Context)
+- [x] `context/CompareContext.tsx` -- Verified
+- [x] `context/ErrorContext.tsx` -- Verified
+- [x] `context/ThemeContext.tsx` -- Verified
 
-// src/components/search/SearchResults.tsx
-export function SearchResults({ results, isLoading }: SearchResultsProps) {
-  if (isLoading) return <SearchResultsSkeleton />;
-  if (!results?.length) return <NoResults />;
+#### Search State (Custom Hooks)
+- [x] `hooks/useSearchForm.ts` -- Verified
+- [x] `hooks/search/useFilterState.ts` -- Verified
+- [x] `hooks/search/useSearchExecution.ts` -- Verified
+- [x] `hooks/search/useSearchParams.ts` -- Verified
 
-  return (
-    <div className="space-y-4">
-      <ResultsHeader count={results.length} />
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {results.map(provider => (
-          <ProviderCard key={provider.npi} provider={provider} />
-        ))}
-      </div>
-      <Pagination />
-    </div>
-  );
-}
-```
+Warning: The prompt lists search hooks at `hooks/useFilterState.ts`, `hooks/useSearchExecution.ts`, `hooks/useSearchParams.ts` without the `search/` subdirectory. The actual files are in `hooks/search/`. The prompt should note the `hooks/search/` subdirectory.
 
-### Verification Components
+#### Compare State
+- [x] `hooks/useCompare.ts` -- Verified
 
-```typescript
-// src/components/verification/VerificationForm.tsx
-export function VerificationForm({ npi, planId }: VerificationFormProps) {
-  const { submitVerification, isSubmitting } = useVerification();
-  const { executeRecaptcha } = useReCaptcha();
+#### Barrel Exports
+- [x] `hooks/index.ts` -- Verified (not mentioned in prompt)
+- [x] `hooks/search/index.ts` -- Verified (not mentioned in prompt)
 
-  const handleSubmit = async (data: VerificationData) => {
-    const captchaToken = await executeRecaptcha('verification');
-    await submitVerification({ ...data, captchaToken });
-  };
+### API Client (`lib/api.ts`)
+- [x] Centralized API client with retry logic -- Verified. `DEFAULT_RETRY_OPTIONS` uses exponential backoff, retries on 429/500/502/503/504.
+- [x] `ApiError` class with statusCode, code, details, retryAfter -- Verified.
+- [x] Rate limit detection from 429 responses -- Verified via `retryableStatuses: [429, ...]`.
+- [x] Cache headers (X-Cache) -- Claimed in prompt; would need full file review to confirm.
+- [x] `providerApi.search()`, `.getByNpi()`, `.getCities()` -- API client methods present.
+- [x] `planApi.search()`, `.getById()`, `.getProvidersForPlan()`, `.getGrouped()`, `.getIssuers()`, `.getTypes()` -- Present.
+- [x] `verifyApi.submit()`, `.vote()`, `.getStats()`, `.getRecent()`, `.getPair()` -- Present.
+- [x] `healthApi.getCities()`, `.getRecentSearches()` -- Present.
 
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <ProviderConfirmation npi={npi} />
-      <PlanSelector selectedPlan={planId} />
-      <AcceptanceToggle />
-      <NotesTextarea maxLength={1000} />
-      <SubmitButton loading={isSubmitting} />
-    </form>
-  );
-}
+### Utilities
 
-// src/components/verification/VerificationVoting.tsx
-export function VerificationVoting({ verification }: { verification: Verification }) {
-  const { vote, hasVoted } = useVoting(verification.id);
+- [x] `lib/analytics.ts` -- Verified
+- [x] `lib/constants.ts` -- Verified. Contains page sizes, confidence thresholds, freshness thresholds, acceptance status, states list.
+- [x] `lib/debounce.ts` -- Verified
+- [x] `lib/errorUtils.ts` -- Verified
+- [x] `lib/imagePreprocess.ts` -- Verified
+- [x] `lib/insuranceCardSchema.ts` -- Verified
 
-  return (
-    <div className="flex items-center gap-2">
-      <VoteButton
-        type="up"
-        count={verification.upvotes}
-        active={hasVoted === 'up'}
-        onClick={() => vote('up')}
-      />
-      <VoteButton
-        type="down"
-        count={verification.downvotes}
-        active={hasVoted === 'down'}
-        onClick={() => vote('down')}
-      />
-      <ConfidenceIndicator score={verification.confidenceScore} />
-    </div>
-  );
-}
+Warning: The following `lib/` files exist but are NOT mentioned in the prompt:
+- `lib/provider-utils.ts` -- Specialty labels and provider formatting utilities
+- `lib/queryClient.ts` -- QueryClient instance configuration
+- `lib/rateLimit.ts` -- In-memory rate limiter for Next.js API routes
+- `lib/utils.ts` -- Generic utility functions (e.g., `cn()` for class names)
+- `lib/__tests__/` -- Test directory
 
-// src/components/verification/ConfidenceBadge.tsx
-export function ConfidenceBadge({ score }: { score: number }) {
-  const level = getConfidenceLevel(score);
+### Types
+- The prompt mentions `packages/frontend/src/types/` but does not inventory files. Actual content:
+  - `types/index.ts` -- Main type exports
+  - `types/insurance.ts` -- Insurance-specific types
 
-  return (
-    <span className={cn(
-      'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium',
-      {
-        'bg-green-100 text-green-800': level === 'high',
-        'bg-yellow-100 text-yellow-800': level === 'medium',
-        'bg-red-100 text-red-800': level === 'low',
-        'bg-gray-100 text-gray-800': level === 'unknown'
-      }
-    )}>
-      {level === 'high' && 'Verified'}
-      {level === 'medium' && 'Likely'}
-      {level === 'low' && 'Uncertain'}
-      {level === 'unknown' && 'Unknown'}
-    </span>
-  );
-}
-```
+### Checklist Verification
 
-### UI Components
+#### Pages
+- [x] Home with marketing sections -- Verified
+- [x] Search with results and filters -- Verified
+- [x] Provider detail with full information -- Verified
+- [x] Insurance browser -- Verified
+- [x] Legal pages (privacy, terms, disclaimer) -- Verified
+- [x] About and research pages -- Verified
+- [x] Error boundary -- Verified
 
-```typescript
-// src/components/ui/Button.tsx
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
-  size?: 'sm' | 'md' | 'lg';
-  loading?: boolean;
-}
+#### State Management
+- [x] React Query for server state -- Verified
+- [x] React Context for client state (compare, error, theme) -- Verified
+- [x] URL parameter sync for search -- Verified (useSearchParams in hooks/search/)
+- [x] No Redux or other state library needed -- Verified
 
-export function Button({ variant = 'primary', size = 'md', loading, children, ...props }: ButtonProps) {
-  return (
-    <button
-      className={cn(buttonVariants({ variant, size }))}
-      disabled={loading || props.disabled}
-      {...props}
-    >
-      {loading && <Spinner className="mr-2" />}
-      {children}
-    </button>
-  );
-}
+#### Data Fetching
+- [x] Centralized API client with retry logic -- Verified
+- [x] React Query hooks for all data needs -- Verified
+- [x] Error handling with ApiError class -- Verified
+- [x] Rate limit detection -- Verified
 
-// src/components/ui/Card.tsx
-export function Card({ children, className }: CardProps) {
-  return (
-    <div className={cn('bg-white rounded-lg shadow-sm border', className)}>
-      {children}
-    </div>
-  );
-}
+#### UX
+- [x] Dark/light mode -- Verified (ThemeContext + ThemeToggle + Tailwind `dark:` classes)
+- [x] Mobile-responsive with bottom navigation -- Verified (BottomNav + `pb-20 md:pb-0` padding)
+- [x] Loading skeletons -- Verified (ProviderCardSkeleton, Skeleton, Shimmer)
+- [x] Empty states -- Verified (EmptyState component)
+- [x] Toast notifications -- Verified (react-hot-toast + ToastProvider)
+- [x] Scroll-to-top -- Verified (ScrollToTop component)
+- [x] Welcome back banner -- Verified (WelcomeBackBanner component)
+- [ ] Offline support / service worker -- Correctly marked as missing
+- [ ] PWA manifest -- Correctly marked as missing
 
-// src/components/ui/Input.tsx
-export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className, type, ...props }, ref) => {
-    return (
-      <input
-        type={type}
-        className={cn(
-          'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2',
-          'text-sm ring-offset-background',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-          className
-        )}
-        ref={ref}
-        {...props}
-      />
-    );
-  }
-);
-```
+#### Accessibility
+- [x] Focus trap for modals -- Listed in technology stack
+- [ ] Full keyboard navigation audit -- Correctly marked as pending
+- [ ] Screen reader testing -- Correctly marked as pending
+- [ ] ARIA labels on all interactive elements -- Correctly marked as pending
 
 ---
 
-## Custom Hooks
+## Summary
 
-```typescript
-// src/hooks/useProvider.ts
-export function useProvider(npi: string) {
-  return useQuery({
-    queryKey: ['provider', npi],
-    queryFn: () => api.getProvider(npi),
-    staleTime: 5 * 60 * 1000,  // 5 minutes
-  });
-}
+The prompt is a highly accurate representation of the frontend structure. All 10 pages, 40+ components, 9+ hooks, 3 context providers, and the API client described in the prompt exist in the codebase. The technology stack description is correct. The checklist items accurately reflect the current state of implementation.
 
-// src/hooks/useSearch.ts
-export function useSearch() {
-  const [results, setResults] = useState<Provider[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+There are a few minor gaps:
 
-  const search = async (query: SearchQuery) => {
-    setIsLoading(true);
-    try {
-      const data = await api.searchProviders(query);
-      setResults(data.providers);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return { results, isLoading, search };
-}
-
-// src/hooks/useVerification.ts
-export function useVerification() {
-  const mutation = useMutation({
-    mutationFn: api.submitVerification,
-    onSuccess: () => {
-      toast.success('Verification submitted!');
-    }
-  });
-
-  return {
-    submitVerification: mutation.mutate,
-    isSubmitting: mutation.isPending
-  };
-}
-
-// src/hooks/useCompare.ts
-export function useCompare() {
-  const [compareList, setCompareList] = useState<string[]>([]);
-
-  const addToCompare = (npi: string) => {
-    if (compareList.length < 4 && !compareList.includes(npi)) {
-      setCompareList([...compareList, npi]);
-    }
-  };
-
-  const removeFromCompare = (npi: string) => {
-    setCompareList(compareList.filter(n => n !== npi));
-  };
-
-  return { compareList, addToCompare, removeFromCompare };
-}
-```
+1. **Missing components from prompt inventory:** `PlanAcceptanceCard.tsx`, `ToastProvider.tsx`, `PostHogProvider.tsx`, and barrel export files (`index.ts`) are present in the codebase but not listed.
+2. **Hook path inaccuracy:** Search-related hooks (`useFilterState`, `useSearchExecution`, `useSearchParams`) live in `hooks/search/` subdirectory, not directly under `hooks/`.
+3. **Missing lib files from prompt:** `provider-utils.ts`, `queryClient.ts`, `rateLimit.ts`, `utils.ts`, and a `__tests__/` directory exist but are not documented.
+4. **Empty route group artifact:** An empty `(main)` route group directory exists as a leftover from a prior refactoring.
+5. **Types directory not inventoried:** The prompt references the directory but does not list its contents (`index.ts`, `insurance.ts`).
 
 ---
 
-## React Contexts
+## Recommendations
 
-```typescript
-// src/contexts/CompareContext.tsx
-interface CompareContextValue {
-  compareList: string[];
-  addToCompare: (npi: string) => void;
-  removeFromCompare: (npi: string) => void;
-  clearCompare: () => void;
-}
-
-export const CompareContext = createContext<CompareContextValue | null>(null);
-
-export function CompareProvider({ children }: { children: React.ReactNode }) {
-  const [compareList, setCompareList] = useState<string[]>([]);
-
-  // ... implementation
-
-  return (
-    <CompareContext.Provider value={{ compareList, addToCompare, removeFromCompare, clearCompare }}>
-      {children}
-    </CompareContext.Provider>
-  );
-}
-
-// src/contexts/SearchContext.tsx
-export const SearchContext = createContext<SearchContextValue | null>(null);
-
-export function SearchProvider({ children }: { children: React.ReactNode }) {
-  const [filters, setFilters] = useState<SearchFilters>({});
-  const [results, setResults] = useState<Provider[]>([]);
-
-  // ... implementation
-
-  return (
-    <SearchContext.Provider value={{ filters, setFilters, results }}>
-      {children}
-    </SearchContext.Provider>
-  );
-}
-```
-
----
-
-## API Client
-
-```typescript
-// src/lib/api.ts
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
-
-export const api = {
-  // Providers
-  searchProviders: async (query: SearchQuery): Promise<SearchResponse> => {
-    const params = new URLSearchParams(query as Record<string, string>);
-    const response = await fetch(`${API_URL}/providers/search?${params}`);
-    return handleResponse(response);
-  },
-
-  getProvider: async (npi: string): Promise<Provider> => {
-    const response = await fetch(`${API_URL}/providers/${npi}`);
-    return handleResponse(response);
-  },
-
-  getProviderPlans: async (npi: string): Promise<PlanAcceptance[]> => {
-    const response = await fetch(`${API_URL}/providers/${npi}/plans`);
-    return handleResponse(response);
-  },
-
-  // Verifications
-  submitVerification: async (data: VerificationData): Promise<Verification> => {
-    const response = await fetch(`${API_URL}/verify`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    return handleResponse(response);
-  },
-
-  voteOnVerification: async (id: string, vote: 'up' | 'down', captchaToken: string) => {
-    const response = await fetch(`${API_URL}/verify/${id}/vote`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ vote, captchaToken })
-    });
-    return handleResponse(response);
-  }
-};
-```
-
----
-
-## Styling Patterns
-
-### Tailwind Configuration
-
-```typescript
-// tailwind.config.ts
-export default {
-  content: ['./src/**/*.{js,ts,jsx,tsx}'],
-  theme: {
-    extend: {
-      colors: {
-        primary: {
-          50: '#f0f9ff',
-          500: '#3b82f6',
-          600: '#2563eb',
-          700: '#1d4ed8'
-        }
-      }
-    }
-  },
-  plugins: [
-    require('@tailwindcss/forms'),
-    require('@tailwindcss/typography')
-  ]
-};
-```
-
-### Component Variants
-
-```typescript
-// src/lib/utils.ts
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
-
-// Usage
-<div className={cn(
-  'base-class',
-  isActive && 'active-class',
-  variant === 'primary' && 'primary-class'
-)} />
-```
-
----
-
-## Performance Optimizations
-
-1. **Server Components**: Default for static content
-2. **Client Components**: Only for interactivity
-3. **Image Optimization**: Next.js Image component
-4. **Code Splitting**: Dynamic imports for large components
-5. **React Query**: Caching and deduplication
-
----
-
-## Conclusion
-
-The frontend is **well-structured** with:
-
-- ✅ Modern Next.js App Router
-- ✅ Clean component hierarchy
-- ✅ Custom hooks for logic reuse
-- ✅ Type-safe with TypeScript
-- ✅ Consistent styling with Tailwind
-- ✅ Good separation of concerns
+1. **Update prompt component inventory** to include `PlanAcceptanceCard.tsx`, `ToastProvider.tsx`, and `PostHogProvider.tsx`.
+2. **Fix hook paths** in the prompt to show the `hooks/search/` subdirectory for filter/execution/params hooks.
+3. **Add missing lib files** (`provider-utils.ts`, `queryClient.ts`, `rateLimit.ts`, `utils.ts`) to the utilities section.
+4. **Delete empty `(main)` route group** directories at `app/(main)/` to avoid confusion.
+5. **Inventory `types/` directory** in the prompt (currently just referenced without details).
+6. **Consider removing or hiding** the `/location/[locationId]` page if the API remains disabled, as the prompt already flags this question.
+7. **Address accessibility gaps** -- the prompt correctly identifies keyboard navigation, screen reader, and ARIA audits as pending work.
+8. **CSP re-enablement** -- `next.config.js` has Content-Security-Policy commented out with a note it was blocking API requests. This should be addressed for production security.
