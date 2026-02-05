@@ -47,13 +47,13 @@ export function buildPaginatedResult<T>(
 }
 
 /**
- * Parse comma-separated cities into filter condition
- * Used by both provider and location services
+ * Parse comma-separated cities into a city filter condition for practice_locations.
+ * Returns a Prisma-compatible where fragment for the city field.
  */
 export function buildCityFilter(
   cities: string | undefined,
   city: string | undefined
-): Prisma.ProviderWhereInput | Prisma.LocationWhereInput | null {
+): Prisma.practice_locationsWhereInput | null {
   if (cities) {
     const cityArray = cities.split(',').map(c => c.trim()).filter(Boolean);
     if (cityArray.length > 0) {

@@ -2,8 +2,6 @@ import { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import {
   getPaginationValues,
-  buildPaginatedResult,
-  buildCityFilter,
   cleanWhereClause,
   addAndCondition,
 } from './utils';
@@ -155,12 +153,11 @@ export interface ProviderSearchParams {
   city?: string;
   cities?: string; // Comma-separated cities
   zipCode?: string;
-  healthSystem?: string;
   specialty?: string;
+  specialtyCategory?: string;
   name?: string;
   npi?: string;
   entityType?: 'INDIVIDUAL' | 'ORGANIZATION';
-  insurancePlanId?: string;
   page?: number;
   limit?: number;
 }
@@ -174,37 +171,82 @@ export interface ProviderSearchResult {
 }
 
 /**
+ * Standard include for enriched provider data
+ */
+const PROVIDER_INCLUDE = {
+  practice_locations: true,
+  provider_taxonomies: true,
+  provider_cms_details: true,
+  provider_hospitals: true,
+  provider_insurance: true,
+  provider_medicare: true,
+} as const;
+
+/**
  * Search providers with filters and pagination
+ *
+ * Updated for new schema:
+ * - Address/location filtering goes through practice_locations relation
+ * - Specialty uses primary_specialty, primary_taxonomy_code, specialty_category
+ * - Entity type maps INDIVIDUAL/ORGANIZATION to DB values '1'/'2'
  */
 export async function searchProviders(params: ProviderSearchParams): Promise<ProviderSearchResult> {
-  const { state, city, cities, zipCode, healthSystem, specialty, name, npi, entityType, insurancePlanId } = params;
+  const { state, city, cities, zipCode, specialty, specialtyCategory, name, npi, entityType } = params;
   const { take, skip, page } = getPaginationValues(params.page, params.limit);
-
-  // Debug logging for insurance plan filter
-  if (insurancePlanId) {
-    logger.debug({ insurancePlanId }, 'Provider search with insurance plan filter');
-  }
 
   const where: Prisma.ProviderWhereInput = { AND: [] };
 
-  // Apply filters
-  if (state) where.state = state.toUpperCase();
-  if (zipCode) where.zipCode = { startsWith: zipCode };
-  if (healthSystem) where.location = { healthSystem };
+  // NPI direct lookup
   if (npi) where.npi = npi;
-  if (entityType) where.entityType = entityType;
 
-  // City filter (single or multiple)
-  const cityFilter = buildCityFilter(cities, city);
-  if (cityFilter) addAndCondition(where, cityFilter);
+  // Map entity type: API uses INDIVIDUAL/ORGANIZATION, DB stores '1'/'2'
+  if (entityType) {
+    where.entityType = entityType === 'INDIVIDUAL' ? '1' : entityType === 'ORGANIZATION' ? '2' : entityType;
+  }
 
-  // Specialty filter (searches both fields)
+  // Location-based filters go through practice_locations relation
+  if (state || city || cities || zipCode) {
+    const locationFilters: Prisma.practice_locationsWhereInput[] = [];
+
+    if (state) locationFilters.push({ state: state.toUpperCase() });
+    if (zipCode) locationFilters.push({ zip_code: { startsWith: zipCode } });
+
+    // City filter (single or multiple)
+    if (cities) {
+      const cityArray = cities.split(',').map(c => c.trim()).filter(Boolean);
+      if (cityArray.length > 0) {
+        locationFilters.push({
+          OR: cityArray.map(cityName => ({
+            city: { equals: cityName, mode: 'insensitive' as const }
+          }))
+        });
+      }
+    } else if (city) {
+      locationFilters.push({ city: { contains: city, mode: 'insensitive' } });
+    }
+
+    addAndCondition(where, {
+      practice_locations: {
+        some: locationFilters.length === 1 ? locationFilters[0] : { AND: locationFilters },
+      },
+    });
+  }
+
+  // Specialty filter - searches primary_specialty, primary_taxonomy_code, and specialty_category
   if (specialty) {
     addAndCondition(where, {
       OR: [
-        { specialty: { contains: specialty, mode: 'insensitive' } },
-        { specialtyCode: { contains: specialty, mode: 'insensitive' } },
+        { primary_specialty: { contains: specialty, mode: 'insensitive' } },
+        { primary_taxonomy_code: { contains: specialty, mode: 'insensitive' } },
+        { specialty_category: { contains: specialty, mode: 'insensitive' } },
       ]
+    });
+  }
+
+  // Specialty category filter (exact category match)
+  if (specialtyCategory) {
+    addAndCondition(where, {
+      specialty_category: { contains: specialtyCategory, mode: 'insensitive' },
     });
   }
 
@@ -216,18 +258,6 @@ export async function searchProviders(params: ProviderSearchParams): Promise<Pro
     }
   }
 
-  // Insurance plan filter - only show providers who accept the specified plan
-  if (insurancePlanId) {
-    addAndCondition(where, {
-      planAcceptances: {
-        some: {
-          planId: insurancePlanId,
-          acceptanceStatus: 'ACCEPTED',
-        },
-      },
-    });
-  }
-
   cleanWhereClause(where);
 
   const [providers, total] = await Promise.all([
@@ -236,22 +266,7 @@ export async function searchProviders(params: ProviderSearchParams): Promise<Pro
       take,
       skip,
       orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }, { organizationName: 'asc' }],
-      include: {
-        planAcceptances: {
-          where: { acceptanceStatus: 'ACCEPTED' },
-          orderBy: { confidenceScore: 'desc' },
-          take: 5, // Limit for preview - top 5 by confidence
-          include: {
-            plan: {
-              select: {
-                planId: true,
-                planName: true,
-                issuerName: true,
-              },
-            },
-          },
-        },
-      },
+      include: PROVIDER_INCLUDE,
     }),
     prisma.provider.count({ where }),
   ]);
@@ -260,70 +275,21 @@ export async function searchProviders(params: ProviderSearchParams): Promise<Pro
 }
 
 /**
- * Get provider by NPI
+ * Get provider by NPI with all enrichment data
  */
 export async function getProviderByNpi(npi: string) {
   return prisma.provider.findUnique({
     where: { npi },
-    include: {
-      location: true,
-      planAcceptances: {
-        orderBy: { confidenceScore: 'desc' },
-        include: {
-          plan: true,
-        },
-      },
-    },
+    include: PROVIDER_INCLUDE,
   });
-}
-
-/**
- * Get accepted plans for a provider
- */
-export async function getProviderAcceptedPlans(
-  npi: string,
-  options: {
-    status?: 'ACCEPTED' | 'NOT_ACCEPTED' | 'PENDING' | 'UNKNOWN';
-    minConfidence?: number;
-    page?: number;
-    limit?: number;
-  } = {}
-) {
-  const { status, minConfidence } = options;
-  const { take, skip, page } = getPaginationValues(options.page, options.limit);
-
-  const provider = await prisma.provider.findUnique({
-    where: { npi },
-    select: { npi: true },
-  });
-
-  if (!provider) return null;
-
-  const where: Prisma.ProviderPlanAcceptanceWhereInput = {
-    providerNpi: provider.npi,
-    ...(status && { acceptanceStatus: status }),
-    ...(minConfidence !== undefined && { confidenceScore: { gte: minConfidence } }),
-  };
-
-  const [acceptances, total] = await Promise.all([
-    prisma.providerPlanAcceptance.findMany({
-      where,
-      take,
-      skip,
-      orderBy: { confidenceScore: 'desc' },
-      include: { plan: true },
-    }),
-    prisma.providerPlanAcceptance.count({ where }),
-  ]);
-
-  return { acceptances, total, page, limit: take, totalPages: Math.ceil(total / take) };
 }
 
 /**
  * Get unique cities for a state (sorted alphabetically)
+ * Now queries practice_locations table instead of providers
  */
 export async function getCitiesByState(state: string): Promise<string[]> {
-  const result = await prisma.provider.findMany({
+  const result = await prisma.practice_locations.findMany({
     where: {
       state: state.toUpperCase(),
     },
@@ -355,15 +321,16 @@ export async function getCitiesByState(state: string): Promise<string[]> {
 
 /**
  * Get provider display name
+ * Entity type: '1' = Individual, '2' = Organization
  */
 export function getProviderDisplayName(provider: {
-  entityType: string;
+  entityType?: string | null;
   firstName?: string | null;
   lastName?: string | null;
   credential?: string | null;
   organizationName?: string | null;
 }): string {
-  if (provider.entityType === 'ORGANIZATION') {
+  if (provider.entityType === '2' || provider.entityType === 'ORGANIZATION') {
     return provider.organizationName || 'Unknown Organization';
   }
 
@@ -372,4 +339,22 @@ export function getProviderDisplayName(provider: {
     .join(' ');
 
   return provider.credential ? `${parts}, ${provider.credential}` : parts || 'Unknown Provider';
+}
+
+/**
+ * Get primary practice location from a provider's locations array
+ * Prefers 'practice' address type, falls back to first available
+ */
+export function getPrimaryLocation(locations?: Array<{
+  address_type?: string | null;
+  address_line1?: string | null;
+  address_line2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip_code?: string | null;
+  phone?: string | null;
+  fax?: string | null;
+}>) {
+  if (!locations || locations.length === 0) return null;
+  return locations.find(l => l.address_type === 'practice') || locations[0];
 }

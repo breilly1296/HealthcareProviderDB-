@@ -5,12 +5,10 @@ import { searchRateLimiter, defaultRateLimiter } from '../middleware/rateLimiter
 import {
   searchProviders,
   getProviderByNpi,
-  getProviderAcceptedPlans,
   getProviderDisplayName,
   getCitiesByState,
+  getPrimaryLocation,
 } from '../services/providerService';
-import { enrichAcceptanceWithConfidence } from '../services/confidenceService';
-import { getColocatedProviders, getLocationDisplayName } from '../services/locationService';
 import { paginationSchema, npiParamSchema } from '../schemas/commonSchemas';
 import { buildPaginationMeta, sendSuccess } from '../utils/responseHelpers';
 import { cacheGet, cacheSet, generateSearchCacheKey } from '../utils/cache';
@@ -18,36 +16,137 @@ import logger from '../utils/logger';
 
 const router = Router();
 
-/**
- * Standard disclaimer for crowdsourced data accuracy
- */
-const DATA_DISCLAIMER = 'This data is crowdsourced and may be inaccurate or outdated. Always verify insurance acceptance directly with the provider before scheduling an appointment.';
-
 // Validation schemas
 const searchQuerySchema = z.object({
   state: z.string().length(2).toUpperCase().optional(),
   city: z.string().min(1).max(100).optional(),
   cities: z.string().min(1).max(500).optional(), // Comma-separated cities
   zipCode: z.string().min(3).max(10).optional(),
-  healthSystem: z.string().min(1).max(200).optional(),
   specialty: z.string().min(1).max(200).optional(),
+  specialtyCategory: z.string().min(1).max(100).optional(),
   name: z.string().min(1).max(200).optional(),
   npi: z.string().length(10).regex(/^\d+$/).optional(),
   entityType: z.enum(['INDIVIDUAL', 'ORGANIZATION']).optional(),
-  insurancePlanId: z.string().min(1).max(100).optional(),
 }).merge(paginationSchema);
 
-const plansQuerySchema = z.object({
-  status: z.enum(['ACCEPTED', 'NOT_ACCEPTED', 'PENDING', 'UNKNOWN']).optional(),
-  minConfidence: z.coerce.number().min(0).max(100).optional(),
-}).merge(paginationSchema);
+/**
+ * Map entity type from DB value ('1'/'2') to API value
+ */
+function mapEntityType(dbValue: string | null | undefined): string {
+  if (dbValue === '1') return 'INDIVIDUAL';
+  if (dbValue === '2') return 'ORGANIZATION';
+  return dbValue || 'UNKNOWN';
+}
+
+/**
+ * Transform a provider record from DB shape to API response shape.
+ * Pulls address from practice_locations, maps field names for frontend compatibility.
+ */
+function transformProvider(p: Record<string, unknown>) {
+  const provider = p as typeof p & {
+    practice_locations?: Array<{
+      id: number;
+      address_type?: string | null;
+      address_line1?: string | null;
+      address_line2?: string | null;
+      city?: string | null;
+      state?: string | null;
+      zip_code?: string | null;
+      phone?: string | null;
+      fax?: string | null;
+    }>;
+    provider_cms_details?: {
+      group_practice_name?: string | null;
+      medical_school?: string | null;
+      graduation_year?: string | null;
+      medicare_assignment?: string | null;
+      telehealth?: string | null;
+    } | null;
+    provider_hospitals?: Array<{
+      id: number;
+      hospital_system?: string | null;
+      hospital_name?: string | null;
+      ccn?: string | null;
+      confidence?: string | null;
+    }>;
+    provider_insurance?: Array<{
+      id: number;
+      network_name?: string | null;
+      identifier_id?: string | null;
+      confidence?: string | null;
+    }>;
+    provider_medicare?: Array<{
+      id: number;
+      medicare_id?: string | null;
+      medicare_state?: string | null;
+    }>;
+    provider_taxonomies?: Array<{
+      id: number;
+      taxonomy_code?: string | null;
+      is_primary?: string | null;
+      slot_number?: number | null;
+    }>;
+    npi: string;
+    entityType?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    middle_name?: string | null;
+    name_prefix?: string | null;
+    name_suffix?: string | null;
+    credential?: string | null;
+    organizationName?: string | null;
+    gender?: string | null;
+    primary_taxonomy_code?: string | null;
+    primary_specialty?: string | null;
+    specialty_category?: string | null;
+    deactivation_date?: string | null;
+    enumerationDate?: string | null;
+  };
+
+  const loc = getPrimaryLocation(provider.practice_locations);
+
+  return {
+    id: provider.npi,
+    npi: provider.npi,
+    entityType: mapEntityType(provider.entityType),
+    firstName: provider.firstName,
+    lastName: provider.lastName,
+    middleName: provider.middle_name || null,
+    namePrefix: provider.name_prefix || null,
+    nameSuffix: provider.name_suffix || null,
+    credential: provider.credential,
+    organizationName: provider.organizationName,
+    gender: provider.gender || null,
+    // Address from primary practice location
+    addressLine1: loc?.address_line1 || null,
+    addressLine2: loc?.address_line2 || null,
+    city: loc?.city || null,
+    state: loc?.state || null,
+    zip: loc?.zip_code || null,
+    phone: loc?.phone || null,
+    fax: loc?.fax || null,
+    // Specialty
+    taxonomyCode: provider.primary_taxonomy_code,
+    taxonomyDescription: provider.primary_specialty,
+    specialtyCategory: provider.specialty_category || null,
+    // Status
+    npiStatus: provider.deactivation_date ? 'DEACTIVATED' : 'ACTIVE',
+    displayName: getProviderDisplayName(provider),
+    // Enrichment data from new tables
+    cmsDetails: provider.provider_cms_details || null,
+    hospitals: provider.provider_hospitals || [],
+    insuranceNetworks: provider.provider_insurance || [],
+    medicareIds: provider.provider_medicare || [],
+    taxonomies: provider.provider_taxonomies || [],
+    locations: provider.practice_locations || [],
+  };
+}
 
 /**
  * GET /api/v1/providers/search
  * Search providers with filters
  *
  * Caching: Results are cached for 5 minutes to improve performance.
- * Cache is invalidated when new verifications are submitted.
  */
 router.get(
   '/search',
@@ -61,12 +160,11 @@ router.get(
       city: query.city,
       cities: query.cities,
       zipCode: query.zipCode,
-      healthSystem: query.healthSystem,
       specialty: query.specialty,
+      specialtyCategory: query.specialtyCategory,
       name: query.name,
       npi: query.npi,
       entityType: query.entityType,
-      insurancePlanId: query.insurancePlanId,
       page: query.page,
       limit: query.limit,
     });
@@ -98,68 +196,18 @@ router.get(
       city: query.city,
       cities: query.cities,
       zipCode: query.zipCode,
-      healthSystem: query.healthSystem,
       specialty: query.specialty,
+      specialtyCategory: query.specialtyCategory,
       name: query.name,
       npi: query.npi,
       entityType: query.entityType,
-      insurancePlanId: query.insurancePlanId,
       page: query.page,
       limit: query.limit,
     });
 
     // Transform result for response
     const responseData = {
-      providers: result.providers.map((p) => {
-        // Get highest confidence score from accepted plans
-        // Type assertion needed because Prisma include types aren't reflected in service return type
-        const providerWithPlans = p as typeof p & {
-          planAcceptances?: Array<{
-            id: number;
-            planId: string | null;
-            acceptanceStatus: string;
-            confidenceScore: number;
-            plan?: { planId: string; planName: string | null; issuerName: string | null } | null;
-          }>;
-        };
-        const acceptedPlans = providerWithPlans.planAcceptances || [];
-        const highestConfidence = acceptedPlans.length > 0
-          ? Math.max(...acceptedPlans.map((pa) => pa.confidenceScore))
-          : null;
-
-        return {
-          id: p.npi,
-          npi: p.npi,
-          entityType: p.entityType,
-          firstName: p.firstName,
-          lastName: p.lastName,
-          middleName: null,
-          credential: p.credential,
-          organizationName: p.organizationName,
-          addressLine1: p.addressLine1,
-          addressLine2: p.addressLine2,
-          city: p.city,
-          state: p.state,
-          zip: p.zipCode,
-          phone: p.phone,
-          // Map backend fields to frontend expected names
-          taxonomyCode: p.specialtyCode,
-          taxonomyDescription: p.specialty,
-          specialtyCategory: null,
-          npiStatus: 'ACTIVE',
-          displayName: getProviderDisplayName(p),
-          // Include confidence and plan data for card preview
-          confidenceScore: highestConfidence,
-          planAcceptances: acceptedPlans.map((pa) => ({
-            id: pa.id,
-            planId: pa.planId,
-            planName: pa.plan?.planName || null,
-            issuerName: pa.plan?.issuerName || null,
-            acceptanceStatus: pa.acceptanceStatus,
-            confidenceScore: pa.confidenceScore,
-          })),
-        };
-      }),
+      providers: result.providers.map(transformProvider),
       pagination: buildPaginationMeta(result.total, result.page, result.limit),
     };
 
@@ -196,7 +244,7 @@ router.get(
 
 /**
  * GET /api/v1/providers/:npi
- * Get provider by NPI with full confidence breakdown
+ * Get provider by NPI with full enrichment data
  */
 router.get(
   '/:npi',
@@ -213,121 +261,7 @@ router.get(
     res.json({
       success: true,
       data: {
-        provider: {
-          id: provider.npi,
-          npi: provider.npi,
-          entityType: provider.entityType,
-          firstName: provider.firstName,
-          lastName: provider.lastName,
-          middleName: null,
-          credential: provider.credential,
-          organizationName: provider.organizationName,
-          addressLine1: provider.addressLine1,
-          addressLine2: provider.addressLine2,
-          city: provider.city,
-          state: provider.state,
-          zip: provider.zipCode,
-          phone: provider.phone,
-          taxonomyCode: provider.specialtyCode,
-          taxonomyDescription: provider.specialty,
-          specialtyCategory: null,
-          npiStatus: 'ACTIVE',
-          displayName: getProviderDisplayName(provider),
-          planAcceptances: provider.planAcceptances.map((pa) =>
-            enrichAcceptanceWithConfidence(pa, { specialty: provider.specialty })
-          ),
-        },
-      },
-      disclaimer: DATA_DISCLAIMER,
-    });
-  })
-);
-
-/**
- * GET /api/v1/providers/:npi/plans
- * Get accepted plans for a provider with full confidence breakdown
- */
-router.get(
-  '/:npi/plans',
-  defaultRateLimiter,
-  asyncHandler(async (req, res) => {
-    const { npi } = npiParamSchema.parse(req.params);
-    const query = plansQuerySchema.parse(req.query);
-
-    const result = await getProviderAcceptedPlans(npi, {
-      status: query.status,
-      minConfidence: query.minConfidence,
-      page: query.page,
-      limit: query.limit,
-    });
-
-    if (!result) {
-      throw AppError.notFound(`Provider with NPI ${npi} not found`);
-    }
-
-    res.json({
-      success: true,
-      data: {
-        npi,
-        acceptances: result.acceptances.map((a) =>
-          enrichAcceptanceWithConfidence(a, { specialty: a.plan?.planType })
-        ),
-        pagination: buildPaginationMeta(result.total, result.page, result.limit),
-      },
-      disclaimer: DATA_DISCLAIMER,
-    });
-  })
-);
-
-/**
- * GET /api/v1/providers/:npi/colocated
- * Get other providers at the same location as this provider
- */
-router.get(
-  '/:npi/colocated',
-  defaultRateLimiter,
-  asyncHandler(async (req, res) => {
-    const { npi } = npiParamSchema.parse(req.params);
-    const query = plansQuerySchema.parse(req.query);
-
-    const result = await getColocatedProviders(npi, {
-      page: query.page,
-      limit: query.limit,
-    });
-
-    if (!result) {
-      throw AppError.notFound(`Provider with NPI ${npi} not found or has no location`);
-    }
-
-    res.json({
-      success: true,
-      data: {
-        location: result.location ? {
-          ...result.location,
-          displayName: getLocationDisplayName(result.location),
-        } : null,
-        providers: result.providers.map((p) => ({
-          id: p.npi,
-          npi: p.npi,
-          entityType: p.entityType,
-          firstName: p.firstName,
-          lastName: p.lastName,
-          middleName: null,
-          credential: p.credential,
-          organizationName: p.organizationName,
-          addressLine1: p.addressLine1,
-          addressLine2: p.addressLine2,
-          city: p.city,
-          state: p.state,
-          zip: p.zipCode,
-          phone: p.phone,
-          taxonomyCode: p.specialtyCode,
-          taxonomyDescription: p.specialty,
-          specialtyCategory: null,
-          npiStatus: 'ACTIVE',
-          displayName: getProviderDisplayName(p),
-        })),
-        pagination: buildPaginationMeta(result.total, result.page, result.limit),
+        provider: transformProvider(provider),
       },
     });
   })

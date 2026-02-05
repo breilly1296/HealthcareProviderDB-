@@ -299,6 +299,7 @@ interface SearchParams {
   zipCode?: string;
   healthSystem?: string;
   specialty?: string;
+  specialtyCategory?: string;
   name?: string;
   npi?: string;
   entityType?: string;
@@ -340,6 +341,7 @@ export function generateSearchCacheKey(params: SearchParams): string {
   if (params.cities) additionalParams.push(`cities:${normalize(params.cities)}`);
   if (params.zipCode) additionalParams.push(`zip:${normalize(params.zipCode)}`);
   if (params.healthSystem) additionalParams.push(`hs:${normalize(params.healthSystem)}`);
+  if (params.specialtyCategory) additionalParams.push(`sc:${normalize(params.specialtyCategory)}`);
   if (params.name) additionalParams.push(`name:${normalize(params.name)}`);
   if (params.npi) additionalParams.push(`npi:${params.npi}`);
   if (params.entityType) additionalParams.push(`et:${normalize(params.entityType)}`);

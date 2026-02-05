@@ -3,7 +3,8 @@ import { timingSafeEqual } from 'crypto';
 import { z } from 'zod';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { cleanupExpiredVerifications, getExpirationStats } from '../services/verificationService';
-import { enrichLocationNames, getEnrichmentStats } from '../services/locationEnrichment';
+// TODO: locationEnrichment depends on old Location model - re-enable when practice_locations rewrite is done
+// import { enrichLocationNames, getEnrichmentStats } from '../services/locationEnrichment';
 import { cacheClear, getCacheStats } from '../utils/cache';
 import prisma from '../lib/prisma';
 import logger from '../utils/logger';
@@ -233,75 +234,8 @@ router.get(
 
 // ============================================================================
 // Location Enrichment Endpoints
+// TODO: Disabled - depends on old Location model, needs rewrite for practice_locations
 // ============================================================================
-
-const enrichLocationsSchema = z.object({
-  dryRun: z.enum(['true', 'false']).optional().transform((v) => v === 'true'),
-  batchSize: z.string().optional().transform((v) => (v ? parseInt(v, 10) : 1000)),
-  minProviders: z.string().optional().transform((v) => (v ? parseInt(v, 10) : 1)),
-  onlyUnnamed: z.enum(['true', 'false']).optional().transform((v) => v !== 'false'),
-});
-
-/**
- * POST /api/v1/admin/locations/enrich
- * Enrich location names from provider organization names
- *
- * Protected by X-Admin-Secret header
- *
- * Query params:
- *   - dryRun: If 'true', only return what would be updated (default: false)
- *   - batchSize: Number of locations to process per batch (default: 1000)
- *   - minProviders: Minimum providers needed to derive name (default: 1)
- *   - onlyUnnamed: Only process locations without names (default: true)
- */
-router.post(
-  '/locations/enrich',
-  adminAuthMiddleware,
-  asyncHandler(async (req, res) => {
-    const params = enrichLocationsSchema.parse(req.query);
-
-    logger.info({ params }, 'Admin location enrichment started');
-
-    const result = await enrichLocationNames({
-      dryRun: params.dryRun,
-      batchSize: params.batchSize,
-      minProviders: params.minProviders,
-      onlyUnnamed: params.onlyUnnamed,
-    });
-
-    logger.info({ stats: result.stats }, 'Admin location enrichment complete');
-
-    res.json({
-      success: true,
-      data: {
-        stats: result.stats,
-        results: params.dryRun ? result.results : undefined,
-        message: params.dryRun
-          ? `Dry run complete. ${result.stats.locationsEnriched} locations would be enriched.`
-          : `Enrichment complete. ${result.stats.locationsEnriched} locations updated.`,
-      },
-    });
-  })
-);
-
-/**
- * GET /api/v1/admin/locations/enrichment-stats
- * Get statistics about location name enrichment
- *
- * Protected by X-Admin-Secret header
- */
-router.get(
-  '/locations/enrichment-stats',
-  adminAuthMiddleware,
-  asyncHandler(async (req, res) => {
-    const stats = await getEnrichmentStats();
-
-    res.json({
-      success: true,
-      data: stats,
-    });
-  })
-);
 
 // ============================================================================
 // Log Retention Cleanup Endpoints

@@ -318,10 +318,12 @@ export async function getProvidersForPlan(
             lastName: true,
             organizationName: true,
             entityType: true,
-            specialty: true,
-            city: true,
-            state: true,
-            phone: true,
+            primary_specialty: true,
+            primary_taxonomy_code: true,
+            practice_locations: {
+              where: { address_type: 'practice' },
+              take: 1,
+            },
           },
         },
       },
@@ -331,15 +333,27 @@ export async function getProvidersForPlan(
 
   const providers = acceptances
     .filter(a => a.provider)
-    .map(a => ({
-      ...a.provider!,
-      displayName: a.provider!.entityType === 'ORGANIZATION'
-        ? a.provider!.organizationName || 'Unknown Organization'
-        : `${a.provider!.firstName || ''} ${a.provider!.lastName || ''}`.trim() || 'Unknown Provider',
-      confidenceScore: a.confidenceScore,
-      lastVerified: a.lastVerified,
-      verificationCount: a.verificationCount,
-    }));
+    .map(a => {
+      const prov = a.provider!;
+      const loc = prov.practice_locations?.[0];
+      return {
+        npi: prov.npi,
+        firstName: prov.firstName,
+        lastName: prov.lastName,
+        organizationName: prov.organizationName,
+        entityType: prov.entityType,
+        specialty: prov.primary_specialty,
+        city: loc?.city || null,
+        state: loc?.state || null,
+        phone: loc?.phone || null,
+        displayName: prov.entityType === '2'
+          ? prov.organizationName || 'Unknown Organization'
+          : `${prov.firstName || ''} ${prov.lastName || ''}`.trim() || 'Unknown Provider',
+        confidenceScore: a.confidenceScore,
+        lastVerified: a.lastVerified,
+        verificationCount: a.verificationCount,
+      };
+    });
 
   return {
     providers,
