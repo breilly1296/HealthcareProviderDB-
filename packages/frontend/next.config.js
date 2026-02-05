@@ -55,6 +55,8 @@ const nextConfig = {
   experimental: {
     // Explicitly disable turbopack for ARM64 compatibility
     turbo: undefined,
+    // Externalize sharp so its native deps (detect-libc) resolve from node_modules
+    serverComponentsExternalPackages: ['sharp'],
   },
 
   // Apply security headers to all routes
