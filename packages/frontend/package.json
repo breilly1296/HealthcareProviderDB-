@@ -13,7 +13,7 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
-    "postinstall": "node scripts/patch-next-swc.js"
+    "postinstall": "node -e \"try{require('./scripts/patch-next-swc.js')}catch(e){}\""
   },
   "keywords": [],
   "license": "ISC",
