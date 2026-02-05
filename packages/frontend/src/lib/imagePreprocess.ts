@@ -4,7 +4,12 @@
  * Uses Sharp library for server-side image processing to optimize
  * images before sending to Claude for extraction.
  */
-import sharp from 'sharp';
+import type Sharp from 'sharp';
+
+async function getSharp(): Promise<typeof Sharp> {
+  const mod = await import('sharp');
+  return mod.default;
+}
 
 /**
  * Configuration for image preprocessing
@@ -97,6 +102,7 @@ export async function preprocessImage(
   const originalSize = inputBuffer.length;
 
   // Get original image metadata
+  const sharp = await getSharp();
   const metadata = await sharp(inputBuffer).metadata();
   const originalWidth = metadata.width || 0;
   const originalHeight = metadata.height || 0;
@@ -206,6 +212,7 @@ export async function preprocessImageEnhanced(
  */
 export async function shouldEnhanceImage(base64Image: string): Promise<boolean> {
   const inputBuffer = decodeBase64ToBuffer(base64Image);
+  const sharp = await getSharp();
   const metadata = await sharp(inputBuffer).metadata();
 
   // Get image stats
