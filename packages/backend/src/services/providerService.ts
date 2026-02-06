@@ -173,7 +173,7 @@ export interface ProviderSearchResult {
 /**
  * Standard include for enriched provider data
  */
-const PROVIDER_INCLUDE = {
+export const PROVIDER_INCLUDE = {
   practice_locations: true,
   provider_taxonomies: true,
   provider_cms_details: true,

@@ -151,6 +151,44 @@ export async function getProvidersAtLocation(
 }
 
 /**
+ * Get distinct NPIs of providers colocated at the same address.
+ * Excludes the queried provider's NPI. Returns paginated NPI strings.
+ */
+export async function getColocatedNpis(
+  addressLine1: string,
+  city: string | null,
+  state: string | null,
+  zipCode: string | null,
+  excludeNpi: string,
+  options: { page?: number; limit?: number } = {}
+) {
+  const { take, skip, page } = getPaginationValues(options.page, options.limit);
+
+  const where: Prisma.practice_locationsWhereInput = {
+    address_line1: { equals: addressLine1, mode: 'insensitive' },
+    ...(city && { city: { equals: city, mode: 'insensitive' as const } }),
+    ...(state && { state }),
+    ...(zipCode && { zip_code: zipCode }),
+    npi: { not: excludeNpi },
+  };
+
+  // Fetch all distinct NPIs for total count (Prisma doesn't support count + distinct together)
+  const allDistinct = await prisma.practice_locations.findMany({
+    where,
+    select: { npi: true },
+    distinct: ['npi'],
+    orderBy: { npi: 'asc' },
+  });
+
+  const total = allDistinct.length;
+
+  // Paginate the distinct NPIs
+  const paginatedNpis = allDistinct.slice(skip, skip + take).map(r => r.npi);
+
+  return { npis: paginatedNpis, total, page, limit: take };
+}
+
+/**
  * Get distinct health system names from provider_hospitals.
  * Optionally filtered by state/city via providers → practice_locations.
  */

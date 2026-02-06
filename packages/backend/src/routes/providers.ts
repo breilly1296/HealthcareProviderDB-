@@ -8,7 +8,11 @@ import {
   getProviderDisplayName,
   getCitiesByState,
   getPrimaryLocation,
+  PROVIDER_INCLUDE,
 } from '../services/providerService';
+import { getColocatedNpis } from '../services/locationService';
+import { getLocationHealthSystem } from '../services/locationEnrichment';
+import prisma from '../lib/prisma';
 import { paginationSchema, npiParamSchema } from '../schemas/commonSchemas';
 import { buildPaginationMeta, sendSuccess } from '../utils/responseHelpers';
 import { cacheGet, cacheSet, generateSearchCacheKey } from '../utils/cache';
@@ -294,6 +298,77 @@ router.get(
     const cities = await getCitiesByState(state);
 
     sendSuccess(res, { state, cities, count: cities.length });
+  })
+);
+
+/**
+ * GET /api/v1/providers/:npi/colocated
+ * Get providers at the same practice address as the given NPI
+ */
+router.get(
+  '/:npi/colocated',
+  defaultRateLimiter,
+  asyncHandler(async (req, res) => {
+    const { npi } = npiParamSchema.parse(req.params);
+    const { page, limit } = paginationSchema.parse(req.query);
+
+    const provider = await getProviderByNpi(npi);
+    if (!provider) {
+      throw AppError.notFound(`Provider with NPI ${npi} not found`);
+    }
+
+    const primaryLoc = getPrimaryLocation(provider.practice_locations);
+    const emptyResponse = {
+      location: null,
+      providers: [],
+      pagination: buildPaginationMeta(0, page, limit),
+    };
+
+    if (!primaryLoc?.address_line1) {
+      sendSuccess(res, emptyResponse);
+      return;
+    }
+
+    const [colocatedResult, healthSystem] = await Promise.all([
+      getColocatedNpis(
+        primaryLoc.address_line1,
+        primaryLoc.city ?? null,
+        primaryLoc.state ?? null,
+        primaryLoc.zip_code ?? null,
+        npi,
+        { page, limit }
+      ),
+      getLocationHealthSystem(npi),
+    ]);
+
+    let colocatedProviders: Array<Record<string, unknown>> = [];
+    if (colocatedResult.npis.length > 0) {
+      colocatedProviders = await prisma.provider.findMany({
+        where: { npi: { in: colocatedResult.npis } },
+        include: PROVIDER_INCLUDE,
+      });
+    }
+
+    const location = {
+      id: 0,
+      addressLine1: primaryLoc.address_line1,
+      addressLine2: primaryLoc.address_line2 || null,
+      city: primaryLoc.city || '',
+      state: primaryLoc.state || '',
+      zipCode: primaryLoc.zip_code || '',
+      name: null,
+      healthSystem,
+      facilityType: null,
+      providerCount: colocatedResult.total + 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    sendSuccess(res, {
+      location,
+      providers: colocatedProviders.map(transformProvider),
+      pagination: buildPaginationMeta(colocatedResult.total, colocatedResult.page, colocatedResult.limit),
+    });
   })
 );
 
