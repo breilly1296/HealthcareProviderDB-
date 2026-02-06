@@ -26,10 +26,8 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy dependency tree from deps stage (includes hoisted .bin symlinks)
+# Copy dependencies from deps stage
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
-COPY --from=deps /app/packages/frontend/node_modules ./packages/frontend/node_modules
 
 # Copy package files and shared tsconfig base
 COPY package.json package-lock.json tsconfig.base.json ./
@@ -39,6 +37,9 @@ COPY packages/frontend/package.json ./packages/frontend/
 # Copy source code
 COPY packages/shared ./packages/shared
 COPY packages/frontend ./packages/frontend
+
+# Rebuild .bin symlinks broken by cross-stage COPY
+RUN npm rebuild
 
 # Build shared package first
 RUN cd packages/shared && npm run build
