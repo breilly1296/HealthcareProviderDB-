@@ -1,7 +1,7 @@
 # ================================
-# Dependencies stage
+# Build stage
 # ================================
-FROM node:20-alpine AS deps
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -9,7 +9,7 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat
 
 # Copy root package files for workspaces
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json tsconfig.base.json ./
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/frontend/package.json ./packages/frontend/
 
@@ -19,27 +19,9 @@ RUN mkdir -p packages/shared packages/frontend
 # Install all dependencies
 RUN npm install --force
 
-# ================================
-# Build stage
-# ================================
-FROM node:20-alpine AS builder
-
-WORKDIR /app
-
-# Copy dependencies from deps stage
-COPY --from=deps /app/node_modules ./node_modules
-
-# Copy package files and shared tsconfig base
-COPY package.json package-lock.json tsconfig.base.json ./
-COPY packages/shared/package.json ./packages/shared/
-COPY packages/frontend/package.json ./packages/frontend/
-
 # Copy source code
 COPY packages/shared ./packages/shared
 COPY packages/frontend ./packages/frontend
-
-# Rebuild .bin symlinks broken by cross-stage COPY
-RUN npm rebuild
 
 # Build shared package first
 RUN cd packages/shared && npm run build
