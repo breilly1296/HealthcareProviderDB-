@@ -26,8 +26,10 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy dependencies from deps stage
+# Copy dependency tree from deps stage (includes hoisted .bin symlinks)
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
+COPY --from=deps /app/packages/frontend/node_modules ./packages/frontend/node_modules
 
 # Copy package files
 COPY package.json package-lock.json ./
@@ -48,8 +50,6 @@ ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 ARG NEXT_PUBLIC_POSTHOG_KEY
 ENV NEXT_PUBLIC_POSTHOG_KEY=${NEXT_PUBLIC_POSTHOG_KEY}
 
-# Install dependencies in builder (to get .bin symlinks)
-RUN npm install --force
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN cd packages/frontend && npm run build
 
