@@ -159,6 +159,78 @@ export function errorHandler(
       });
       return;
     }
+
+    if (prismaError.code === 'P2003') {
+      res.status(400).json({
+        success: false,
+        error: {
+          message: 'Referenced record not found',
+          code: 'FOREIGN_KEY_VIOLATION',
+          statusCode: 400,
+          requestId: req.id,
+        },
+      });
+      return;
+    }
+
+    if (prismaError.code === 'P2024') {
+      logger.error({
+        requestId: req.id,
+        prismaCode: prismaError.code,
+        path: req.path,
+      }, 'Database connection pool timeout');
+      res.status(503).json({
+        success: false,
+        error: {
+          message: 'Database temporarily unavailable. Please try again.',
+          code: 'DATABASE_TIMEOUT',
+          statusCode: 503,
+          requestId: req.id,
+        },
+      });
+      return;
+    }
+
+    if (prismaError.code === 'P2010') {
+      logger.error({
+        requestId: req.id,
+        prismaCode: prismaError.code,
+        meta: prismaError.meta,
+        path: req.path,
+      }, 'Raw query failed');
+      const message = process.env.NODE_ENV === 'production'
+        ? 'Internal server error'
+        : err.message;
+      res.status(500).json({
+        success: false,
+        error: {
+          message,
+          code: 'QUERY_ERROR',
+          statusCode: 500,
+          requestId: req.id,
+        },
+      });
+      return;
+    }
+  }
+
+  // Handle Prisma initialization errors (database connection failures)
+  if (err.name === 'PrismaClientInitializationError') {
+    logger.error({
+      requestId: req.id,
+      path: req.path,
+      method: req.method,
+    }, 'CRITICAL: Database connection failed');
+    res.status(503).json({
+      success: false,
+      error: {
+        message: 'Service temporarily unavailable',
+        code: 'DATABASE_UNAVAILABLE',
+        statusCode: 503,
+        requestId: req.id,
+      },
+    });
+    return;
   }
 
   // Default error response
