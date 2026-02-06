@@ -221,6 +221,7 @@ async function main() {
     let byInfo = 0;
     let cursor: string | null = null;
     const allDiscrepancies: Discrepancy[] = [];
+    const allProcessedNpis: string[] = [];
 
     while (true) {
       // Fetch batch with cursor-based pagination
@@ -247,8 +248,10 @@ async function main() {
         query += ' WHERE ' + conditions.join(' AND ');
       }
 
+      const remaining = limit ? limit - processed : BATCH_SIZE;
+      const batchLimit = Math.min(BATCH_SIZE, remaining);
       query += ' GROUP BY p.npi ORDER BY p.npi LIMIT $' + (params.length + 1);
-      params.push(String(BATCH_SIZE));
+      params.push(String(batchLimit));
 
       const batch = await pool.query(query, params);
 
@@ -256,6 +259,7 @@ async function main() {
 
       // Process each provider in the batch
       for (const row of batch.rows) {
+        allProcessedNpis.push(row.npi);
         const nppes = await fetchNppes(row.npi);
 
         if (!nppes) {
@@ -302,29 +306,37 @@ async function main() {
 
     console.log('\n');
 
-    // Write discrepancies to DB if in apply mode
-    if (applyMode && allDiscrepancies.length > 0) {
-      console.log('Writing discrepancies to data_quality_audit table...');
+    // Write results to DB if in apply mode
+    if (applyMode) {
+      if (allDiscrepancies.length > 0) {
+        console.log('Writing discrepancies to data_quality_audit table...');
 
-      for (const d of allDiscrepancies) {
-        await pool.query(
-          `INSERT INTO data_quality_audit (npi, audit_type, severity, field, current_value, expected_value, details)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)
-           ON CONFLICT DO NOTHING`,
-          [d.npi, d.auditType, d.severity, d.field, d.currentValue, d.expectedValue, d.details]
-        );
+        for (const d of allDiscrepancies) {
+          await pool.query(
+            `INSERT INTO data_quality_audit (npi, audit_type, severity, field, current_value, expected_value, details)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
+             ON CONFLICT DO NOTHING`,
+            [d.npi, d.auditType, d.severity, d.field, d.currentValue, d.expectedValue, d.details]
+          );
+        }
+
+        console.log(`  Wrote ${allDiscrepancies.length} audit records`);
       }
 
-      // Update nppes_last_synced for processed providers
-      const npis = [...new Set(allDiscrepancies.map(d => d.npi))];
-      // Also update providers that had no discrepancies
-      const processedNpis = allDiscrepancies.map(d => d.npi);
-      console.log(`Updating nppes_last_synced for processed providers...`);
-      // We update all that were processed, not just those with discrepancies
-      // This requires tracking all processed NPIs separately
-      // For now, update the ones we have discrepancies for + mark sync time
-
-      console.log(`  Wrote ${allDiscrepancies.length} audit records`);
+      // Update nppes_last_synced for ALL processed providers (not just those with discrepancies)
+      if (allProcessedNpis.length > 0) {
+        console.log(`Updating nppes_last_synced for ${allProcessedNpis.length} processed providers...`);
+        const SYNC_BATCH = 500;
+        for (let i = 0; i < allProcessedNpis.length; i += SYNC_BATCH) {
+          const chunk = allProcessedNpis.slice(i, i + SYNC_BATCH);
+          const placeholders = chunk.map((_, idx) => `$${idx + 1}`).join(', ');
+          await pool.query(
+            `UPDATE providers SET nppes_last_synced = NOW() WHERE npi IN (${placeholders})`,
+            chunk
+          );
+        }
+        console.log(`  Updated nppes_last_synced for ${allProcessedNpis.length} providers`);
+      }
     }
 
     // Print summary

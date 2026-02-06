@@ -6,6 +6,7 @@ import { NYC_ALL_BOROUGHS_VALUE, NYC_BOROUGHS } from '../useCities';
 import { isAbortError, toAppError, getUserMessage, logError } from '../../lib/errorUtils';
 import { debounce, SEARCH_DEBOUNCE_MS } from '../../lib/debounce';
 import type { DebouncedFunction } from '../../lib/debounce';
+import { trackSearch } from '../../lib/analytics';
 import type { SearchFilters, PaginationState, ProviderDisplay } from '../../types';
 
 // ============================================================================
@@ -137,6 +138,16 @@ export function useSearchExecution(options: UseSearchExecutionOptions): UseSearc
 
         setResults(response.providers);
         setPagination(response.pagination);
+
+        trackSearch({
+          specialty: currentFilters.specialty,
+          state: currentFilters.state,
+          city: currentFilters.city,
+          cities: expandedCities.join(','),
+          healthSystem: currentFilters.healthSystem,
+          resultsCount: response.pagination.total,
+          mode: 'providers',
+        });
       } catch (err) {
         // Ignore abort errors (user cancelled the request)
         if (isAbortError(err)) {

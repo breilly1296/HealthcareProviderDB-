@@ -35,10 +35,13 @@ function computeAddressHash(
 async function main() {
   const args = process.argv.slice(2);
   const applyMode = args.includes('--apply');
+  const limitArg = args.indexOf('--limit');
+  const limit = limitArg !== -1 ? parseInt(args[limitArg + 1]) : 0;
 
   console.log('\n🏢 Location Deduplication\n');
   console.log('='.repeat(70));
   console.log(`Mode: ${applyMode ? 'APPLY' : 'DRY RUN (report only)'}`);
+  if (limit) console.log(`Limit: ${limit}`);
 
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
@@ -62,15 +65,20 @@ async function main() {
     if (applyMode) {
       let processed = 0;
       let offset = 0;
+      const toProcess = limit ? Math.min(limit, totalLocations - alreadyHashed) : totalLocations - alreadyHashed;
 
       while (true) {
+        const remaining = limit ? toProcess - processed : BATCH_SIZE;
+        const batchLimit = Math.min(BATCH_SIZE, remaining);
+        if (batchLimit <= 0) break;
+
         const batch = await pool.query(
           `SELECT id, address_line1, city, state, zip_code
            FROM practice_locations
            WHERE address_hash IS NULL
            ORDER BY id
            LIMIT $1 OFFSET $2`,
-          [BATCH_SIZE, offset]
+          [batchLimit, offset]
         );
 
         if (batch.rows.length === 0) break;
@@ -102,8 +110,8 @@ async function main() {
         processed += batch.rows.length;
         offset += BATCH_SIZE;
 
-        const pct = Math.round((processed / (totalLocations - alreadyHashed)) * 100);
-        process.stdout.write(`\r  Hashed: ${processed}/${totalLocations - alreadyHashed} (${pct}%)`);
+        const pct = Math.round((processed / toProcess) * 100);
+        process.stdout.write(`\r  Hashed: ${processed}/${toProcess} (${pct}%)`);
       }
 
       console.log('\n');

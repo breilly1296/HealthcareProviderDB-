@@ -15,6 +15,7 @@ import { ErrorProvider } from '@/context/ErrorContext';
 import { CompareBar } from '@/components/compare';
 import { GlobalErrorBanner } from '@/components/GlobalErrorBanner';
 import { Disclaimer } from '@/components/Disclaimer';
+import { CookieConsent } from '@/components/CookieConsent';
 
 // Script to prevent flash of wrong theme on page load
 const themeScript = `
@@ -172,6 +173,7 @@ export default function RootLayout({
                     <Footer />
                     <ScrollToTop />
                     <CompareBar />
+                    <CookieConsent />
                     <BottomNav />
                   </ErrorProvider>
                 </CompareProvider>
