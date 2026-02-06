@@ -24,16 +24,16 @@ if (!adminSecret) return res.status(503).json({ ... code: 'ADMIN_NOT_CONFIGURED'
 // Uses crypto.timingSafeEqual to prevent timing attacks
 const isValid = providedBuffer.length === secretBuffer.length && timingSafeEqual(providedBuffer, secretBuffer);
 ```
-Protected endpoints (7 total):
+Protected endpoints (9 total):
 - `POST /api/v1/admin/cleanup-expired` — Delete expired verification records (dryRun, batchSize params)
 - `GET /api/v1/admin/expiration-stats` — View verification expiration statistics
 - `GET /api/v1/admin/health` — Admin health check with retention metrics (uptime, cache stats, log counts)
 - `POST /api/v1/admin/cache/clear` — Clear all cached data (for post-import refresh)
 - `GET /api/v1/admin/cache/stats` — Cache statistics with hit rate
+- `GET /api/v1/admin/enrichment/stats` — Location enrichment statistics for practice_locations and provider_hospitals
 - `POST /api/v1/admin/cleanup/sync-logs` — Clean up sync_logs older than N days (dryRun, retentionDays params)
 - `GET /api/v1/admin/retention/stats` — Comprehensive retention stats for all log types (verification, sync, plan acceptance, vote)
-
-**Note:** Location enrichment endpoints are disabled (depend on old Location model — see prompt 28).
+- `POST /api/v1/admin/recalculate-confidence` — Recalculate confidence scores with time-based decay (dryRun, limit params)
 
 ## VerifyMyProvider Auth Architecture
 - **Current State:** NO authentication (all endpoints public/anonymous)

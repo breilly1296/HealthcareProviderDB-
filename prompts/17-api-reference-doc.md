@@ -17,8 +17,8 @@ Generate a complete API reference for the VerifyMyProvider backend, covering all
 - `packages/backend/src/routes/providers.ts` (3 provider endpoints)
 - `packages/backend/src/routes/plans.ts` (6 plan endpoints)
 - `packages/backend/src/routes/verify.ts` (5 verification endpoints)
-- `packages/backend/src/routes/admin.ts` (7 admin endpoints)
-- `packages/backend/src/routes/locations.ts` (DISABLED — old Location model)
+- `packages/backend/src/routes/admin.ts` (9 admin endpoints)
+- `packages/backend/src/routes/locations.ts` (5 location endpoints — active)
 - `packages/backend/src/routes/index.ts` (route registration + health check)
 - `packages/backend/src/middleware/rateLimiter.ts` (rate limits)
 - `packages/backend/src/middleware/captcha.ts` (CAPTCHA middleware)
@@ -32,6 +32,7 @@ Generate a complete API reference for the VerifyMyProvider backend, covering all
 | Method | Endpoint | Rate Limit | CAPTCHA | Purpose |
 |--------|----------|------------|---------|---------|
 | GET | `/api/v1/providers/search` | 100/hr | No | Search providers |
+| GET | `/api/v1/providers/cities` | 200/hr | No | Cities for state |
 | GET | `/api/v1/providers/:npi` | 200/hr | No | Provider detail |
 | GET | `/api/v1/providers/:npi/colocated` | 200/hr | No | Co-located providers |
 | GET | `/api/v1/plans/search` | 100/hr | No | Search plans |
@@ -45,6 +46,11 @@ Generate a complete API reference for the VerifyMyProvider backend, covering all
 | GET | `/api/v1/verify/stats` | 200/hr | No | Verification stats |
 | GET | `/api/v1/verify/recent` | 200/hr | No | Recent verifications |
 | GET | `/api/v1/verify/:npi/:planId` | 200/hr | No | Pair verifications |
+| GET | `/api/v1/locations/search` | 200/hr | No | Search locations |
+| GET | `/api/v1/locations/health-systems` | 200/hr | No | Health systems |
+| GET | `/api/v1/locations/stats/:state` | 200/hr | No | Location stats by state |
+| GET | `/api/v1/locations/:locationId` | 200/hr | No | Location details |
+| GET | `/api/v1/locations/:locationId/providers` | 200/hr | No | Providers at location |
 | GET | `/health` | None | No | Health check |
 
 ### Admin Endpoints (X-Admin-Secret required)
@@ -55,8 +61,10 @@ Generate a complete API reference for the VerifyMyProvider backend, covering all
 | GET | `/api/v1/admin/health` | Admin health with metrics |
 | POST | `/api/v1/admin/cache/clear` | Clear cache |
 | GET | `/api/v1/admin/cache/stats` | Cache statistics |
+| GET | `/api/v1/admin/enrichment/stats` | Enrichment statistics |
 | POST | `/api/v1/admin/cleanup/sync-logs` | Clean old sync logs |
 | GET | `/api/v1/admin/retention/stats` | Retention statistics |
+| POST | `/api/v1/admin/recalculate-confidence` | Confidence decay recalculation |
 
 ## Questions to Ask
 1. Should the API reference be auto-generated from code (e.g., Swagger/OpenAPI)?

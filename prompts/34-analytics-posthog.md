@@ -35,17 +35,47 @@ PostHog is used for product analytics to understand user behavior and improve th
 
 import posthog from 'posthog-js';
 import { PostHogProvider as PHProvider } from 'posthog-js/react';
+import { useEffect } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
 
 if (typeof window !== 'undefined') {
-  posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
-    api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://app.posthog.com',
-    capture_pageview: false, // We capture manually
-    capture_pageleave: true,
-  });
+  const posthogKey = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+  if (posthogKey) {
+    posthog.init(posthogKey, {
+      api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com',
+      capture_pageview: false,    // We capture manually for better control
+      capture_pageleave: true,
+      persistence: 'localStorage',
+      autocapture: false,         // No auto-captured clicks/forms
+      disable_session_recording: true,  // No session replays
+      opt_out_capturing_by_default: true, // Respect consent — no tracking until opt-in
+    });
+  }
+}
+
+// PostHogPageview: Tracks pageviews on route changes with sensitive param sanitization
+function PostHogPageview() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    if (pathname && typeof window !== 'undefined') {
+      const sanitizedParams = new URLSearchParams(searchParams.toString());
+      ['npi', 'planId', 'name'].forEach(key => sanitizedParams.delete(key));
+      const query = sanitizedParams.toString();
+      const url = window.origin + pathname + (query ? `?${query}` : '');
+      posthog.capture('$pageview', { $current_url: url });
+    }
+  }, [pathname, searchParams]);
+  return null;
 }
 
 export function PostHogProvider({ children }: { children: React.ReactNode }) {
-  return <PHProvider client={posthog}>{children}</PHProvider>;
+  return (
+    <PHProvider client={posthog}>
+      <PostHogPageview />
+      {children}
+    </PHProvider>
+  );
 }
 ```
 
@@ -97,9 +127,10 @@ Also provides `identifyUser()` and `resetUser()` for future account integration.
 ### Page Views
 | Event | Properties |
 |-------|------------|
+| `$pageview` | `$current_url` (sanitized — npi, planId, name params stripped) |
 | `$pageleave` | (auto-captured via `capture_pageleave: true`) |
 
-**Note:** `capture_pageview` is set to `false` — page views are NOT auto-captured.
+**Note:** `capture_pageview` is set to `false` — page views are captured manually via the `PostHogPageview` component, which sanitizes sensitive query parameters (npi, planId, name) before sending.
 
 ### User Actions (Privacy-Preserving)
 | Event | Properties Sent | Properties NOT Sent | Purpose |
@@ -120,10 +151,12 @@ Also provides `identifyUser()` and `resetUser()` for future account integration.
 ### Privacy Settings
 ```typescript
 posthog.init(key, {
-  autocapture: false,      // Don't auto-capture clicks
-  capture_pageview: false, // Manual pageview tracking
-  persistence: 'localStorage', // or 'cookie'
-  disable_session_recording: true, // No session replays (for now)
+  autocapture: false,                  // Don't auto-capture clicks/forms
+  capture_pageview: false,             // Manual pageview tracking with param sanitization
+  capture_pageleave: true,             // Auto-capture page leave events
+  persistence: 'localStorage',        // localStorage persistence (not cookies)
+  disable_session_recording: true,     // No session replays
+  opt_out_capturing_by_default: true,  // No tracking until user opts in via CookieConsent
 });
 ```
 
@@ -192,7 +225,8 @@ The analytics implementation follows a "maximum utility, minimum data" approach.
 ### Privacy
 - [x] No PII captured (only booleans and counts)
 - [x] No healthcare data captured (specialties, plans stripped)
-- [x] `autocapture` not explicitly disabled in PostHogProvider (consider adding)
+- [x] `autocapture: false` explicitly set in PostHogProvider
+- [x] `opt_out_capturing_by_default: true` — no tracking until user opts in
 - [x] Cookie consent banner — `CookieConsent.tsx` with sliding banner, accept/decline buttons
 - [ ] Privacy policy updated to mention PostHog
 - [x] Opt-out mechanism — via CookieConsent decline button

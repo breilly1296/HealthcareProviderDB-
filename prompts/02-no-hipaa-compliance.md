@@ -10,7 +10,7 @@ priority: 1
 # No HIPAA Compliance Review
 
 ## Files to Review
-- `prisma/schema.prisma` (verify no PHI fields)
+- `packages/backend/prisma/schema.prisma` (verify no PHI fields)
 - `packages/backend/src/routes/` (verify what data is collected)
   - `providers.ts` - provider search/detail endpoints
   - `verify.ts` - verification submission endpoints

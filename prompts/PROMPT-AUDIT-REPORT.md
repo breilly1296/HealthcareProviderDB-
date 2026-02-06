@@ -1,7 +1,7 @@
 # Prompt Audit Report — VerifyMyProvider
 
-**Generated:** 2026-02-05
-**Method:** Cross-referenced actual codebase state against all 39+ prompt files
+**Generated:** 2026-02-05 | **Updated:** 2026-02-06
+**Method:** Cross-referenced actual codebase state against all 45 prompt files
 
 ---
 
@@ -42,7 +42,7 @@
 - `locationService.ts` has a TODO comment: needs rewrite for `practice_locations`
 - `locationEnrichment.ts` also needs rewrite
 - The Prisma schema code block in the prompt is **entirely wrong** — the model doesn't exist
-- API endpoints described (`/health-systems`, `/:locationId`, `/:locationId/providers`, `/:npi/colocated`) are **not functional**
+- API endpoints described (`/health-systems`, `/:locationId`, `/:locationId/providers`) are active; `/:npi/colocated` added 2026-02-06
 - Checklist marks database items as `[x]` implemented — this is **incorrect**
 
 **Action:** Rewrite to reflect actual state: `practice_locations` table exists with address data, but the Location abstraction (grouping, naming, health systems) is **not implemented**. Mark the prompt tag as `planned` not `implemented`. Update schema, endpoints, and checklist.
@@ -351,3 +351,36 @@ These are Q&A templates or strategic docs that aren't meant to track codebase st
 20. ✅ Populated 8 empty templates (15, 16, 17, 18, 19, 20, 23, 26)
 21. ✅ Removed duplicate `28-hospital-analysis-prompt.md` (kept `Hospital Data Pull/` copy)
 22. ✅ Updated `00-index.md` with all new prompts, corrected descriptions, new sections
+
+---
+
+## SECTION 8: SECOND AUDIT — 2026-02-06
+
+**Method:** Full codebase re-verification of all 45 prompts (00-44) against actual source code.
+
+### Findings: 9 Prompts Updated, 1 Bug Discovered
+
+#### Bug Discovered: Missing Backend Endpoints
+The frontend API client (`lib/api.ts`) defines two methods that call backend endpoints which **do not exist**:
+- `providerApi.getColocated(npi)` → `GET /providers/:npi/colocated` — **FIXED** (endpoint added 2026-02-06)
+- `providerApi.getPlans(npi)` → `GET /providers/:npi/plans` — **404 at runtime**
+
+**Remaining action:** Add `GET /providers/:npi/plans` to the backend, or update the frontend to use an alternative API.
+
+#### Fixes Applied — 2026-02-06
+
+| # | Prompt | Issue | Fix |
+|---|--------|-------|-----|
+| 1 | `02-no-hipaa-compliance.md` | Wrong schema path: `prisma/schema.prisma` | Fixed to `packages/backend/prisma/schema.prisma` |
+| 2 | `03-authentication.md` | Said "7 total" admin endpoints, missing enrichment/stats and recalculate-confidence | Fixed to 9 total, added both endpoints, removed stale "enrichment disabled" note |
+| 3 | `06-api-routes.md` | Missing enrichment/stats and recalculate-confidence from admin table; Q5 referenced disabled locations | Added both endpoints; fixed Q5 |
+| 4 | `17-api-reference-doc.md` | Missing `/providers/cities`; said 7 admin endpoints; said locations DISABLED; missing location endpoints | Added cities, fixed to 9 admin, added location endpoints, fixed locations status; re-added `/providers/:npi/colocated` after endpoint was implemented |
+| 5 | `18-troubleshooting-doc.md` | Said locations route disabled/commented out | Fixed: locations route is active with 5 endpoints on practice_locations |
+| 6 | `34-analytics-posthog.md` | PostHogProvider code sample missing `autocapture:false`, `opt_out_capturing_by_default:true`, `disable_session_recording:true`, `PostHogPageview` component, sensitive param sanitization; wrong api_host; checklist said autocapture not disabled | Rewrote code sample to match actual implementation; added PostHogPageview docs; fixed privacy settings block; fixed checklist |
+| 7 | `40-docker-cicd.md` | Missing `rollback.yml` workflow; checklist said "No rollback automation" | Added rollback.yml to files list, added rollback section, checked rollback item |
+| 8 | `41-frontend-data-fetching.md` | Said "Backend locations route is disabled"; didn't flag plans as non-functional | Fixed locations note to active; added "no backend route — will 404" warning on getPlans; getColocated route was added 2026-02-06 |
+| 9 | `32-ttl-data-expiration.md` | Wrong schema path: `prisma/schema.prisma` | Fixed to `packages/backend/prisma/schema.prisma` |
+
+#### Prompts Confirmed Accurate (No Changes Needed) — 2026-02-06
+
+All remaining prompts (00, 01, 04, 05, 07, 08, 09, 10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 33, 35, 36, 37, 38, 39, 42, 43, 44) were verified against the codebase and are accurate.

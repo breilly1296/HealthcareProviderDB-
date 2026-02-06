@@ -10,7 +10,7 @@ priority: 2
 # TTL & Data Expiration Strategy
 
 ## Files to Review
-- `prisma/schema.prisma` (expiresAt fields)
+- `packages/backend/prisma/schema.prisma` (expiresAt fields)
 - `packages/backend/src/routes/admin.ts` (cleanup endpoints)
 - `packages/backend/src/services/verificationService.ts` (TTL logic)
 - `scripts/backfill-verification-ttl.ts` (TTL backfill)

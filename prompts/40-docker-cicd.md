@@ -18,6 +18,7 @@ created: 2026-02-05
 - `.github/workflows/deploy.yml` (production Cloud Run deployment pipeline)
 - `.github/workflows/deploy-staging.yml` (staging Cloud Run deployment pipeline)
 - `.github/workflows/playwright.yml` (E2E test pipeline)
+- `.github/workflows/rollback.yml` (Cloud Run rollback automation)
 - `.github/workflows/security-scan.yml` (SAST security scanning)
 - `.github/workflows/test.yml` (unit test CI on PRs)
 
@@ -186,6 +187,10 @@ Steps:
 ## Security Scan Pipeline (`.github/workflows/security-scan.yml`)
 - SAST security scanning
 
+## Rollback Pipeline (`.github/workflows/rollback.yml`)
+- Manual dispatch to roll back Cloud Run services to a previous revision
+- Supports rolling back backend, frontend, or both
+
 ## Unit Test Pipeline (`.github/workflows/test.yml`)
 - Runs Jest tests on PRs
 
@@ -210,7 +215,7 @@ Steps:
 - [x] Frontend depends on backend URL (sequential deploy)
 - [x] Deployment summary with status table
 - [x] Staging environment — `deploy-staging.yml` triggers on `staging` branch, deploys to `-staging` services
-- [ ] No rollback automation (manual via Cloud Run console)
+- [x] Rollback automation — `rollback.yml` workflow exists (manual dispatch)
 - [ ] No smoke tests after deployment
 - [ ] No build caching in GitHub Actions (Docker layer caching)
 - [ ] No Slack/email notification on deploy success/failure

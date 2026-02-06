@@ -42,7 +42,7 @@ updated: 2026-02-05
 | `/` | `app/page.tsx` | Home — Hero, WhyItMatters, HowItWorks, Confidence, CTA sections |
 | `/search` | `app/search/page.tsx` | Provider search with form, results, filters, pagination |
 | `/provider/[npi]` | `app/provider/[npi]/page.tsx` | Provider detail — hero card, plans, co-located, about |
-| `/location/[locationId]` | `app/location/[locationId]/page.tsx` | Location detail (may not function — API disabled) |
+| `/location/[locationId]` | `app/location/[locationId]/page.tsx` | Location detail — address, providers at location |
 | `/insurance` | `app/insurance/page.tsx` | Insurance plan browser |
 | `/research` | `app/research/page.tsx` | Research/methodology page |
 | `/about` | `app/about/page.tsx` | About page |

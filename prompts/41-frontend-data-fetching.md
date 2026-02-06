@@ -70,7 +70,7 @@ Centralized fetch wrapper with:
 | `search(filters, page, limit)` | `GET /providers/search` | Search with all filters |
 | `getByNpi(npi)` | `GET /providers/:npi` | Provider detail + plan acceptances |
 | `getCities(state)` | `GET /providers/cities` | Cities for state dropdown |
-| `getPlans(npi, params)` | `GET /providers/:npi/plans` | Provider's plan acceptances |
+| `getPlans(npi, params)` | `GET /providers/:npi/plans` | Provider's plan acceptances (**no backend route — will 404**) |
 | `getColocated(npi, params)` | `GET /providers/:npi/colocated` | Co-located providers |
 
 **`plans`**
@@ -93,7 +93,7 @@ Centralized fetch wrapper with:
 | `getForPair(npi, planId)` | `GET /verify/:npi/:planId` | Verification pair data |
 
 **`locations` (exported as `locationApi`)**
-Note: Backend locations route is disabled — these calls will fail.
+Note: Backend locations route is active with 5 endpoints (search, health-systems, stats/:state, /:locationId, /:locationId/providers).
 
 ### Utility: `buildQueryString(params)`
 Builds URL query string from object, filtering out null/undefined/empty values.

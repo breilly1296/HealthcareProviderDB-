@@ -38,9 +38,10 @@ Generate a troubleshooting guide for common issues encountered during developmen
    - Cloud Run: Automatic via Cloud SQL proxy (unix socket)
 
 ### Deployment
-6. **Locations route disabled**
-   - `routes/locations.ts` commented out in `routes/index.ts`
-   - Depends on old `Location` model — needs rewrite for `practice_locations`
+6. **Locations route** — ACTIVE
+   - `routes/locations.ts` is registered and active in `routes/index.ts`
+   - Provides 5 endpoints: search, health-systems, stats/:state, /:locationId, /:locationId/providers
+   - Uses `practice_locations` model (rewrite from old Location model is complete)
 
 7. **ADMIN_SECRET not configured**
    - Admin endpoints return 503 if `ADMIN_SECRET` env var not set

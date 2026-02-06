@@ -34,6 +34,7 @@ File: `routes/providers.ts`
 |--------|------|-----------|------|------------|-------------|
 | GET | `/search` | searchRateLimiter (100/hr) | None | Zod validation, caching | Search providers with filters (state, city, specialty, name, NPI, entityType) |
 | GET | `/cities` | defaultRateLimiter (200/hr) | None | Zod validation | Get unique cities for a state |
+| GET | `/:npi/colocated` | defaultRateLimiter (200/hr) | None | NPI + pagination validation | Get co-located providers at same practice address |
 | GET | `/:npi` | defaultRateLimiter (200/hr) | None | NPI param validation | Get provider by NPI with full enrichment data |
 
 **Search query parameters:** `state`, `city`, `cities` (comma-separated), `zipCode`, `specialty`, `specialtyCategory`, `name`, `npi`, `entityType` (INDIVIDUAL/ORGANIZATION), `page`, `limit`
@@ -89,8 +90,10 @@ File: `routes/admin.ts`
 | GET | `/health` | Admin health check with retention metrics (verification logs, sync logs, vote logs) |
 | POST | `/cache/clear` | Clear all cached data. Returns deleted count. |
 | GET | `/cache/stats` | Get cache statistics with hit rate |
+| GET | `/enrichment/stats` | Location enrichment statistics for practice_locations and provider_hospitals |
 | POST | `/cleanup/sync-logs` | Clean up sync_logs older than N days. Query: `dryRun=true`, `retentionDays=90`. |
 | GET | `/retention/stats` | Comprehensive retention stats for all log types (verification, sync, plan acceptance, votes) |
+| POST | `/recalculate-confidence` | Recalculate confidence scores with time-based decay. Query: `dryRun=true`, `limit=N`. |
 
 **Admin auth behavior:**
 - 503 if `ADMIN_SECRET` env var not configured (graceful disable)
@@ -151,4 +154,4 @@ File: `index.ts`
 2. Are there any endpoints that should require authentication before beta launch?
 3. Should admin endpoints have IP allowlisting in addition to the secret?
 4. Should plan search results be cached like provider search results?
-5. Should the disabled locations route file be removed or kept for reference?
+5. Should the locations route endpoints be expanded with additional features?
