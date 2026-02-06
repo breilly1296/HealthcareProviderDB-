@@ -5,37 +5,45 @@ import { searchRateLimiter, defaultRateLimiter } from '../middleware/rateLimiter
 import {
   searchLocations,
   getLocationById,
-  getLocationStatsByState,
+  getProvidersAtLocation,
   getHealthSystems,
-  getLocationDisplayName,
+  getLocationStats,
 } from '../services/locationService';
-import { getProviderDisplayName } from '../services/providerService';
-import { paginationSchema, stateQuerySchema } from '../schemas/commonSchemas';
+import { paginationSchema } from '../schemas/commonSchemas';
 import { buildPaginationMeta, sendSuccess } from '../utils/responseHelpers';
 
 const router = Router();
 
-// Validation schemas
+// ============================================================================
+// Validation Schemas
+// ============================================================================
+
 const searchQuerySchema = z.object({
-  search: z.string().min(1).max(200).optional(),
+  state: z.string().length(2).toUpperCase(),
   city: z.string().min(1).max(100).optional(),
-  cities: z.string().min(1).max(500).optional(), // Comma-separated cities
   zipCode: z.string().min(3).max(10).optional(),
-  healthSystem: z.string().min(1).max(200).optional(),
-  minProviders: z.coerce.number().int().min(1).optional(),
-}).merge(stateQuerySchema).merge(paginationSchema);
+}).merge(paginationSchema);
 
 const locationIdSchema = z.object({
   locationId: z.coerce.number().int().positive(),
 });
 
 const stateParamSchema = z.object({
-  state: stateQuerySchema.shape.state.unwrap(), // Required state (not optional)
+  state: z.string().length(2).toUpperCase(),
 });
+
+const healthSystemsQuerySchema = z.object({
+  state: z.string().length(2).toUpperCase().optional(),
+  city: z.string().min(1).max(100).optional(),
+});
+
+// ============================================================================
+// Routes
+// ============================================================================
 
 /**
  * GET /api/v1/locations/search
- * Search locations with filters
+ * Search practice locations with filters (state required)
  */
 router.get(
   '/search',
@@ -44,13 +52,9 @@ router.get(
     const query = searchQuerySchema.parse(req.query);
 
     const result = await searchLocations({
-      search: query.search,
       state: query.state,
       city: query.city,
-      cities: query.cities,
       zipCode: query.zipCode,
-      healthSystem: query.healthSystem,
-      minProviders: query.minProviders,
       page: query.page,
       limit: query.limit,
     });
@@ -58,10 +62,7 @@ router.get(
     res.json({
       success: true,
       data: {
-        locations: result.locations.map((loc) => ({
-          ...loc,
-          displayName: getLocationDisplayName(loc),
-        })),
+        locations: result.locations,
         pagination: buildPaginationMeta(result.total, result.page, result.limit),
       },
     });
@@ -70,22 +71,14 @@ router.get(
 
 /**
  * GET /api/v1/locations/health-systems
- * Get list of distinct health systems
- * Optionally filtered by state and/or cities
+ * Get distinct health system names, optionally filtered by state/city
  */
 router.get(
   '/health-systems',
   defaultRateLimiter,
   asyncHandler(async (req, res) => {
-    const query = stateQuerySchema.extend({
-      cities: z.string().min(1).max(500).optional(), // Comma-separated cities
-    }).parse(req.query);
-
-    const healthSystems = await getHealthSystems({
-      state: query.state,
-      cities: query.cities,
-    });
-
+    const query = healthSystemsQuerySchema.parse(req.query);
+    const healthSystems = await getHealthSystems(query);
     sendSuccess(res, { healthSystems, count: healthSystems.length });
   })
 );
@@ -99,39 +92,33 @@ router.get(
   defaultRateLimiter,
   asyncHandler(async (req, res) => {
     const { state } = stateParamSchema.parse(req.params);
-    const stats = await getLocationStatsByState(state);
-    sendSuccess(res, { state, ...stats });
+    const stats = await getLocationStats(state);
+    sendSuccess(res, { state: state.toUpperCase(), ...stats });
   })
 );
 
 /**
  * GET /api/v1/locations/:locationId
- * Get location details
+ * Get a single practice location by ID with provider details
  */
 router.get(
   '/:locationId',
   defaultRateLimiter,
   asyncHandler(async (req, res) => {
     const { locationId } = locationIdSchema.parse(req.params);
+    const location = await getLocationById(locationId);
 
-    const result = await getLocationById(locationId, { includeProviders: false });
-
-    if (!result) {
+    if (!location) {
       throw AppError.notFound(`Location with ID ${locationId} not found`);
     }
 
-    sendSuccess(res, {
-      location: {
-        ...result.location,
-        displayName: getLocationDisplayName(result.location),
-      },
-    });
+    sendSuccess(res, { location });
   })
 );
 
 /**
  * GET /api/v1/locations/:locationId/providers
- * Get all providers at a specific location
+ * Get all providers that share the same address as this location
  */
 router.get(
   '/:locationId/providers',
@@ -140,8 +127,7 @@ router.get(
     const { locationId } = locationIdSchema.parse(req.params);
     const query = paginationSchema.parse(req.query);
 
-    const result = await getLocationById(locationId, {
-      includeProviders: true,
+    const result = await getProvidersAtLocation(locationId, {
       page: query.page,
       limit: query.limit,
     });
@@ -153,32 +139,9 @@ router.get(
     res.json({
       success: true,
       data: {
-        location: {
-          ...result.location,
-          displayName: getLocationDisplayName(result.location),
-        },
-        providers: result.providers.map((p) => ({
-          id: p.npi,
-          npi: p.npi,
-          entityType: p.entityType,
-          firstName: p.firstName,
-          lastName: p.lastName,
-          middleName: null,
-          credential: p.credential,
-          organizationName: p.organizationName,
-          addressLine1: p.addressLine1,
-          addressLine2: p.addressLine2,
-          city: p.city,
-          state: p.state,
-          zip: p.zipCode,
-          phone: p.phone,
-          taxonomyCode: p.specialtyCode,
-          taxonomyDescription: p.specialty,
-          specialtyCategory: null,
-          npiStatus: 'ACTIVE',
-          displayName: getProviderDisplayName(p),
-        })),
-        pagination: buildPaginationMeta(result.total ?? 0, result.page ?? 1, result.limit ?? 20),
+        location: result.location,
+        providers: result.providers,
+        pagination: buildPaginationMeta(result.total, result.page, result.limit),
       },
     });
   })

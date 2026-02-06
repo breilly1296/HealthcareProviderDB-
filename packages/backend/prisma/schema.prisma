@@ -30,7 +30,7 @@ model Provider {
   primary_taxonomy_code    String?                    @db.VarChar(20)
   primary_specialty        String?                    @db.VarChar(200)
   specialty_category       String?                    @db.VarChar(100)
-  nppes_last_synced        DateTime?                  @db.Timestamptz(6)
+  nppesLastSynced          DateTime?                  @map("nppes_last_synced") @db.Timestamptz(6)
   practice_locations       practice_locations[]
   provider_cms_details     provider_cms_details?
   provider_hospitals       provider_hospitals[]

@@ -1,0 +1,7 @@
+[allowlist]
+  paths = [
+    '''\.env\.example$''',
+    '''.*_test\.go$''',
+    '''.*\.test\.ts$''',
+    '''.*\.spec\.ts$''',
+  ]

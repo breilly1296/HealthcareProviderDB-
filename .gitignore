@@ -12,7 +12,12 @@ out/
 # Environment files
 .env
 .env.local
+.env.production
 .env.*.local
+
+# Secrets / keys
+*.pem
+*.key
 
 # IDE
 .idea/

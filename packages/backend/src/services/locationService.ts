@@ -1,193 +1,218 @@
 import { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
-import {
-  getPaginationValues,
-  buildCityFilter,
-  cleanWhereClause,
-  addAndCondition,
-} from './utils';
+import { getPaginationValues } from './utils';
 
-// Re-export getLocationDisplayName from enrichment service for convenience
-export { getLocationDisplayName } from './locationEnrichment';
+// ============================================================================
+// Types
+// ============================================================================
 
 export interface LocationSearchParams {
-  search?: string;
-  state?: string;
+  state: string;
   city?: string;
-  cities?: string; // Comma-separated cities
   zipCode?: string;
-  healthSystem?: string;
-  minProviders?: number;
   page?: number;
   limit?: number;
 }
 
-export interface LocationSearchResult {
-  locations: Awaited<ReturnType<typeof prisma.location.findMany>>;
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
+// ============================================================================
+// Shared Selects
+// ============================================================================
 
 /**
- * Search locations with filters and pagination
+ * Explicit select for practice_locations to avoid unmigrated columns (address_hash).
+ * Once the Phase 2 migration lands, address_hash can be added here.
  */
-export async function searchLocations(params: LocationSearchParams): Promise<LocationSearchResult> {
-  const { search, state, city, cities, zipCode, healthSystem, minProviders } = params;
+const locationSelect = {
+  id: true,
+  npi: true,
+  address_type: true,
+  address_line1: true,
+  address_line2: true,
+  city: true,
+  state: true,
+  zip_code: true,
+  phone: true,
+  fax: true,
+} as const;
+
+const providerBriefSelect = {
+  npi: true,
+  firstName: true,
+  lastName: true,
+  organizationName: true,
+  entityType: true,
+  primary_specialty: true,
+} as const;
+
+const providerDetailSelect = {
+  ...providerBriefSelect,
+  credential: true,
+} as const;
+
+// ============================================================================
+// Service Functions
+// ============================================================================
+
+/**
+ * Search practice locations with filters and pagination.
+ * State is required; city and zipCode are optional refinements.
+ */
+export async function searchLocations(params: LocationSearchParams) {
+  const { state, city, zipCode } = params;
   const { take, skip, page } = getPaginationValues(params.page, params.limit);
 
-  const where: Prisma.LocationWhereInput = { AND: [] };
+  const where: Prisma.practice_locationsWhereInput = {
+    state: state.toUpperCase(),
+  };
 
-  // Apply simple filters
-  if (state) where.state = state.toUpperCase();
-  if (zipCode) where.zipCode = { startsWith: zipCode };
-  if (healthSystem) where.healthSystem = healthSystem;
-  if (minProviders !== undefined) where.providerCount = { gte: minProviders };
-
-  // Text search across address fields
-  if (search) {
-    addAndCondition(where, {
-      OR: [
-        { addressLine1: { contains: search, mode: 'insensitive' } },
-        { addressLine2: { contains: search, mode: 'insensitive' } },
-        { city: { contains: search, mode: 'insensitive' } },
-      ]
-    });
+  if (city) {
+    where.city = { contains: city, mode: 'insensitive' };
   }
 
-  // City filter (single or multiple)
-  const cityFilter = buildCityFilter(cities, city);
-  if (cityFilter) addAndCondition(where, cityFilter);
-
-  cleanWhereClause(where);
+  if (zipCode) {
+    where.zip_code = { startsWith: zipCode };
+  }
 
   const [locations, total] = await Promise.all([
-    prisma.location.findMany({
+    prisma.practice_locations.findMany({
       where,
       take,
       skip,
-      orderBy: [{ providerCount: 'desc' }, { city: 'asc' }],
+      orderBy: [{ city: 'asc' }, { address_line1: 'asc' }],
+      select: {
+        ...locationSelect,
+        providers: { select: providerBriefSelect },
+      },
     }),
-    prisma.location.count({ where }),
+    prisma.practice_locations.count({ where }),
   ]);
 
   return { locations, total, page, limit: take, totalPages: Math.ceil(total / take) };
 }
 
 /**
- * Get location by ID with providers
+ * Get a single practice location by ID, including its parent provider.
  */
-export async function getLocationById(
-  locationId: number,
-  options: { includeProviders?: boolean; page?: number; limit?: number } = {}
-) {
-  const { includeProviders = true } = options;
-
-  const location = await prisma.location.findUnique({ where: { id: locationId } });
-  if (!location) return null;
-
-  if (!includeProviders) {
-    return { location, providers: [], total: location.providerCount, page: 1, limit: 0, totalPages: 0 };
-  }
-
-  const { take, skip, page } = getPaginationValues(options.page, options.limit);
-  const where = { locationId };
-
-  const [providers, total] = await Promise.all([
-    prisma.provider.findMany({
-      where,
-      take,
-      skip,
-      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }, { organizationName: 'asc' }],
-    }),
-    prisma.provider.count({ where }),
-  ]);
-
-  return { location, providers, total, page, limit: take, totalPages: Math.ceil(total / take) };
+export async function getLocationById(id: number) {
+  return prisma.practice_locations.findUnique({
+    where: { id },
+    select: {
+      ...locationSelect,
+      providers: { select: providerDetailSelect },
+    },
+  });
 }
 
 /**
- * Get providers colocated with a specific provider (same address)
+ * Get all providers that share the same physical address as the given location.
+ * Matches on address_line1 + city + state + zip_code (case-insensitive for text fields).
  */
-export async function getColocatedProviders(
-  npi: string,
+export async function getProvidersAtLocation(
+  id: number,
   options: { page?: number; limit?: number } = {}
 ) {
-  const provider = await prisma.provider.findUnique({
-    where: { npi },
-    select: { npi: true, locationId: true },
+  const { take, skip, page } = getPaginationValues(options.page, options.limit);
+
+  const location = await prisma.practice_locations.findUnique({
+    where: { id },
+    select: locationSelect,
   });
 
-  if (!provider?.locationId) return null;
+  if (!location) return null;
 
-  const { take, skip, page } = getPaginationValues(options.page, options.limit);
-  const where: Prisma.ProviderWhereInput = {
-    locationId: provider.locationId,
-    npi: { not: npi },
+  // Need at least address_line1 for a meaningful address match
+  if (!location.address_line1) {
+    return { location, providers: [], total: 0, page, limit: take, totalPages: 0 };
+  }
+
+  // Match colocated locations by address fields (only filter on non-null fields)
+  const where: Prisma.practice_locationsWhereInput = {
+    address_line1: { equals: location.address_line1, mode: 'insensitive' },
+    ...(location.city && { city: { equals: location.city, mode: 'insensitive' as const } }),
+    ...(location.state && { state: location.state }),
+    ...(location.zip_code && { zip_code: location.zip_code }),
   };
 
-  const [providers, total, location] = await Promise.all([
-    prisma.provider.findMany({
+  const [colocated, total] = await Promise.all([
+    prisma.practice_locations.findMany({
       where,
       take,
       skip,
-      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }, { organizationName: 'asc' }],
+      select: {
+        ...locationSelect,
+        providers: { select: providerDetailSelect },
+      },
+      orderBy: { npi: 'asc' },
     }),
-    prisma.provider.count({ where }),
-    prisma.location.findUnique({ where: { id: provider.locationId } }),
+    prisma.practice_locations.count({ where }),
   ]);
 
-  return { location, providers, total, page, limit: take, totalPages: Math.ceil(total / take) };
+  return { location, providers: colocated, total, page, limit: take, totalPages: Math.ceil(total / take) };
 }
 
 /**
- * Get location statistics by state
+ * Get distinct health system names from provider_hospitals.
+ * Optionally filtered by state/city via providers → practice_locations.
  */
-export async function getLocationStatsByState(state: string) {
-  const stats = await prisma.location.aggregate({
-    where: { state: state.toUpperCase() },
-    _count: true,
-    _sum: {
-      providerCount: true,
-    },
-    _avg: {
-      providerCount: true,
-    },
-    _max: {
-      providerCount: true,
-    },
+export async function getHealthSystems(options: { state?: string; city?: string } = {}) {
+  const where: Prisma.provider_hospitalsWhereInput = {
+    hospital_system: { not: null },
+  };
+
+  if (options.state || options.city) {
+    where.providers = {
+      practice_locations: {
+        some: {
+          ...(options.state && { state: options.state.toUpperCase() }),
+          ...(options.city && { city: { contains: options.city, mode: 'insensitive' as const } }),
+        },
+      },
+    };
+  }
+
+  const results = await prisma.provider_hospitals.findMany({
+    where,
+    select: { hospital_system: true },
+    distinct: ['hospital_system'],
+    orderBy: { hospital_system: 'asc' },
   });
+
+  return results
+    .map(r => r.hospital_system)
+    .filter((hs): hs is string => hs !== null);
+}
+
+/**
+ * Get location statistics for a state.
+ */
+export async function getLocationStats(state: string) {
+  const upperState = state.toUpperCase();
+
+  const [totalLocations, distinctCities, distinctZips, distinctProviders] = await Promise.all([
+    prisma.practice_locations.count({
+      where: { state: upperState },
+    }),
+    prisma.practice_locations.findMany({
+      where: { state: upperState, city: { not: null } },
+      select: { city: true },
+      distinct: ['city'],
+    }),
+    prisma.practice_locations.findMany({
+      where: { state: upperState, zip_code: { not: null } },
+      select: { zip_code: true },
+      distinct: ['zip_code'],
+    }),
+    prisma.practice_locations.findMany({
+      where: { state: upperState },
+      select: { npi: true },
+      distinct: ['npi'],
+    }),
+  ]);
 
   return {
-    totalLocations: stats._count,
-    totalProviders: stats._sum.providerCount || 0,
-    avgProvidersPerLocation: stats._avg.providerCount || 0,
-    maxProvidersAtLocation: stats._max.providerCount || 0,
+    totalLocations,
+    distinctCities: distinctCities.length,
+    distinctZipCodes: distinctZips.length,
+    totalProviders: distinctProviders.length,
   };
-}
-
-/**
- * Get distinct health systems (sorted by provider count)
- * Optionally filtered by state and/or cities
- */
-export async function getHealthSystems(params?: { state?: string; cities?: string }): Promise<string[]> {
-  const where: Prisma.LocationWhereInput = { healthSystem: { not: null }, AND: [] };
-
-  if (params?.state) where.state = params.state.toUpperCase();
-
-  // City filter using shared utility
-  const cityFilter = buildCityFilter(params?.cities, undefined);
-  if (cityFilter) addAndCondition(where, cityFilter);
-
-  cleanWhereClause(where);
-
-  const result = await prisma.location.groupBy({
-    by: ['healthSystem'],
-    where,
-    _sum: { providerCount: true },
-    orderBy: { _sum: { providerCount: 'desc' } },
-  });
-
-  return result.map(r => r.healthSystem).filter((hs): hs is string => hs !== null);
 }
