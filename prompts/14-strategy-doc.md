@@ -39,7 +39,7 @@ Create or update the strategic direction document for VerifyMyProvider.
    - Validated?
 
 3. What's the launch sequence?
-   - Geographic focus? (Miami?)
+   - Geographic focus: NYC (5 boroughs) for Q2 2026 launch
    - Specialty focus? (Osteoporosis first?)
    - Broader expansion plan?
 
@@ -171,18 +171,18 @@ Create or update the strategic direction document for VerifyMyProvider.
 
 ## Target Market
 
-### Phase 1: Niche (Months 0-12)
-- **Who:** [osteoporosis patients?]
-- **Where:** [Miami?]
-- **Why:** [tight community, word-of-mouth]
+### Phase 1: NYC Launch (Q2 2026)
+- **Who:** All patients needing provider verification
+- **Where:** NYC (5 boroughs — Manhattan, Brooklyn, Queens, Bronx, Staten Island)
+- **Why:** Dense provider market (~50-75K providers), high demand, tight communities
 
-### Phase 2: Regional (Months 12-24)
-- **Who:** [expand specialties]
-- **Where:** [top 5 cities]
+### Phase 2: Tri-State Expansion (Months 12-24)
+- **Who:** Expand to surrounding metro areas
+- **Where:** NJ, CT, Long Island, Westchester
 
 ### Phase 3: National (24+ months)
-- **Who:** [all specialties]
-- **Where:** [top 20 metros]
+- **Who:** All specialties
+- **Where:** Top 20 metros
 
 ---
 
@@ -247,7 +247,7 @@ Create or update the strategic direction document for VerifyMyProvider.
 
 | Risk | Probability | Impact | Mitigation |
 |------|-------------|--------|------------|
-| Cold start problem | High | Critical | Manual seeding, niche focus |
+| Cold start problem | High | Critical | Manual seeding, NYC geographic focus |
 | Verification spam | High | High | Rate limiting, CAPTCHA |
 | [other risks] | | | |
 
@@ -256,7 +256,7 @@ Create or update the strategic direction document for VerifyMyProvider.
 ## Crowdsource Strategy
 
 ### Cold Start Solution
-[Geographic focus, niche community, manual seeding]
+[NYC geographic focus, niche community, manual seeding]
 
 ### Verification Incentives
 [Altruism, gamification, premium features]
@@ -278,12 +278,12 @@ Create or update the strategic direction document for VerifyMyProvider.
 
 ## Success Criteria
 
-**Proof of Concept (3 months):**
-- 50 users, 100 verifications, useful for Miami osteoporosis
+**Proof of Concept (Q2 2026 Launch):**
+- 50 users, 100 verifications, useful for NYC provider search
 
 **One-City Utility (12 months):**
-- 500 users, 2k verifications, useful for all Miami specialties
+- 500 users, 2k verifications, useful for all NYC specialties
 
 **Regional Scale (24 months):**
-- 5k users, 15k verifications, 5 cities, profitable
+- 5k users, 15k verifications, tri-state area, profitable
 ```

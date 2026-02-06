@@ -37,7 +37,8 @@ Generate a changelog documenting significant changes to VerifyMyProvider, organi
 - Dark/light theme support
 
 ### Earlier
-- NPI data import for 6 states (FL, AL, AK, AR, AZ, CA)
+- NPI data import for 6 states (FL, AL, AK, AR, AZ, CA) — used for pipeline testing, NOT the launch dataset
+- **Note:** Current focus is NYC (5 boroughs) for Q2 2026 launch; NY state import filtered to NYC zip codes (~50-75K providers)
 - Initial Prisma schema with Provider, InsurancePlan, VerificationLog
 - Express backend with provider search and detail endpoints
 - Next.js 14 frontend with App Router

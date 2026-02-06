@@ -32,7 +32,7 @@ Track data quality issues in the VerifyMyProvider database, including NPI import
 | Trailing punctuation ("Birmingham,") | Known, cleanup script exists | Duplicate cities in dropdown |
 | Deactivated providers (~0.2%) | Known, kept in DB, filtered in queries | Stale data if not filtered |
 | Stale addresses (self-reported, rarely updated) | Inherent to NPI data | Inaccurate location display |
-| Only 6 states imported | Intentional, ~2.1M providers | Incomplete national coverage |
+| 6 states imported (pipeline testing) + NYC launch dataset | 6 states (FL, AL, AK, AR, AZ, CA) were for pipeline testing; NYC (5 boroughs, ~50-75K providers) is the Q2 2026 launch target | NYC coverage is the priority; other states are test data |
 | Unmapped taxonomy codes | Catch-all "Other" category | Incorrect specialty display |
 
 ### Insurance Plan Data

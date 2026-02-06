@@ -9,6 +9,9 @@ updated: 2026-02-05
 
 # VerifyMyProvider Prompts Index
 
+**Target Market:** NYC (5 boroughs) — ~50-75K providers | **Launch:** Q2 2026
+**Note:** 6 states (FL, AL, AK, AR, AZ, CA) were imported for pipeline testing; NYC is the launch dataset.
+
 Quick reference for all available prompts.
 
 ---
@@ -17,7 +20,7 @@ Quick reference for all available prompts.
 
 | # | Prompt | Purpose | Priority |
 |---|--------|---------|----------|
-| 01 | [[01-database-schema]] | 13 Prisma models, indexes, relationships | Critical |
+| 01 | [[01-database-schema]] | 15 Prisma models, indexes, relationships | Critical |
 | 02 | [[02-no-hipaa-compliance]] | Why no HIPAA needed (public data only) | Critical |
 | 03 | [[03-authentication]] | Admin auth (X-Admin-Secret) + future strategy | High |
 | 04 | [[04-csrf]] | CSRF protection (not needed yet — no auth cookies) | Medium |
@@ -65,7 +68,7 @@ Quick reference for all available prompts.
 
 | # | Prompt | Purpose | Status |
 |---|--------|---------|--------|
-| 28 | [[28-location-features]] | Location abstraction (practice_locations) | Needs rewrite (disabled) |
+| 28 | [[28-location-features]] | Location abstraction (practice_locations) | Active |
 | 29 | [[29-insurance-card-upload]] | Insurance card OCR via Claude AI | Accurate |
 | 30 | [[30-testing-strategy]] | Testing approach | Reference |
 | 31 | [[31-redis-caching]] | Redis caching strategy | Reference |
@@ -81,6 +84,7 @@ Quick reference for all available prompts.
 | 41 | [[41-frontend-data-fetching]] | React Query, API client, state management | **New** |
 | 42 | [[42-provider-detail-page]] | Provider detail page architecture | **New** |
 | 43 | [[43-search-architecture]] | Search flow (frontend + backend) | **New** |
+| 44 | [[44-seo-sitemap]] | SEO strategy, dynamic sitemap, provider page ISR | **New** |
 
 ---
 
@@ -162,4 +166,4 @@ These prompts should be updated when:
 - Architecture changes (new services, database changes, etc.)
 - New external API integrations are added
 
-**Last full audit:** 2026-02-05 (see `PROMPT-AUDIT-REPORT.md`)
+**Last full audit:** 2026-02-06 (see `PROMPT-AUDIT-REPORT.md`)
