@@ -4,6 +4,7 @@ import { memo, useMemo } from 'react';
 import Link from 'next/link';
 import type { ProviderDisplay } from '@/types';
 import { getSpecialtyDisplay } from '@/lib/provider-utils';
+import { toDisplayCase, toAddressCase, toTitleCase } from '@/lib/formatName';
 import { LocationIcon, PhoneIcon, ChevronRightIcon } from '@/components/icons';
 import { CheckCircle, BadgeCheck } from 'lucide-react';
 
@@ -166,9 +167,9 @@ function ProviderCardComponent({
   // Clean and format the display name
   const displayName = useMemo(() => {
     if (provider.entityType === 'ORGANIZATION' && provider.organizationName) {
-      return cleanOrganizationName(provider.organizationName);
+      return toDisplayCase(cleanOrganizationName(provider.organizationName));
     }
-    return cleanProviderName(provider.displayName);
+    return toDisplayCase(cleanProviderName(provider.displayName));
   }, [provider.entityType, provider.organizationName, provider.displayName]);
 
   // Memoize computed specialty
@@ -182,10 +183,12 @@ function ProviderCardComponent({
 
   // Format address - handle missing zip gracefully
   const formattedAddress = useMemo(() => {
-    const cityState = `${provider.city}, ${provider.state}`;
+    const city = toTitleCase(provider.city);
+    const cityState = `${city}, ${provider.state}`;
     const zipPart = provider.zip && provider.zip !== 'undefined' ? ` ${provider.zip}` : '';
+    const street = toAddressCase(provider.addressLine1) + (provider.addressLine2 ? `, ${toAddressCase(provider.addressLine2)}` : '');
     return {
-      street: provider.addressLine1 + (provider.addressLine2 ? `, ${provider.addressLine2}` : ''),
+      street,
       cityStateZip: cityState + zipPart,
     };
   }, [provider.addressLine1, provider.addressLine2, provider.city, provider.state, provider.zip]);
@@ -307,9 +310,14 @@ function ProviderCardComponent({
                   )}
                 </>
               ) : (
-                <span className="text-xs text-stone-500 dark:text-gray-400">
-                  No insurance data available
-                </span>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500 dark:text-gray-400">
+                    No verifications yet
+                  </span>
+                  <span className="text-blue-500 hover:text-blue-400 font-medium">
+                    Be the first to verify →
+                  </span>
+                </div>
               )}
             </div>
 
@@ -352,9 +360,9 @@ function ProviderCardCompactComponent({
 }) {
   const displayName = useMemo(() => {
     if (provider.entityType === 'ORGANIZATION' && provider.organizationName) {
-      return cleanOrganizationName(provider.organizationName);
+      return toDisplayCase(cleanOrganizationName(provider.organizationName));
     }
-    return cleanProviderName(provider.displayName);
+    return toDisplayCase(cleanProviderName(provider.displayName));
   }, [provider.entityType, provider.organizationName, provider.displayName]);
 
   return (
@@ -362,7 +370,7 @@ function ProviderCardCompactComponent({
       <div>
         <h4 className="font-medium text-stone-800 dark:text-white">{displayName}</h4>
         <p className="text-sm text-stone-600 dark:text-gray-400">
-          {provider.city}, {provider.state}
+          {toTitleCase(provider.city)}, {provider.state}
         </p>
       </div>
       <Link

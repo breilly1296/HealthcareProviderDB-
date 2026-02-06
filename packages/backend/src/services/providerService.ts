@@ -279,7 +279,12 @@ export async function searchProviders(params: ProviderSearchParams): Promise<Pro
       where,
       take,
       skip,
-      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }, { organizationName: 'asc' }],
+      orderBy: [
+        { providerPlanAcceptances: { _count: 'desc' } },
+        { lastName: 'asc' },
+        { firstName: 'asc' },
+        { organizationName: 'asc' },
+      ],
       include: PROVIDER_INCLUDE,
     }),
     prisma.provider.count({ where }),

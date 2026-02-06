@@ -2,7 +2,7 @@ const path = require('path');
 
 /** @type {import('jest').Config} */
 const config = {
-  testEnvironment: 'jsdom',
+  testEnvironment: 'node',
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
     // Handle CSS imports

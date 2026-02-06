@@ -4,6 +4,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import FocusTrap from 'focus-trap-react';
 import { useCompare, CompareProvider } from '@/hooks/useCompare';
 import { CONFIDENCE_THRESHOLDS } from '@/lib/constants';
+import { toDisplayCase, toAddressCase, toTitleCase } from '@/lib/formatName';
 
 interface CompareModalProps {
   isOpen: boolean;
@@ -249,9 +250,9 @@ export function CompareModal({ isOpen, onClose }: CompareModalProps) {
       ),
       renderValue: (p: CompareProvider) => (
         <div className="text-sm">
-          <div>{p.address}</div>
+          <div>{toAddressCase(p.address)}</div>
           <div className="text-gray-500 dark:text-gray-400">
-            {p.city}, {p.state} {p.zip}
+            {toTitleCase(p.city)}, {p.state} {p.zip}
           </div>
         </div>
       ),
@@ -406,10 +407,10 @@ export function CompareModal({ isOpen, onClose }: CompareModalProps) {
                     className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-800 px-4 py-3 text-center min-w-[200px]"
                   >
                     <div className="flex flex-col items-center gap-2">
-                      <ProviderInitial name={provider.name} />
+                      <ProviderInitial name={toDisplayCase(provider.name)} />
                       <div>
                         <div className="font-semibold text-gray-900 dark:text-white text-sm">
-                          {provider.name}
+                          {toDisplayCase(provider.name)}
                         </div>
                         <button
                           onClick={() => handleRemoveProvider(provider.npi)}

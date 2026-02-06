@@ -56,6 +56,14 @@ export const SPECIALTY_LABELS: Record<string, string> = {
   SPEECH_THERAPY: 'Speech Therapy',
   SURGERY: 'Surgery',
   UROLOGY: 'Urology',
+  OPHTHALMOLOGY: 'Ophthalmology',
+  PODIATRY: 'Podiatry',
+  PHYSICAL_MEDICINE_REHAB: 'Physical Medicine & Rehabilitation',
+  GENERAL_PRACTICE: 'General Practice',
+  PLASTIC_SURGERY: 'Plastic Surgery',
+  PREVENTIVE_MEDICINE: 'Preventive Medicine',
+  NUCLEAR_MEDICINE: 'Nuclear Medicine',
+  COLON_RECTAL_SURGERY: 'Colon & Rectal Surgery',
 };
 
 /** Specialty options for dropdowns with value/label pairs */

@@ -2,6 +2,7 @@
 
 import { MapPin, Phone, BadgeCheck, Navigation } from 'lucide-react';
 import { ConfidenceGauge } from './ConfidenceGauge';
+import { toDisplayCase, toAddressCase, toTitleCase } from '@/lib/formatName';
 
 interface Provider {
   npi: string;
@@ -83,10 +84,10 @@ export function ProviderHeroCard({ provider, confidenceScore, verificationCount 
   const specialty = provider.specialty || provider.specialtyCategory || provider.taxonomyDescription || 'Healthcare Provider';
   const isVerified = confidenceScore >= 70;
 
-  // Build full address
-  const streetAddress = [provider.addressLine1, provider.addressLine2].filter(Boolean).join(', ');
+  // Build full address (title-cased from NPPES ALL-CAPS)
+  const streetAddress = [toAddressCase(provider.addressLine1), toAddressCase(provider.addressLine2)].filter(Boolean).join(', ');
   const cityStateZip = [
-    provider.city,
+    toTitleCase(provider.city),
     provider.state ? `${provider.state}${provider.zip ? ` ${provider.zip}` : ''}` : null
   ].filter(Boolean).join(', ');
 
@@ -104,7 +105,7 @@ export function ProviderHeroCard({ provider, confidenceScore, verificationCount 
           <div className="flex-1 min-w-0">
             <div className="flex items-start gap-2 mb-1">
               <h1 className="text-xl md:text-2xl font-bold text-stone-800 dark:text-white">
-                {provider.displayName}
+                {toDisplayCase(provider.displayName)}
               </h1>
               {isVerified && (
                 <BadgeCheck className="w-5 h-5 text-[#137fec] flex-shrink-0 mt-1" />
@@ -116,7 +117,7 @@ export function ProviderHeroCard({ provider, confidenceScore, verificationCount 
             {/* Organization name if different */}
             {provider.organizationName && provider.entityType !== 'ORGANIZATION' && (
               <p className="text-sm text-stone-600 dark:text-gray-400 mb-2">
-                {provider.organizationName}
+                {toDisplayCase(provider.organizationName)}
               </p>
             )}
 

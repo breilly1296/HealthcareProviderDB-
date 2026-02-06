@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { providerApi } from '@/lib/api';
 import { toAppError, getUserMessage, logError } from '@/lib/errorUtils';
 import { Shimmer } from '@/components/ui/Shimmer';
+import { toDisplayCase, toAddressCase, toTitleCase } from '@/lib/formatName';
 import type { ProviderDisplay, Location } from '@/types';
 
 interface ColocatedProvidersProps {
@@ -113,14 +114,14 @@ export function ColocatedProviders({ npi }: ColocatedProvidersProps) {
             </svg>
             <div className="text-sm text-gray-700 dark:text-gray-300">
               {location.name && (
-                <p className="font-semibold text-base text-gray-900 dark:text-white mb-1">{location.name}</p>
+                <p className="font-semibold text-base text-gray-900 dark:text-white mb-1">{toDisplayCase(location.name)}</p>
               )}
               {location.healthSystem && (
-                <p className="text-primary-600 dark:text-primary-400 mb-1">{location.healthSystem}</p>
+                <p className="text-primary-600 dark:text-primary-400 mb-1">{toDisplayCase(location.healthSystem)}</p>
               )}
-              <p className="font-medium">{location.addressLine1}</p>
-              {location.addressLine2 && <p>{location.addressLine2}</p>}
-              <p>{location.city}, {location.state} {location.zipCode}</p>
+              <p className="font-medium">{toAddressCase(location.addressLine1)}</p>
+              {location.addressLine2 && <p>{toAddressCase(location.addressLine2)}</p>}
+              <p>{toTitleCase(location.city)}, {location.state} {location.zipCode}</p>
               <p className="text-gray-500 dark:text-gray-400 mt-1">
                 {colocatedTotal + 1} provider{colocatedTotal + 1 !== 1 ? 's' : ''} at this {location.facilityType ? location.facilityType.toLowerCase() : 'address'}
               </p>
@@ -138,7 +139,7 @@ export function ColocatedProviders({ npi }: ColocatedProvidersProps) {
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
                     <h3 className="font-medium text-gray-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400">
-                      {colProvider.displayName}
+                      {toDisplayCase(colProvider.displayName)}
                     </h3>
                     <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                       {colProvider.taxonomyDescription || colProvider.specialtyCategory || 'Healthcare Provider'}

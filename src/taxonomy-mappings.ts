@@ -52,6 +52,14 @@ export type SpecialtyCategory =
   | 'COMMUNITY_HEALTH'
   | 'HOME_HEALTH'
   | 'HOSPICE_PALLIATIVE'
+  | 'OPHTHALMOLOGY'
+  | 'PODIATRY'
+  | 'PHYSICAL_MEDICINE_REHAB'
+  | 'GENERAL_PRACTICE'
+  | 'PLASTIC_SURGERY'
+  | 'PREVENTIVE_MEDICINE'
+  | 'NUCLEAR_MEDICINE'
+  | 'COLON_RECTAL_SURGERY'
   | 'CLINIC_FACILITY'
   | 'HOSPITAL'
   | 'OTHER';
@@ -508,11 +516,8 @@ export const TAXONOMY_TO_SPECIALTY: Record<string, SpecialtyCategory> = {
   '207VX0201X': 'OB_GYN', // OB/GYN - Gynecologic Oncology
 
   // ============================================================
-  // CARDIOLOGY (207RC*)
+  // CARDIOLOGY — additional codes not in Internal Medicine section
   // ============================================================
-  '207RC0000X': 'CARDIOLOGY', // Cardiovascular Disease
-  '207RC0001X': 'CARDIOLOGY', // Clinical Cardiac Electrophysiology
-  '207RC0200X': 'CARDIOLOGY', // Critical Care Medicine (Cardiovascular)
   '207RI0001X': 'CARDIOLOGY', // Interventional Cardiology
   '207RY0107X': 'CARDIOLOGY', // Adult Congenital Heart Disease
 
@@ -543,19 +548,10 @@ export const TAXONOMY_TO_SPECIALTY: Record<string, SpecialtyCategory> = {
   '207NS0135X': 'DERMATOLOGY', // Dermatology - Procedural Dermatology
 
   // ============================================================
-  // NEUROLOGY (204*)
+  // NEUROLOGY — additional codes not in Psychiatry section
   // ============================================================
-  '2084N0400X': 'NEUROLOGY', // Neurology
-  '2084N0402X': 'NEUROLOGY', // Neurology with Special Qualifications in Child Neurology
-  '2084N0600X': 'NEUROLOGY', // Clinical Neurophysiology
   '204D00000X': 'NEUROLOGY', // Neuromusculoskeletal Medicine & OMM
   '204C00000X': 'NEUROLOGY', // Neuromusculoskeletal Medicine, Sports Medicine
-
-  // ============================================================
-  // ONCOLOGY (207RX*, 207RH0003X)
-  // ============================================================
-  '207RX0202X': 'ONCOLOGY', // Medical Oncology
-  '207RH0003X': 'ONCOLOGY', // Hematology & Oncology
 
   // ============================================================
   // UROLOGY (2088*)
@@ -563,27 +559,6 @@ export const TAXONOMY_TO_SPECIALTY: Record<string, SpecialtyCategory> = {
   '208800000X': 'UROLOGY', // Urology
   '2088F0040X': 'UROLOGY', // Urology - Female Pelvic Medicine and Reconstructive Surgery
   '2088P0231X': 'UROLOGY', // Urology - Pediatric Urology
-
-  // ============================================================
-  // GASTROENTEROLOGY (207RG*)
-  // ============================================================
-  '207RG0100X': 'GASTROENTEROLOGY', // Gastroenterology
-  '207RG0300X': 'GERIATRICS',       // Geriatric Medicine (keep under Geriatrics)
-
-  // ============================================================
-  // PULMONOLOGY (207RP*)
-  // ============================================================
-  '207RP1001X': 'PULMONOLOGY', // Pulmonary Disease
-
-  // ============================================================
-  // NEPHROLOGY (207RN*)
-  // ============================================================
-  '207RN0300X': 'NEPHROLOGY', // Nephrology
-
-  // ============================================================
-  // INFECTIOUS DISEASE (207RI*)
-  // ============================================================
-  '207RI0200X': 'INFECTIOUS_DISEASE', // Infectious Disease
 
   // ============================================================
   // ALLERGY & IMMUNOLOGY (207K*)
@@ -647,6 +622,75 @@ export const TAXONOMY_TO_SPECIALTY: Record<string, SpecialtyCategory> = {
   '335V00000X': 'DME_PROSTHETICS', // Orthotics/Prosthetics Fitter
 
   // ============================================================
+  // OPHTHALMOLOGY (207W*)
+  // ============================================================
+  '207W00000X': 'OPHTHALMOLOGY', // Ophthalmology
+  '207WX0009X': 'OPHTHALMOLOGY', // Glaucoma Specialist
+  '207WX0107X': 'OPHTHALMOLOGY', // Retinal Specialist
+  '207WX0108X': 'OPHTHALMOLOGY', // Uveitis and Ocular Inflammatory Disease
+  '207WX0200X': 'OPHTHALMOLOGY', // Ophthalmic Plastic and Reconstructive Surgery
+
+  // ============================================================
+  // PODIATRY (213E*)
+  // ============================================================
+  '213E00000X': 'PODIATRY', // Podiatrist
+  '213EG0000X': 'PODIATRY', // General Practice (Podiatry)
+  '213EP0504X': 'PODIATRY', // Public Medicine (Podiatry)
+  '213EP1101X': 'PODIATRY', // Primary Podiatric Medicine
+  '213ES0000X': 'PODIATRY', // Sports Medicine (Podiatry)
+  '213ES0103X': 'PODIATRY', // Foot & Ankle Surgery
+  '213ES0131X': 'PODIATRY', // Foot Surgery
+
+  // ============================================================
+  // PHYSICAL MEDICINE & REHABILITATION (2081*)
+  // ============================================================
+  '208100000X': 'PHYSICAL_MEDICINE_REHAB', // Physical Medicine & Rehabilitation
+  '2081H0002X': 'PHYSICAL_MEDICINE_REHAB', // PM&R - Hospice and Palliative
+  '2081N0008X': 'PHYSICAL_MEDICINE_REHAB', // PM&R - Neuromuscular Medicine
+  '2081P0004X': 'PHYSICAL_MEDICINE_REHAB', // PM&R - Spinal Cord Injury
+  '2081P0010X': 'PHYSICAL_MEDICINE_REHAB', // PM&R - Pediatric Rehabilitation
+  '2081P0301X': 'PHYSICAL_MEDICINE_REHAB', // PM&R - Brain Injury Medicine
+  '2081P2900X': 'PHYSICAL_MEDICINE_REHAB', // PM&R - Pain Medicine
+  '2081S0010X': 'PHYSICAL_MEDICINE_REHAB', // PM&R - Sports Medicine
+
+  // ============================================================
+  // GENERAL PRACTICE (208D*)
+  // ============================================================
+  '208D00000X': 'GENERAL_PRACTICE', // General Practice
+
+  // ============================================================
+  // PLASTIC SURGERY (2082*)
+  // ============================================================
+  '208200000X': 'PLASTIC_SURGERY', // Plastic Surgery
+  '2082S0099X': 'PLASTIC_SURGERY', // Plastic Surgery Within the Head and Neck
+  '2082S0105X': 'PLASTIC_SURGERY', // Surgery of the Hand (Plastic Surgery)
+
+  // ============================================================
+  // COLON & RECTAL SURGERY (208C*)
+  // ============================================================
+  '208C00000X': 'COLON_RECTAL_SURGERY', // Colon & Rectal Surgery
+
+  // ============================================================
+  // NUCLEAR MEDICINE (207U*)
+  // ============================================================
+  '207U00000X': 'NUCLEAR_MEDICINE', // Nuclear Medicine
+  '207UN0901X': 'NUCLEAR_MEDICINE', // Nuclear Cardiology
+  '207UN0903X': 'NUCLEAR_MEDICINE', // In Vivo & In Vitro Nuclear Medicine
+
+  // ============================================================
+  // PREVENTIVE MEDICINE (2083*)
+  // ============================================================
+  '2083A0100X': 'PREVENTIVE_MEDICINE', // Aerospace Medicine
+  '2083B0002X': 'PREVENTIVE_MEDICINE', // Obesity Medicine
+  '2083C0008X': 'PREVENTIVE_MEDICINE', // Clinical Informatics
+  '2083P0011X': 'PREVENTIVE_MEDICINE', // Undersea and Hyperbaric Medicine
+  '2083P0500X': 'PREVENTIVE_MEDICINE', // Preventive Medicine/Occupational Environmental
+  '2083P0901X': 'PREVENTIVE_MEDICINE', // Public Health & General Preventive Medicine
+  '2083S0010X': 'PREVENTIVE_MEDICINE', // Sports Medicine
+  '2083T0002X': 'PREVENTIVE_MEDICINE', // Medical Toxicology
+  '2083X0100X': 'PREVENTIVE_MEDICINE', // Occupational Medicine
+
+  // ============================================================
   // COMMUNITY HEALTH (172*, 173*, 174*, 175*, 176*, 251*)
   // ============================================================
   '172V00000X': 'COMMUNITY_HEALTH', // Community Health Worker
@@ -663,9 +707,7 @@ export const TAXONOMY_TO_SPECIALTY: Record<string, SpecialtyCategory> = {
   '177F00000X': 'COMMUNITY_HEALTH', // Lodging
   '251B00000X': 'COMMUNITY_HEALTH', // Case Management Agency
   '251C00000X': 'COMMUNITY_HEALTH', // Day Training/Habilitation Agency
-  '251E00000X': 'COMMUNITY_HEALTH', // Home Health Agency
   '251F00000X': 'COMMUNITY_HEALTH', // Home Infusion Agency
-  '251G00000X': 'COMMUNITY_HEALTH', // Hospice, Community Based
   '251J00000X': 'COMMUNITY_HEALTH', // Nursing Care Agency
   '251K00000X': 'COMMUNITY_HEALTH', // Public Health Agency
   '251S00000X': 'COMMUNITY_HEALTH', // Community/Behavioral Health Agency
@@ -700,7 +742,6 @@ export const TAXONOMY_TO_SPECIALTY: Record<string, SpecialtyCategory> = {
   '261QD0000X': 'CLINIC_FACILITY', // Dental
   '261QD1600X': 'CLINIC_FACILITY', // Developmental Disabilities
   '261QE0002X': 'CLINIC_FACILITY', // Emergency Care
-  '261QE0700X': 'CLINIC_FACILITY', // Endocrinology
   '261QE0800X': 'CLINIC_FACILITY', // End-Stage Renal Disease
   '261QF0050X': 'CLINIC_FACILITY', // Family Planning, Non-Surgical
   '261QF0400X': 'CLINIC_FACILITY', // Federally Qualified Health Center
@@ -734,7 +775,6 @@ export const TAXONOMY_TO_SPECIALTY: Record<string, SpecialtyCategory> = {
   '261QR0207X': 'CLINIC_FACILITY', // Radiology, Mobile Mammography
   '261QR0208X': 'CLINIC_FACILITY', // Radiology, Mobile
   '261QR0400X': 'CLINIC_FACILITY', // Rehabilitation
-  '261QR0401X': 'CLINIC_FACILITY', // Rheumatology
   '261QR0404X': 'CLINIC_FACILITY', // Rehabilitation, Cardiac
   '261QR0405X': 'CLINIC_FACILITY', // Rehabilitation, Substance Use Disorder
   '261QR0800X': 'CLINIC_FACILITY', // Recovery Care
@@ -802,7 +842,6 @@ export const TAXONOMY_TO_SPECIALTY: Record<string, SpecialtyCategory> = {
   '332U00000X': 'PHARMACY', // Home Infusion Therapy Pharmacy
   '333300000X': 'PHARMACY', // Pharmacy - Hospital Pharmacy
   '333600000X': 'PHARMACY', // Pharmacy - Institutional Pharmacy
-  '335E00000X': 'DME_PROSTHETICS', // Prosthetist
   '341600000X': 'CLINIC_FACILITY', // Ambulance
   '341800000X': 'CLINIC_FACILITY', // Military/US Coast Guard Transport
   '343800000X': 'CLINIC_FACILITY', // Secure Transportation
@@ -956,6 +995,14 @@ const PREFIX_MAPPINGS: [string, SpecialtyCategory][] = [
   ['207X', 'ORTHOPEDICS'],
   ['207Q', 'FAMILY_MEDICINE'],
   ['207R', 'INTERNAL_MEDICINE'],
+  ['207W', 'OPHTHALMOLOGY'],
+  ['213E', 'PODIATRY'],
+  ['2081', 'PHYSICAL_MEDICINE_REHAB'],
+  ['208D', 'GENERAL_PRACTICE'],
+  ['2082', 'PLASTIC_SURGERY'],
+  ['208C', 'COLON_RECTAL_SURGERY'],
+  ['207U', 'NUCLEAR_MEDICINE'],
+  ['2083', 'PREVENTIVE_MEDICINE'],
 
   // Support Services
   ['133', 'DIETETICS'],
@@ -1017,54 +1064,302 @@ export function getSpecialtyCategory(taxonomyCode: string | null | undefined): S
  * Taxonomy code descriptions (subset for common codes)
  */
 export const TAXONOMY_DESCRIPTIONS: Record<string, string> = {
-  '207RE0101X': 'Endocrinology, Diabetes & Metabolism',
-  '207RR0500X': 'Rheumatology',
-  '207X00000X': 'Orthopaedic Surgery',
+  // Internal Medicine & Subspecialties
   '207R00000X': 'Internal Medicine',
+  '207RA0000X': 'Adolescent Medicine',
+  '207RA0001X': 'Advanced Heart Failure & Transplant Cardiology',
+  '207RC0000X': 'Cardiovascular Disease',
+  '207RC0001X': 'Clinical Cardiac Electrophysiology',
+  '207RC0200X': 'Critical Care Medicine',
+  '207RE0101X': 'Endocrinology, Diabetes & Metabolism',
+  '207RG0100X': 'Gastroenterology',
+  '207RG0300X': 'Geriatric Medicine',
+  '207RH0000X': 'Hematology',
+  '207RH0003X': 'Hematology & Oncology',
+  '207RI0001X': 'Interventional Cardiology',
+  '207RI0008X': 'Hepatology',
+  '207RI0011X': 'Endocrinology',
+  '207RI0200X': 'Infectious Disease',
+  '207RM1200X': 'Magnetic Resonance Imaging',
+  '207RN0300X': 'Nephrology',
+  '207RP1001X': 'Pulmonary Disease',
+  '207RR0500X': 'Rheumatology',
+  '207RX0202X': 'Medical Oncology',
+  '207RY0107X': 'Adult Congenital Heart Disease',
+
+  // Family Medicine
   '207Q00000X': 'Family Medicine',
-  '207QG0300X': 'Geriatric Medicine (Family Medicine)',
-  '207RG0300X': 'Geriatric Medicine (Internal Medicine)',
-  '101YM0800X': 'Mental Health Counselor',
-  '103TC0700X': 'Clinical Psychologist',
+  '207QA0000X': 'Family Medicine - Adolescent Medicine',
+  '207QA0401X': 'Family Medicine - Addiction Medicine',
+  '207QA0505X': 'Family Medicine - Adult Medicine',
+  '207QB0002X': 'Family Medicine - Obesity Medicine',
+  '207QG0300X': 'Geriatric Medicine',
+  '207QH0002X': 'Hospice & Palliative Medicine',
+  '207QS0010X': 'Family Medicine - Sports Medicine',
+
+  // General Practice
+  '208D00000X': 'General Practice',
+
+  // Emergency Medicine
+  '207P00000X': 'Emergency Medicine',
+  '207PE0004X': 'Emergency Medical Services',
+  '207PP0204X': 'Pediatric Emergency Medicine',
+  '207PS0010X': 'Emergency Medicine - Sports Medicine',
+
+  // Pediatrics
+  '208000000X': 'Pediatrics',
+  '2080A0000X': 'Pediatrics - Adolescent Medicine',
+  '2080C0008X': 'Pediatrics - Child Abuse Pediatrics',
+  '2080N0001X': 'Neonatal-Perinatal Medicine',
+  '2080P0006X': 'Developmental-Behavioral Pediatrics',
+  '2080P0201X': 'Pediatric Allergy & Immunology',
+  '2080P0202X': 'Pediatric Cardiology',
+  '2080P0203X': 'Pediatric Critical Care',
+  '2080P0205X': 'Pediatric Endocrinology',
+  '2080P0206X': 'Pediatric Gastroenterology',
+  '2080P0207X': 'Pediatric Hematology-Oncology',
+  '2080P0210X': 'Pediatric Nephrology',
+  '2080P0214X': 'Pediatric Pulmonology',
+
+  // Surgery
+  '208600000X': 'Surgery',
+  '2086S0102X': 'Surgical Critical Care',
+  '2086S0105X': 'Surgery of the Hand',
+  '2086S0120X': 'Pediatric Surgery',
+  '2086S0122X': 'Plastic & Reconstructive Surgery',
+  '2086S0127X': 'Trauma Surgery',
+  '2086S0129X': 'Vascular Surgery',
+  '2086X0206X': 'Surgical Oncology',
+  '208G00000X': 'Thoracic Surgery',
+  '208M00000X': 'Hospitalist',
+  '208VP0000X': 'Pain Medicine',
+  '208VP0014X': 'Interventional Pain Medicine',
+
+  // Orthopedics
+  '207X00000X': 'Orthopaedic Surgery',
+  '207XS0106X': 'Hand Surgery',
+  '207XS0114X': 'Adult Reconstructive Orthopaedic Surgery',
+  '207XS0117X': 'Orthopaedic Spine Surgery',
+  '207XX0004X': 'Orthopaedic Foot & Ankle Surgery',
+  '207XX0005X': 'Sports Medicine',
+  '207XX0801X': 'Orthopaedic Trauma',
+
+  // OB/GYN
+  '207V00000X': 'Obstetrics & Gynecology',
+  '207VE0102X': 'Reproductive Endocrinology',
+  '207VG0400X': 'Gynecology',
+  '207VM0101X': 'Maternal & Fetal Medicine',
+  '207VX0000X': 'Obstetrics',
+  '207VX0201X': 'Gynecologic Oncology',
+
+  // Ophthalmology
+  '207W00000X': 'Ophthalmology',
+  '207WX0009X': 'Glaucoma Specialist',
+  '207WX0107X': 'Retinal Specialist',
+  '207WX0200X': 'Ophthalmic Plastic & Reconstructive Surgery',
+
+  // Dermatology
+  '207N00000X': 'Dermatology',
+  '207ND0101X': 'MOHS Micrographic Surgery',
+  '207ND0900X': 'Dermatopathology',
+  '207NP0225X': 'Pediatric Dermatology',
+
+  // Neurology & Psychiatry
+  '2084N0400X': 'Neurology',
+  '2084N0402X': 'Child Neurology',
+  '2084N0600X': 'Clinical Neurophysiology',
   '2084P0800X': 'Psychiatry',
+  '2084P0802X': 'Addiction Psychiatry',
+  '2084P0804X': 'Child & Adolescent Psychiatry',
+  '2084P0805X': 'Geriatric Psychiatry',
+  '2084A0401X': 'Psychiatry - Addiction Medicine',
+  '2084S0012X': 'Sleep Medicine',
+
+  // Radiology
+  '2085R0202X': 'Diagnostic Radiology',
+  '2085R0001X': 'Radiation Oncology',
+  '2085R0204X': 'Vascular & Interventional Radiology',
+  '2085N0700X': 'Neuroradiology',
+  '2085P0229X': 'Pediatric Radiology',
+
+  // Anesthesiology
+  '207L00000X': 'Anesthesiology',
+  '207LC0200X': 'Anesthesiology - Critical Care',
+  '207LP2900X': 'Anesthesiology - Pain Medicine',
+
+  // Urology
+  '208800000X': 'Urology',
+  '2088P0231X': 'Pediatric Urology',
+
+  // Allergy & Immunology
+  '207K00000X': 'Allergy & Immunology',
+
+  // Pathology
+  '207ZP0101X': 'Anatomic Pathology',
+  '207ZP0102X': 'Anatomic & Clinical Pathology',
+  '207ZC0006X': 'Clinical Pathology',
+
+  // Podiatry
+  '213E00000X': 'Podiatrist',
+  '213EG0000X': 'Podiatrist - General Practice',
+  '213ES0103X': 'Podiatrist - Foot & Ankle Surgery',
+  '213ES0131X': 'Podiatrist - Foot Surgery',
+
+  // Physical Medicine & Rehabilitation
+  '208100000X': 'Physical Medicine & Rehabilitation',
+  '2081P2900X': 'PM&R - Pain Medicine',
+  '2081S0010X': 'PM&R - Sports Medicine',
+
+  // Plastic Surgery
+  '208200000X': 'Plastic Surgery',
+
+  // Colon & Rectal Surgery
+  '208C00000X': 'Colon & Rectal Surgery',
+
+  // Nuclear Medicine
+  '207U00000X': 'Nuclear Medicine',
+
+  // Preventive Medicine
+  '2083P0500X': 'Preventive Medicine',
+  '2083P0901X': 'Public Health & General Preventive Medicine',
+  '2083X0100X': 'Occupational Medicine',
+
+  // Psychiatry, Psychology & Mental Health
+  '103T00000X': 'Psychologist',
+  '103TC0700X': 'Clinical Psychologist',
+  '103TC1900X': 'Counseling Psychologist',
+  '103TH0100X': 'Health Service Psychologist',
+  '103TS0200X': 'School Psychologist',
+  '103G00000X': 'Clinical Neuropsychologist',
+  '101Y00000X': 'Counselor',
+  '101YM0800X': 'Mental Health Counselor',
+  '101YA0400X': 'Addiction Counselor',
   '104100000X': 'Social Worker',
-  '1041C0700X': 'Clinical Social Worker',
+  '1041C0700X': 'Licensed Clinical Social Worker',
+  '106H00000X': 'Marriage & Family Therapist',
+  '103K00000X': 'Behavioral Analyst',
+
+  // Nursing
   '163W00000X': 'Registered Nurse',
+  '163WP0808X': 'Psychiatric/Mental Health Nurse',
+  '163WP0200X': 'Pediatric Nurse',
+  '163WC0200X': 'Critical Care Nurse',
+  '163WE0003X': 'Emergency Nurse',
+  '163WG0600X': 'Gerontology Nurse',
   '164W00000X': 'Licensed Practical Nurse',
+  '164X00000X': 'Licensed Vocational Nurse',
+
+  // Nurse Practitioner
   '363L00000X': 'Nurse Practitioner',
+  '363LA2100X': 'Nurse Practitioner - Acute Care',
+  '363LA2200X': 'Nurse Practitioner - Adult Health',
+  '363LC0200X': 'Nurse Practitioner - Critical Care',
   '363LF0000X': 'Nurse Practitioner - Family',
+  '363LG0600X': 'Nurse Practitioner - Gerontology',
+  '363LN0000X': 'Nurse Practitioner - Neonatal',
+  '363LP0200X': 'Nurse Practitioner - Pediatrics',
+  '363LP0808X': 'Nurse Practitioner - Psychiatric/Mental Health',
+  '363LP2300X': 'Nurse Practitioner - Primary Care',
+  '363LW0102X': 'Nurse Practitioner - Women\'s Health',
+  '363LX0001X': 'Nurse Practitioner - OB/GYN',
+
+  // Physician Assistant
   '363A00000X': 'Physician Assistant',
+  '363AS0400X': 'Physician Assistant - Surgical',
+
+  // CRNA & Midwifery
+  '367H00000X': 'Anesthesiologist Assistant',
   '171M00000X': 'Midwife',
+  '176B00000X': 'Certified Nurse Midwife',
+
+  // Dentistry
   '122300000X': 'Dentist',
   '1223G0001X': 'General Practice Dentist',
+  '1223E0200X': 'Endodontist',
+  '1223P0106X': 'Oral & Maxillofacial Pathologist',
+  '1223P0221X': 'Pediatric Dentist',
+  '1223P0300X': 'Periodontist',
+  '1223P0700X': 'Prosthodontist',
+  '1223S0112X': 'Oral & Maxillofacial Surgeon',
+  '1223X0400X': 'Orthodontist',
+  '124Q00000X': 'Dental Hygienist',
+
+  // Optometry
   '152W00000X': 'Optometrist',
+  '152WP0200X': 'Optometrist - Pediatrics',
+
+  // Pharmacy
   '183500000X': 'Pharmacist',
+  '1835G0000X': 'Pharmacist - General Practice',
+  '183700000X': 'Pharmacy Technician',
+
+  // Physical Therapy
   '225100000X': 'Physical Therapist',
+  '2251X0800X': 'Physical Therapist - Orthopedic',
+  '2251S0007X': 'Physical Therapist - Sports',
+  '2251N0400X': 'Physical Therapist - Neurology',
+  '225200000X': 'Physical Therapy Assistant',
+
+  // Occupational Therapy
   '225X00000X': 'Occupational Therapist',
+  '225XH1200X': 'Occupational Therapist - Hand',
+  '225XP0200X': 'Occupational Therapist - Pediatrics',
+  '224Z00000X': 'Occupational Therapy Assistant',
+
+  // Speech & Hearing
   '235Z00000X': 'Speech-Language Pathologist',
+  '237600000X': 'Audiologist',
+
+  // Respiratory Therapy
+  '227800000X': 'Respiratory Therapist',
+  '227900000X': 'Respiratory Therapist',
   '367500000X': 'Respiratory Therapist',
+
+  // Chiropractic & Acupuncture
   '111N00000X': 'Chiropractor',
   '171100000X': 'Acupuncturist',
-  '207P00000X': 'Emergency Medicine',
-  '208000000X': 'Pediatrics',
-  '207L00000X': 'Anesthesiology',
-  '208600000X': 'Surgery',
-  '207V00000X': 'Obstetrics & Gynecology',
-  '207RC0000X': 'Cardiovascular Disease',
-  '2085R0202X': 'Diagnostic Radiology',
-  '207N00000X': 'Dermatology',
-  '2084N0400X': 'Neurology',
-  '207RX0202X': 'Medical Oncology',
-  '208800000X': 'Urology',
-  '207RG0100X': 'Gastroenterology',
-  '207RP1001X': 'Pulmonary Disease',
-  '207RN0300X': 'Nephrology',
-  '207RI0200X': 'Infectious Disease',
-  '207K00000X': 'Allergy & Immunology',
+
+  // Dietetics
   '133V00000X': 'Registered Dietitian',
+  '133N00000X': 'Nutritionist',
+
+  // Lab & DME
   '3747P1801X': 'Phlebotomy Technician',
   '332B00000X': 'Durable Medical Equipment',
   '172V00000X': 'Community Health Worker',
+
+  // Facilities
   '261Q00000X': 'Clinic/Center',
+  '261QP2300X': 'Primary Care Clinic',
+  '261QU0200X': 'Urgent Care Clinic',
+  '261QM0801X': 'Mental Health Clinic',
+  '261QF0400X': 'Federally Qualified Health Center',
   '282N00000X': 'General Acute Care Hospital',
+  '283Q00000X': 'Psychiatric Hospital',
+  '283X00000X': 'Rehabilitation Hospital',
+  '314000000X': 'Skilled Nursing Facility',
 };
+
+/**
+ * Get a human-readable description for a taxonomy code.
+ * Falls back to the specialty category label if no exact description exists.
+ */
+export function getTaxonomyDescription(taxonomyCode: string | null | undefined): string | null {
+  if (!taxonomyCode) return null;
+
+  // Direct lookup
+  if (TAXONOMY_DESCRIPTIONS[taxonomyCode]) {
+    return TAXONOMY_DESCRIPTIONS[taxonomyCode];
+  }
+
+  // Fall back to category label (e.g., "ENDOCRINOLOGY" → "Endocrinology")
+  const category = getSpecialtyCategory(taxonomyCode);
+  if (category && category !== 'OTHER') {
+    return category
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  }
+
+  return null;
+}

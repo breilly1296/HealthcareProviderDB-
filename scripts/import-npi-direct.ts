@@ -9,7 +9,7 @@ import { parse } from 'csv-parse';
 import { createHash } from 'crypto';
 import path from 'path';
 import pg from 'pg';
-import { getSpecialtyCategory } from '../src/taxonomy-mappings';
+import { getSpecialtyCategory, getTaxonomyDescription as getTaxDesc } from '../src/taxonomy-mappings';
 
 const { Pool, Client } = pg;
 
@@ -78,25 +78,7 @@ function extractSecondaryTaxonomies(record: NPIRecord): string[] {
 }
 
 function getTaxonomyDescription(code: string): string | null {
-  const descriptions: Record<string, string> = {
-    '207RE0101X': 'Endocrinology, Diabetes & Metabolism',
-    '207RI0011X': 'Internal Medicine - Endocrinology',
-    '261QE0700X': 'Clinic/Center - Endocrinology',
-    '207RR0500X': 'Internal Medicine - Rheumatology',
-    '261QR0401X': 'Clinic/Center - Rheumatology',
-    '207X00000X': 'Orthopaedic Surgery',
-    '207XS0114X': 'Adult Reconstructive Orthopaedic Surgery',
-    '207XS0106X': 'Hand Surgery (Orthopaedic)',
-    '207XS0117X': 'Orthopaedic Surgery of the Spine',
-    '207XX0004X': 'Orthopaedic Foot and Ankle Surgery',
-    '207XX0005X': 'Sports Medicine (Orthopaedic)',
-    '207XX0801X': 'Orthopaedic Trauma',
-    '207R00000X': 'Internal Medicine',
-    '207Q00000X': 'Family Medicine',
-    '207QG0300X': 'Geriatric Medicine (Family Medicine)',
-    '207RG0300X': 'Geriatric Medicine (Internal Medicine)',
-  };
-  return descriptions[code] || null;
+  return getTaxDesc(code);
 }
 
 async function calculateFileHash(filePath: string): Promise<string> {

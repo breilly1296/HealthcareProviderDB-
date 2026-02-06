@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { Location } from '@/types';
+import { toDisplayCase, toAddressCase, toTitleCase } from '@/lib/formatName';
 
 interface LocationCardProps {
   location: Location;
@@ -21,24 +22,24 @@ export function LocationCard({ location }: LocationCardProps) {
             </div>
             <div className="flex-1">
               <h3 className="text-lg font-semibold text-gray-900 mb-2 hover:text-primary-600">
-                {location.name || location.addressLine1}
+                {toDisplayCase(location.name) || toAddressCase(location.addressLine1)}
               </h3>
               {location.name && (
                 <p className="text-sm text-gray-700 mb-1 font-medium">
-                  {location.addressLine1}
+                  {toAddressCase(location.addressLine1)}
                 </p>
               )}
               {location.addressLine2 && (
                 <p className="text-sm text-gray-600 mb-1">
-                  {location.addressLine2}
+                  {toAddressCase(location.addressLine2)}
                 </p>
               )}
               <p className="text-sm text-gray-600">
-                {location.city}, {location.state} {location.zipCode}
+                {toTitleCase(location.city)}, {location.state} {location.zipCode}
               </p>
               {location.healthSystem && (
                 <p className="text-sm text-primary-600 mt-1">
-                  {location.healthSystem}
+                  {toDisplayCase(location.healthSystem)}
                 </p>
               )}
             </div>
