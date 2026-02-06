@@ -43,10 +43,10 @@ updated: 2026-02-05
 
 ## VerifyMyProvider NPI Architecture
 - **Source:** NPPES Data Dissemination (CMS)
-- **Size:** 9.2M providers (10.8GB CSV)
-- **Strategy:** State-by-state import (50 separate files)
-- **Current:** ~2.1M providers imported (6 states: FL, AL, AK, AR, AZ, CA)
-- **Target:** All 50 states + territories
+- **Size:** 9.2M providers nationally (10.8GB CSV)
+- **Strategy:** NYC-focused import from NY state file
+- **Target Market:** NYC (5 boroughs) — estimated 50,000-75,000 providers
+- **Launch:** Q2 2026
 
 ## Checklist
 
@@ -113,18 +113,10 @@ model provider_taxonomies {
 
 ### 4. Import Progress Tracking
 
-**States Completed:**
-- [ ] Florida (FL): 613,875 providers
-- [ ] Alabama (AL): 90,572 providers
-- [ ] Alaska (AK): 34,701 providers
-- [ ] Arkansas (AR): 82,527 providers
-- [ ] Arizona (AZ): 167,899 providers
-- [ ] California (CA): 1,113,464 providers
-- [ ] **Total:** ~2.1M providers
-
-**States Remaining:**
-- [ ] 44 states + DC + territories
-- [ ] Estimated: ~7M additional providers
+**NYC Focus (Q2 2026 Launch):**
+- [ ] NY state import: Filter to NYC 5-borough zip codes
+- [ ] Estimated NYC providers: 50,000-75,000
+- [ ] Previous exploration imports (FL, AL, AK, AR, AZ, CA) used for pipeline testing — not the launch dataset
 
 ### 5. Performance Optimization
 
@@ -134,13 +126,9 @@ model provider_taxonomies {
 - [ ] Speedup: 5-10x faster
 - [ ] Memory usage: Acceptable
 
-**Import Time:**
-- [ ] FL (614k): ~110 minutes
-- [ ] AL (91k): ~88 minutes
-- [ ] AK (35k): ~40 minutes
-- [ ] AR (83k): ~81 minutes
-- [ ] AZ (168k): ~163 minutes
-- [ ] CA (1.1M): Running overnight
+**Import Time (from prior test imports):**
+- [ ] ~40 min per 35k providers, ~110 min per 614k providers
+- [ ] NYC import (~50-75k providers): estimated ~60-90 minutes
 
 **Database Performance:**
 - [ ] Indexes created after import (not during)?
@@ -157,7 +145,7 @@ model provider_taxonomies {
 
 **Data Quality:**
 - [ ] City names need cleanup (typos, duplicates)
-- [ ] Should regenerate after all states imported
+- [ ] Should regenerate for NYC boroughs after import
 - [ ] Consider deduplication strategy
 
 ### 7. Organization Linking Research
@@ -199,10 +187,10 @@ model provider_taxonomies {
 ## Questions to Ask
 
 ### Import Progress
-1. How many states have been imported?
-2. What's the current total provider count?
-3. Are there any states that failed to import?
-4. What's the ETA for completing all 50 states?
+1. Has the NYC-filtered NY import been completed?
+2. What's the current NYC provider count?
+3. Are all 5 boroughs covered?
+4. Are there any zip codes missing from the NYC filter?
 
 ### Data Quality
 1. Should we clean up city names now or later?
@@ -241,16 +229,15 @@ model provider_taxonomies {
 
 ### City Dropdown
 1. When should we regenerate cities.json?
-   - After each state import?
-   - After all states complete?
+   - After NYC import is complete
 
-2. Should we add county information?
+2. Should we add borough-level filtering?
 3. Should we add coordinates for proximity search?
 
 ### Next Steps
-1. What's the priority after all states are imported?
-   - Data cleanup?
-   - FHIR integration?
+1. What's the priority after NYC import is complete?
+   - Data enrichment (CMS details, hospital affiliations)?
+   - Insurance plan data for NYC carriers?
    - Frontend polish?
 
 ## Output Format
@@ -260,24 +247,17 @@ model provider_taxonomies {
 
 **Last Updated:** [Date]
 **Total Providers:** [count]
-**States Imported:** X/50
+**Target Market:** NYC (5 boroughs)
+**Launch:** Q2 2026
 
 ---
 
 ## Import Progress
 
-### Completed States
-| State | Providers | Import Time | Date Completed |
-|-------|-----------|-------------|----------------|
-| FL | 613,875 | ~110 min | [date] |
-| AL | 90,572 | ~88 min | [date] |
-[etc]
-
-### In Progress
-- [state]: [status]
-
-### Remaining
-- [list of states]
+### NYC Import Status
+- [ ] NY state file filtered to NYC zip codes
+- [ ] Provider count: [count]
+- [ ] All 5 boroughs covered: [yes/no]
 
 ---
 
@@ -319,7 +299,7 @@ model provider_taxonomies {
 ### Import Speed
 - **Batch Size:** 5000 records
 - **Average Time:** ~X minutes per 100k providers
-- **Total ETA:** [estimate for remaining states]
+- **NYC ETA:** ~60-90 minutes for 50-75k providers
 
 ### Database Performance
 - **Total Records:** [count]
@@ -356,10 +336,10 @@ model provider_taxonomies {
 **Current:**
 - File: `/public/data/cities.json`
 - Size: 40KB
-- States: [list]
+- State: NY (NYC boroughs)
 
 **Next Steps:**
-- [ ] Regenerate after all states imported
+- [ ] Regenerate after NYC import complete
 - [ ] Clean up duplicate/typo cities
 - [ ] Consider adding coordinates
 
@@ -367,17 +347,18 @@ model provider_taxonomies {
 
 ## Next Actions
 
-1. **Immediate:**
-   - [ ] Complete remaining state imports
-   - [ ] [other tasks]
+1. **Immediate (Pre-Launch):**
+   - [ ] Complete NYC provider data enrichment (CMS details, hospital affiliations, insurance networks)
+   - [ ] Run normalize-city-names.ts for NY state (424+ NYC mappings already exist)
+   - [ ] Populate insurance plan data for NYC major carriers (UnitedHealthcare, Aetna, Cigna, MetroPlus, 1199)
 
-2. **After imports complete:**
+2. **After NYC import complete:**
    - [ ] Data cleanup (cities, deactivated providers)
-   - [ ] Regenerate cities.json
+   - [ ] Regenerate cities.json for NYC boroughs
    - [ ] Database optimization (VACUUM ANALYZE)
 
-3. **Future:**
+3. **Future (Post-Launch):**
    - [ ] NPI API integration for provider details
    - [ ] Monthly delta updates
-   - [ ] Organization linking (revisit)
+   - [ ] Expand beyond NYC (tri-state area, then national)
 ```
