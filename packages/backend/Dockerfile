@@ -9,7 +9,7 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat openssl openssl-dev
 
 # Copy root package files for workspaces
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json tsconfig.base.json ./
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/backend/package.json ./packages/backend/
 
