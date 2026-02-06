@@ -701,12 +701,11 @@ export async function getVerificationsForPair(
   }
 
   const [acceptance, verifications] = await Promise.all([
-    prisma.providerPlanAcceptance.findUnique({
+    prisma.providerPlanAcceptance.findFirst({
       where: {
-        providerNpi_planId: {
-          providerNpi: provider.npi,
-          planId: plan.planId,
-        },
+        providerNpi: provider.npi,
+        planId: plan.planId,
+        locationId: null,
       },
     }),
     // Security: Exclude PII fields (sourceIp, userAgent, submittedBy)

@@ -183,12 +183,11 @@ async function upsertAcceptance(
   providerNpi: string,
   planId: string
 ): Promise<boolean> {
-  const existing = await prisma.providerPlanAcceptance.findUnique({
+  const existing = await prisma.providerPlanAcceptance.findFirst({
     where: {
-      providerNpi_planId: {
-        providerNpi,
-        planId,
-      },
+      providerNpi,
+      planId,
+      locationId: null,
     },
   });
 
