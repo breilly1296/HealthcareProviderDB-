@@ -7,7 +7,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces",
+    "build": "npm run build:shared && npm run build:backend && npm run build:frontend",
     "build:shared": "npm run build -w @healthcareproviderdb/shared",
     "build:backend": "npm run build -w @healthcareproviderdb/backend",
     "build:frontend": "npm run build -w @healthcareproviderdb/frontend",
@@ -52,6 +52,7 @@
   },
   "devDependencies": {
     "@types/pg": "^8.16.0",
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "rimraf": "^6.1.2"
   }
 }
