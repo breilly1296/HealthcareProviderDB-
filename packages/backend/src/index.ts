@@ -11,6 +11,7 @@ import requestIdMiddleware from './middleware/requestId';
 import httpLogger from './middleware/httpLogger';
 import logger from './utils/logger';
 import { getCacheStats } from './utils/cache';
+import { generalTimeout } from './middleware/requestTimeout';
 
 // Load environment variables
 dotenv.config();
@@ -171,6 +172,9 @@ app.get('/', (req: Request, res: Response) => {
     },
   });
 });
+
+// Request timeout (30s default for all API routes)
+app.use('/api/v1', generalTimeout);
 
 // API routes
 app.use('/api/v1', routes);

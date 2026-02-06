@@ -7,6 +7,7 @@ import { recalculateAllConfidenceScores } from '../services/confidenceDecayServi
 import { getEnrichmentStats } from '../services/locationEnrichment';
 import { cacheClear, getCacheStats } from '../utils/cache';
 import prisma from '../lib/prisma';
+import { adminTimeout } from '../middleware/requestTimeout';
 import logger from '../utils/logger';
 
 const router = Router();
@@ -68,6 +69,7 @@ function adminAuthMiddleware(req: Request, res: Response, next: NextFunction) {
 router.post(
   '/cleanup-expired',
   adminAuthMiddleware,
+  adminTimeout,
   asyncHandler(async (req, res) => {
     const dryRun = req.query.dryRun === 'true';
     const batchSize = parseInt(req.query.batchSize as string) || 1000;
@@ -273,6 +275,7 @@ router.get(
 router.post(
   '/cleanup/sync-logs',
   adminAuthMiddleware,
+  adminTimeout,
   asyncHandler(async (req, res) => {
     const dryRun = req.query.dryRun === 'true';
     const retentionDays = parseInt(req.query.retentionDays as string) || 90;
@@ -462,6 +465,7 @@ router.get(
 router.post(
   '/recalculate-confidence',
   adminAuthMiddleware,
+  adminTimeout,
   asyncHandler(async (req, res) => {
     const dryRun = req.query.dryRun === 'true';
     const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : undefined;

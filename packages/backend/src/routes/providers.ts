@@ -12,6 +12,7 @@ import {
 import { paginationSchema, npiParamSchema } from '../schemas/commonSchemas';
 import { buildPaginationMeta, sendSuccess } from '../utils/responseHelpers';
 import { cacheGet, cacheSet, generateSearchCacheKey } from '../utils/cache';
+import { searchTimeout } from '../middleware/requestTimeout';
 import logger from '../utils/logger';
 
 const router = Router();
@@ -203,6 +204,7 @@ function transformProvider(p: Record<string, unknown>) {
  */
 router.get(
   '/search',
+  searchTimeout,
   searchRateLimiter,
   asyncHandler(async (req, res) => {
     const query = searchQuerySchema.parse(req.query);
