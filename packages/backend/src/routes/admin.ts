@@ -3,8 +3,7 @@ import { timingSafeEqual } from 'crypto';
 import { z } from 'zod';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { cleanupExpiredVerifications, getExpirationStats } from '../services/verificationService';
-// TODO: locationEnrichment depends on old Location model - re-enable when practice_locations rewrite is done
-// import { enrichLocationNames, getEnrichmentStats } from '../services/locationEnrichment';
+import { getEnrichmentStats } from '../services/locationEnrichment';
 import { cacheClear, getCacheStats } from '../utils/cache';
 import prisma from '../lib/prisma';
 import logger from '../utils/logger';
@@ -234,8 +233,26 @@ router.get(
 
 // ============================================================================
 // Location Enrichment Endpoints
-// TODO: Disabled - depends on old Location model, needs rewrite for practice_locations
 // ============================================================================
+
+/**
+ * GET /api/v1/admin/enrichment/stats
+ * Get location enrichment statistics (practice_locations + provider_hospitals)
+ *
+ * Protected by X-Admin-Secret header
+ */
+router.get(
+  '/enrichment/stats',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    const stats = await getEnrichmentStats();
+
+    res.json({
+      success: true,
+      data: stats,
+    });
+  })
+);
 
 // ============================================================================
 // Log Retention Cleanup Endpoints

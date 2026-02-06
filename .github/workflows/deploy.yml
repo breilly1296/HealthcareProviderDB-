@@ -72,12 +72,13 @@ jobs:
             --max-instances=10
             --concurrency=80
             --add-cloudsql-instances=verifymyprovider-prod:us-central1:verifymyprovider-db
-            --remove-secrets=ADMIN_SECRET
           env_vars: |
             NODE_ENV=production
             FRONTEND_URL=${{ secrets.FRONTEND_URL }}
           secrets: |
             DATABASE_URL=DATABASE_URL:latest
+            ADMIN_SECRET=ADMIN_SECRET:latest
+            RECAPTCHA_SECRET_KEY=RECAPTCHA_SECRET_KEY:latest
 
       - name: Show Backend URL
         run: echo "Backend deployed to ${{ steps.deploy.outputs.url }}"

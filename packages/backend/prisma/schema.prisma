@@ -194,7 +194,9 @@ model ProviderPlanAcceptance {
   insurancePlan      InsurancePlan?     @relation(fields: [planId], references: [planId], onUpdate: NoAction)
   location           practice_locations? @relation(fields: [locationId], references: [id], onUpdate: NoAction)
 
-  @@unique([providerNpi, planId])
+  // Unique constraints managed via raw SQL partial indexes:
+  // idx_ppa_npi_plan_location: UNIQUE(npi, plan_id, location_id) WHERE location_id IS NOT NULL
+  // idx_ppa_npi_plan_legacy: UNIQUE(npi, plan_id) WHERE location_id IS NULL
   @@index([acceptanceStatus], map: "idx_ppa_acceptance_status")
   @@index([confidenceScore], map: "idx_ppa_confidence_score")
   @@index([expiresAt], map: "idx_ppa_expires_at")
