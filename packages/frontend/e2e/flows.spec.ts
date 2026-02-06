@@ -9,7 +9,6 @@ import { test, expect } from '@playwright/test';
  * Each test is independent — no shared state between tests.
  */
 
-// Increase default timeout for tests that hit the real backend
 test.describe('Search Flows', () => {
   test('search for providers in New York', async ({ page }) => {
     await page.goto('/search');
@@ -24,15 +23,16 @@ test.describe('Search Flows', () => {
     const nyOption = page.getByRole('option', { name: /^New York$/i });
     await nyOption.click();
 
-    // Click Search
-    const searchButton = page.getByRole('button', { name: /search/i });
-    await searchButton.click();
+    // Click Search (exact match to avoid "Save search profile" button)
+    const searchButton = page.getByRole('button', { name: 'Search', exact: true });
 
-    // Wait for results to load
-    await page.waitForResponse(
+    // Set up response listener BEFORE clicking to avoid race condition
+    const searchResponse = page.waitForResponse(
       (resp) => resp.url().includes('/providers/search') && resp.status() === 200,
       { timeout: 15000 },
     );
+    await searchButton.click();
+    await searchResponse;
 
     // Verify at least one provider card appears
     const providerCards = page.locator('article');
@@ -78,13 +78,15 @@ test.describe('Search Flows', () => {
     await page.keyboard.type('New York');
     await page.getByRole('option', { name: /^New York$/i }).click();
 
-    await page.getByRole('button', { name: /search/i }).click();
+    const searchButton = page.getByRole('button', { name: 'Search', exact: true });
 
-    // Wait for results
-    await page.waitForResponse(
+    // Set up response listener BEFORE clicking
+    const firstResponse = page.waitForResponse(
       (resp) => resp.url().includes('/providers/search') && resp.status() === 200,
       { timeout: 15000 },
     );
+    await searchButton.click();
+    await firstResponse;
 
     // Get the initial result count from the "Found X providers" text
     const resultsText = page.locator('text=/Found \\d+/');
@@ -100,14 +102,13 @@ test.describe('Search Flows', () => {
     const firstSpecialty = page.getByRole('option').first();
     await firstSpecialty.click();
 
-    // Click Search again
-    await page.getByRole('button', { name: /search/i }).click();
-
-    // Wait for filtered results
-    await page.waitForResponse(
+    // Click Search again — set up response listener BEFORE clicking
+    const filteredResponse = page.waitForResponse(
       (resp) => resp.url().includes('/providers/search') && resp.status() === 200,
       { timeout: 15000 },
     );
+    await searchButton.click();
+    await filteredResponse;
 
     // Wait for results to update
     await page.waitForTimeout(1000);
@@ -124,12 +125,13 @@ test.describe('Search Flows', () => {
 
     if (hasClearAll) {
       await clearAllButton.click();
-      // Re-search after clearing
-      await page.getByRole('button', { name: /search/i }).click();
-      await page.waitForResponse(
+      // Re-search after clearing — set up response listener BEFORE clicking
+      const clearedResponse = page.waitForResponse(
         (resp) => resp.url().includes('/providers/search') && resp.status() === 200,
         { timeout: 15000 },
       );
+      await searchButton.click();
+      await clearedResponse;
       await page.waitForTimeout(1000);
 
       const clearedText = await resultsText.textContent().catch(() => 'Found 0');
@@ -204,13 +206,14 @@ test.describe('Provider Comparison', () => {
     await closeButton.click();
     await expect(modal).not.toBeVisible();
 
-    // Click Clear to remove all
-    const clearButton = page.getByRole('button', { name: /clear/i })
-      .or(page.getByText('Clear'));
+    // Click Clear to remove all — use exact text match to target the
+    // CompareBar's Clear button specifically (not modal or other elements)
+    const clearButton = page.getByRole('button', { name: 'Clear', exact: true });
     await clearButton.first().click();
 
-    // Verify compare bar disappears
-    await expect(compareText.first()).not.toBeVisible({ timeout: 3000 });
+    // After clearAll(), the CompareBar returns null (count === 0)
+    // so the "2 providers selected" text should disappear
+    await expect(compareText.first()).not.toBeVisible({ timeout: 5000 });
   });
 });
 
@@ -291,13 +294,16 @@ test.describe('Provider Detail SEO', () => {
     await stateCombobox.click();
     await page.keyboard.type('New York');
     await page.getByRole('option', { name: /^New York$/i }).click();
-    await page.getByRole('button', { name: /search/i }).click();
 
-    // Wait for results
-    await page.waitForResponse(
+    const searchButton = page.getByRole('button', { name: 'Search', exact: true });
+
+    // Set up response listener BEFORE clicking
+    const searchResponse = page.waitForResponse(
       (resp) => resp.url().includes('/providers/search') && resp.status() === 200,
       { timeout: 15000 },
     );
+    await searchButton.click();
+    await searchResponse;
 
     // Get the provider name from the first result card
     const firstCard = page.locator('article').first();
