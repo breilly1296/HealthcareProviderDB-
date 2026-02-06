@@ -53,7 +53,7 @@ coverage/
 # Cache
 .cache/
 *.tsbuildinfo
-tmpclaude-*-cwd
+tmpclaude-*
 
 # Playwright
 /test-results/
