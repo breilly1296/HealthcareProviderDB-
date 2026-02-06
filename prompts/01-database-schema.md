@@ -37,7 +37,7 @@ updated: 2026-02-05
 - [x] Verification data is anonymous (no user_id linkage)
 - [x] Public data accessible without RLS
 
-### 3. Core Models (13 total)
+### 3. Core Models (15 total)
 
 #### Provider Data (7 models)
 - [x] `Provider` (`providers`) — NPI registry data (name, specialty, entity type, taxonomy)
@@ -58,8 +58,9 @@ updated: 2026-02-05
 - [x] `VerificationLog` (`verification_logs`) — Anonymous user verifications with upvotes/downvotes + TTL
 - [x] `VoteLog` (`vote_logs`) — Individual votes on verifications (one per IP per verification)
 
-#### System (1 model)
+#### System (2 models)
 - [x] `SyncLog` (`sync_logs`) — Data import/sync tracking
+- [x] `DataQualityAudit` (`data_quality_audit`) — Data quality issues per provider (auditType, severity, field, currentValue, expectedValue, resolved status). Indexes on npi, severity, auditType, resolved.
 
 ### 4. Key Relationships
 
@@ -72,7 +73,8 @@ Provider (npi PK)
   ├── provider_medicare[] (npi FK, one-to-many)
   ├── provider_taxonomies[] (npi FK, one-to-many)
   ├── ProviderPlanAcceptance[] (npi FK)
-  └── VerificationLog[] (provider_npi FK)
+  ├── VerificationLog[] (provider_npi FK)
+  └── DataQualityAudit[] (npi FK, one-to-many)
 
 InsurancePlan (plan_id PK)
   ├── ProviderPlanAcceptance[] (plan_id FK)
@@ -163,6 +165,9 @@ enum VerificationSource {
   PHONE_CALL
   CROWDSOURCE
   AUTOMATED
+  NPPES_SYNC
+  CARRIER_SCRAPE
+  NETWORK_CROSSREF
 }
 
 enum VerificationType {
@@ -176,7 +181,7 @@ enum VerificationType {
 
 ### 7. Data Quality Fields
 - [x] Confidence scoring: `ProviderPlanAcceptance.confidenceScore` (0-100 integer)
-- [x] Source tracking: `VerificationSource` enum (CMS_DATA, CARRIER_DATA, PROVIDER_PORTAL, PHONE_CALL, CROWDSOURCE, AUTOMATED)
+- [x] Source tracking: `VerificationSource` enum (CMS_DATA, CARRIER_DATA, PROVIDER_PORTAL, PHONE_CALL, CROWDSOURCE, AUTOMATED, NPPES_SYNC, CARRIER_SCRAPE, NETWORK_CROSSREF)
 - [x] Timestamps: `createdAt`, `updatedAt`, `lastVerified` on ProviderPlanAcceptance
 - [x] Verification count: `ProviderPlanAcceptance.verificationCount`
 - [x] TTL fields: `expiresAt` on both ProviderPlanAcceptance and VerificationLog
@@ -191,7 +196,7 @@ enum VerificationType {
 - `@default(autoincrement())` for integer primary keys (practice_locations, provider_hospitals, etc.)
 
 ### 9. Known Schema Issues
-- [ ] `practice_locations` replaced the old `Location` model — locations route is disabled pending rewrite
+- [x] `practice_locations` replaced the old `Location` model — locations route has been re-enabled
 - [ ] No `state` or `city` index directly on Provider — address data lives in `practice_locations`
 - [ ] `provider_cms_details` source defaults to `"cms_national"` — may need source diversification
 - [ ] Several Provider fields use raw snake_case (`middle_name`, `name_prefix`, etc.) without `@map` — inconsistent with camelCase convention

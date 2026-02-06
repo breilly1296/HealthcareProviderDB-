@@ -15,8 +15,11 @@ created: 2026-02-05
 - `docker-compose.dev.yml` (development Docker Compose — PostgreSQL only)
 - `packages/backend/Dockerfile` (backend container)
 - `packages/frontend/Dockerfile` (frontend container)
-- `.github/workflows/deploy.yml` (Cloud Run deployment pipeline)
+- `.github/workflows/deploy.yml` (production Cloud Run deployment pipeline)
+- `.github/workflows/deploy-staging.yml` (staging Cloud Run deployment pipeline)
 - `.github/workflows/playwright.yml` (E2E test pipeline)
+- `.github/workflows/security-scan.yml` (SAST security scanning)
+- `.github/workflows/test.yml` (unit test CI on PRs)
 
 ## Architecture Overview
 
@@ -170,9 +173,21 @@ Steps:
 - GitHub Actions OIDC token exchanged for GCP credentials
 - Service account with minimal permissions for deploy
 
+## Staging Pipeline (`.github/workflows/deploy-staging.yml`)
+- **Trigger:** Push to `staging` branch or manual dispatch
+- **Services:** `verifymyprovider-backend-staging`, `verifymyprovider-frontend-staging`
+- **Differences from production:** Max 2 instances (vs 10), staging-prefixed image tags
+- All other config identical (Node 20, GCP auth, Docker build, secrets, memory/CPU)
+
 ## E2E Test Pipeline (`.github/workflows/playwright.yml`)
-- Runs Playwright browser tests
+- Runs Playwright browser tests on staging
 - Separate workflow from deployment
+
+## Security Scan Pipeline (`.github/workflows/security-scan.yml`)
+- SAST security scanning
+
+## Unit Test Pipeline (`.github/workflows/test.yml`)
+- Runs Jest tests on PRs
 
 ## Checklist
 
@@ -194,7 +209,7 @@ Steps:
 - [x] Cloud Run deployment with proper configuration
 - [x] Frontend depends on backend URL (sequential deploy)
 - [x] Deployment summary with status table
-- [ ] No staging environment — deploys directly to production
+- [x] Staging environment — `deploy-staging.yml` triggers on `staging` branch, deploys to `-staging` services
 - [ ] No rollback automation (manual via Cloud Run console)
 - [ ] No smoke tests after deployment
 - [ ] No build caching in GitHub Actions (Docker layer caching)

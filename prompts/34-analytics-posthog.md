@@ -148,8 +148,8 @@ posthog.init(key, {
 The analytics implementation follows a "maximum utility, minimum data" approach. Functions accept full event data (NPI, plan ID, etc.) as typed parameters but deliberately discard identifiable information before sending to PostHog. This means the type signatures serve as documentation of what COULD be tracked, while the implementation ensures only aggregate/boolean data is actually sent.
 
 ### User Consent
-- [ ] Cookie consent banner
-- [ ] Opt-out mechanism
+- [x] Cookie consent banner — `CookieConsent.tsx` component with accept/decline, localStorage-backed consent state
+- [x] Opt-out mechanism — declining disables PostHog capture via `posthog.opt_out_capturing()`
 - [ ] Privacy policy updated
 
 ## Dashboard & Insights
@@ -193,9 +193,9 @@ The analytics implementation follows a "maximum utility, minimum data" approach.
 - [x] No PII captured (only booleans and counts)
 - [x] No healthcare data captured (specialties, plans stripped)
 - [x] `autocapture` not explicitly disabled in PostHogProvider (consider adding)
-- [ ] Cookie consent banner
+- [x] Cookie consent banner — `CookieConsent.tsx` with sliding banner, accept/decline buttons
 - [ ] Privacy policy updated to mention PostHog
-- [ ] Opt-out mechanism
+- [x] Opt-out mechanism — via CookieConsent decline button
 
 ### Analysis
 - [ ] Dashboard created

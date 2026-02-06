@@ -14,6 +14,7 @@ priority: 2
 - `packages/backend/src/services/verificationService.ts` (prevention logic)
 - `packages/backend/src/middleware/rateLimiter.ts` (rate limiting)
 - `packages/backend/src/middleware/captcha.ts` (CAPTCHA)
+- `packages/backend/src/middleware/honeypot.ts` (bot detection)
 
 ## What is a Sybil Attack?
 
@@ -35,7 +36,19 @@ A Sybil attack is when an attacker creates multiple fake identities to manipulat
 └─────────────────────────────────────────────┘
 ```
 
-### Layer 2: CAPTCHA (Bot Detection)
+### Layer 2: Honeypot (Bot Detection)
+```
+┌─────────────────────────────────────────────┐
+│  Honeypot Field (middleware/honeypot.ts)     │
+│  • Hidden "website" form field              │
+│  • Real users never fill it, bots do        │
+│  • Returns fake 200 OK to confuse bots     │
+│  • Logs bot detection with IP and path     │
+│  • Applied on verification and vote routes │
+└─────────────────────────────────────────────┘
+```
+
+### Layer 3: CAPTCHA (Bot Detection)
 ```
 ┌─────────────────────────────────────────────┐
 │  Google reCAPTCHA v3                        │
@@ -45,7 +58,7 @@ A Sybil attack is when an attacker creates multiple fake identities to manipulat
 └─────────────────────────────────────────────┘
 ```
 
-### Layer 3: Vote Deduplication (Database)
+### Layer 4: Vote Deduplication (Database)
 ```
 ┌─────────────────────────────────────────────┐
 │  VoteLog Table                              │
@@ -55,7 +68,7 @@ A Sybil attack is when an attacker creates multiple fake identities to manipulat
 └─────────────────────────────────────────────┘
 ```
 
-### Layer 4: Verification Windows (Database)
+### Layer 5: Verification Windows (Database)
 ```
 ┌─────────────────────────────────────────────┐
 │  Sybil Prevention Indexes                   │
@@ -240,6 +253,11 @@ HAVING SUM(CASE WHEN new_value->>'accepted' = 'true' THEN 1 ELSE 0 END) > 0
 - [x] Rate limit headers returned
 - [x] Retry-After on 429
 
+### Honeypot
+- [x] Hidden "website" field on verification and vote forms
+- [x] Fake 200 OK response to confuse bots
+- [x] Bot detection logged with IP and path
+
 ### CAPTCHA
 - [x] reCAPTCHA v3 on verification
 - [x] reCAPTCHA v3 on voting
@@ -294,6 +312,7 @@ HAVING SUM(CASE WHEN new_value->>'accepted' = 'true' THEN 1 ELSE 0 END) > 0
 | Layer | Status | Notes |
 |-------|--------|-------|
 | Rate Limiting | ✅ | 10/hr verify, 10/hr vote |
+| Honeypot | ✅ | Hidden field, fake 200 OK |
 | CAPTCHA | ✅ | reCAPTCHA v3 |
 | Vote Dedup | ✅ | 1 vote per IP |
 | Verification Window | ✅ | 30-day IP + email check |

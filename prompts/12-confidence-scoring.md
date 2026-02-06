@@ -194,13 +194,22 @@ Helper: `enrichAcceptanceWithConfidence()` — attaches full confidence breakdow
 - [x] Confidence badge for compact display
 - [x] Freshness warning for stale data
 
-### 7. Confidence Decay (Future Feature)
+### 7. Confidence Decay (Implemented)
 
-**Background Job (Not Yet Implemented):**
-- [ ] Run nightly
-- [ ] Recalculate confidence for all provider-plan pairs
-- [ ] Age decreases recency score automatically
-- [ ] No manual updates needed
+**File:** `packages/backend/src/services/confidenceDecayService.ts`
+
+**Admin Endpoint:** `POST /api/v1/admin/recalculate-confidence` (supports `dryRun` and `limit` params)
+
+The `confidenceDecayService` proactively recalculates confidence scores with time-based decay:
+
+- [x] `recalculateAllConfidenceScores()` — batch recalculation for all acceptances with verifications
+- [x] Fetches provider specialty for specialty-specific decay rates
+- [x] Aggregates upvotes/downvotes from related VerificationLog entries
+- [x] Only considers non-expired verifications
+- [x] Supports dry-run mode for preview without writing
+- [x] Cursor-based pagination with configurable batch size
+- [x] Progress callback support for monitoring
+- [x] Returns stats: `{ processed, updated, unchanged, errors, durationMs }`
 
 ## Questions to Ask
 

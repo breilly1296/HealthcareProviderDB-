@@ -17,7 +17,7 @@ Meta-prompt that runs a comprehensive security audit by referencing all security
 ### Critical Priority
 | # | Prompt | Focus Area | Key Concern |
 |---|--------|------------|-------------|
-| 01 | [[01-database-schema]] | Schema security, indexes, constraints | 13 models, proper indexes, no RLS needed |
+| 01 | [[01-database-schema]] | Schema security, indexes, constraints | 15 models, proper indexes, no RLS needed |
 | 02 | [[02-no-hipaa-compliance]] | HIPAA compliance position | Public data only, no PHI stored |
 | 08 | [[08-rate-limiting]] | Rate limiting, spam prevention | Dual-mode Redis/in-memory, 4 tiers |
 | 11 | [[11-environment-secrets]] | Secret management | 20+ env vars, GCP Secret Manager |
@@ -56,7 +56,7 @@ Meta-prompt that runs a comprehensive security audit by referencing all security
 - **Secrets:** GCP Secret Manager, no hardcoded secrets
 - **Logging:** PII-free application logs, IPs stored in DB for anti-abuse only
 - **Error Handling:** No stack traces in production, structured error responses
-- **Sybil Prevention:** Rate limiting + CAPTCHA + vote dedup + 30-day windows
+- **Sybil Prevention:** Rate limiting + honeypot + CAPTCHA + vote dedup + 30-day windows
 - **HIPAA:** Not required (public provider data only)
 
 ## Questions to Ask

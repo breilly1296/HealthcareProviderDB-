@@ -69,7 +69,7 @@ User → Next.js Frontend → Express Backend → PostgreSQL
 
 ## Checklist
 - [x] Monorepo with npm workspaces
-- [x] 13 Prisma models with proper relationships
+- [x] 15 Prisma models with proper relationships
 - [x] RESTful API with versioned routes (`/api/v1/`)
 - [x] Client-side React app with App Router
 - [x] Dual-mode caching (Redis + in-memory)

@@ -165,6 +165,78 @@ gcloud scheduler jobs create http cleanup-expired \
 gcloud scheduler jobs run cleanup-expired --location=us-central1
 ```
 
+### `POST /api/v1/admin/cache/clear`
+
+Clear all cached data.
+
+**Authentication:** `X-Admin-Secret` header required
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "deletedCount": 42,
+    "message": "Cache cleared"
+  }
+}
+```
+
+### `GET /api/v1/admin/cache/stats`
+
+Get cache statistics with hit rate calculation.
+
+**Authentication:** `X-Admin-Secret` header required
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "hits": 150,
+    "misses": 30,
+    "hitRate": "83.3%",
+    "size": 42
+  }
+}
+```
+
+### `GET /api/v1/admin/enrichment/stats`
+
+Get location enrichment statistics for `practice_locations` and `provider_hospitals`.
+
+**Authentication:** `X-Admin-Secret` header required
+
+### `POST /api/v1/admin/cleanup/sync-logs`
+
+Clean up sync_logs older than N days.
+
+**Authentication:** `X-Admin-Secret` header required
+
+**Query Parameters:**
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `dryRun` | string | 'false' | If 'true', only return counts |
+| `retentionDays` | number | 90 | Delete logs older than this |
+
+### `GET /api/v1/admin/retention/stats`
+
+Comprehensive retention statistics for all log types (verification, sync, plan acceptance, votes).
+
+**Authentication:** `X-Admin-Secret` header required
+
+### `POST /api/v1/admin/recalculate-confidence`
+
+Recalculate confidence scores with time-based decay for all provider-plan acceptances.
+
+**Authentication:** `X-Admin-Secret` header required
+
+**Query Parameters:**
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `dryRun` | string | 'false' | If 'true', preview without writing |
+| `limit` | number | — | Max records to process |
+
 ## Future Admin Endpoints (Planned)
 
 | Endpoint | Purpose |
@@ -173,7 +245,6 @@ gcloud scheduler jobs run cleanup-expired --location=us-central1
 | `GET /admin/providers/flagged` | Providers with conflicting verifications |
 | `POST /admin/providers/:npi/review` | Mark provider as manually reviewed |
 | `GET /admin/rate-limits` | Current rate limit status |
-| `POST /admin/cache/clear` | Clear cached data |
 
 ## Checklist
 
@@ -183,11 +254,16 @@ gcloud scheduler jobs run cleanup-expired --location=us-central1
 - [x] Graceful 503 if not configured
 - [ ] Audit logging for admin actions
 
-### Endpoints
+### Endpoints (9 total)
 - [x] POST /admin/cleanup-expired
 - [x] GET /admin/expiration-stats
 - [x] GET /admin/health
-- [ ] Additional stats endpoints
+- [x] POST /admin/cache/clear
+- [x] GET /admin/cache/stats
+- [x] GET /admin/enrichment/stats
+- [x] POST /admin/cleanup/sync-logs
+- [x] GET /admin/retention/stats
+- [x] POST /admin/recalculate-confidence
 
 ### Automation
 - [ ] Cloud Scheduler configured
@@ -238,6 +314,12 @@ gcloud scheduler jobs run cleanup-expired --location=us-central1
 | POST /admin/cleanup-expired | TTL cleanup | ✅ |
 | GET /admin/expiration-stats | Expiration stats | ✅ |
 | GET /admin/health | Health check | ✅ |
+| POST /admin/cache/clear | Clear cache | ✅ |
+| GET /admin/cache/stats | Cache statistics | ✅ |
+| GET /admin/enrichment/stats | Location enrichment stats | ✅ |
+| POST /admin/cleanup/sync-logs | Sync log retention | ✅ |
+| GET /admin/retention/stats | Retention statistics | ✅ |
+| POST /admin/recalculate-confidence | Confidence decay | ✅ |
 
 ## Authentication
 - Method: X-Admin-Secret header

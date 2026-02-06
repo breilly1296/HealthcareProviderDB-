@@ -22,11 +22,11 @@ Document known issues, limitations, and workarounds in VerifyMyProvider.
 ## Known Issues
 
 ### Architecture
-1. **Locations route disabled** — `routes/locations.ts` commented out in `routes/index.ts`. Depends on old `Location` model; needs rewrite for `practice_locations` table. Frontend `/location/[locationId]` page exists but backend returns 404.
+1. ~~**Locations route disabled**~~ **RESOLVED** — `routes/locations.ts` is registered and active in `routes/index.ts`. Frontend `/location/[locationId]` page connects to working API endpoints.
 
 2. **Location enrichment disabled** — Admin endpoints for location enrichment commented out in `admin.ts`. Depends on old Location model.
 
-3. **No staging environment** — CI/CD deploys directly to production on push to `main`. No pre-production testing.
+3. ~~**No staging environment**~~ **RESOLVED** — Staging pipeline exists (`.github/workflows/deploy-staging.yml`), triggers on `staging` branch, deploys to `-staging` Cloud Run services with max 2 instances.
 
 ### Development
 4. **Next.js SWC on Windows ARM64** — Native SWC binaries incompatible with Node.js v24+ on Windows ARM64. Workaround: postinstall script patches SWC to use WASM fallback.

@@ -11,12 +11,12 @@ updated: 2026-02-05
 # API Routes Security Review
 
 ## Files to Review
-- `packages/backend/src/routes/index.ts` (route registry — locations commented out)
+- `packages/backend/src/routes/index.ts` (route registry)
 - `packages/backend/src/routes/providers.ts` (provider search, details, cities)
 - `packages/backend/src/routes/plans.ts` (insurance plan search, metadata, providers-for-plan)
 - `packages/backend/src/routes/verify.ts` (verification submissions, votes, stats)
 - `packages/backend/src/routes/admin.ts` (admin cleanup, stats, cache — requires X-Admin-Secret)
-- `packages/backend/src/routes/locations.ts` (EXISTS but DISABLED — commented out in index.ts)
+- `packages/backend/src/routes/locations.ts` (location/geographic endpoints)
 - `packages/backend/src/middleware/rateLimiter.ts` (rate limiting)
 - `packages/backend/src/middleware/captcha.ts` (reCAPTCHA v3 on verify/vote)
 - `packages/backend/src/middleware/errorHandler.ts` (error handling)
@@ -96,22 +96,16 @@ File: `routes/admin.ts`
 - 503 if `ADMIN_SECRET` env var not configured (graceful disable)
 - 401 if secret is wrong (timing-safe to prevent extraction)
 
-### Location Routes (`/api/v1/locations`) — DISABLED
-File: `routes/locations.ts` (exists but NOT registered in `routes/index.ts`)
+### Location Routes (`/api/v1/locations`) — ACTIVE
+File: `routes/locations.ts` (registered in `routes/index.ts`)
 
-```typescript
-// routes/index.ts
-// TODO: locations route depends on old Location model - needs rewrite for practice_locations
-// import locationsRouter from './locations';
-// router.use('/locations', locationsRouter);
-```
-
-These endpoints exist in the file but are **non-functional**:
-- GET `/search` — Search locations with filters
-- GET `/health-systems` — Get distinct health systems
-- GET `/stats/:state` — Location statistics by state
-- GET `/:locationId` — Location details
-- GET `/:locationId/providers` — Providers at a location
+| Method | Path | Rate Limit | Auth | Description |
+|--------|------|-----------|------|-------------|
+| GET | `/search` | defaultRateLimiter (200/hr) | None | Search locations with filters |
+| GET | `/health-systems` | defaultRateLimiter (200/hr) | None | Get distinct health systems |
+| GET | `/stats/:state` | defaultRateLimiter (200/hr) | None | Location statistics by state |
+| GET | `/:locationId` | defaultRateLimiter (200/hr) | None | Location details |
+| GET | `/:locationId/providers` | defaultRateLimiter (200/hr) | None | Providers at a location |
 
 ### Infrastructure Endpoints (not under `/api/v1`)
 File: `index.ts`
@@ -129,12 +123,13 @@ File: `index.ts`
 3. helmet                  — Security headers (strict CSP for JSON API)
 4. cors                    — CORS with whitelist (verifymyprovider.com, Cloud Run, localhost)
 5. express.json            — Body parsing (100kb limit)
-6. /health endpoint        — Health check (BEFORE rate limiter)
-7. defaultRateLimiter      — 200 req/hr global rate limit
-8. requestLogger           — Usage tracking (searches, verifications, votes)
-9. /api/v1/* routes        — Route handlers (with their own specific rate limiters)
-10. notFoundHandler        — 404 handler
-11. errorHandler           — Global error handler
+6. express.urlencoded      — URL-encoded body parsing (100kb limit)
+7. /health endpoint        — Health check (BEFORE rate limiter)
+8. defaultRateLimiter      — 200 req/hr global rate limit
+9. requestLogger           — Usage tracking (searches, verifications, votes)
+10. /api/v1/* routes       — Route handlers (with per-route: honeypot, captcha, specific rate limiters)
+11. notFoundHandler        — 404 handler
+12. errorHandler           — Global error handler
 ```
 
 ## Security Status
@@ -149,7 +144,7 @@ File: `index.ts`
 - [x] **Admin auth:** Timing-safe secret comparison
 - [ ] **User authentication:** Not implemented (all routes public)
 - [ ] **CSRF:** Not needed until auth is added
-- [ ] **Locations route:** Disabled pending practice_locations rewrite
+- [x] **Locations route:** Active and registered
 
 ## Questions to Ask
 1. Should the `/` endpoint listing be kept in sync with actual routes automatically?

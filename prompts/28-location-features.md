@@ -2,7 +2,7 @@
 tags:
   - feature
   - location
-  - needs-rewrite
+  - active
 type: prompt
 priority: 2
 updated: 2026-02-05
@@ -10,25 +10,23 @@ updated: 2026-02-05
 
 # Location Features Review
 
-## Current Status: PARTIALLY DISABLED
+## Current Status: ACTIVE
 
-The original `Location` model (grouping providers by shared address with health system/facility type metadata) was **replaced** by the `practice_locations` table during the schema migration. The locations API route is **commented out** in `routes/index.ts` pending a rewrite.
+The original `Location` model was **replaced** by the `practice_locations` table during the schema migration. The locations API route is **registered and active** in `routes/index.ts`.
 
 **What exists:**
 - `practice_locations` table stores raw provider addresses (one-to-many per provider)
-- Frontend `LocationCard` and `/location/[locationId]` page exist but may not function without the API
+- `routes/locations.ts` — registered in `routes/index.ts` (`router.use('/locations', locationsRouter)`)
+- `services/locationService.ts` — location queries and geographic enrichment
+- `services/locationEnrichment.ts` — enrichment pipeline
+- Frontend `LocationCard` and `/location/[locationId]` page
 - `ColocatedProviders` component on provider detail page
 
-**What is disabled/broken:**
-- `routes/locations.ts` — exists but is **not registered** (commented out in `routes/index.ts`)
-- `services/locationService.ts` — depends on old Location model, needs rewrite for `practice_locations`
-- `services/locationEnrichment.ts` — has TODO for rewrite
-
 ## Files to Review
-- `packages/backend/src/routes/index.ts` (locations route is commented out — line 6-7, 14)
-- `packages/backend/src/routes/locations.ts` (route file exists but is not active)
-- `packages/backend/src/services/locationService.ts` (needs rewrite for practice_locations)
-- `packages/backend/src/services/locationEnrichment.ts` (needs rewrite)
+- `packages/backend/src/routes/index.ts` (locations route registered)
+- `packages/backend/src/routes/locations.ts` (active location endpoints)
+- `packages/backend/src/services/locationService.ts` (location queries)
+- `packages/backend/src/services/locationEnrichment.ts` (enrichment pipeline)
 - `packages/backend/prisma/schema.prisma` (practice_locations model)
 - `packages/frontend/src/app/location/[locationId]/page.tsx` (frontend page)
 - `packages/frontend/src/components/LocationCard.tsx` (location display)
@@ -92,9 +90,9 @@ The location feature should group healthcare providers by their physical address
 - Identify health systems
 - Find co-located specialists
 
-## Planned API Endpoints (Need Rewrite)
+## API Endpoints (Active)
 
-The route file `locations.ts` defines these endpoints but they are **not active**:
+The route file `locations.ts` defines these endpoints, registered in `routes/index.ts`:
 
 ```
 GET /api/v1/locations/search          — Search locations with filters
@@ -133,17 +131,17 @@ GET /api/v1/locations/:locationId/providers — Providers at a location
 - [ ] No unique constraint on address (duplicate addresses possible)
 - [ ] No facility/health system metadata fields
 
-### API Routes (DISABLED)
-- [ ] Route file exists but is commented out in `routes/index.ts`
-- [ ] `locationService.ts` needs rewrite for `practice_locations` schema
-- [ ] `locationEnrichment.ts` needs rewrite
-- [ ] All 5 endpoints non-functional
+### API Routes (ACTIVE)
+- [x] Route file registered in `routes/index.ts`
+- [x] `locationService.ts` active
+- [x] `locationEnrichment.ts` active
+- [x] All 5 endpoints functional
 
 ### Frontend (PARTIALLY EXISTS)
 - [x] Location detail page exists (`/location/[locationId]`)
 - [x] `LocationCard` component exists
 - [x] `ColocatedProviders` component on provider detail page
-- [ ] Frontend pages may error without working API endpoints
+- [x] Frontend pages connected to working API endpoints
 - [ ] Link from provider detail to location page
 
 ### Data Quality (NOT STARTED)

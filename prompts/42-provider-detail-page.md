@@ -28,7 +28,7 @@ created: 2026-02-05
 The provider detail page (`/provider/[npi]`) is the most complex page in the app. It displays comprehensive information about a single healthcare provider, including their insurance acceptance, confidence scoring, and co-located providers.
 
 **Route:** `/provider/[npi]` (dynamic segment = NPI number)
-**Rendering:** Client-side (`'use client'`)
+**Rendering:** Server-side with ISR (`revalidate: 3600`) + client-side interactivity via `ProviderDetailClient`
 
 ## Data Flow
 
@@ -181,7 +181,9 @@ Data accuracy disclaimer:
 
 ### Page
 - [x] Dynamic route `/provider/[npi]`
-- [x] Client-side rendering
+- [x] Server-side rendering with ISR (`revalidate: 3600`)
+- [x] SEO metadata generation (Physician schema)
+- [x] Client-side interactivity via `ProviderDetailClient`
 - [x] Breadcrumb navigation back to search
 - [x] Loading, error, and success states
 - [x] Retry on error
@@ -201,8 +203,8 @@ Data accuracy disclaimer:
 - [x] Data accuracy Disclaimer
 
 ### Missing / Future
-- [ ] Server-side rendering for SEO (currently client-only)
-- [ ] Structured data / JSON-LD for search engines
+- [x] Server-side rendering for SEO — implemented with `revalidate: 3600` and metadata generation
+- [ ] Structured data / JSON-LD for search engines (beyond current metadata)
 - [ ] Share provider button
 - [ ] Print-friendly view
 - [ ] Verification history timeline (component exists but not wired in)
