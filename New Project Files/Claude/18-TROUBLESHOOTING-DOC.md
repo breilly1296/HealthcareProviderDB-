@@ -1,212 +1,209 @@
 # VerifyMyProvider Troubleshooting Guide
 
-**Last Updated:** 2026-02-05
-**Generated From:** prompts/18-troubleshooting-doc.md
+**Last Updated:** 2026-02-06
 
 ---
 
-## Table of Contents
+## Development Environment Issues
 
-1. [Development Environment Issues](#1-development-environment-issues)
-   - [1.1 Next.js SWC on Windows ARM64 + Node 24](#11-nextjs-swc-on-windows-arm64--node-24)
-   - [1.2 OneDrive + node_modules Corruption](#12-onedrive--node_modules-corruption)
-   - [1.3 npm Workspaces Hoisting Conflicts](#13-npm-workspaces-hoisting-conflicts)
-2. [Database Issues](#2-database-issues)
-   - [2.1 Prisma Schema Conventions After db pull](#21-prisma-schema-conventions-after-db-pull)
-   - [2.2 Cloud SQL Connection Failures](#22-cloud-sql-connection-failures)
-3. [Backend / API Issues](#3-backend--api-issues)
-   - [3.1 Locations Route Returns 404](#31-locations-route-returns-404)
-   - [3.2 Admin Endpoints Return 503](#32-admin-endpoints-return-503)
-   - [3.3 Location Enrichment Endpoints Not Available](#33-location-enrichment-endpoints-not-available)
-   - [3.4 Rate Limiting False Positives](#34-rate-limiting-false-positives)
-   - [3.5 CAPTCHA Verification Failures](#35-captcha-verification-failures)
-4. [Deployment Issues](#4-deployment-issues)
-   - [4.1 Cloud Run Deployment Failures](#41-cloud-run-deployment-failures)
-   - [4.2 No Staging Environment](#42-no-staging-environment)
-5. [Data Quality Issues](#5-data-quality-issues)
-   - [5.1 City Name Typos in NPI Data](#51-city-name-typos-in-npi-data)
-   - [5.2 Stale Provider Addresses](#52-stale-provider-addresses)
+### 1. Next.js SWC on Windows ARM64 + Node.js v24+
 
----
+**Symptom:** Build fails with "not a valid Win32 application" when running `next dev` or `next build` on Windows ARM64 with Node.js v24+.
 
-## 1. Development Environment Issues
+**Root Cause:** Next.js 14.x ships native SWC binaries that are incompatible with Node.js v24+ on Windows ARM64. The SWC WASM fallback is only auto-enabled for a hardcoded list of "unsupported" platforms, and `win32-arm64` is not in that list.
 
-### 1.1 Next.js SWC on Windows ARM64 + Node 24
+**Fix:** The postinstall script at `packages/frontend/scripts/patch-next-swc.js` automatically patches this. It:
+1. Adds `"aarch64-pc-windows-msvc"` to `knownDefaultWasmFallbackTriples` in `next/dist/build/swc/index.js`
+2. Removes the `useWasmBinary` gate so unsupported platforms automatically fall back to WASM
 
-**Symptom:**
-When running `npm run dev` in the frontend package on Windows ARM64 with Node.js v24+, the following error appears:
-
-```
-Error: not a valid Win32 application
-```
-
-The error originates from Next.js attempting to load native SWC binaries (`.node` files) that are incompatible with the Node.js v24+ runtime on Windows ARM64.
-
-**Root Cause:**
-Next.js 14.x ships native SWC binaries and includes a hardcoded list of platforms in `knownDefaultWasmFallbackTriples` for which it auto-enables a WASM fallback. The `win32-arm64` platform (`aarch64-pc-windows-msvc`) is **not** in that list. Additionally, the code gates the WASM fallback behind a `useWasmBinary` condition, preventing automatic fallback even if the platform were listed.
-
-**Fix:**
-A postinstall script at `packages/frontend/scripts/patch-next-swc.js` automates two patches to `next/dist/build/swc/index.js`:
-
-1. **Patch 1:** Adds `"aarch64-pc-windows-msvc"` to the `knownDefaultWasmFallbackTriples` array so Next.js recognizes Windows ARM64 as a platform needing WASM fallback.
-2. **Patch 2:** Changes the condition `unsupportedPlatform && useWasmBinary ||` to `unsupportedPlatform ||`, removing the `useWasmBinary` gate so the fallback engages automatically.
-
-The script checks both the local `node_modules` path and the hoisted monorepo path. It is safe to run on non-ARM64 systems (the patch is harmless if the platform is not matched).
-
-**How to Apply:**
+**Verification:**
 ```bash
-cd packages/frontend
-npm run postinstall
+# Run from packages/frontend
+node scripts/patch-next-swc.js
+# Should print: "Patched Next.js SWC loader for Windows ARM64 WASM fallback"
 ```
 
-Or it runs automatically during `npm install` if the postinstall script is configured in `packages/frontend/package.json`.
+**If the patch fails:**
+- Check that `next` is installed in the correct location (either `packages/frontend/node_modules/next` or the hoisted `node_modules/next`)
+- The script checks both locations automatically
+- If `next` is not found at either path, ensure `npm install` completed successfully
 
-**Verification:**
-After patching, `npm run dev` in the frontend package should start the Next.js dev server without the "not a valid Win32 application" error.
-
-**Reference File:** `packages/frontend/scripts/patch-next-swc.js`
-
----
-
-### 1.2 OneDrive + node_modules Corruption
-
-**Symptom:**
-Native `.node` binary files (such as SWC binaries, Prisma engines, or other native Node.js addons) fail to load with cryptic errors. Files may appear truncated or corrupted.
-
-**Root Cause:**
-OneDrive file sync can corrupt native binary files in `node_modules/`. This happens because OneDrive's sync mechanism may not correctly handle files that are being written while syncing, or it may alter file metadata in ways that break binary executables.
-
-**Workaround:**
-- Prefer WASM fallbacks over native binaries when available (e.g., the SWC WASM fallback described in section 1.1).
-- If corruption is suspected, delete `node_modules/` and reinstall:
-  ```bash
-  rm -rf node_modules packages/*/node_modules
-  npm install
-  ```
-- Consider adding `node_modules/` to OneDrive's exclusion list, or moving the project to a non-synced directory for development.
+**Source File:** `C:\Users\breil\OneDrive\Desktop\HealthcareProviderDB\packages\frontend\scripts\patch-next-swc.js`
 
 ---
 
-### 1.3 npm Workspaces Hoisting Conflicts
+### 2. OneDrive + node_modules Corruption
 
-**Symptom:**
-SWC version mismatches, unexpected Next.js behavior, or build errors after installing dependencies. The frontend may pick up a different version of `next` than expected.
+**Symptom:** Random build failures with cryptic errors about invalid binaries or corrupted files. Most commonly affects native `.node` binary modules.
 
-**Root Cause:**
-npm workspaces hoists dependencies to the root `node_modules/`. If `next` is listed in the root `package.json` (e.g., `next@^16.1.1`), it overrides the frontend workspace version (`next@^14.2.35`), causing SWC binary mismatches and API incompatibilities.
+**Root Cause:** OneDrive file sync can corrupt native binary modules when it syncs the `node_modules` directory. The sync process modifies binary file metadata or contents.
 
 **Fix:**
-- **NEVER** put `next` in the root `package.json`.
-- Only shared dependencies belong at root: `prisma`, `csv-parse`, `pg`, and similar cross-workspace utilities.
-- If the wrong version is installed, remove and reinstall:
-  ```bash
-  # Remove next from root if present
-  npm uninstall next --workspace-root
-  # Clean reinstall
-  rm -rf node_modules packages/*/node_modules
-  npm install
-  ```
+- The SWC WASM fallback (above) mitigates this for Next.js specifically
+- For other native modules, consider excluding `node_modules` from OneDrive sync
+- Alternatively, move the project directory outside of OneDrive-synced folders
 
-**Verification:**
-Check the resolved version: `npm ls next` should show `next` only under `packages/frontend`.
+**Prevention:**
+- Use WASM fallbacks wherever available
+- Add `node_modules` to OneDrive's exclusion list
+- If working from an OneDrive-synced directory, run `npm ci` (clean install) if you encounter corruption
 
 ---
 
-## 2. Database Issues
+### 3. npm Workspace Hoisting Conflicts
 
-### 2.1 Prisma Schema Conventions After db pull
+**Symptom:** SWC version mismatches, build errors mentioning wrong Next.js version, or `Cannot find module` errors.
 
-**Symptom:**
-After running `prisma db pull`, model names are lowercase (e.g., `model providers` instead of `model Provider`) and field names use `snake_case`, which does not match TypeScript conventions.
+**Root Cause:** Putting `next` in the root `package.json` causes npm to hoist it to the root `node_modules`, overriding the version specified in `packages/frontend/package.json`. The root had `next@^16.1.1` while the frontend needed `next@^14.2.35`.
 
-**Root Cause:**
-`prisma db pull` generates raw model and field names from the PostgreSQL table and column names, which are typically lowercase/snake_case.
+**Fix:** Only put shared dependencies at the root `package.json`:
+- Root dependencies: `@prisma/client`, `csv-parse`, `pg` (shared across packages)
+- Package-specific dependencies: `next`, `react`, `express` (in their respective `packages/*/package.json`)
 
-**Fix:**
-After every `prisma db pull`, manually update the schema:
-
-1. **Rename models** to PascalCase and add `@@map("table_name")`:
-   ```prisma
-   model Provider {
-     // fields...
-     @@map("providers")
-   }
-   ```
-
-2. **Rename fields** to camelCase and add `@map("column_name")`:
-   ```prisma
-   model Provider {
-     firstName String @map("first_name")
-     lastName  String @map("last_name")
-     // ...
-   }
-   ```
-
-3. For application-generated TEXT primary keys (e.g., `verification_logs`, `vote_logs`), add `@default(cuid())`.
-
-4. Run `npx prisma generate` after schema changes to regenerate the Prisma Client.
-
----
-
-### 2.2 Cloud SQL Connection Failures
-
-**Symptom:**
-Backend cannot connect to the database. Error messages referencing connection refused or timeout.
-
-**Root Cause / Configuration:**
-Connection methods differ by environment:
-
-| Environment | Method | Configuration |
-|---|---|---|
-| Local development | Direct TCP | `DATABASE_URL` in `.env` pointing to `localhost` or Cloud SQL public IP |
-| Cloud Run (production) | Cloud SQL Auth Proxy | Automatic unix socket via `CLOUD_SQL_CONNECTION_NAME` env var |
-
-**Troubleshooting Steps:**
-
-1. **Local:** Verify `DATABASE_URL` in `.env` is correct and the database is accessible:
-   ```bash
-   npx prisma db pull   # Quick connectivity test
-   ```
-
-2. **Cloud Run:** Verify:
-   - The Cloud SQL connection is configured in the Cloud Run service settings.
-   - `CLOUD_SQL_CONNECTION_NAME` is set in the format `project:region:instance`.
-   - The service account has `roles/cloudsql.client` permission.
-
----
-
-## 3. Backend / API Issues
-
-### 3.1 Locations Route Returns 404
-
-**Symptom:**
-Any request to `/api/v1/locations/*` returns a 404 error. Frontend pages that depend on location data do not function.
-
-**Root Cause:**
-The locations router is **commented out** in `packages/backend/src/routes/index.ts`:
-
-```typescript
-// TODO: locations route depends on old Location model - needs rewrite for practice_locations
-// import locationsRouter from './locations';
-// ...
-// router.use('/locations', locationsRouter);
+**Current Root Dependencies (verified in `package.json`):**
+```json
+{
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "csv-parse": "^5.6.0",
+    "pg": "^8.13.1"
+  }
+}
 ```
 
-The old `Location` model has been replaced by the `practice_locations` table, but the locations route has not been updated to use the new schema.
-
-**Status:** Disabled intentionally. Requires a rewrite of `routes/locations.ts` to work with the `practice_locations` table.
-
-**Workaround:** Provider location data is accessible through the provider detail endpoints (`/api/v1/providers/:npi`) which include associated practice locations.
-
-**Reference File:** `packages/backend/src/routes/index.ts` (lines 5-6, 14)
+**If you see version conflicts:**
+```bash
+# Delete all node_modules and reinstall
+rm -rf node_modules packages/*/node_modules
+npm install
+```
 
 ---
 
-### 3.2 Admin Endpoints Return 503
+### 4. Prisma Schema Conventions
 
-**Symptom:**
-All admin API calls (`/api/v1/admin/*`) return HTTP 503 with the response:
+**Symptom:** TypeScript compilation errors after running `prisma db pull`, fields not accessible by expected names, or model names appearing in lowercase.
 
+**Root Cause:** `prisma db pull` generates raw lowercase model names from PostgreSQL table names. Without manual mapping, TypeScript code cannot use PascalCase model names.
+
+**Fix:** After `prisma db pull`, manually adjust:
+1. Rename models to PascalCase and add `@@map("original_table_name")`
+2. Rename fields to camelCase and add `@map("original_column_name")`
+3. For application-generated primary keys (like verification_logs, vote_logs), add `@default(cuid())`
+
+**Example:**
+```prisma
+model ProviderPlanAcceptance {
+  id              Int    @id @default(autoincrement())
+  providerNpi     String @map("provider_npi")
+  planId          String @map("plan_id")
+  @@map("provider_plan_acceptance")
+}
+```
+
+**Source File:** `C:\Users\breil\OneDrive\Desktop\HealthcareProviderDB\packages\backend\prisma\schema.prisma`
+
+---
+
+## Database Issues
+
+### 5. Cloud SQL Connection
+
+**Symptom:** Backend cannot connect to the database. Health check returns 503 with `status: "degraded"`.
+
+**Local Development:**
+```bash
+# Start local PostgreSQL via Docker
+npm run docker:dev
+
+# Verify connection
+# In packages/backend/.env:
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/healthcare_providers
+```
+
+**Cloud Run (Production):**
+- Connection is automatic via Cloud SQL proxy (Unix socket)
+- `DATABASE_URL` is stored in Google Secret Manager and mounted as an environment variable
+- Format: `postgresql://user:password@/database?host=/cloudsql/project:region:instance`
+
+**Diagnosis Steps:**
+1. Check Docker container is running: `docker ps | grep healthcaredb-postgres`
+2. Check database URL is set: `echo $DATABASE_URL`
+3. Test connection: `npx prisma db push --force-reset` (WARNING: destroys data)
+4. Check Prisma client is generated: `npx prisma generate`
+5. For Cloud Run: check Secret Manager permissions in GCP Console
+
+---
+
+### 6. Database Schema Push/Migration
+
+**Symptom:** Schema changes not reflected in the database, or Prisma client types don't match the database.
+
+**Fix:**
+```bash
+# Generate Prisma client (TypeScript types)
+npm run db:generate
+
+# Push schema to database (development only -- no migration history)
+npm run db:push
+```
+
+**Important Notes:**
+- `prisma db push` is used instead of `prisma migrate` -- there is no migration history
+- This is additive for new fields/tables but can be destructive for removed fields
+- Always take a Cloud SQL backup before pushing schema changes in production
+- For destructive changes, manually backup affected data first
+
+---
+
+## Deployment Issues
+
+### 7. Cloud Run Service Won't Start
+
+**Symptom:** Deployment succeeds but the service shows "unhealthy" or fails health checks.
+
+**Diagnosis:**
+```bash
+# Check Cloud Run logs
+gcloud run services logs read verifymyprovider-backend --region=us-central1
+
+# Check revision status
+gcloud run revisions list --service=verifymyprovider-backend --region=us-central1
+```
+
+**Common Causes:**
+1. **DATABASE_URL secret not accessible:** Verify Secret Manager permissions. The Cloud Run service account needs `roles/secretmanager.secretAccessor`.
+2. **Port mismatch:** The Dockerfile exposes port 8080 but `PORT` env var might override it. Cloud Run expects port 8080.
+3. **Memory limit exceeded:** Default is 512Mi. If the service OOMs on startup, increase to 1Gi.
+4. **Prisma client not generated:** Ensure `npx prisma generate` runs in the Docker build stage BEFORE the TypeScript compilation.
+
+---
+
+### 8. Health Check Failing
+
+**Symptom:** Cloud Run reports the service as unhealthy, or `/health` returns 503.
+
+**How the health check works:**
+- Backend Dockerfile: `wget --no-verbose --tries=1 --spider http://localhost:8080/health`
+- Frontend Dockerfile: Similar health check on port 8080
+- The `/health` endpoint tests database connectivity with `SELECT 1`
+
+**If database is unreachable:**
+```json
+{
+  "status": "degraded",
+  "checks": { "database": "unhealthy" },
+  "error": "Database connection failed"
+}
+```
+
+**Fix:** Check the DATABASE_URL secret is correctly mounted. For Cloud SQL, ensure the Cloud SQL Admin API is enabled and the instance is running.
+
+---
+
+### 9. ADMIN_SECRET Not Configured
+
+**Symptom:** Admin endpoints return 503 with this response:
 ```json
 {
   "success": false,
@@ -218,217 +215,208 @@ All admin API calls (`/api/v1/admin/*`) return HTTP 503 with the response:
 }
 ```
 
-**Root Cause:**
-The `ADMIN_SECRET` environment variable is not set. The admin authentication middleware in `packages/backend/src/routes/admin.ts` checks for this variable and returns 503 if it is absent. This is **intentional** behavior that allows deployment in environments where admin access is not needed.
+**Root Cause:** The `ADMIN_SECRET` environment variable is not set. This is intentional behavior -- admin endpoints are disabled gracefully when the secret is not configured.
+
+**Fix:** Set `ADMIN_SECRET` in:
+- Local: `packages/backend/.env` file
+- Production: Google Secret Manager, referenced in Cloud Run service configuration
+
+---
+
+### 10. Docker Build Failures
+
+**Symptom:** `npm run docker:build` fails during the build stage.
+
+**Common Causes:**
+
+1. **npm install fails with peer dependency errors:**
+   - The Dockerfiles use `npm install --force` to handle workspace peer dependency conflicts
+   - If this flag is missing, add `--force` to the `RUN npm install` command
+
+2. **Prisma generate fails:**
+   - `npx prisma generate` must run in the builder stage BEFORE the TypeScript build
+   - Ensure the Prisma schema is copied into the build context
+
+3. **TypeScript compilation errors:**
+   - The build compiles `packages/shared` first, then the target package
+   - Check that shared types are up to date: `npm run build:shared`
+
+4. **Context too large:**
+   - Ensure `.dockerignore` excludes `node_modules`, `.next`, `dist`
+
+---
+
+### 11. CORS Errors
+
+**Symptom:** Frontend cannot call backend API. Browser console shows CORS errors.
+
+**Allowed Origins (from `packages/backend/src/index.ts`):**
+- `https://verifymyprovider.com`
+- `https://www.verifymyprovider.com`
+- Cloud Run frontend URL (hardcoded)
+- `FRONTEND_URL` environment variable
+- `localhost:3000` and `localhost:3001` (development only)
 
 **Fix:**
-Set the `ADMIN_SECRET` environment variable:
-
-```bash
-# In .env
-ADMIN_SECRET=your-secure-random-secret-here
-```
-
-For Cloud Run, set it via the Google Cloud Console or CLI:
-```bash
-gcloud run services update verifymyprovider-backend \
-  --set-secrets=ADMIN_SECRET=admin-secret:latest
-```
-
-**Authentication:**
-Once configured, admin endpoints require the `X-Admin-Secret` header:
-```bash
-curl -H "X-Admin-Secret: your-secret" https://your-backend/api/v1/admin/health
-```
-
-The middleware uses `timingSafeEqual` for constant-time secret comparison to prevent timing attacks.
-
-**Available Admin Endpoints:**
-| Endpoint | Method | Purpose |
-|---|---|---|
-| `/admin/health` | GET | Health check with retention metrics |
-| `/admin/cleanup-expired` | POST | Clean up expired verification records |
-| `/admin/expiration-stats` | GET | Verification expiration statistics |
-| `/admin/cache/clear` | POST | Clear all cached data |
-| `/admin/cache/stats` | GET | Cache hit/miss statistics |
-| `/admin/cleanup/sync-logs` | POST | Clean up sync logs older than retention period |
-| `/admin/retention/stats` | GET | Comprehensive retention statistics |
-
-**Reference File:** `packages/backend/src/routes/admin.ts` (lines 21-55)
+1. Check the `FRONTEND_URL` env var is set to the correct Cloud Run frontend URL
+2. If deploying to a new domain, add it to the `ALLOWED_ORIGINS` array in `packages/backend/src/index.ts`
+3. Blocked CORS requests are logged: look for "CORS blocked request from origin" in logs
 
 ---
 
-### 3.3 Location Enrichment Endpoints Not Available
+## Production Issues
 
-**Symptom:**
-No admin endpoints exist for location enrichment (expected endpoints like `/admin/enrich-locations` are not registered).
+### 12. Rate Limiting False Positives
 
-**Root Cause:**
-The location enrichment imports and endpoints are commented out in `packages/backend/src/routes/admin.ts`:
+**Symptom:** Legitimate users receiving 429 Too Many Requests responses.
 
-```typescript
-// TODO: locationEnrichment depends on old Location model - re-enable when practice_locations rewrite is done
-// import { enrichLocationNames, getEnrichmentStats } from '../services/locationEnrichment';
-```
+**Diagnosis:**
+1. Check if the user is behind a shared IP (corporate network, VPN, ISP NAT)
+2. Check the rate limit headers in the response:
+   - `X-RateLimit-Limit`: What the limit is
+   - `X-RateLimit-Remaining`: How many requests remain
+   - `X-RateLimit-Reset`: When the window resets
 
-The section header remains at line 236-238:
-```
-// ============================================================================
-// Location Enrichment Endpoints
-// TODO: Disabled - depends on old Location model, needs rewrite for practice_locations
-// ============================================================================
-```
-
-**Status:** Disabled intentionally. Will be re-enabled after the `practice_locations` rewrite is complete.
-
-**Reference File:** `packages/backend/src/routes/admin.ts` (lines 6-7, 235-238)
-
----
-
-### 3.4 Rate Limiting False Positives
-
-**Symptom:**
-Legitimate users receive HTTP 429 (Too Many Requests) responses despite normal usage patterns.
-
-**Root Cause / Considerations:**
-
-1. **Shared IP addresses:** The rate limiter uses IP-based identification. Users behind corporate NATs, VPNs, or shared proxies share an IP address and collectively consume the rate limit.
-
-2. **In-memory mode inconsistency:** Without Redis (`REDIS_URL` not set), each backend instance maintains independent counters. In multi-instance deployments, a user routed to different instances will have separate counters (potentially allowing more requests than intended), but sticky sessions could cause all requests to hit one instance.
-
-3. **Fail-open behavior:** If Redis becomes unavailable during operation, requests are **allowed** with a warning logged. This prioritizes availability over strict rate limiting.
-
-**Troubleshooting:**
-- Check logs for rate limit warnings: look for rate limiter log entries.
-- Verify whether `REDIS_URL` is configured for distributed rate limiting.
-- Review the sliding window algorithm: unlike fixed windows, sliding windows track individual request timestamps, so limits are enforced smoothly without boundary bursts.
+**Rate Limits:**
+| Endpoint Type | Limit | Window |
+|--------------|-------|--------|
+| Default | 200/hr | 1 hour sliding window |
+| Search | 100/hr | 1 hour sliding window |
+| Verification | 10/hr | 1 hour sliding window |
+| Vote | 10/hr | 1 hour sliding window |
 
 **Mitigation:**
-- Configure `REDIS_URL` for accurate distributed rate limiting across instances.
-- Consider implementing user-based rate limiting (requires authentication) as a future improvement.
-
-**Reference File:** `packages/backend/src/middleware/rateLimiter.ts`
-
----
-
-### 3.5 CAPTCHA Verification Failures
-
-**Symptom:**
-Verification or vote submissions fail with CAPTCHA-related errors, or bots bypass CAPTCHA protection.
-
-**Root Cause / Configuration:**
-The CAPTCHA middleware (Google reCAPTCHA v3) has two fail modes controlled by `CAPTCHA_FAIL_MODE`:
-
-| Mode | Behavior | Risk |
-|---|---|---|
-| `open` (default) | Allows requests through when Google API fails; applies stricter fallback rate limiting (3 requests/hour vs normal 10) | Attackers could exploit Google outages |
-| `closed` | Blocks ALL requests when Google API fails | Legitimate users blocked during outages |
-
-**Troubleshooting Steps:**
-
-1. **Verify `RECAPTCHA_SECRET_KEY` is set** in the environment. Without it, CAPTCHA validation cannot occur.
-2. **Check logs** for `[CAPTCHA] Google API error` messages indicating Google API outages.
-3. **Monitor** for high volumes of `FAIL-OPEN: Allowing request` log entries, which indicate the fallback rate limiter is active.
-4. **In development:** CAPTCHA logging is suppressed when `NODE_ENV` is `development` or `test`.
-
-**Reference File:** `packages/backend/src/middleware/captcha.ts`
+- The sliding window algorithm prevents burst attacks at window boundaries
+- Redis mode shares state across instances (proper counting)
+- In-memory mode has per-instance counters (could under-count with multiple instances)
+- The rate limiter fails open if Redis becomes unavailable mid-operation
 
 ---
 
-## 4. Deployment Issues
+### 13. Cache Inconsistency
 
-### 4.1 Cloud Run Deployment Failures
+**Symptom:** Search results don't reflect recently submitted verifications.
 
-**Symptom:**
-GitHub Actions deployment workflow fails or Cloud Run services do not start.
+**Root Cause:** Search results are cached for 5 minutes. Although verification submission triggers async cache invalidation, the invalidation may fail silently.
 
-**Troubleshooting Steps:**
+**Fix:**
+```bash
+# Clear cache via admin endpoint
+curl -X POST https://backend-url/api/v1/admin/cache/clear \
+  -H "X-Admin-Secret: your-secret"
 
-1. **Check GitHub Actions logs:** The workflow is defined in `.github/workflows/deploy.yml` and triggers on push to `main` or manual dispatch.
-2. **Verify GCP credentials:** Ensure the service account has proper IAM roles (`roles/run.admin`, `roles/cloudsql.client`, `roles/iam.serviceAccountUser`).
-3. **Check environment variables:** Ensure all required secrets are configured in Cloud Run:
-   - `DATABASE_URL` or `CLOUD_SQL_CONNECTION_NAME`
-   - `RECAPTCHA_SECRET_KEY`
-   - `ADMIN_SECRET`
-   - `REDIS_URL` (optional, for distributed rate limiting)
+# Check cache stats
+curl https://backend-url/api/v1/admin/cache/stats \
+  -H "X-Admin-Secret: your-secret"
+```
 
-4. **Container build issues:** Both `packages/backend/Dockerfile` and `packages/frontend/Dockerfile` must build successfully. Test locally:
-   ```bash
-   docker build -t verifymyprovider-backend packages/backend/
-   docker build -t verifymyprovider-frontend packages/frontend/
-   ```
+**Source:** Cache invalidation is triggered in `packages/backend/src/routes/verify.ts` line 74 but runs asynchronously and failures are caught and logged as warnings.
 
 ---
 
-### 4.2 No Staging Environment
+### 14. Confidence Score Drift
 
-**Symptom:**
-Changes pushed to `main` deploy directly to production without a pre-production testing step.
+**Symptom:** Provider-plan acceptance confidence scores don't reflect time-based decay.
 
-**Root Cause:**
-The CI/CD pipeline (`.github/workflows/deploy.yml`) is configured to deploy on every push to `main`. There is no staging branch or environment configured.
+**Root Cause:** Confidence scores are calculated at verification time but not automatically recalculated as time passes. The recency factor (30 points max) should decrease as verifications age.
 
-**Risk:** Bugs can reach production without pre-deployment validation.
+**Fix:**
+```bash
+# Recalculate all confidence scores (dry run first)
+curl -X POST "https://backend-url/api/v1/admin/recalculate-confidence?dryRun=true" \
+  -H "X-Admin-Secret: your-secret"
 
-**Workaround:**
-- Test changes thoroughly in local development.
-- Use the `workflow_dispatch` trigger for manual deployments when additional caution is needed.
-- Consider adding a `staging` branch and separate Cloud Run services for pre-production testing.
+# Apply recalculation
+curl -X POST "https://backend-url/api/v1/admin/recalculate-confidence" \
+  -H "X-Admin-Secret: your-secret"
+```
 
----
+**Recommendation:** Schedule this via Cloud Scheduler (e.g., daily) to keep scores fresh.
 
-## 5. Data Quality Issues
-
-### 5.1 City Name Typos in NPI Data
-
-**Symptom:**
-Provider search returns unexpected results or fails to match cities. City names in the database contain typos, trailing state codes, or trailing punctuation.
-
-**Root Cause:**
-NPI data from CMS is self-reported by providers and contains inconsistencies in city name formatting. Examples include:
-- `"JACKSONVILL"` instead of `"JACKSONVILLE"`
-- `"MIAMI FL"` with trailing state code
-- `"TAMPA,"` with trailing punctuation
-
-**Status:** A cleanup script exists but has not been run across all imported data.
-
-**Workaround:** Use fuzzy matching or LIKE queries when searching by city. The search endpoints may already handle some normalization.
+**Source:** `C:\Users\breil\OneDrive\Desktop\HealthcareProviderDB\packages\backend\src\services\confidenceDecayService.ts`
 
 ---
 
-### 5.2 Stale Provider Addresses
+### 15. NPI Import Errors
 
-**Symptom:**
-Provider address information is outdated. A provider may have moved to a new practice location but their NPI record still shows the old address.
+**Symptom:** NPI import script fails or produces unexpected results.
 
-**Root Cause:**
-NPI data is self-reported by providers to CMS and is rarely updated. There is no automated mechanism to detect when a provider has changed their practice location.
+**Common Issues:**
 
-**Mitigation:**
-- The confidence scoring system (`packages/backend/src/services/confidenceService.ts`) accounts for data staleness through a recency score (0-30 points) that decays over time.
-- Specialty-specific freshness thresholds are applied:
-  - Mental health providers: 30 days (high turnover, 43% Medicaid acceptance)
-  - Primary care: 60 days (12% annual turnover)
-  - Specialists: 60 days
-  - Hospital-based: 90 days (more stable positions)
-- Community verification via the voting system helps identify stale data.
-- The `recommendReVerification` flag in the confidence result signals when data should be re-verified.
+1. **Connection pool exhaustion:** Import uses `pg.Pool` with max 5 connections. If interrupted, connections may leak.
+   - Fix: Restart the script (it uses upserts so re-running is safe)
+
+2. **File hash already imported:** The script tracks SHA-256 hashes of imported files in `sync_logs`.
+   - If you need to re-import the same file, delete the corresponding `sync_logs` entry
+
+3. **Memory issues with large files:** CA has 1.1M+ providers.
+   - The script streams CSV records and batches inserts (5000 per batch)
+   - Monitor memory with the progress logging (every 10,000 records)
+
+4. **Deactivated providers appearing:** The script filters out deactivated providers (those with deactivation date and no subsequent reactivation). Verify the filter at lines 264-275 of `scripts/import-npi-direct.ts`.
+
+**Running an import:**
+```bash
+npx tsx scripts/import-npi-direct.ts --file /path/to/state-data.csv
+```
+
+**Source:** `C:\Users\breil\OneDrive\Desktop\HealthcareProviderDB\scripts\import-npi-direct.ts`
 
 ---
 
-## Quick Reference: Environment Variables
+### 16. Graceful Shutdown Timeout
 
-| Variable | Required | Default | Purpose |
-|---|---|---|---|
-| `DATABASE_URL` | Yes | - | PostgreSQL connection string |
-| `PORT` | No | `3001` | Backend server port |
-| `NODE_ENV` | No | `development` | Environment mode |
-| `CORS_ORIGIN` | No | `http://localhost:3000` | Allowed CORS origin |
-| `NEXT_PUBLIC_API_URL` | Yes (frontend) | - | Backend API base URL |
-| `RECAPTCHA_SECRET_KEY` | Production | - | Google reCAPTCHA v3 secret |
-| `CAPTCHA_FAIL_MODE` | No | `open` | `open` or `closed` |
-| `ADMIN_SECRET` | No | - | Admin endpoint authentication |
-| `REDIS_URL` | No | - | Redis for distributed rate limiting |
-| `CLOUD_SQL_CONNECTION_NAME` | Cloud Run | - | Cloud SQL proxy connection |
-| `GCP_PROJECT_ID` | Deployment | - | Google Cloud project ID |
-| `GCP_REGION` | Deployment | `us-central1` | Google Cloud region |
+**Symptom:** Cloud Run shows "Container called exit(1)" in logs during deployments.
+
+**Root Cause:** The graceful shutdown handler has a 10-second timeout (`SHUTDOWN_TIMEOUT_MS`). If the database disconnect takes longer, the process force-exits with code 1.
+
+**Fix:** This is generally not a problem. Cloud Run sends SIGTERM and waits for the configured grace period. The 10-second timeout in the application code ensures the process does not hang indefinitely.
+
+**Source:** `C:\Users\breil\OneDrive\Desktop\HealthcareProviderDB\packages\backend\src\index.ts` (lines 197-233)
+
+---
+
+## Monitoring and Alerting
+
+### Current Monitoring
+- **Health check:** `/health` endpoint verifies database connectivity, cache stats, and memory usage
+- **Admin health:** `/api/v1/admin/health` provides retention metrics
+- **Structured logging:** Pino logs with request IDs for correlation
+- **PostHog:** Privacy-preserving analytics on the frontend
+
+### Not Yet Implemented
+- No automated alerting (e.g., PagerDuty, Opsgenie)
+- No Cloud Run monitoring dashboards
+- No log-based alerting rules
+- No uptime monitoring (e.g., Pingdom, UptimeRobot)
+- No error tracking service (e.g., Sentry)
+
+---
+
+## Checklist Status
+
+- [x] SWC ARM64 workaround documented
+- [x] OneDrive workaround documented
+- [x] npm workspace hoisting issue documented
+- [x] Database connection troubleshooting documented
+- [x] Docker build troubleshooting documented
+- [x] CORS troubleshooting documented
+- [x] Rate limiting false positives documented
+- [x] Cache inconsistency documented
+- [x] NPI import errors documented
+- [ ] Production incident runbook (not yet created)
+- [ ] Cloud Run scaling issue documentation (not yet needed -- scale-to-zero is current config)
+
+---
+
+## Answers to Prompt Questions
+
+1. **What are the most common issues developers encounter?** -- Based on codebase analysis: (a) SWC ARM64 compatibility on Windows, (b) npm workspace hoisting conflicts, (c) OneDrive binary corruption. All three have automated or documented workarounds.
+
+2. **Are there any recurring production incidents?** -- The project is pre-beta and not yet in production at scale. The most likely production issues will be: rate limiting false positives for shared IPs, cache staleness after verifications, and confidence score drift without scheduled recalculation.
+
+3. **What monitoring/alerting is in place?** -- Minimal. Health check endpoint exists, structured logging via Pino is in place, PostHog for frontend analytics. No automated alerting, error tracking, or uptime monitoring is configured.
+
+4. **Are there any database migration gotchas?** -- The project uses `prisma db push` (not `prisma migrate`), so there is no migration history. Schema changes are additive via push. Destructive changes require manual backup and restore. There is no automated rollback for schema changes.
+
+5. **What is the process for investigating a reported data quality issue?** -- (a) Check the `DataQualityAudit` table for known issues, (b) use admin endpoints to check verification and retention stats, (c) query the provider directly via GET /api/v1/providers/:npi, (d) check sync_logs for import issues, (e) compare against NPI Registry API for source data validation.

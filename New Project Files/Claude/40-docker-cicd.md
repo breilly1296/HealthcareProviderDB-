@@ -1,118 +1,96 @@
-# Docker & CI/CD Pipeline -- Analysis
-
-**Generated:** 2026-02-05
-**Source Prompt:** prompts/40-docker-cicd.md
-**Status:** Fully Implemented -- Production-Ready with Enhancement Opportunities
-
----
-
-## Findings
-
-### Docker Configuration
-
-- **Backend Dockerfile (Node 20, non-root user, health check):** Verified in `packages/backend/Dockerfile`. Uses `node:20-alpine` for both build and production stages. Multi-stage build with `builder` (build stage) and `runner` (production stage). Non-root user `expressjs` (UID 1001, group `nodejs` GID 1001) is created and used. Health check configured: `wget --no-verbose --tries=1 --spider http://localhost:8080/health` with 30s interval, 10s timeout, 5s start period, 3 retries. Port 8080 exposed, matching Cloud Run convention.
-
-- **Frontend Dockerfile (Node 20, Next.js standalone output, health check):** Verified in `packages/frontend/Dockerfile`. Uses three-stage build: `deps` (dependency installation), `builder` (build), `runner` (production). Non-root user `nextjs` (UID 1001, group `nodejs` GID 1001). Uses Next.js standalone output (copies `.next/standalone`, `.next/static`, and `public` directories). Health check: `wget --no-verbose --tries=1 --spider http://localhost:8080/` with same timings. Build args for `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_POSTHOG_KEY`. Port 8080, hostname `0.0.0.0`.
-
-- **docker-compose.yml with all 3 services:** Verified. Three services defined:
-  - `db`: `postgres:15-alpine`, port 5432:5432, named volume `postgres_data`, health check with `pg_isready`.
-  - `backend`: builds from `packages/backend/Dockerfile`, port 3001:8080, depends on `db` with `service_healthy` condition. Environment includes `DATABASE_URL`, `PORT=8080`, `NODE_ENV=production`, `CORS_ORIGIN=http://localhost:3000`.
-  - `frontend`: builds from `packages/frontend/Dockerfile`, port 3000:8080, depends on `backend`. Build arg `NEXT_PUBLIC_API_URL=http://localhost:3001/api/v1`.
-
-- **docker-compose.dev.yml for local database:** Verified. Contains only the `db` service (`postgres:15-alpine`) with a separate named volume `postgres_data_dev`. Same health check configuration. Container named `healthcaredb-postgres-dev` to avoid conflicts with the full-stack compose.
-
-- **Health checks on all services:** Verified.
-  - `db`: `pg_isready -U postgres` every 10s, 5s timeout, 5 retries.
-  - `backend`: `wget http://localhost:8080/health` every 30s, 10s timeout, 3 retries.
-  - `frontend`: `wget http://localhost:8080/` every 30s, 10s timeout, 3 retries.
-  - Dockerfiles also have `HEALTHCHECK` instructions with 5s `start-period`.
-
-- **Named volumes for data persistence:** Verified. `postgres_data` in `docker-compose.yml`, `postgres_data_dev` in `docker-compose.dev.yml`.
-
-- **Multi-stage builds for smaller images:** Verified. Backend uses 2 stages (`builder` -> `runner`). Frontend uses 3 stages (`deps` -> `builder` -> `runner`). Production stages only contain built artifacts, Prisma client, and production dependencies (backend) or standalone output (frontend).
-
-- **`.dockerignore` files:** Partially verified. A root-level `.dockerignore` exists at `C:\Users\breil\OneDrive\Desktop\HealthcareProviderDB\.dockerignore` with comprehensive exclusions: `node_modules`, `.git`, `.env*`, IDE files, OS files, logs, test files, markdown docs, data/CSV files, and build info. However, there are no per-package `.dockerignore` files (only the root one). Since the Docker build context is the project root (`.`), the root `.dockerignore` is sufficient.
-
-### CI/CD Pipeline (deploy.yml)
-
-- **Automatic deploy on push to main:** Verified. Trigger: `on: push: branches: [main]`.
-- **Manual dispatch option:** Verified. `workflow_dispatch` is included.
-- **Workload Identity Federation (no long-lived keys):** Verified. Both `deploy-backend` and `deploy-frontend` jobs use `google-github-actions/auth@v2` with `workload_identity_provider` and `service_account` from secrets. Permission `id-token: write` is set for OIDC token generation.
-
-- **Artifact Registry for image storage:** Verified. Docker is configured for `us-central1-docker.pkg.dev`. Images are tagged with both `${{ github.sha }}` (immutable) and `latest` (mutable), then pushed to the registry under repository `verifymyprovider`.
-
-- **Cloud Run deployment with proper configuration:** Verified for both services.
-
-  **Backend Cloud Run settings:**
-  | Setting | Documented | Actual | Match |
-  |---------|-----------|--------|-------|
-  | Port | 8080 | 8080 | Yes |
-  | Memory | 512Mi | 512Mi | Yes |
-  | CPU | 1 | 1 | Yes |
-  | Min instances | 0 | 0 | Yes |
-  | Max instances | 10 | 10 | Yes |
-  | Concurrency | 80 | 80 | Yes |
-  | Cloud SQL | `verifymyprovider-prod:us-central1:verifymyprovider-db` | Same | Yes |
-  | Auth | `--allow-unauthenticated` | Same | Yes |
-
-  Backend env vars: `NODE_ENV=production`, `FRONTEND_URL` from secret.
-  Backend secrets: `DATABASE_URL=DATABASE_URL:latest` (from Secret Manager).
-  Special: `--remove-secrets=ADMIN_SECRET` flag is present (removes previously set secret).
-
-  **Frontend Cloud Run settings:**
-  | Setting | Documented | Actual | Match |
-  |---------|-----------|--------|-------|
-  | Port | 8080 | 8080 | Yes |
-  | Memory | 512Mi | 512Mi | Yes |
-  | CPU | 1 | 1 | Yes |
-  | Min instances | 0 | 0 | Yes |
-  | Max instances | 10 | 10 | Yes |
-  | Concurrency | 80 | 80 | Yes |
-  | Auth | `--allow-unauthenticated` | Same | Yes |
-
-  Frontend env vars: `NODE_ENV=production`.
-  Frontend secrets: `ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest`.
-  Frontend build args: `NEXT_PUBLIC_API_URL` (from backend output), `NEXT_PUBLIC_POSTHOG_KEY` (from secret).
-
-- **Frontend depends on backend URL (sequential deploy):** Verified. `deploy-frontend` job has `needs: deploy-backend` and uses `${{ needs.deploy-backend.outputs.backend_url }}/api/v1` as the `NEXT_PUBLIC_API_URL` build arg.
-
-- **Deployment summary with status table:** Verified. The `summary` job runs `if: always()` and writes a markdown table to `$GITHUB_STEP_SUMMARY` with backend/frontend status and URLs. Note: the frontend URL shows "See Cloud Run console" rather than the actual URL (the frontend deploy job does not output its URL to the summary job).
-
-### E2E Test Pipeline (playwright.yml)
-
-- **Playwright E2E tests exist:** Verified in `.github/workflows/playwright.yml`. Triggers on push and PR to `main` for `packages/frontend/**` path changes. Uses Node 20, installs only Chromium browser, builds shared then frontend, runs `test:e2e` with `PLAYWRIGHT_BASE_URL=http://localhost:3000`. Uploads `playwright-report/` as artifact with 30-day retention. Job has 15-minute timeout.
-
-### Security
-
-- **Workload Identity Federation (no service account keys in GitHub):** Verified. OIDC-based authentication, no JSON key files stored as secrets.
-- **Secrets in GCP Secret Manager (not in env vars):** Verified. `DATABASE_URL` and `ANTHROPIC_API_KEY` are mounted from Secret Manager as `secrets:` in the Cloud Run deploy step, not as plain `env_vars`.
-- **Build args for public frontend keys (not secrets):** Verified. `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_POSTHOG_KEY` are build args (public by design -- embedded in client-side JavaScript). Actual secrets like `ANTHROPIC_API_KEY` use Secret Manager.
-- **`--allow-unauthenticated` (public-facing services):** Verified on both services. This is appropriate for a public-facing web application.
-- **No Cloud Armor / DDoS protection:** Confirmed not configured. The services rely on Cloud Run's built-in rate limiting (max instances = 10) and the application-level rate limiting in Express.
-- **No VPC connector for Cloud SQL:** Confirmed. Uses Cloud SQL proxy via `--add-cloudsql-instances` flag rather than a VPC connector.
-
-### Unchecked Items from Prompt
-
-- **No staging environment:** Confirmed. The workflow deploys directly to production on every push to `main`.
-- **No rollback automation:** Confirmed. Rollback would need to be done manually via `gcloud run services update-traffic --to-revisions` or the Cloud Run console.
-- **No smoke tests after deployment:** Confirmed. No post-deploy health check or API call to verify the deployment succeeded.
-- **No build caching in GitHub Actions:** Confirmed. Neither `docker/build-push-action` with cache nor `actions/cache` for Docker layers is used. Each build downloads all layers fresh.
-- **No Slack/email notification on deploy success/failure:** Confirmed. The summary job writes to GitHub Step Summary but does not send external notifications.
-
----
+# Docker & CI/CD Pipeline Review -- Analysis Output
 
 ## Summary
 
-The Docker and CI/CD infrastructure is fully implemented and production-ready. Both Dockerfiles use multi-stage builds with non-root users, health checks, and Node 20 Alpine. The production `docker-compose.yml` correctly orchestrates all three services with health-check-based dependency ordering. The deployment pipeline uses Workload Identity Federation for secure GCP authentication, pushes to Artifact Registry with SHA-tagged images, and deploys to Cloud Run with appropriate resource limits and secret management. The E2E test pipeline runs Playwright tests on frontend changes.
+The Docker and CI/CD infrastructure is well-architected for a Cloud Run deployment. Both Dockerfiles use multi-stage builds with non-root users and health checks. The CI/CD pipeline uses Workload Identity Federation (no long-lived keys), GitHub Actions caching via `docker/build-push-action` with GHA cache, and includes a staging environment. Notable findings: a smoke test already exists for the backend, `ADMIN_SECRET` is now being injected (not removed), and the `.dockerignore` is comprehensive.
 
-All documented settings in the prompt match the actual configuration exactly. The `.dockerignore` file exists at the root level with comprehensive exclusions. The main gaps are operational: no staging environment, no rollback automation, no post-deploy smoke tests, no Docker layer caching, and no external deploy notifications.
+---
 
-## Recommendations
+## Checklist Verification
 
-1. **Add Docker layer caching to GitHub Actions.** Use `docker/build-push-action` with `cache-from`/`cache-to` or `actions/cache` for Docker layers. This can significantly reduce build times (especially for the `npm install` layer).
-2. **Add post-deploy smoke tests.** After each Cloud Run deploy, run a simple `curl` against the health endpoint and a critical API route to verify the deployment is functional before the workflow completes.
-3. **Propagate frontend URL to the summary job.** The `deploy-frontend` job does not export its deployed URL, so the summary table shows "See Cloud Run console." Add an `outputs: frontend_url: ${{ steps.deploy.outputs.url }}` to the frontend job and reference it in the summary.
-4. **Consider a staging environment.** Deploying directly to production on every push to `main` is risky. A staging Cloud Run service with a separate URL could receive the deploy first, pass smoke tests, then promote to production.
-5. **Add deploy notifications.** Integrate Slack or GitHub Actions-native notifications (e.g., `slackapi/slack-github-action`) so the team is alerted on deploy success or failure.
-6. **Investigate the `ADMIN_SECRET` removal.** The `--remove-secrets=ADMIN_SECRET` flag on the backend deploy suggests an intentional cleanup of a previously configured secret. Verify this is expected and not a misconfiguration that would break admin functionality.
-7. **Consider VPC connector for Cloud SQL.** While Cloud SQL proxy works, a VPC connector provides an additional security layer by keeping database traffic within the VPC. This is especially relevant if the Cloud SQL instance has a private IP.
+### Docker
+
+| Item | Status | Evidence |
+|------|--------|----------|
+| Backend Dockerfile (Node 20, non-root user, health check) | VERIFIED | `packages/backend/Dockerfile`: Uses `node:20-alpine`, creates `expressjs` user (UID 1001), `HEALTHCHECK` on `/health` |
+| Frontend Dockerfile (Node 20, Next.js standalone output, health check) | VERIFIED | `packages/frontend/Dockerfile`: Uses `node:20-alpine`, copies `.next/standalone`, creates `nextjs` user (UID 1001), `HEALTHCHECK` on `/` |
+| docker-compose.yml with all 3 services | VERIFIED | `docker-compose.yml`: Services `db` (postgres:15-alpine), `backend`, `frontend` all present |
+| docker-compose.dev.yml for local database | VERIFIED | `docker-compose.dev.yml`: Single `db` service with `postgres_data_dev` volume |
+| Health checks on all services | VERIFIED | `db`: `pg_isready -U postgres` (10s interval); `backend`: `wget /health` (30s); `frontend`: `wget /` (30s) |
+| Named volumes for data persistence | VERIFIED | `postgres_data` in production compose, `postgres_data_dev` in dev compose |
+| Multi-stage builds for smaller images | VERIFIED | Backend: 2-stage (builder + runner). Frontend: 3-stage (deps + builder + runner). Both install only production dependencies in the final stage. |
+| `.dockerignore` files to exclude node_modules, .git, etc. | VERIFIED | Root `.dockerignore` excludes `node_modules/`, `.git/`, `.next/`, `dist/`, `.env`, `coverage/`, test files, `*.csv`, data files, and more. Comprehensive and well-maintained. |
+
+### CI/CD
+
+| Item | Status | Evidence |
+|------|--------|----------|
+| Automatic deploy on push to main | VERIFIED | `deploy.yml` line 4: `on: push: branches: [main]` |
+| Manual dispatch option | VERIFIED | `deploy.yml` line 7: `workflow_dispatch` |
+| Workload Identity Federation (no long-lived keys) | VERIFIED | Uses `google-github-actions/auth@v2` with `workload_identity_provider` and `service_account` secrets |
+| Artifact Registry for image storage | VERIFIED | Tags point to `us-central1-docker.pkg.dev/$PROJECT_ID/verifymyprovider/` |
+| Cloud Run deployment with proper configuration | VERIFIED | Uses `google-github-actions/deploy-cloudrun@v2` with 512Mi memory, 1 CPU, 0-10 instances, concurrency 80 |
+| Frontend depends on backend URL (sequential deploy) | VERIFIED | `deploy-frontend` job has `needs: deploy-backend` and uses `needs.deploy-backend.outputs.backend_url` as build arg |
+| Deployment summary with status table | VERIFIED | `summary` job runs `if: always()` and writes markdown table to `$GITHUB_STEP_SUMMARY` |
+| Staging environment | VERIFIED | `deploy-staging.yml`: Triggers on `staging` branch, deploys to `-staging` services, max 2 instances |
+| No rollback automation | CONFIRMED MISSING | No rollback steps in any workflow. Manual via Cloud Run console. |
+| No smoke tests after deployment | PARTIALLY ADDRESSED | Backend deploy has a post-deploy smoke test (`curl /health` after 10s sleep) at line 114-121 of `deploy.yml`. Frontend does NOT have a smoke test. |
+| No build caching in GitHub Actions | ADDRESSED | Both `deploy.yml` and `deploy-staging.yml` use `docker/build-push-action@v6` with `cache-from: type=gha` and `cache-to: type=gha,mode=max`. Docker Buildx is set up via `docker/setup-buildx-action@v3`. |
+| No Slack/email notification on deploy success/failure | CONFIRMED MISSING | No notification steps in any workflow. |
+
+### Security
+
+| Item | Status | Evidence |
+|------|--------|----------|
+| Workload Identity Federation | VERIFIED | `permissions: id-token: write` + `google-github-actions/auth@v2` |
+| Secrets in GCP Secret Manager | VERIFIED | `DATABASE_URL`, `ADMIN_SECRET`, `RECAPTCHA_SECRET_KEY`, `ANTHROPIC_API_KEY` all mounted from Secret Manager via `secrets:` block |
+| Build args for public frontend keys (not secrets) | VERIFIED | `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_POSTHOG_KEY` are build args (public by design) |
+| `--allow-unauthenticated` (public-facing services) | VERIFIED | Both backend and frontend deploy with `--allow-unauthenticated` |
+| No Cloud Armor / DDoS protection | CONFIRMED MISSING | Not configured in any workflow or compose file |
+| No VPC connector for Cloud SQL | CONFIRMED -- uses Cloud SQL proxy | `--add-cloudsql-instances` flag used; automatic proxy in Cloud Run |
+
+### Additional CI Pipelines
+
+| Pipeline | File | Trigger | What It Does |
+|----------|------|---------|--------------|
+| PR Test Gate | `test.yml` | PRs to `main` or `staging` | Runs backend + frontend tests, builds backend |
+| Playwright E2E | `playwright.yml` | Push/PR to `main` (frontend changes only) | Installs Chromium, builds frontend, runs E2E tests, uploads report |
+| Security Scan | `security-scan.yml` | Push/PR to `main` | Runs Gitleaks secret scan with full history (`fetch-depth: 0`) |
+
+---
+
+## Questions Answered
+
+### 1. Should we add a staging environment before deploying to production?
+**Already implemented.** `deploy-staging.yml` exists and deploys to `verifymyprovider-backend-staging` and `verifymyprovider-frontend-staging` on push to the `staging` branch. The only difference from production is `--max-instances=2` (vs 10) and `staging-` prefixed image tags. All other configuration (secrets, GCP auth, memory/CPU) is identical.
+
+### 2. Should we implement rollback automation?
+**Yes, recommended.** Currently there is no automated rollback. Cloud Run supports traffic splitting via `gcloud run services update-traffic --to-revisions`. A rollback workflow could be added that takes a previous `$GITHUB_SHA` and redeploys that revision. Since images are tagged with `$GITHUB_SHA` (immutable), any previous version can be redeployed by image tag.
+
+### 3. Should we add post-deploy smoke tests to verify the deployment?
+**Backend already has one.** `deploy.yml` lines 114-121 perform a `curl` health check on the deployed backend URL after a 10-second sleep. The frontend does NOT have a comparable smoke test. Adding one (e.g., `curl` to verify the frontend returns HTTP 200) would catch deployment failures early.
+
+### 4. Should Docker builds use layer caching in GitHub Actions for faster builds?
+**Already implemented.** Both `deploy.yml` and `deploy-staging.yml` use `docker/build-push-action@v6` with `cache-from: type=gha` and `cache-to: type=gha,mode=max` for GitHub Actions cache-backed Docker layer caching. Docker Buildx is set up via `docker/setup-buildx-action@v3`.
+
+### 5. Should we add deploy notifications to Slack or email?
+**Recommended for production reliability.** The deployment summary step writes to GitHub's step summary, which is only visible in the Actions UI. Adding a Slack webhook notification (e.g., `slackapi/slack-github-action`) to the `summary` job would provide immediate visibility for the team on deploy success/failure, especially for the `if: always()` summary job.
+
+### 6. Is the `ADMIN_SECRET` `--remove-secrets` flag intentional, or should it be added back?
+**Clarified: `ADMIN_SECRET` is now actively injected, not removed.** The current `deploy.yml` (line 111) includes `ADMIN_SECRET=ADMIN_SECRET:latest` in the `secrets:` block. There is no `--remove-secrets` flag present. The prompt's description appears to have been based on an earlier version of the workflow. The current production and staging deployments both inject `ADMIN_SECRET`, `DATABASE_URL`, and `RECAPTCHA_SECRET_KEY` from Secret Manager.
+
+---
+
+## Additional Findings
+
+1. **Frontend Dockerfile runs `npm install --force` twice** -- once in the `deps` stage (line 20) and again in the `builder` stage (line 52) with the comment "Install dependencies in builder (to get .bin symlinks)". This doubles the install time. The second install may be needed for symlinks, but copying `node_modules/.bin` from deps could avoid this.
+
+2. **Backend Dockerfile also uses `npm install --force`** -- The `--force` flag is used in both build and production stages. This may mask dependency resolution issues.
+
+3. **Both deploy workflows run tests before deploying** -- The `test` job is a `needs` dependency for `deploy-backend`, which ensures no deploy happens if tests fail.
+
+4. **Playwright tests do NOT test against a running backend** -- The `playwright.yml` workflow sets `NEXT_PUBLIC_API_URL=http://localhost:3001/api/v1` as a build env but does not start the backend. Tests appear to test frontend rendering and navigation only (or mock API calls).
+
+5. **docker-compose.yml uses `version: '3.8'`** -- This is deprecated in Docker Compose V2 but still functional. No urgency to change.
+
+6. **Security scan is Gitleaks only** -- No SAST analysis of code (e.g., CodeQL, Semgrep, or Snyk). Consider adding CodeQL for JavaScript/TypeScript vulnerability detection.

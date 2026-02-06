@@ -1,125 +1,101 @@
-# Provider Detail Page Architecture -- Analysis
-
-**Generated:** 2026-02-05
-**Source Prompt:** prompts/42-provider-detail-page.md
-**Status:** Fully Implemented -- All checklist items verified with minor documentation discrepancies
-
----
-
-## Findings
-
-### Page
-
-- **Dynamic route `/provider/[npi]`** -- Verified. `packages/frontend/src/app/provider/[npi]/page.tsx` exists as a Next.js dynamic route. Uses `useParams()` to extract `npi` from the URL.
-
-- **Client-side rendering** -- Verified. The file begins with `'use client'` directive (line 1). No server-side data fetching.
-
-- **Breadcrumb navigation back to search** -- Verified. Lines 95-105 render a `<nav>` with a `<Link href="/search">` containing an `ArrowLeft` icon, "Search" text, a `>` separator, and "Provider Details" label.
-
-- **Loading, error, and success states** -- Verified. Three distinct states:
-  - **Loading** (lines 108-112): Centered `<LoadingSpinner />` with `py-20` padding
-  - **Error** (lines 115-139): Card with error icon, "Provider Not Found" heading, error message, "Try Again" button, and "Back to Search" link
-  - **Success** (lines 142-174): Full provider content with all sub-components
-
-- **Retry on error** -- Verified. The "Try Again" button at line 126 calls `fetchProvider` which resets loading/error state and re-fetches.
-
-### Data
-
-- **Single API call for provider + plan acceptances** -- Verified. Line 38 calls `providerApi.getByNpi(npi)` which maps to `GET /providers/:npi`. The backend's `getProviderByNpi()` includes `providerPlanAcceptances` with nested `insurancePlan` and `location` data in a single Prisma query via `PROVIDER_INCLUDE`. No separate API call needed for plan acceptances.
-  - Note: The page does NOT use the `useProvider` React Query hook from `useProviderSearch.ts`. Instead, it uses raw `useState` + manual `providerApi.getByNpi()` call. This means provider detail data is NOT cached by React Query.
-
-- **Confidence score aggregation (max across plans)** -- Verified. Lines 54-57:
-  ```typescript
-  const confidenceScore = provider?.planAcceptances?.reduce(
-    (max, p) => Math.max(max, p.confidence?.score ?? p.confidenceScore ?? 0),
-    0
-  ) || 0;
-  ```
-  Uses `Math.max` with dual fallback: `p.confidence?.score` (nested object) then `p.confidenceScore` (flat field), defaulting to 0.
-
-- **Verification count aggregation (sum across plans)** -- Verified. Lines 60-63:
-  ```typescript
-  const verificationCount = provider?.planAcceptances?.reduce(
-    (total, p) => total + (p.verificationCount || 0),
-    0
-  ) || 0;
-  ```
-
-- **Insurance plan data transformation** -- Verified. Lines 73-89 transform `planAcceptances` to `InsuranceList` format. Notable improvements over prompt description:
-  - Prompt shows only `'accepted' | 'unknown'` status mapping, but actual code at lines 73-78 maps a full status set: `ACCEPTED -> 'accepted'`, `NOT_ACCEPTED -> 'not_accepted'`, `PENDING -> 'pending'`, `UNKNOWN -> 'unknown'`
-  - Actual code also passes `locationId`, `location`, and `lastVerifiedAt` per plan, which the prompt's example omits
-
-- **Co-located provider fetching** -- Verified. `<ColocatedProviders npi={npi} />` rendered at line 172. The component (`ColocatedProviders.tsx`) uses `IntersectionObserver` for lazy loading -- only fetches when scrolled into view. Uses `providerApi.getColocated(npi, { limit: 10 })`.
-
-- **Most recent verification date** -- Verified. Lines 66-70 compute `lastVerifiedAt` by reducing across all plan acceptances to find the most recent date. This is not mentioned in the prompt checklist but is implemented and passed to `InsuranceList`.
-
-### Components
-
-- **ProviderHeroCard with confidence badge** -- Verified. `packages/frontend/src/components/provider-detail/ProviderHeroCard.tsx` receives `provider`, `confidenceScore`, and `verificationCount` props. Contains:
-  - `getInitials()` helper that filters medical titles for avatar fallback
-  - `formatPhone()` for 10-digit US phone formatting
-  - `getGoogleMapsUrl()` for Google Maps deep link
-  - Uses `ConfidenceGauge` component (not `ConfidenceBadge` as prompt states)
-  - Prompt mentions `ConfidenceBadge` but actual component uses `ConfidenceGauge` imported from `./ConfidenceGauge`
-
-- **InsuranceList with per-plan scores** -- Verified. `packages/frontend/src/components/provider-detail/InsuranceList.tsx` implements:
-  - `PlanStatus` type: `'accepted' | 'not_accepted' | 'pending' | 'unknown'` (broader than prompt's `'accepted' | 'unknown'`)
-  - Carrier family grouping via `CARRIER_PATTERNS` (16 patterns including Aetna, BCBS, UnitedHealthcare, Cigna, etc.)
-  - Per-plan confidence scores
-  - Sample data fallback (`samplePlans` array for demo/empty state)
-  - Uses `verificationApi` for in-component verification submission
-
-- **AboutProvider (entity type, new patients, languages)** -- Verified. `packages/frontend/src/components/provider-detail/AboutProvider.tsx` accepts `entityType`, `acceptsNewPatients`, and `languages` props. Maps entity type to "Group Practice / Organization" or "Individual Provider". Shows new patient status as "Yes"/"No"/"Unknown" with color coding.
-
-- **ColocatedProviders** -- Verified. Implements:
-  - Lazy loading via `IntersectionObserver` (only fetches when visible)
-  - `Shimmer` loading component
-  - Standardized error handling via `toAppError`, `getUserMessage`, `logError`
-  - Links to other provider detail pages
-  - Shows total count from pagination
-
-- **Data accuracy Disclaimer** -- Verified. Line 152: `<Disclaimer variant="inline" showLearnMore={true} />`. The `Disclaimer.tsx` component exists at `packages/frontend/src/components/Disclaimer.tsx`.
-
-### Component Tree Accuracy
-
-The prompt's component tree is accurate with one naming discrepancy:
-- Prompt lists `ConfidenceBadge` inside `ProviderHeroCard`, but the actual component uses `ConfidenceGauge`
-- `ConfidenceBadge.tsx` exists as a separate component at `packages/frontend/src/components/ConfidenceBadge.tsx` but is NOT used in the provider detail page
-- `ConfidenceGauge.tsx` exists at `packages/frontend/src/components/provider-detail/ConfidenceGauge.tsx` and IS what ProviderHeroCard imports
-
-The barrel export at `packages/frontend/src/components/provider-detail/index.ts` exports: `ProviderHeader`, `ProviderPlansSection`, `ColocatedProviders`, `ProviderSidebar`, `ConfidenceGauge`, `ProviderHeroCard`, `ScoreBreakdown`, `InsuranceList`, `AboutProvider`.
-
-### Missing / Future Items
-
-- **Server-side rendering for SEO** -- Confirmed not implemented. Page uses `'use client'` with no server-side data fetching. No `generateMetadata()` or `getServerSideProps`.
-- **Structured data / JSON-LD** -- Confirmed not implemented.
-- **Share provider button** -- Confirmed not implemented.
-- **Print-friendly view** -- Confirmed not implemented.
-- **Verification history timeline** -- `ConfidenceScoreBreakdown.tsx` exists at `packages/frontend/src/components/ConfidenceScoreBreakdown.tsx` but is not imported or rendered on the provider detail page.
-- **Score breakdown modal** -- `ScoreBreakdown.tsx` exists at `packages/frontend/src/components/provider-detail/ScoreBreakdown.tsx` and is exported from the barrel file, but is not rendered on the provider detail page.
-
----
+# Provider Detail Page Architecture -- Analysis Output
 
 ## Summary
 
-The provider detail page is fully implemented and matches the prompt's architecture closely. The page correctly fetches a single provider with all plan acceptances in one API call, computes aggregate confidence score (max), verification count (sum), and most recent verification date. All five sub-components (ProviderHeroCard, Disclaimer, AboutProvider, InsuranceList, ColocatedProviders) are properly wired up with the correct props.
-
-The most significant finding is that the page uses manual `useState` + `providerApi.getByNpi()` instead of the `useProvider()` React Query hook from `useProviderSearch.ts`. This means navigating to the same provider detail page twice will result in two API calls with no client-side caching. This is a missed optimization opportunity.
-
-Two documentation inaccuracies in the prompt: (1) the ProviderHeroCard uses `ConfidenceGauge`, not `ConfidenceBadge`; (2) the InsuranceList status type supports four statuses (`accepted`, `not_accepted`, `pending`, `unknown`), not just the two shown in the prompt's code example.
-
-The lazy loading pattern on ColocatedProviders using `IntersectionObserver` is a good performance optimization not called out in the prompt but present in the implementation.
+The provider detail page (`/provider/[npi]`) is a hybrid SSR + client-side page. The server-side component (`page.tsx`) fetches provider data with ISR (revalidate: 3600), generates SEO metadata, and injects JSON-LD structured data. It passes the data as `initialProvider` to `ProviderDetailClient`, which handles all interactivity. The client component computes aggregated confidence scores and verification counts, transforms plan acceptance data, and renders four sub-components: `ProviderHeroCard`, `AboutProvider`, `InsuranceList`, and `ColocatedProviders`. `ColocatedProviders` uses lazy loading via `IntersectionObserver`.
 
 ---
 
-## Recommendations
+## Checklist Verification
 
-1. **Use `useProvider()` React Query hook** -- The provider detail page should use the existing `useProvider(npi)` hook from `useProviderSearch.ts` instead of manual `useState` + `providerApi.getByNpi()`. This would provide automatic caching (10-min staleTime already configured), deduplication, and background refetching. The current manual approach loses all React Query benefits.
+### Page
 
-2. **Update prompt: ConfidenceBadge vs ConfidenceGauge** -- The prompt's component tree should reference `ConfidenceGauge` instead of `ConfidenceBadge`. These are distinct components; the Gauge is the one actually used in the HeroCard.
+| Item | Status | Evidence |
+|------|--------|----------|
+| Dynamic route `/provider/[npi]` | VERIFIED | File at `packages/frontend/src/app/provider/[npi]/page.tsx` |
+| Server-side rendering with ISR (`revalidate: 3600`) | VERIFIED | `page.tsx` line 10: `next: { revalidate: 3600 }` in the `getProvider()` fetch call |
+| SEO metadata generation | VERIFIED | `page.tsx` lines 28-55: `generateMetadata()` builds title, description, and OpenGraph tags from provider name, specialty, and location |
+| Client-side interactivity via `ProviderDetailClient` | VERIFIED | `page.tsx` line 96: `<ProviderDetailClient npi={npi} initialProvider={provider} />` |
+| Breadcrumb navigation back to search | VERIFIED | `ProviderDetailClient.tsx` lines 127-137: `<Link href="/search">` with ArrowLeft icon, "Search > Provider Details" breadcrumb |
+| Loading, error, and success states | VERIFIED | Lines 140-144 (loading spinner), 147-171 (error card with retry + back to search), 174-209 (success content) |
+| Retry on error | VERIFIED | Line 158: `<button onClick={fetchProvider}>Try Again</button>` re-invokes the fetch function |
 
-3. **Update prompt: Status mapping** -- The prompt's insurance plan transformation example shows only `'accepted' | 'unknown'`, but the actual code maps four statuses. Update the prompt to reflect the full `statusMap`.
+### Data
 
-4. **Consider SSR for SEO** -- Provider detail pages are high-value SEO targets. Migrating to server-side rendering with `generateMetadata()` for dynamic title/description and `generateStaticParams()` for popular NPIs would significantly improve discoverability. This is listed as a future item and should be prioritized.
+| Item | Status | Evidence |
+|------|--------|----------|
+| Single API call for provider + plan acceptances | VERIFIED | `ProviderDetailClient.tsx` line 60: `providerApi.getByNpi(npi)` returns provider with `planAcceptances` included. Backend `providerService.ts` `PROVIDER_INCLUDE` (line 176) includes `providerPlanAcceptances` with `insurancePlan` and `location` |
+| Confidence score aggregation (max across plans) | VERIFIED | Lines 87-96: `bestAcceptance` found via `reduce()` comparing `confidence.score ?? confidenceScore`, then `confidenceScore` extracted from it |
+| Verification count aggregation (sum across plans) | VERIFIED | Lines 99-102: `reduce()` summing `p.verificationCount` across all plan acceptances |
+| Insurance plan data transformation | VERIFIED | Lines 112-121: Maps `planAcceptances` to `{id, planId, name, status, confidence, locationId, location, lastVerifiedAt}` using `statusMap` for status normalization |
+| Co-located provider fetching | VERIFIED | `ColocatedProviders.tsx` line 29: `providerApi.getColocated(npi, { limit: 10 })` |
 
-5. **Wire up ScoreBreakdown** -- The `ScoreBreakdown` component is built, exported from the barrel file, but never rendered. Consider adding it as a collapsible section or modal accessible from the confidence gauge.
+### Components
+
+| Item | Status | Evidence |
+|------|--------|----------|
+| ProviderHeroCard with confidence badge | VERIFIED | `ProviderHeroCard.tsx`: Renders initials avatar, display name (title-cased), specialty, address (title-cased from NPPES ALL-CAPS), phone with formatting, Google Maps link, NPI, NPPES sync date, and `ConfidenceGauge` component |
+| InsuranceList with per-plan scores | VERIFIED | `InsuranceList.tsx`: 843-line component with carrier grouping (via `CARRIER_PATTERNS`), per-plan confidence display, search filtering, location filtering, collapsible carrier groups, verification modal, data freshness badges |
+| AboutProvider (entity type, new patients, languages) | VERIFIED | `AboutProvider.tsx`: Grid layout showing new patients (Yes/No/Unknown with color coding), practice type (Individual/Organization), and languages. Conditionally rendered -- returns `null` if no meaningful data |
+| ColocatedProviders | VERIFIED | `ColocatedProviders.tsx`: Lazy-loaded via `IntersectionObserver` with 100px rootMargin. Shows location info (name, health system, address), up to 10 provider links, "View all" link if >10. Returns `null` if no colocated providers or error. |
+| Data accuracy Disclaimer | VERIFIED | `ProviderDetailClient.tsx` line 186: `<Disclaimer variant="inline" showLearnMore={true} />` |
+
+### Missing / Future
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Server-side rendering for SEO | IMPLEMENTED | ISR with `revalidate: 3600` and full metadata generation including OpenGraph tags |
+| JSON-LD structured data | IMPLEMENTED | `page.tsx` lines 69-86: Generates `Physician` or `MedicalOrganization` schema with name, specialty, address, phone. Injected via `<script type="application/ld+json">` |
+| Open Graph / social sharing tags | IMPLEMENTED | `page.tsx` lines 49-53: `openGraph: { title, description, type: 'profile' }` in metadata |
+| Share provider button | NOT IMPLEMENTED | No share functionality exists in the component tree |
+| Print-friendly view | NOT IMPLEMENTED | No `@media print` styles or print button |
+| Verification history timeline | NOT IMPLEMENTED | No timeline component is wired into the detail page. The `verificationApi.getForPair()` and `verificationApi.getRecent()` methods exist in the API client but are not called from this page. |
+| Score breakdown modal | PARTIALLY IMPLEMENTED | `ScoreBreakdown.tsx` and `ConfidenceGauge.tsx` exist in `provider-detail/`. `ConfidenceGauge` is used by `ProviderHeroCard`. The `confidenceBreakdown` prop is passed through from `bestAcceptance?.confidence`. Whether the gauge renders a breakdown modal depends on `ConfidenceGauge` implementation. |
+
+---
+
+## Questions Answered
+
+### 1. Should provider detail pages be server-rendered for SEO?
+**Already implemented.** The page uses Next.js ISR with `revalidate: 3600` (1 hour). The `getProvider()` function fetches data server-side and passes it as `initialProvider` to the client component. The client component skips fetching if `initialProvider` is available (`if (!initialProvider && npi)`). This means the first render is fully server-side with hydrated HTML, and subsequent renders use cached ISR pages.
+
+### 2. Should we add structured data (JSON-LD) for Google healthcare search results?
+**Already implemented.** `page.tsx` lines 69-86 generate a JSON-LD script tag with:
+- `@type: "Physician"` for individuals, `"MedicalOrganization"` for organizations
+- `name`, `medicalSpecialty`, `telephone`
+- `PostalAddress` with street, city, state, postal code
+- Only generated when provider data is available
+
+This enables Google to display rich results for healthcare provider searches.
+
+### 3. Is the co-located providers feature useful? Is it performant?
+**Useful and well-optimized.** The `ColocatedProviders` component:
+- **Lazy loads** via `IntersectionObserver` -- only fetches when the section scrolls into view (with 100px rootMargin for preloading)
+- **Limits to 10** providers per request
+- **Hides gracefully** -- returns `null` if there are 0 colocated providers or if the fetch errors
+- **Shows location context** -- displays the shared location's name, health system, full address, and provider count
+- **Links to search** -- "View all" links to `/search?city=...&state=...&zipCode=...` for locations with >10 providers
+
+Performance concern: The API call fetches providers with full `PROVIDER_INCLUDE` joins (6 related tables). For a colocated providers endpoint that only needs name/specialty/phone, a leaner query would reduce response size. However, this is mitigated by the lazy loading pattern.
+
+### 4. Should the verification timeline be displayed on this page?
+**Recommended, especially for high-verification providers.** The API supports `verificationApi.getRecent({ npi })` and `verificationApi.getForPair(npi, planId)`, but neither is called from the detail page. The `InsuranceList` component shows a `DataFreshnessBadge` per plan (green/yellow/red dot based on days since verification) and `formatLastVerified()` for the overall last-verified date. Adding a collapsible verification timeline (showing recent verifications with dates, up/down votes, and notes) would increase trust and transparency.
+
+### 5. Should we add a "Report incorrect information" feature?
+**Yes, recommended for data quality.** Currently users can verify insurance acceptance (yes/no) via the `VerificationModal` in `InsuranceList`. But there is no way to report incorrect non-insurance data (wrong address, wrong phone, wrong specialty). A "Report" button could submit a flag via a new API endpoint that feeds into an admin review queue.
+
+---
+
+## Additional Findings
+
+1. **SSR data vs client data type mismatch.** `page.tsx` fetches via raw `fetch()` and expects the response at `json.data?.provider`. `ProviderDetailClient` also fetches via `providerApi.getByNpi(npi)` which returns `response.provider` (from `apiFetch` which returns `data.data`). The server and client fetch paths parse the response differently, which could cause issues if the API response structure changes.
+
+2. **`ProviderDetailClient` does not use React Query.** Despite `useProvider()` existing in `useProviderSearch.ts`, the detail client uses raw `useState` + `useEffect` + `providerApi.getByNpi()`. This means provider detail data is NOT cached by React Query, and navigating away and back will either re-render from SSR cache or re-fetch.
+
+3. **`InsuranceList` has sample fallback data.** Lines 46-50 define `samplePlans` used as default when no plans are provided. In production, `ProviderDetailClient` passes `plans={insurancePlans.length > 0 ? insurancePlans : undefined}`. When `undefined`, InsuranceList falls back to sample data, which could display fake plans for providers with no plan acceptances.
+
+4. **Carrier family grouping is client-side.** `InsuranceList.tsx` lines 53-83 define 18 `CARRIER_PATTERNS` regex patterns for grouping plans by carrier family (Aetna, BCBS, UnitedHealthcare, etc.). This duplicates logic that could live on the backend. If new carriers are added, both frontend patterns and backend data would need updates.
+
+5. **VerificationModal includes honeypot spam protection.** Lines 349-359 have a hidden `website` field that bots would fill. The `website` value is sent with the verification submission. This is a lightweight anti-spam measure.
+
+6. **Entity type display differs from prompt description.** The prompt lists `ProviderHeroCard` showing an "Entity type badge", but the actual component does not render a visible badge. Entity type is only visible indirectly through the organization name display (line 118: shown only when `entityType !== 'ORGANIZATION'`). The entity type badge is shown in `AboutProvider` as "Practice Type".

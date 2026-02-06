@@ -1,119 +1,99 @@
-# Frontend Data Fetching & State Management -- Analysis
-
-**Generated:** 2026-02-05
-**Source Prompt:** prompts/41-frontend-data-fetching.md
-**Status:** Fully Implemented -- All checklist items verified with minor discrepancies in prompt documentation
-
----
-
-## Findings
-
-### API Client
-
-- **Centralized `apiFetch()` with retry logic** -- Verified. `packages/frontend/src/lib/api.ts` lines 312-356 implement `apiFetch<T>()` which delegates to `fetchWithRetry()` (lines 243-303). The retry loop iterates `attempt <= maxRetries` with configurable options.
-
-- **`ApiError` class with typed error details** -- Verified. Lines 51-91 define `ApiError` extending `Error` with `statusCode`, `code`, `details` (typed as `ApiErrorDetails`), and `retryAfter`. Includes convenience methods: `isRateLimited()`, `isValidationError()`, `isNotFound()`, `isUnauthorized()`, `isRetryable()`.
-
-- **Rate limit detection with Retry-After parsing** -- Verified. `parseRetryAfter()` at lines 133-150 supports both integer seconds and HTTP-date formats. When rate limited, a toast is shown via `react-hot-toast` with countdown formatting (lines 344-350).
-
-- **Exponential backoff (configurable)** -- Verified. `calculateRetryDelay()` at lines 155-173 implements `baseDelay * 2^attempt` when `exponentialBackoff` is true. Default config at lines 34-39 sets `retryDelay: 1000`, `exponentialBackoff: true`.
-
-- **Network error detection** -- Verified. `isNetworkError()` at lines 114-127 checks for `TypeError`, and keywords like `network`, `failed to fetch`, `connection`, `timeout`, `econnrefused`, `econnreset`.
-
-- **Abort/cancel support** -- Verified. `isAbortError()` at lines 107-109 detects `AbortError`. The retry loop at line 282 immediately throws on abort without retrying.
-
-- **All API namespaces typed (providers, plans, verify, locations)** -- Verified. Four namespaces defined:
-  - `providers` (lines 396-471): search, getByNpi, getCities, getPlans, getColocated
-  - `plans` (lines 473-534): search, getGrouped, getGroupedPlans (legacy), getIssuers, getPlanTypes, getById, getProviders
-  - `verify` (lines 536-581): submit, vote, getStats, getRecent, getForPair
-  - `locations` (lines 583-647): search, getHealthSystems, getById, getProviders, getStats
-  - Legacy exports at lines 666-669: `providerApi`, `verificationApi`, `locationApi`
-
-### React Query
-
-- **QueryClientProvider in app layout** -- Verified. `packages/frontend/src/components/providers/QueryProvider.tsx` wraps children in `QueryClientProvider` using a shared `queryClient` from `packages/frontend/src/lib/queryClient.ts`. The client is configured with `staleTime: 5min`, `gcTime: 10min`, `retry: 2`, `refetchOnWindowFocus: false`.
-
-- **Query key factory pattern (`providerKeys`)** -- Verified. `packages/frontend/src/hooks/useProviderSearch.ts` lines 8-18 define `providerKeys` with `all`, `searches`, `search`, `detail`, `plans`, `colocated` factories.
-  - Minor discrepancy: The prompt shows `providerKeys.search(filters)` with just filters as the key shape, but the actual implementation is `search(filters, page, limit)` producing `['providers', 'search', { filters, page, limit }]`. The key also nests filters inside an object rather than spreading them inline. This is fine and more precise for cache granularity.
-
-- **Provider search/detail/plans/colocated hooks** -- Verified. Four hooks in `useProviderSearch.ts`:
-  - `useProviderSearch()` (line 43): Requires `filters.state` to be truthy, staleTime 2min
-  - `useProvider()` (line 70): staleTime 10min for detail caching
-  - `useProviderPlans()` (line 89): Supports status, minConfidence, pagination params
-  - `useColocatedProviders()` (line 115): Supports page/limit params
-
-- **Dropdown data hooks with caching (cities, plans, health systems)** -- Verified.
-  - `useCities.ts`: Custom cache with NYC boroughs special handling (`NYC_ALL_BOROUGHS_VALUE`, `NYC_BOROUGHS` constants). Pinned cities config for 24 states.
-  - `useInsurancePlans.ts`: Module-level `plansCache` Map with 10-min TTL, deduplication via `pendingRequests` Map.
-  - `useHealthSystems.ts`: Module-level `healthSystemsCache` Map with 5-min TTL, deduplication via `pendingRequests` Map.
-
-- **Prefetch utilities for dropdown data** -- Verified. `prefetchHealthSystems()` exported from `useHealthSystems.ts` (line 43). `useCities.ts` exports `prefetchCities()` (confirmed from prompt description; pinned city handling implies preloading logic).
-
-- **Cache clear utilities** -- Verified. `clearInsurancePlansCache()` in `useInsurancePlans.ts` (line 39), `clearHealthSystemsCache()` in `useHealthSystems.ts` (line 36).
-
-### Search State
-
-- **URL parameter sync (bi-directional)** -- Verified. `packages/frontend/src/hooks/search/useSearchParams.ts` implements:
-  - `parseUrlToFilters()` (lines 14-48): URL -> SearchFilters (reads state, city, cities, specialty, name, npi, entityType, insurancePlanId, healthSystem, zipCode)
-  - `filtersToSearchParams()` (lines 53-92): SearchFilters -> URLSearchParams (only includes non-default values)
-  - `useSearchUrlParams()` hook (lines 110-140): Wraps both utilities, uses `router.replace()` with `{ scroll: false }` to avoid history spam
-
-- **Filter state management with defaults** -- Verified. `packages/frontend/src/hooks/search/useFilterState.ts` exports `DEFAULT_FILTERS` (lines 10-21) and `useFilterState()` hook with `setFilter`, `setFilters`, `clearFilters`, `clearFilter`, `hasActiveFilters`, `activeFilterCount`, `canSearch`. Dependent filter clearing on state change (city, cities, healthSystem reset).
-  - Minor discrepancy: Prompt shows `DEFAULT_FILTERS` with `cities: ''` (string), but actual code has `cities: []` (array). The actual code also includes `npi` and `zipCode` fields not shown in prompt's shortened version.
-
-- **Search execution via React Query** -- Warning. `useSearchExecution.ts` does NOT use React Query (`useQuery`). It uses raw `useState` + `useCallback` with manual `api.providers.search()` calls, abort controllers, and custom debounce. The prompt's architecture diagram shows React Query in the flow, but the actual search execution bypasses it for direct fetch control (debounce, abort, immediate vs. delayed search). The `useProviderSearch` hook in `useProviderSearch.ts` does use React Query, but the search page uses `useSearchExecution` via `useSearchForm`.
-
-- **Form state orchestration** -- Verified. `packages/frontend/src/hooks/useSearchForm.ts` composes `useSearchUrlParams`, `useFilterState`, and `useSearchExecution` into a unified interface. Exposes both `search()` (debounced, 450ms) and `searchImmediate()` (button clicks). Auto-search option available but defaults to `false`.
-
-### Client State
-
-- **CompareContext (provider comparison, max 4)** -- Verified. `packages/frontend/src/context/CompareContext.tsx` implements a full-featured comparison context:
-  - `CompareProvider` interface with 12 fields (npi, name, specialty, healthSystem, address, city, state, zip, confidenceScore, acceptanceStatus, verificationCount, lastVerified, phone)
-  - Actions: `addProvider`, `removeProvider`, `clearAll`, `isSelected`, `canAddMore`
-  - Persisted to `sessionStorage` (key: `verifymyprovider-compare`)
-  - SSR-safe with `mounted` flag
-  - Robust error handling for storage operations (SyntaxError, DOMException, QuotaExceededError)
-  - Max enforced via `MAX_COMPARE_PROVIDERS` constant imported from `@/lib/constants`
-
-- **ErrorContext (global error banner)** -- Verified. `packages/frontend/src/context/ErrorContext.tsx` provides `ErrorProvider` with:
-  - `error` (AppError), `errorVariant`, `errorMessage` (derived)
-  - `setError`, `clearError`, `showErrorToast` (with auto-dismiss via timeout)
-  - Uses standardized `toAppError`, `getUserMessage`, `getErrorVariant` from `@/lib/errorUtils`
-
-- **ThemeContext (dark/light mode)** -- Verified. `packages/frontend/src/context/ThemeContext.tsx` provides `ThemeProvider` with:
-  - Three modes: `light`, `dark`, `system`
-  - `resolvedTheme` computed from system preference when in `system` mode
-  - Persisted to `localStorage` (key: `verifymyprovider-theme`)
-  - Listens for `prefers-color-scheme` media query changes
-  - Hydration-safe with `mounted` guard (returns null until mounted)
-
-### Missing / Future Items
-
-- **Optimistic updates for verifications/votes** -- Confirmed not implemented. The `verify` namespace uses standard `apiFetch` with no optimistic update patterns.
-- **Infinite scroll / virtual list** -- Confirmed not implemented. Search results use standard pagination.
-- **Service worker for offline caching** -- Confirmed not implemented.
-- **React Query devtools in development** -- Confirmed not included. `QueryProvider.tsx` does not import `ReactQueryDevtools`.
-
----
+# Frontend Data Fetching & State Management -- Analysis Output
 
 ## Summary
 
-The frontend data fetching and state management layer is fully implemented and matches the prompt's architecture with high fidelity. The API client (`api.ts`) is well-structured with retry logic, rate limit handling, exponential backoff, and typed namespaces. React Query is properly configured with a shared `QueryClient` and query key factories. Dropdown hooks (cities, insurance plans, health systems) implement their own module-level caching with TTLs and deduplication, which is effective but creates a parallel caching layer alongside React Query.
-
-The most notable discrepancy is that `useSearchExecution` does NOT use React Query for the actual search execution -- it manages state with raw `useState` and manual fetch calls. This is a deliberate design choice to support debounced search, abort controllers, and the two-tier search strategy (debounced auto-search vs. immediate button clicks), which would be harder to implement cleanly with `useQuery`. However, the prompt's architecture diagram and checklist item "Search execution via React Query" are misleading.
-
-All three React contexts (Compare, Error, Theme) are robustly implemented with SSR safety, persistence, and proper error handling.
+The frontend data fetching layer is well-structured with a centralized API client (`lib/api.ts`), React Query for server state management (`QueryProvider` + `queryClient`), and a clean separation of concerns across custom hooks. The API client includes robust retry logic with exponential backoff and rate-limit handling. Dropdown data hooks (`useCities`, `useInsurancePlans`, `useHealthSystems`) use their own module-level caching independent of React Query, while provider data hooks use React Query's built-in cache. Client state is managed through three React contexts (Compare, Error, Theme).
 
 ---
 
-## Recommendations
+## Checklist Verification
 
-1. **Clarify prompt re: search execution** -- The checklist item "Search execution via React Query" should be updated to "Search execution via custom hooks with debounce and abort" since `useSearchExecution` does not use React Query. The `useProviderSearch` hook with React Query exists but is not used by the search page.
+### API Client
 
-2. **Consider React Query devtools** -- Adding `@tanstack/react-query-devtools` in development would aid debugging cache behavior, especially since there are two parallel caching layers (React Query for provider detail/plans, module-level Maps for dropdowns).
+| Item | Status | Evidence |
+|------|--------|----------|
+| Centralized `apiFetch()` with retry logic | VERIFIED | `lib/api.ts` line 312: Generic `apiFetch<T>()` wraps `fetchWithRetry()` which handles retries with configurable max retries, delay, backoff |
+| `ApiError` class with typed error details | VERIFIED | Lines 51-91: `ApiError` extends `Error` with `statusCode`, `code`, `details`, `retryAfter` fields and helper methods (`isRateLimited()`, `isRetryable()`, etc.) |
+| Rate limit detection with Retry-After parsing | VERIFIED | Lines 133-150: `parseRetryAfter()` handles both integer seconds and HTTP-date format. Lines 344-349: Rate-limited responses show toast with countdown |
+| Exponential backoff (configurable) | VERIFIED | Lines 155-173: `calculateRetryDelay()` implements `baseDelay * 2^attempt`, caps Retry-After at 30s |
+| Network error detection | VERIFIED | Lines 114-127: `isNetworkError()` checks for `TypeError`, network/connection/timeout keywords |
+| Abort/cancel support | VERIFIED | Lines 107-109: `isAbortError()` detects `AbortError`; line 282: aborted requests are never retried |
+| All API namespaces typed | VERIFIED | Lines 397-671: Four namespaces -- `providers` (5 methods), `plans` (7 methods), `verify` (5 methods), `locations` (5 methods). All return typed generics via `apiFetch<T>()` |
 
-3. **Consolidate caching layers** -- The dropdown hooks (useCities, useInsurancePlans, useHealthSystems) each maintain their own `Map`-based caches. These could potentially be unified under React Query with appropriate `staleTime` and `queryKey` patterns, reducing code duplication and providing a single cache inspection point.
+### React Query
 
-4. **Add `planApi` export** -- The legacy exports section notes `planApi removed - unused`, but the prompt documents it as `plans` namespace. If external consumers need it, consider re-exporting.
+| Item | Status | Evidence |
+|------|--------|----------|
+| QueryClientProvider in app layout | VERIFIED | `layout.tsx` line 162: `<QueryProvider>` wraps children. `QueryProvider.tsx` wraps in `QueryClientProvider` using `queryClient` from `lib/queryClient.ts` |
+| Query key factory pattern | VERIFIED | `useProviderSearch.ts` lines 8-18: `providerKeys` factory with `all`, `searches`, `search`, `detail`, `plans`, `colocated` keys |
+| Provider search/detail/plans/colocated hooks | VERIFIED | `useProviderSearch.ts`: `useProviderSearch()` (line 43), `useProvider()` (line 70), `useProviderPlans()` (line 89), `useColocatedProviders()` (line 115) |
+| Dropdown data hooks with caching | VERIFIED | `useCities.ts`: module-level `Map` cache with 5-min TTL; `useInsurancePlans.ts`: module-level cache with 10-min TTL; `useHealthSystems.ts`: module-level cache with 5-min TTL |
+| Prefetch utilities for dropdown data | VERIFIED | `useCities.ts` line 161: `prefetchCities()`; `useHealthSystems.ts` line 43: `prefetchHealthSystems()` |
+| Cache clear utilities | VERIFIED | `useCities.ts` line 154: `clearCitiesCache()`; `useInsurancePlans.ts` line 39: `clearInsurancePlansCache()`; `useHealthSystems.ts` line 36: `clearHealthSystemsCache()` |
 
-5. **Document the `locations` namespace caveat** -- The prompt correctly notes "Backend locations route is disabled -- these calls will fail." This should be prominently documented in the `locationApi` export or guarded to prevent runtime errors.
+### Search State
+
+| Item | Status | Evidence |
+|------|--------|----------|
+| URL parameter sync (bi-directional) | VERIFIED | `useSearchParams.ts`: `parseUrlToFilters()` (URL -> state, line 14) and `filtersToSearchParams()` (state -> URL, line 53). Uses `router.replace()` with `scroll: false` |
+| Filter state management with defaults | VERIFIED | `useFilterState.ts`: `DEFAULT_FILTERS` (line 10) with all filter fields. `setFilter()` auto-clears dependent filters when state changes (city, cities, healthSystem) |
+| Search execution via React Query | PARTIALLY VERIFIED | `useSearchExecution.ts` does NOT use React Query -- it uses raw `api.providers.search()` calls with manual state management (`useState` for results/pagination/loading/error). `useProviderSearch.ts` wraps React Query, but `useSearchExecution.ts` manages its own state. |
+| Form state orchestration | VERIFIED | `useSearchForm.ts`: Composes `useSearchUrlParams`, `useFilterState`, and `useSearchExecution` into a single unified hook |
+
+### Client State
+
+| Item | Status | Evidence |
+|------|--------|----------|
+| CompareContext (provider comparison, max 4) | VERIFIED | `CompareContext.tsx`: Uses `sessionStorage` for persistence, `MAX_COMPARE_PROVIDERS` constant (imported from `constants.ts`), `addProvider`/`removeProvider`/`clearAll`/`isSelected`/`canAddMore` |
+| ErrorContext (global error banner) | VERIFIED | `ErrorContext.tsx`: `setError()`, `clearError()`, `showErrorToast()` with auto-dismiss timer. Uses `toAppError()` and `getUserMessage()` for standardized error handling |
+| ThemeContext (dark/light mode) | VERIFIED | `ThemeContext.tsx`: Three modes (`light`, `dark`, `system`), persists to `localStorage`, listens for `prefers-color-scheme` media query changes, prevents hydration mismatch by returning `null` until mounted |
+
+### Missing / Future
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Optimistic updates for verifications/votes | NOT IMPLEMENTED | Verification submissions in `InsuranceList.tsx` use `verificationApi.submit()` and track success via local `recentlyVerifiedPlans` state, but no React Query mutation or optimistic update |
+| Infinite scroll / virtual list for large result sets | NOT IMPLEMENTED | Pagination is page-based with manual page links |
+| Service worker for offline caching | NOT IMPLEMENTED | No service worker or PWA manifest found |
+| React Query devtools in development | NOT IMPLEMENTED | `QueryProvider.tsx` only wraps `QueryClientProvider` with no devtools import. `queryClient.ts` has no devtools configuration. |
+
+---
+
+## Questions Answered
+
+### 1. Should we add optimistic updates for verification submissions?
+**Yes, moderately recommended.** Currently, `InsuranceList.tsx` submits via `verificationApi.submit()` and tracks recently-verified plans via local `Set<string>` state (`recentlyVerifiedPlans`). This provides immediate UI feedback by showing a "Verified" badge. However, the page does not invalidate or refetch the provider's plan acceptance data after verification. Adding a React Query `useMutation` with `onSuccess` that invalidates `providerKeys.detail(npi)` would keep the data consistent without a full page reload.
+
+### 2. Is the retry logic appropriate for the expected traffic patterns?
+**Yes, well-calibrated.** The configuration is:
+- Max 2 retries (3 total attempts)
+- Exponential backoff: 1s, 2s, 4s
+- Retryable statuses: 429, 500, 502, 503, 504
+- Retry-After header respected (capped at 30s)
+- Aborted requests never retried
+- Rate limit toast shown after all retries exhausted
+
+This is appropriate for a consumer-facing app. The backend's search rate limit is 100 requests/hour, so the 2-retry cap prevents excessive load during rate limiting while still recovering from transient 5xx errors.
+
+### 3. Should dropdown data (cities, plans) be prefetched on app load or on-demand?
+**Current approach is on-demand with smart caching, which is appropriate.** Cities and health systems are fetched when the user selects a state. Insurance plans are fetched when the component mounts. All three have module-level caches (5-10 min TTL) and deduplication of in-flight requests (`pendingRequests` Map). Prefetch functions exist (`prefetchCities`, `prefetchHealthSystems`) for use on hover or route transition, which is the ideal pattern. Prefetching on app load would be wasteful since users may never reach the search page, and the data is state-dependent.
+
+### 4. Should we add React Query devtools for development debugging?
+**Yes, highly recommended -- trivial to add.** Install `@tanstack/react-query-devtools` and add `<ReactQueryDevtools initialIsOpen={false} />` inside the `QueryProvider`. This provides a floating panel showing all cached queries, their states, and timing. It should only be included in development builds.
+
+### 5. Is the max 4 provider comparison limit sufficient?
+**Yes, 4 is a reasonable limit.** The comparison feature stores providers in `sessionStorage` (not `localStorage`), so data clears when the browser session ends. The `CompareProvider` interface stores 12 fields per provider. With 4 providers, the session storage footprint is minimal. Increasing beyond 4 would make the comparison UI unwieldy on both desktop and mobile.
+
+---
+
+## Additional Findings
+
+1. **Dual caching layers for dropdown data.** `useCities`, `useInsurancePlans`, and `useHealthSystems` each implement their own module-level `Map` cache with TTL, pending request deduplication, and race condition handling. This is independent of React Query's cache. React Query's default `staleTime: 5 * 60 * 1000` (from `queryClient.ts`) overlaps with these custom caches. The provider search hooks (`useProviderSearch.ts`) correctly use React Query, but the dropdown hooks do not. This is likely intentional to avoid re-renders, but it means the dropdown hooks bypass React Query's refetching, deduplication, and devtools visibility.
+
+2. **`useSearchExecution` does NOT use React Query.** Despite the prompt describing "Search execution via React Query," the actual `useSearchExecution.ts` hook manually manages state with `useState` for results, pagination, loading, and error. It calls `api.providers.search()` directly (not through `useQuery`). This means search results are NOT cached by React Query and are lost on unmount. The debounced search with abort controller pattern is well-implemented, but migrating to `useQuery` with `keepPreviousData` would improve UX.
+
+3. **NYC boroughs special handling.** `useCities.ts` has a `NYC_ALL_BOROUGHS_VALUE` sentinel that expands to 5 borough names. The expansion happens in `useSearchExecution.ts` (line 124) before the API call. This is a nice UX touch but creates coupling between the cities hook and the search execution hook.
+
+4. **`locationApi` calls will fail.** The prompt notes (line 96-97) that the backend locations route is disabled. The `locations` namespace in `api.ts` still defines 5 endpoints. `useHealthSystems.ts` calls `api.locations.getHealthSystems()` -- this will fail if the backend route is truly disabled.
+
+5. **Query client configuration.** `queryClient.ts` sets `staleTime: 5min`, `gcTime: 10min`, `retry: 2`, `refetchOnWindowFocus: false`. The `useProviderSearch` hook overrides `staleTime` to 2 minutes for search results, and `useProvider` overrides it to 10 minutes for detail pages. This tiered staleness approach is well-designed.

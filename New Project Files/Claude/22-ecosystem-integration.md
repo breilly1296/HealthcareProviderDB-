@@ -1,31 +1,29 @@
 # VerifyMyProvider + OwnMyHealth Ecosystem
 
-**Last Updated:** 2026-02-05
-**Generated From:** prompts/22-ecosystem-integration.md
-
----
+**Last Updated:** 2026-02-06
 
 ## The Portfolio Model
 
 ```
-                    +--------------------------+
-                    |     Holding Company /     |
-                    |     Parent Entity         |
-                    +-----------+--------------+
+                    +-----------------------+
+                    |    Holding Company     |
+                    |  (Future Structure)    |
+                    +-----------+-----------+
                                 |
-              +-----------------+------------------+
-              |                                    |
-   +----------+----------+          +--------------+----------+
-   |  VerifyMyProvider    |          |    OwnMyHealth          |
-   |  (Public Directory)  |          |    (Health Management)  |
-   +----------+----------+          +--------------+----------+
-              |                                    |
-   +----------+----------+          +--------------+----------+
-   | - Provider search    |          | - Personal health data  |
-   | - Insurance verify   |          | - Care coordination     |
-   | - Crowdsource data   |          | - Health records mgmt   |
-   | - Public, no login   |          | - Premium features      |
-   +---------------------+          +-------------------------+
+                +---------------+---------------+
+                |                               |
+    +-----------+-----------+       +-----------+-----------+
+    |  VerifyMyProvider     |       |    OwnMyHealth        |
+    |  (Provider Directory  |       |  (Personal Health     |
+    |   + Verification)     |       |   Records Platform)   |
+    +-----------+-----------+       +-----------+-----------+
+                |                               |
+    +-----------+-----------+       +-----------+-----------+
+    | - Public data only    |       | - HIPAA-compliant     |
+    | - No auth required    |       | - User accounts       |
+    | - Crowdsource model   |       | - PHI storage         |
+    | - Free tier           |       | - Premium features    |
+    +-----------------------+       +-----------------------+
 ```
 
 ---
@@ -34,26 +32,27 @@
 
 ### Different Compliance Requirements
 
-| Dimension | VerifyMyProvider | OwnMyHealth |
-|-----------|-----------------|-------------|
-| **Data Type** | Public provider data (NPI, specialties, insurance acceptance) | Personal health information (PHI) |
-| **HIPAA Required** | No - all data is public or crowdsourced | Yes - handles patient health data |
-| **User Accounts** | Not required (anonymous use) | Required (authenticated, identity-verified) |
-| **Data Sensitivity** | Low - publicly available NPI registry data | High - protected health information |
-| **Regulatory Burden** | Minimal | HIPAA BAA, encryption at rest, audit trails |
-| **Development Speed** | Fast - no compliance overhead | Slower - compliance gates on every feature |
-| **Liability Profile** | Low - aggregator of public data | High - custodian of health data |
-| **Launch Timeline** | Pre-beta (current) | Future phase |
+| Aspect | VerifyMyProvider | OwnMyHealth |
+|--------|-----------------|-------------|
+| **HIPAA Required** | No - public NPI data only | Yes - stores PHI |
+| **User Auth Required** | No - anonymous verification | Yes - accounts mandatory |
+| **Data Sensitivity** | Public provider info | Protected health info |
+| **Development Speed** | Fast - no compliance overhead | Slower - HIPAA audit trail |
+| **Risk Profile** | Low - public data | High - regulated data |
+| **Launch Timeline** | Near-term (beta ready) | Medium-term |
+| **Liability** | Minimal | Significant |
+| **Cost to Build** | Lower | Higher |
+| **Regulatory Burden** | None | HIPAA, state privacy laws |
 
-### Benefits of Separation
+### Strategic Separation Rationale
 
-1. **Risk Isolation:** A security incident in VerifyMyProvider does not expose PHI, because no PHI exists in the system. A vulnerability in OwnMyHealth's compliance posture does not affect VerifyMyProvider's ability to operate.
+1. **Risk Isolation** - A security incident on VerifyMyProvider does not expose PHI. A HIPAA breach on OwnMyHealth does not affect VerifyMyProvider's reputation or operations.
 
-2. **Development Velocity:** VerifyMyProvider can ship features rapidly without HIPAA compliance review gates. Each feature does not require a privacy impact assessment or BAA review.
+2. **Development Speed** - VerifyMyProvider can ship features rapidly without HIPAA compliance review cycles. Evidence: the codebase already has rate limiting, CAPTCHA, Sybil prevention, and a full API deployed to Google Cloud Run.
 
-3. **Cost Efficiency:** HIPAA-compliant infrastructure (encrypted databases, audit logging, breach notification procedures) is only needed for OwnMyHealth, not for the entire portfolio.
+3. **Exit Optionality** - Either product can be sold independently, or both together at a premium for the synergy.
 
-4. **Exit Optionality:** Either product can be sold independently, merged, or sunset without affecting the other.
+4. **Cost Savings** - VerifyMyProvider does not need HIPAA-compliant infrastructure (encrypted storage, audit logging, BAAs with vendors), significantly reducing operational costs.
 
 ---
 
@@ -62,214 +61,157 @@
 ### User Journey: Casual User ("Your Sister")
 
 ```
-Google Search: "does Dr. Smith accept my insurance?"
-         |
-         v
-+--VerifyMyProvider--+
-| Search for doctor  |
-| See: accepts Blue  |
-| Cross, 85% conf.  |
-+--------+-----------+
-         |
-         v
-  Books appointment
-         |
-         v
-+--VerifyMyProvider--+
-| (Post-visit)       |
-| Submits            |
-| verification:      |
-| "Yes, accepted!"   |
-+--------------------+
-
-  [Journey ends here for casual user]
+1. Googles "does Dr. Smith accept Blue Cross"
+2. Lands on VerifyMyProvider search results
+3. Finds Dr. Smith's verification status
+4. Sees: "46% of directories contain errors - verify this!"
+5. Maybe submits a verification after appointment
+6. Never needs OwnMyHealth
 ```
 
 **Value to ecosystem:**
-- Contributes verification data (crowdsource moat)
-- Free organic traffic via SEO
+- Verification data (crowdsource contribution)
+- SEO traffic (long-tail search queries for provider names)
 - Top-of-funnel awareness for OwnMyHealth
-- Zero customer acquisition cost for data contribution
+- Zero acquisition cost if organic search
 
 ### User Journey: Power User ("You")
 
 ```
-+--VerifyMyProvider--+       +--OwnMyHealth---------+
-| Search providers   | ----> | Manage health records |
-| by insurance plan  |       | Track appointments    |
-| Verify acceptance  |       | Coordinate care       |
-| Track network      |       | Insurance management  |
-| changes            |       | Premium features      |
-+--------------------+       +-----------------------+
-        |                             |
-        +-------- Bidirectional ------+
-        |  Provider data flows to     |
-        |  OwnMyHealth for context    |
-        |  Health context enriches    |
-        |  VerifyMyProvider searches  |
-        +-----------------------------+
+1. Searches for in-network provider on VerifyMyProvider
+2. Verifies provider accepts their specific plan
+3. Sees CTA: "Track your health records across providers"
+4. Signs up for OwnMyHealth
+5. Uses VerifyMyProvider to find new providers
+6. Uses OwnMyHealth to manage records across providers
 ```
 
 **Value to ecosystem:**
 - Higher engagement across both products
 - Premium subscription revenue (OwnMyHealth)
-- Deeper verification data (verified from actual visits)
-- Multiple touchpoints increase retention
+- Multiple verification contributions (VerifyMyProvider)
+- Network effect: verified providers attract more users
 
 ---
 
 ## The Conversion Funnel
 
 ```
-  +------------------------------------+
-  |  VerifyMyProvider Visitors (100%)   |  <-- SEO, word of mouth
-  +------------------------------------+
-                  |
-                  v
-  +------------------------------------+
-  |  Perform a Search (60%)            |  <-- Active engagement
-  +------------------------------------+
-                  |
-                  v
-  +------------------------------------+
-  |  Submit a Verification (5-10%)     |  <-- Data contributors
-  +------------------------------------+
-                  |
-                  v
-  +------------------------------------+
-  |  See OwnMyHealth CTA (100% of     |  <-- Post-verification upsell
-  |  verifiers, footer for all)        |
-  +------------------------------------+
-                  |
-                  v
-  +------------------------------------+
-  |  Click through to OwnMyHealth (2%) |  <-- Cross-product conversion
-  +------------------------------------+
-                  |
-                  v
-  +------------------------------------+
-  |  OwnMyHealth Signup (0.5-1%)       |  <-- Premium conversion
-  +------------------------------------+
+    VerifyMyProvider Users (100%)
+            |
+    Search for provider (100%)
+            |
+    View provider details (70%)
+            |
+    Submit verification (5-10%)
+            |
+    See OwnMyHealth CTA (5-10%)
+            |
+    Click through to OwnMyHealth (1-3%)
+            |
+    Create OwnMyHealth account (0.5-1%)
+            |
+    Convert to premium (0.1-0.3%)
 ```
 
-**The math (illustrative targets):**
-- 100,000 monthly VerifyMyProvider visitors
-- 60,000 perform searches
-- 5,000-10,000 submit verifications
-- 2,000 see and engage with OwnMyHealth CTA
-- 500-1,000 sign up for OwnMyHealth
-- Cost to acquire via VerifyMyProvider: near $0 (organic)
-- Cost to acquire OwnMyHealth user directly: $15-50 (paid marketing)
+**The math (hypothetical):**
+- 10,000 monthly VerifyMyProvider visitors
+- 500-1,000 verifications submitted
+- 100-300 click through to OwnMyHealth
+- 50-100 create accounts
+- 10-30 convert to premium ($10/month)
+- Revenue: $100-$300/month from cross-product conversion
+- **Key insight:** VerifyMyProvider acquisition cost = $0 (organic SEO), vs $20-50 per OwnMyHealth user via direct marketing
 
 ---
 
 ## Data Synergy
 
-### VerifyMyProvider --> OwnMyHealth
+**VerifyMyProvider -> OwnMyHealth:**
+- Verified provider acceptance status (no PHI)
+- Provider search results (public NPI data)
+- Confidence scores for provider-plan pairs
+- **NO PHI crosses this boundary**
 
-- **Provider directory data:** OwnMyHealth users can look up providers directly within the health management interface without leaving the platform
-- **Insurance acceptance status:** Pre-verified acceptance data helps OwnMyHealth users find in-network providers
-- **Confidence scores:** OwnMyHealth can surface data freshness to help users decide whether to call ahead
-- **No PHI crosses this boundary:** Only public provider and insurance data flows from VMP to OMH
+**OwnMyHealth -> VerifyMyProvider:**
+- Verification submissions (users verify their own providers)
+- Aggregate usage patterns (which plans are most searched)
+- **NO PHI crosses this boundary**
 
-### OwnMyHealth --> VerifyMyProvider
-
-- **Verified visit data:** When an OwnMyHealth user completes a visit, they can contribute a high-confidence verification back to VerifyMyProvider (data source: `PROVIDER_PORTAL`, score: 20/25)
-- **Insurance plan context:** OwnMyHealth knows the user's actual plan, so verifications submitted from OMH include precise plan matching
-- **No PHI crosses this boundary:** Only the verification submission (provider NPI, plan ID, accepts Y/N) flows back
-
-### Shared but Independent
-
-- **Separate databases:** No shared database access. API calls only.
-- **Separate deployments:** Independent scaling, independent uptime
-- **Separate user bases:** VerifyMyProvider has no user accounts; OwnMyHealth requires authentication
-- **No PHI in the boundary:** The API contract between products carries only public provider data and anonymous verification submissions
+**Shared but independent:**
+- Provider NPI data (public, from CMS NPPES)
+- Insurance plan reference data (public, from CMS Plan Finder)
+- Both products can independently pull from the same public data sources
 
 ---
 
 ## Technical Integration
 
-### Separate but Connected
+### Separate but connected:
 
 ```
-+-- Google Cloud ------------------------------------------+
-|                                                          |
-|  +--Cloud Run-----------+   +--Cloud Run-----------+    |
-|  | VerifyMyProvider API  |   | OwnMyHealth API      |    |
-|  | (Express + Prisma)   |   | (TBD stack)          |    |
-|  +--------+-------------+   +--------+-------------+    |
-|           |                          |                   |
-|  +--------v-------------+   +--------v-------------+    |
-|  | Cloud SQL PostgreSQL  |   | Cloud SQL PostgreSQL  |    |
-|  | verifymyprovider DB   |   | ownmyhealth DB       |    |
-|  | (public data only)    |   | (HIPAA-compliant)    |    |
-|  +-----------------------+   +-----------------------+    |
-|                                                          |
-|  +--Cloud Run-----------+                                |
-|  | VerifyMyProvider      |                               |
-|  | Frontend (Next.js)    |                               |
-|  +-----------------------+                               |
-+----------------------------------------------------------+
-
- API Contract (REST):
-   OMH --> VMP: GET /api/v1/providers/search?...
-   OMH --> VMP: GET /api/v1/providers/:npi/plans
-   OMH --> VMP: POST /api/v1/verify (with auth token)
+    +------------------+         +------------------+
+    | VerifyMyProvider  |         |   OwnMyHealth    |
+    |                   |         |                  |
+    | Frontend (Next.js)|         | Frontend (TBD)   |
+    | Backend (Express) |   API   | Backend (TBD)    |
+    | DB (PostgreSQL)   |<------->| DB (PostgreSQL)  |
+    |                   |         |                  |
+    | Google Cloud Run  |         | HIPAA-compliant  |
+    | No HIPAA needed   |         | infrastructure   |
+    +------------------+         +------------------+
 ```
 
-### API Contract Between Products
+### Current VerifyMyProvider Architecture (from codebase):
+- **Frontend:** Next.js 14.2 deployed on Google Cloud Run
+- **Backend:** Express + Prisma + PostgreSQL (Google Cloud SQL)
+- **Database:** `verifymyprovider` on Google Cloud SQL PostgreSQL
+- **Deployment:** GitHub Actions -> Docker -> Cloud Run (auto-deploy on push to main)
+- **Monorepo:** npm workspaces with packages/backend, packages/frontend, packages/shared
+
+### API contract between products (future):
 
 ```typescript
-// OwnMyHealth fetching provider data from VerifyMyProvider
-// No authentication required (public API)
-GET /api/v1/providers/search?name=Smith&state=NY&specialty=Cardiology
-GET /api/v1/providers/1234567890
-GET /api/v1/providers/1234567890/plans
+// VerifyMyProvider exposes public API for OwnMyHealth:
+GET /api/v1/providers/search?state=NY&city=New+York&specialty=Cardiology
+GET /api/v1/providers/:npi
+GET /api/v1/verify/:npi/:planId
 
-// OwnMyHealth submitting a verification to VerifyMyProvider
-// Rate limited + CAPTCHA protected
+// OwnMyHealth could submit verifications via:
 POST /api/v1/verify
-{
-  "npi": "1234567890",
-  "planId": "12345NY0010001",
-  "acceptsInsurance": true,
-  "acceptsNewPatients": true,
-  "captchaToken": "...",
-  "submittedBy": "user@ownmyhealth.com"  // Optional, for dedup
-}
+  { npi, planId, acceptsInsurance, captchaToken }
 ```
 
-### User Experience Integration
+### User experience integration:
 
-**On VerifyMyProvider:**
-- Footer CTA: "Want to manage your health records? Try OwnMyHealth"
-- Post-verification prompt: "Thanks for verifying! Track all your providers in one place with OwnMyHealth"
-- Search results sidebar: "Save this provider to your health profile" (links to OwnMyHealth)
+**On VerifyMyProvider (current frontend):**
+- Post-verification success screen could show OwnMyHealth CTA
+- Footer link to OwnMyHealth
+- "Track your health records" banner on provider detail pages
 
-**On OwnMyHealth:**
-- "Find a doctor" feature powered by VerifyMyProvider API
-- Insurance verification status shown inline on provider profiles
-- "Verify this provider" button that submits back to VerifyMyProvider
-- Deep links to VerifyMyProvider with pre-filled insurance plan from user profile
+**On OwnMyHealth (future):**
+- "Find a doctor" button deep-links to VerifyMyProvider search
+- Embedded provider search widget
+- Pre-filled plan information from user profile
 
 ---
 
 ## Why This Strategy Works
 
 1. **Separate Risk Profiles**
-   VerifyMyProvider handles only public data with no HIPAA obligations. A security incident is embarrassing but not a regulatory event. OwnMyHealth can take the time to build HIPAA-compliant infrastructure without delaying the VerifyMyProvider launch.
+   VerifyMyProvider handles only public NPI data - no HIPAA, no PHI, no regulated data. A security incident is embarrassing but not legally catastrophic. OwnMyHealth's HIPAA risk is fully isolated.
 
 2. **Separate Acquisition Channels**
-   VerifyMyProvider grows organically through SEO ("does my doctor accept my insurance?" searches) and word of mouth. OwnMyHealth acquires users through VerifyMyProvider's funnel at near-zero CAC, plus targeted marketing for premium features.
+   VerifyMyProvider grows via SEO (people searching "does my doctor accept my insurance"). OwnMyHealth grows via VerifyMyProvider conversion + direct health-conscious user marketing. Different channels, different costs.
 
 3. **Separate Exit Options**
-   VerifyMyProvider could be acquired by a health directory (Zocdoc, Healthgrades) or insurance company. OwnMyHealth could be acquired by a health platform (Apple Health, MyChart). Either product can be sold independently or together.
+   VerifyMyProvider could be acquired by a health tech company wanting crowdsourced directory data. OwnMyHealth could be acquired by a health records company. Together they command a premium. Separately they still have value.
 
 4. **Separate Development Timelines**
-   VerifyMyProvider can ship weekly with fast iteration cycles. OwnMyHealth's development is gated by compliance reviews and privacy assessments, operating on a different (slower) cadence without blocking the other product.
+   VerifyMyProvider is near beta-ready (API deployed, frontend live, security hardened). OwnMyHealth can be developed in parallel without blocking VerifyMyProvider's launch.
 
 5. **Portfolio Diversification**
-   Two products in adjacent markets reduce single-product risk. If one market shifts (e.g., insurance companies build better provider directories), the other product's value proposition remains intact.
+   If the crowdsourced verification model doesn't achieve traction, OwnMyHealth still has independent value. If OwnMyHealth's HIPAA compliance takes longer than expected, VerifyMyProvider still generates traffic and data.
 
 ---
 
@@ -278,105 +220,68 @@ POST /api/v1/verify
 ### Legal Organization (Recommended)
 
 ```
-  +-----------------------------+
-  |  [Parent LLC / Corp]        |
-  |  Holding company            |
-  +-------+----------+----------+
-          |          |
-  +-------v---+  +--v-----------+
-  | VMP LLC   |  | OMH LLC      |
-  | Operating |  | Operating    |
-  | entity    |  | entity       |
-  +----------+  | (HIPAA CE)   |
-                 +--------------+
+    +---------------------------+
+    |     [Holding Company]     |
+    |     Parent LLC            |
+    +---------------------------+
+                |
+    +-----------+-----------+
+    |                       |
+    +-------------+  +-----+-------+
+    | VMP LLC     |  | OMH LLC     |
+    | (Operating) |  | (Operating) |
+    +-------------+  +-------------+
 ```
 
-- Parent entity owns both operating entities
-- VMP LLC: Standard operating company, no special compliance
-- OMH LLC: HIPAA Covered Entity (or Business Associate), separate insurance, separate liability
-- Shared services (billing, HR, cloud accounts) at parent level
+- Separate LLCs for liability isolation
+- Holding company owns both
+- Shared services (founder, infrastructure) billed via inter-company agreements
 
 ### Exit Scenarios
 
-**Scenario A: Sell VerifyMyProvider Only**
-- Attractive to health directories, insurance companies, or provider networks
-- Value: provider directory + crowdsourced verification data + SEO traffic
-- Clean separation from OwnMyHealth since no shared data
+**Scenario A: Sell VerifyMyProvider alone**
+- Buyer: Health tech company wanting crowdsourced provider directory data
+- Value drivers: NPI database, verification data moat, SEO traffic
+- OwnMyHealth continues independently
 
-**Scenario B: Sell OwnMyHealth Only**
-- Attractive to health platforms, EHR vendors, or insurance tech companies
-- Value: HIPAA-compliant health management platform + user base
-- VerifyMyProvider continues independently as data feed
+**Scenario B: Sell OwnMyHealth alone**
+- Buyer: EHR/PHR company wanting personal health records platform
+- Value drivers: HIPAA-compliant platform, user base
+- VerifyMyProvider continues independently
 
-**Scenario C: Sell Both Together**
-- Attractive to larger health tech acquirers who want end-to-end consumer health
-- Premium valuation for the integrated ecosystem and data flywheel
+**Scenario C: Sell both together**
+- Buyer: Large health tech company wanting end-to-end patient platform
+- Value drivers: Full patient journey from finding provider to managing records
+- Premium valuation for integrated ecosystem
 
-**Scenario D: Keep as Portfolio**
-- Build both products to profitability
-- Cross-subsidize acquisition costs
-- Option value preserved for future exit
-
----
-
-## External Data Sources and Integration Opportunities
-
-### Current Data Sources
-
-| Source | Data | Integration Status |
-|--------|------|-------------------|
-| CMS NPPES Registry | Provider NPI, name, specialty, address | Imported (6 states, ~2.1M providers) |
-| CMS Plan Finder | Insurance plan details, issuer info | Imported |
-| Crowdsource (users) | Insurance acceptance verifications | Live |
-
-### Future Integration Opportunities
-
-| Integration | Value | Complexity | Priority |
-|-------------|-------|------------|----------|
-| **FHIR R4 API** | Standardized provider/insurance data exchange with EHR systems | High | Medium-term |
-| **CMS Provider Enrollment API** | Real-time provider enrollment status | Medium | Medium-term |
-| **State Medicaid APIs** | Medicaid acceptance data by state | Medium | Medium-term |
-| **Insurance Carrier APIs** | Direct carrier network data (Aetna, UHC, etc.) | High (requires partnerships) | Long-term |
-| **Zocdoc/Healthgrades** | Appointment availability, patient reviews | Medium (requires partnerships) | Long-term |
-| **Google Places API** | Verify provider addresses, hours, phone numbers | Low | Short-term |
-| **NPI Registry real-time sync** | Daily/weekly NPPES delta updates | Low | Short-term (partially built) |
-
-### FHIR Integration Strategy
-
-VerifyMyProvider's data model maps well to FHIR R4 resources:
-
-- `Provider` --> `Practitioner` / `Organization`
-- `InsurancePlan` --> `InsurancePlan`
-- `ProviderPlanAcceptance` --> `PractitionerRole` (with network affiliation)
-- `PracticeLocation` --> `Location`
-
-A FHIR facade API could expose VerifyMyProvider data to EHR systems, patient portals, and health information exchanges (HIEs), increasing the product's value in the health IT ecosystem.
+**Scenario D: Keep both as portfolio**
+- Build each to profitability independently
+- Maximize cross-product synergies over time
+- Reinvest revenue from one into the other
 
 ---
 
 ## Ecosystem Success Metrics
 
-### Cross-Product Engagement
-- VMP-to-OMH click-through rate (target: 2-5%)
-- VMP-to-OMH signup conversion rate (target: 0.5-1%)
-- OMH users who submit VMP verifications (target: 20%+)
-- Bidirectional monthly active users (target: growing MoM)
+**Cross-Product Engagement:**
+- Conversion rate from VerifyMyProvider to OwnMyHealth signups
+- Verification submissions from OwnMyHealth users
+- Average sessions per user across both products
 
-### Product Health
-- **VerifyMyProvider:** Monthly searches, verifications submitted, confidence score coverage, SEO ranking
-- **OwnMyHealth:** Signups, DAU/MAU ratio, premium conversion, retention at 30/60/90 days
-- **Ecosystem:** Combined CAC, cross-product LTV, data completeness improvement rate
+**Product Health:**
+- VerifyMyProvider: Monthly active users, verifications submitted, search queries, SEO rankings
+- OwnMyHealth: Registered users, premium conversion rate, records stored
+- Combined: Total ecosystem users, cross-product users, LTV by user type
 
 ---
 
 ## Current Status
 
-- **VerifyMyProvider:** Pre-beta. Backend API functional with provider search, insurance plan matching, crowdsourced verification system, rate limiting, and CAPTCHA. Frontend built with Next.js 14.2. Deployed on Google Cloud Run with Cloud SQL PostgreSQL.
-- **OwnMyHealth:** Planning phase. No code written. Dependent on VerifyMyProvider establishing a user base and data foundation first.
-- **Integration Status:** No cross-product integration yet. VerifyMyProvider operates as a standalone product.
+- **VerifyMyProvider:** Near beta-ready. Backend API deployed to Cloud Run. Frontend live. Security hardened (rate limiting, CAPTCHA, Sybil prevention). ~2.1M providers across 6 states imported.
+- **OwnMyHealth:** Not yet started. Conceptual stage.
+- **Integration Status:** No integration exists yet. Products are fully independent.
 - **Next Steps:**
   1. Launch VerifyMyProvider beta
-  2. Establish organic traffic and verification data flywheel
-  3. Begin OwnMyHealth architecture and compliance planning
-  4. Design cross-product API contract
-  5. Implement CTA integration points in VerifyMyProvider UI
+  2. Build initial traffic and verification data
+  3. Begin OwnMyHealth development
+  4. Add cross-product CTAs once both are live

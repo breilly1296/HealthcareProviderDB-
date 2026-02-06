@@ -1,80 +1,296 @@
-# Insurance Plans Feature -- Analysis
+# Insurance Plans Feature Review
 
-**Generated:** 2026-02-05
-**Source Prompt:** prompts/39-insurance-plans.md
-**Status:** Largely Implemented with Minor Inconsistencies
+**Last Updated:** 2026-02-06
 
----
+## Feature Overview
 
-## Findings
+The insurance plans feature connects providers to insurance networks they accept, supporting search, browsing, verification, and confidence-scored acceptance tracking. The implementation spans backend (6 API endpoints, service layer, data pipeline), frontend (insurance page, provider detail plans, card upload, hooks), and shared types.
+
+## Database Schema
+
+### InsurancePlan (`insurance_plans`) -- VERIFIED in schema.prisma
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `planId` | VarChar(50) PK | `@map("plan_id")` |
+| `planName` | VarChar(200) | Nullable |
+| `issuerName` | VarChar(200) | Nullable |
+| `planType` | VarChar(20) | Nullable (HMO, PPO, etc.) |
+| `state` | VarChar(2) | Nullable |
+| `carrier` | VarChar(100) | Nullable, indexed |
+| `planVariant` | VarChar(50) | Nullable, indexed |
+| `rawName` | VarChar(500) | Original scraped name |
+| `sourceHealthSystem` | VarChar(200) | Hospital source |
+| `providerCount` | Int (default 0) | Denormalized count |
+| `carrierId` | Int | Nullable, indexed |
+| `healthSystemId` | Int | Nullable, indexed |
+| `createdAt` | Timestamptz | Default now() |
+
+**Indexes**: carrier, carrierId, healthSystemId, planVariant
+
+**Relations**: `providerAcceptances` (ProviderPlanAcceptance[]), `verificationLogs` (VerificationLog[])
+
+### ProviderPlanAcceptance (`provider_plan_acceptance`) -- VERIFIED
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `id` | Int PK | Auto-increment |
+| `providerNpi` | VarChar(10) | FK to providers, nullable |
+| `planId` | VarChar(50) | FK to insurance_plans, nullable |
+| `locationId` | Int | FK to practice_locations, nullable |
+| `acceptanceStatus` | VarChar(20) | Default "UNKNOWN" |
+| `confidenceScore` | Int | Default 0, range 0-100 |
+| `lastVerified` | Timestamptz | Nullable |
+| `verificationCount` | Int | Default 0 |
+| `expiresAt` | Timestamptz | 6-month TTL |
+| `createdAt` | Timestamptz | Default now() |
+| `updatedAt` | Timestamptz | Default now() |
+
+**Unique constraints**: Managed via raw SQL partial indexes:
+- `idx_ppa_npi_plan_location`: UNIQUE(npi, plan_id, location_id) WHERE location_id IS NOT NULL
+- `idx_ppa_npi_plan_legacy`: UNIQUE(npi, plan_id) WHERE location_id IS NULL
+
+**Indexes**: acceptanceStatus, confidenceScore, expiresAt, lastVerified, locationId
+
+**Key finding**: The schema supports **location-specific** plan acceptance (a provider may accept a plan at one office but not another), which is more granular than described in the prompt.
+
+## Backend API Endpoints -- VERIFIED
+
+### Plan Search & Browsing
+
+**GET `/api/v1/plans/search`** -- VERIFIED in `plans.ts`
+- Zod validation: issuerName, planType, search, state (2-char uppercase), page, limit
+- Rate limit: `searchRateLimiter` (100/hr)
+- Service: `searchPlans()` -- searches across carrier, issuerName, planName, rawName, planId via OR clause
+- Pagination with `buildPaginationMeta()`
+
+**GET `/api/v1/plans/grouped`** -- VERIFIED
+- Zod validation: search, state
+- Rate limit: `defaultRateLimiter` (200/hr)
+- Service: `getGroupedPlans()` -- groups plans by carrier for dropdown UI
+- Returns `{ carriers: [...], totalPlans: number }`
+
+**GET `/api/v1/plans/meta/issuers`** -- VERIFIED
+- Rate limit: `defaultRateLimiter` (200/hr)
+- Service: `getIssuers()` -- uses `getDistinctField('issuerName')`
+- Optional state filter
+
+**GET `/api/v1/plans/meta/types`** -- VERIFIED
+- Rate limit: `defaultRateLimiter` (200/hr)
+- Service: `getPlanTypes()` -- uses `getDistinctField('planType')`
+- Optional state and issuerName filters
+
+**GET `/api/v1/plans/:planId/providers`** -- VERIFIED
+- Rate limit: `searchRateLimiter` (100/hr)
+- Service: `getProvidersForPlan()` -- returns providers with ACCEPTED status
+- Includes practice location (first practice address), confidence score, verification count
+- Maps provider data to display format with `displayName` computation
+
+**GET `/api/v1/plans/:planId`** -- VERIFIED
+- Rate limit: `defaultRateLimiter` (200/hr)
+- Service: `getPlanByPlanId()` -- includes `_count.providerAcceptances`
+- Returns plan metadata with provider count (uses stored `providerCount` with `_count` fallback)
+
+### Route Ordering Note
+The `/:planId/providers` route is correctly defined BEFORE `/:planId` to avoid Express route parameter conflicts.
+
+## Plan Service (`planService.ts`) -- VERIFIED
+
+**Key patterns**:
+- Uses a generic `getDistinctField()` helper for deduplicating field value queries (carrier, issuerName, planType, etc.)
+- Case-insensitive search across multiple fields via Prisma `contains` with `mode: 'insensitive'`
+- Pagination via `getPaginationValues()` utility
+- `getProvidersForPlan()` filters on `acceptanceStatus: 'ACCEPTED'` and includes provider relations
+
+**Additional service functions** not exposed as API endpoints:
+- `getCarriers(options)` -- distinct carrier names
+- `getPlanVariants(options)` -- distinct plan variants
+- `getSourceHealthSystems()` -- distinct health system sources
+
+## Plan Parser (`insurancePlanParser.ts`) -- VERIFIED
+
+**Purpose**: Normalizes raw insurance plan names (scraped from hospital websites) into structured carrier/variant fields.
+
+**Features**:
+- `CARRIER_ALIASES`: 30+ carrier name aliases mapping to canonical names (e.g., "bcbs" -> "Blue Cross Blue Shield", "uhc" -> "UnitedHealthcare")
+- `VARIANT_PATTERNS`: 20+ regex patterns for plan types (Medicare Advantage, PPO, HMO, etc.)
+- `parseInsurancePlan(rawName)`: Extracts carrier + variant from raw name
+- `generatePlanId(parsed)`: Creates unique 50-char ID from carrier slug + variant slug
+- `parseInsurancePlans(rawNames)`: Deduplicates parsed plans
+- `parsePlanList(planListString)`: Splits semicolon/comma-separated lists and parses each
+
+**Carrier matching**: Uses longest-match-first strategy (sorted by alias length descending) to handle overlapping names (e.g., "Empire Blue Cross" matches before "Blue Cross").
+
+## Validation Schemas (`commonSchemas.ts`) -- VERIFIED
+
+| Schema | Used In | Validation |
+|--------|---------|------------|
+| `paginationSchema` | plans, providers, verify, locations | page >= 1, limit 1-100, defaults 1/20 |
+| `planIdParamSchema` | plans, verify | string 1-50 chars |
+| `stateQuerySchema` | plans, providers, locations | 2-char uppercase string, optional |
+| `npiParamSchema` | providers, verify | exactly 10 digits |
+
+All schemas use Zod with `z.coerce` for query parameter type coercion.
+
+## Frontend Integration -- VERIFIED
+
+### Insurance Page (`/insurance`)
+- Located at `packages/frontend/src/app/insurance/page.tsx`
+- Server component with metadata (title, description)
+- Renders `InsuranceCardUploader` component
+- Includes privacy notice ("Your insurance card image is processed securely and is not stored")
+- Tips section for best photo results
+- Breadcrumb navigation
+
+### Insurance Card Uploader (`InsuranceCardUploader.tsx`)
+- Located at `packages/frontend/src/components/InsuranceCardUploader.tsx`
+- Uses `@anthropic-ai/sdk` for Claude AI extraction
+- Processes uploaded card images to extract plan information
+
+### Provider Plans Section (`ProviderPlansSection.tsx`)
+- Located at `packages/frontend/src/components/provider-detail/ProviderPlansSection.tsx`
+- Groups accepted plans by carrier
+- Collapsible carrier sections with expand/collapse all
+- Search filter for 5+ plans
+- Each plan shows:
+  - Plan name and type
+  - New patient acceptance status
+  - Confidence score badge with breakdown
+  - Verification button
+  - Freshness warning with re-verification prompt
+
+### Insurance List (`InsuranceList.tsx`)
+- Located at `packages/frontend/src/components/provider-detail/InsuranceList.tsx`
+- Complex component (~844 lines) handling plan display, grouping, search, and verification
+- Features:
+  - Carrier family grouping (18 known carrier patterns)
+  - Data freshness badges (green < 30d, yellow < 90d, red >= 90d)
+  - Status icons (accepted, not_accepted, pending, unknown)
+  - Location-based filtering for multi-location providers
+  - Inline verification modal with honeypot field
+  - Recently-verified state tracking
+  - Collapsible "Other Plans" section for single-plan carriers
+
+### API Client (`api.ts`) -- VERIFIED
+
+`plans` namespace methods:
+| Method | Endpoint | Verified |
+|--------|----------|----------|
+| `plans.search(params)` | GET /plans/search | YES |
+| `plans.getGrouped(params)` | GET /plans/grouped | YES |
+| `plans.getGroupedPlans(params)` | GET /plans/grouped (legacy alias) | YES |
+| `plans.getIssuers(state)` | GET /plans/meta/issuers | YES |
+| `plans.getPlanTypes(params)` | GET /plans/meta/plan-types | YES |
+| `plans.getById(planId)` | GET /plans/:planId | YES |
+| `plans.getProviders(planId, params)` | GET /plans/:planId/providers | YES |
+
+**Note**: `planApi` export was removed ("planApi removed - unused" comment in api.ts). Plans are accessed via `api.plans.*`.
+
+### React Hooks -- VERIFIED
+
+**`useInsurancePlans`** (`hooks/useInsurancePlans.ts`):
+- Fetches grouped plans via `api.plans.getGrouped()`
+- Module-level cache with 10-minute TTL
+- Deduplicates in-flight requests
+- Returns: `groupedPlans`, `allPlans` (flattened), `selectOptions` (for dropdowns), `findPlan()`, `refetch()`
+- Race condition handling via `currentParamsRef`
+
+**`useHealthSystems`** (`hooks/useHealthSystems.ts`):
+- Fetches health systems for a state/cities combination
+- Module-level cache with 5-minute TTL
+- Same deduplication and race condition patterns
+- Returns: `healthSystems`, `isLoading`, `error`, `refetch()`
+- Supports prefetching via `prefetchHealthSystems()`
+
+## Shared Types -- VERIFIED
+
+### InsurancePlan (`types/insurance-plan.ts`)
+- Full interface with carrier info, plan details, coverage area, plan year, data source
+- `InsurancePlanWithRelations` extends with `providerCount`
+- Search filters: carrierName, planType, metalLevel, marketType, state, planYear, isActive
+- Search result: paginated with plans array
+
+### ProviderPlanAcceptance (`types/provider-plan-acceptance.ts`)
+- Full interface with acceptance status, confidence scoring, TTL
+- `ConfidenceFactors`: dataSourceScore (0-25), recencyScore (0-30), verificationScore (0-25), agreementScore (0-20)
+- `ConfidenceMetadata`: freshness tracking with research notes
+- `getConfidenceLevel()`: Maps score to VERY_HIGH/HIGH/MEDIUM/LOW/VERY_LOW with verification count threshold (3 required for HIGH+)
+- Research citation: Mortensen et al. (2015) and Ndumele et al. (2018)
+
+### Enums (`types/enums.ts`)
+- `PlanType`: HMO, PPO, EPO, POS, HDHP, MEDICARE_ADVANTAGE, MEDICAID, OTHER
+- `AcceptanceStatus`: ACCEPTED, NOT_ACCEPTED, PENDING, UNKNOWN
+- `MetalLevel`: BRONZE, SILVER, GOLD, PLATINUM, CATASTROPHIC
+- `MarketType`: INDIVIDUAL, SMALL_GROUP, LARGE_GROUP, MEDICARE, MEDICAID
+
+## Checklist Verification
 
 ### Database
+- [x] InsurancePlan model with all fields -- VERIFIED in schema.prisma (12 fields)
+- [x] ProviderPlanAcceptance with unique constraint on (npi, planId) -- VERIFIED via partial indexes
+- [x] Location-specific acceptance support -- VERIFIED: `locationId` field with partial unique index
+- [x] Confidence scoring on acceptance records -- VERIFIED: `confidenceScore` field (0-100)
+- [x] TTL via expiresAt field -- VERIFIED: 6-month TTL computed in `getExpirationDate()`
+- [x] Indexes on carrier, carrierId, healthSystemId, planVariant -- VERIFIED
+- [x] Provider count denormalized on plan -- VERIFIED: `providerCount` with `_count` fallback
 
-- **InsurancePlan model with all fields:** Verified. The prompt documents all fields (`planId`, `planName`, `issuerName`, `planType`, `state`, `carrier`, `planVariant`, `rawName`, `sourceHealthSystem`, `providerCount`, `carrierId`, `healthSystemId`, `createdAt`) and relationships (`providerAcceptances`, `verificationLogs`). The `planService.ts` queries confirm these fields are actively used via Prisma.
-- **ProviderPlanAcceptance with unique constraint on (npi, planId):** Verified. The prompt documents `@@unique([providerNpi, planId])` on the model. The `getProvidersForPlan` service function queries this table with `planId` and `acceptanceStatus` filters.
-- **Confidence scoring on acceptance records:** Verified. The `confidenceScore` field (0-100) is present on `ProviderPlanAcceptance`. The shared type `packages/shared/src/types/provider-plan-acceptance.ts` defines `ConfidenceFactors`, `ConfidenceDetails`, and `getConfidenceLevel()` with research-based scoring. The backend returns `confidenceScore`, `lastVerified`, and `verificationCount` from `getProvidersForPlan`.
-- **TTL via expiresAt field:** Verified. The prompt documents `expiresAt DateTime?` with 6-month TTL. The shared types reference it with the comment "6 months based on 12% annual provider turnover."
-- **Indexes on carrier, carrierId, healthSystemId, planVariant:** Verified per the prompt's schema definition showing `@@index([carrier])`, `@@index([carrierId])`, `@@index([healthSystemId])`, `@@index([planVariant])`.
-- **Provider count denormalized on plan:** Verified. `providerCount Int @default(0)` is on the model, and `getPlanByPlanId` uses both the stored `plan.providerCount` and `plan._count.providerAcceptances` as a fallback.
-
-### Backend API (6 Endpoints)
-
-1. **GET `/api/v1/plans/search` -- Plan search with filters:** Verified in `packages/backend/src/routes/plans.ts` (line 30). Uses `searchRateLimiter`, validates via `searchQuerySchema` (Zod with `issuerName`, `planType`, `search`, `state`, `page`, `limit`). Calls `searchPlans()` in `planService.ts` which builds a Prisma `where` clause with case-insensitive filtering and full-text search across `carrier`, `issuerName`, `planName`, `rawName`, and `planId`.
-
-2. **GET `/api/v1/plans/grouped` -- Plans grouped by carrier:** Verified at line 59. Uses `defaultRateLimiter`, accepts `search` and `state` filters. Calls `getGroupedPlans()` which groups plans into a `carrier -> plans[]` map.
-
-3. **GET `/api/v1/plans/meta/issuers` -- Unique insurance issuers:** Verified at line 81. Uses `defaultRateLimiter` and `stateQuerySchema`. Calls `getIssuers()` which uses the generic `getDistinctField('issuerName', ...)` helper.
-
-4. **GET `/api/v1/plans/meta/types` -- Available plan types:** Verified at line 99. Uses `defaultRateLimiter`, accepts `state` and `issuerName` filters. Calls `getPlanTypes()` using `getDistinctField('planType', ...)`.
-
-5. **GET `/api/v1/plans/:planId/providers` -- Providers accepting a plan:** Verified at line 121. Correctly placed before the `/:planId` route to avoid conflicts (documented in code comment). Uses `searchRateLimiter`, `planIdParamSchema`, and `paginationSchema`. Returns provider details with confidence scores, verification counts, and location info.
-
-6. **GET `/api/v1/plans/:planId` -- Plan details:** Verified at line 174. Uses `defaultRateLimiter` and `planIdParamSchema`. Returns plan data with `providerCount` computed from `_count.providerAcceptances`.
-
-- **Zod validation on all inputs:** Verified. All 6 endpoints use Zod schemas: `searchQuerySchema`, inline schema for grouped, `stateQuerySchema`, extended state+issuer schema, `planIdParamSchema`, and `paginationSchema`. The shared schemas are in `packages/backend/src/schemas/commonSchemas.ts`.
-- **Rate limiting on all endpoints:** Verified. Search and providers-for-plan use `searchRateLimiter` (100/hr); grouped, issuers, types, and plan detail use `defaultRateLimiter` (200/hr).
+### Backend API
+- [x] Plan search with filters -- VERIFIED: issuerName, planType, search, state
+- [x] Grouped plans by carrier -- VERIFIED: `/plans/grouped`
+- [x] Issuer metadata endpoint -- VERIFIED: `/plans/meta/issuers`
+- [x] Plan type metadata endpoint -- VERIFIED: `/plans/meta/types`
+- [x] Providers-for-plan with pagination -- VERIFIED: `/:planId/providers`
+- [x] Plan detail with provider count -- VERIFIED: `/:planId`
+- [x] Zod validation on all inputs -- VERIFIED: all routes use schema.parse()
+- [x] Rate limiting on all endpoints -- VERIFIED: searchRateLimiter or defaultRateLimiter
 
 ### Frontend
-
-- **Insurance browser page:** Verified. File exists at `packages/frontend/src/app/insurance/page.tsx`.
-- **Plan search hooks (`useInsurancePlans`):** Verified in `packages/frontend/src/hooks/useInsurancePlans.ts`. Implements module-level caching with 10-minute TTL, pending request deduplication, race-condition handling via `currentParamsRef`, and returns `groupedPlans`, `allPlans`, `selectOptions`, `isLoading`, `error`, `findPlan`, and `refetch`.
-- **Provider detail plans section:** Verified. `ProviderPlansSection.tsx` and `InsuranceList.tsx` both exist at `packages/frontend/src/components/provider-detail/`.
-- **Insurance card upload with Claude extraction:** Verified. `InsuranceCardUploader.tsx` exists at `packages/frontend/src/components/InsuranceCardUploader.tsx`.
-- **API client methods for all plan endpoints:** Verified in `packages/frontend/src/lib/api.ts` (lines 473-534). The `plans` object provides: `search()`, `getGrouped()`, `getGroupedPlans()` (legacy alias), `getIssuers()`, `getPlanTypes()`, `getById()`, `getProviders()`.
+- [x] Insurance browser page -- VERIFIED: `/insurance` with card uploader
+- [x] Plan search hooks -- VERIFIED: `useInsurancePlans` with caching
+- [x] Provider detail plans section -- VERIFIED: `ProviderPlansSection` with carrier grouping
+- [x] Insurance card upload with Claude extraction -- VERIFIED: `InsuranceCardUploader` using `@anthropic-ai/sdk`
+- [x] API client methods for all plan endpoints -- VERIFIED: 7 methods in `api.plans`
+- [x] Insurance list with verification modal -- VERIFIED: `InsuranceList` with inline verification
 
 ### Data Pipeline
+- [x] Import script exists -- VERIFIED: `importInsurancePlans.ts` found
+- [x] Plan parser/normalizer exists -- VERIFIED: `insurancePlanParser.ts` with carrier aliases and variant patterns
+- [ ] Automated periodic import not configured
+- [ ] Plan data freshness tracking
 
-- **Import script exists:** Verified. `packages/backend/src/scripts/importInsurancePlans.ts` handles CSV import with plan name normalization, carrier identification, and provider-plan acceptance creation. Uses a confidence score of 70 for hospital scrape data.
-- **Plan parser/normalizer exists:** Verified. `packages/backend/src/utils/insurancePlanParser.ts` includes carrier alias normalization (e.g., "bcbs" -> "Blue Cross Blue Shield", "uhc" -> "UnitedHealthcare"), plan variant extraction, and plan ID generation.
-- **Automated periodic import not configured:** Confirmed -- the import script is run manually via `npx ts-node`. No cron job or scheduled Cloud Run job is configured.
-- **Plan data freshness tracking:** Confirmed not implemented. Plans have `createdAt` but no `updatedAt` or `lastImportedAt` field.
+## Questions Answered
 
-### Shared Types
+### 1. How frequently should plan data be refreshed?
+The current 6-month TTL on ProviderPlanAcceptance records provides a reasonable baseline based on 12% annual provider turnover research. However, plan data itself (the InsurancePlan records) has no TTL or freshness tracking. Insurance plan offerings change annually (typically during open enrollment). **Recommendation**: Refresh plan data annually, ideally before open enrollment periods, and add a `lastUpdated` field to InsurancePlan.
 
-- **InsurancePlan types (`packages/shared/src/types/insurance-plan.ts`):** Verified. Defines `InsurancePlan`, `InsurancePlanWithRelations`, `CreateInsurancePlanInput`, `UpdateInsurancePlanInput`, `InsurancePlanSearchFilters`, and `InsurancePlanSearchResult`.
-- **ProviderPlanAcceptance types (`packages/shared/src/types/provider-plan-acceptance.ts`):** Verified. Defines `ProviderPlanAcceptance`, `ConfidenceFactors`, `ConfidenceMetadata`, `ConfidenceDetails`, `ConfidenceLevel`, `getConfidenceLevel()`, and `getConfidenceLevelDescription()`. Research citations included (Mortensen et al. 2015, Ndumele et al. 2018).
-- **Enums (`packages/shared/src/types/enums.ts`):** Verified. Includes `PlanType` (HMO, PPO, EPO, POS, HDHP, MEDICARE_ADVANTAGE, MEDICAID, OTHER), `AcceptanceStatus` (ACCEPTED, NOT_ACCEPTED, PENDING, UNKNOWN), `MetalLevel`, `MarketType`, `DataSource`, and `VerificationSource`.
+### 2. Should plan search results be cached like provider search results?
+The frontend already caches grouped plans with a **10-minute TTL** in `useInsurancePlans.ts`. The backend uses the `cache` utility for some endpoints (admin uses `cacheClear`). Adding server-side caching for plan search would be beneficial since plan data changes infrequently. The `/plans/meta/issuers` and `/plans/meta/types` responses are ideal caching candidates (change only when new plans are imported).
 
-### Issues and Warnings
+### 3. How are carrier IDs and health system IDs assigned during import?
+Based on the schema, `carrierId` (Int) and `healthSystemId` (Int) are nullable fields on InsurancePlan. The `insurancePlanParser.ts` does not assign these IDs -- it only extracts carrier name and variant from raw plan names. The IDs appear to be assigned during the import pipeline (`importInsurancePlans.ts`) which was not fully reviewed, but the parser generates `planId` via `generatePlanId()` using slugified carrier + variant. **The assignment mechanism for carrierId and healthSystemId would need further investigation of the import script.**
 
-- **Frontend API path mismatch for plan types endpoint:** The backend route is `/meta/types` (line 99 of `plans.ts`), but the frontend API client calls `/plans/meta/plan-types` (line 510 of `api.ts`). These paths do not match. The frontend `getPlanTypes` call would get a 404 from the backend.
-- **Shared types vs Prisma schema drift:** The shared `InsurancePlan` type in `packages/shared/src/types/insurance-plan.ts` has fields like `metalLevel`, `marketType`, `planYear`, `statesCovered[]`, `serviceArea`, `isActive`, `effectiveDate`, `terminationDate`, `dataSource`, `sourceFileId` that do not appear in the Prisma schema documented in the prompt. The Prisma model has `carrier`, `planVariant`, `rawName`, `sourceHealthSystem`, `carrierId`, `healthSystemId` which are not in the shared type. These two type definitions have diverged significantly.
-- **`useInsurancePlans` uses custom caching, not React Query:** The prompt mentions "React Query caching" for `useInsurancePlans`, but the actual hook uses a custom module-level `Map`-based cache with manual TTL management. There is no `useQuery` from `@tanstack/react-query` in this hook.
-- **`planApi` legacy export removed:** The prompt references `planApi` in `lib/api.ts`, but the code shows `planApi removed - unused` at line 667. The plans are still accessible via `api.plans.*` but the named export `planApi` no longer exists.
+### 4. Should there be a plan comparison feature?
+Not currently implemented. The frontend has a `CompareProvider` context but it compares providers, not plans. A plan comparison feature would be useful for users choosing between insurance plans, showing:
+- Which providers accept each plan
+- Coverage area differences
+- Plan type (HMO vs PPO) implications
+- **Recommendation**: This would be a valuable feature but is lower priority than core verification functionality.
 
----
+### 5. How should we handle plans with no providers linked?
+Currently, `getProvidersForPlan()` returns an empty providers array (with total: 0) for plans with no acceptances. The `providerCount` denormalized field defaults to 0. The `getPlanByPlanId()` function returns both `providerCount` (stored) and `_count.providerAcceptances` (computed). Plans with zero providers are still searchable and visible. **Recommendation**: Consider adding a filter option to hide plans with zero providers in search results, or display a "No verified providers yet" message with a CTA to submit the first verification.
 
-## Summary
+## Issues
 
-The insurance plans feature is substantially implemented across all layers. All 6 backend API endpoints are present with proper Zod validation, rate limiting, and Prisma-based queries. The frontend has the insurance browser page, provider detail plans section, insurance card uploader, and a full API client covering all endpoints. The data pipeline includes both an import script and a plan name parser/normalizer.
-
-However, there are notable inconsistencies: the frontend plan types endpoint URL does not match the backend route (`/meta/plan-types` vs `/meta/types`), the shared TypeScript types have diverged from the Prisma schema (different field sets), and the hook uses custom caching instead of the React Query approach described in the prompt. No automated import scheduling or data freshness tracking is in place.
+1. **Shared type mismatch**: The shared `InsurancePlan` interface has fields not in the database schema (e.g., `id`, `carrierName`, `metalLevel`, `marketType`, `statesCovered`, `serviceArea`, `planYear`, `effectiveDate`, `terminationDate`, `isActive`). The database model has simpler fields (carrier, planType, state). These types are out of sync.
+2. **No server-side caching**: Plan search and metadata endpoints query the database on every request. Plan data changes infrequently and could benefit from Redis-based caching.
+3. **providerCount staleness**: The denormalized `providerCount` on InsurancePlan can become stale when acceptances are added/removed. No mechanism refreshes this count.
+4. **API route mismatch**: Frontend calls `/plans/meta/plan-types` but backend defines `/plans/meta/types`. This would cause 404 errors.
+5. **No plan freshness tracking**: InsurancePlan records have `createdAt` but no `updatedAt` or `lastImported` field to track data freshness.
 
 ## Recommendations
 
-1. **Fix the plan types endpoint URL mismatch.** Either rename the backend route from `/meta/types` to `/meta/plan-types`, or update the frontend `getPlanTypes` call to hit `/meta/types`. The former is preferred since it is more descriptive.
-2. **Reconcile shared types with Prisma schema.** The shared `InsurancePlan` interface and the Prisma `InsurancePlan` model define very different field sets. Consider whether the shared types represent a future target schema or if they should be updated to match what the database actually stores. Having diverged types creates confusion and potential runtime errors.
-3. **Consider migrating `useInsurancePlans` to React Query.** The custom caching implementation works but duplicates functionality that React Query provides (caching, stale-while-revalidate, deduplication, background refetch). Migrating would reduce code and align with how the prompt describes the feature.
-4. **Implement automated plan data import.** Currently the import is manual via CLI. Consider a Cloud Run Job on a schedule or a Cloud Scheduler trigger to keep plan data fresh.
-5. **Add `updatedAt` to InsurancePlan.** The model only has `createdAt`, making it impossible to track when plan data was last refreshed.
-6. **Re-export `planApi` or update documentation.** The prompt references `planApi` as a named export, but it has been removed. Either restore it for backward compatibility or update all documentation to reference `api.plans` instead.
+1. **Align shared types with database schema**: Update `packages/shared/src/types/insurance-plan.ts` to match the actual database model, or clearly separate "database types" from "API response types".
+2. **Fix API route mismatch**: Either rename the backend route from `/meta/types` to `/meta/plan-types` or update the frontend API client to use `/meta/types`.
+3. **Add server-side caching for metadata**: Cache `/plans/meta/issuers` and `/plans/meta/types` responses in Redis with a 1-hour TTL, cleared when plans are imported.
+4. **Add providerCount refresh**: Create an admin endpoint or scheduled job to recalculate `providerCount` on InsurancePlan based on current ProviderPlanAcceptance counts.
+5. **Add plan data freshness tracking**: Add `lastImported` or `updatedAt` field to InsurancePlan to track when plan data was last refreshed, enabling freshness warnings in the UI.

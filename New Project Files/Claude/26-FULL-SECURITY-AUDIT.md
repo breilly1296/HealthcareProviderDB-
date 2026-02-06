@@ -1,442 +1,374 @@
 # VerifyMyProvider Full Security Audit
 
-**Last Updated:** 2026-02-05
-**Generated From:** prompts/26-full-security-audit.md
+**Last Updated:** 2026-02-06
+**Audit Type:** Comprehensive code review of all security-related components
+**Scope:** Backend API, frontend verification form, CI/CD pipeline, database schema
 
 ---
 
 ## Executive Summary
 
-The VerifyMyProvider application has a solid security posture for its current stage (Phase 1 / Proof of Concept). All critical and high-priority security areas identified in the prompt system are addressed with working implementations. The application handles only public provider data (no PHI/PII stored), which significantly reduces compliance requirements. Key strengths include dual-mode rate limiting, reCAPTCHA integration, timing-safe admin authentication, strict input validation via Zod, and comprehensive error handling that prevents information leakage in production.
+The VerifyMyProvider application has a strong security posture for a pre-beta product. All 4 findings from the January 2026 ZeroPath scan have been resolved. The application implements defense-in-depth with 8 layers of protection on write endpoints. No critical or high-severity open vulnerabilities were identified during this audit.
+
+**Overall Security Grade: B+**
+
+Key strengths: Multi-layer Sybil prevention, timing-safe admin auth, PII stripping, structured error handling.
+Key gaps: Frontend CAPTCHA integration incomplete, no SAST/DAST in CI, no automated secret rotation.
 
 ---
 
-## Audit Procedure
+## Audit Results by Category
 
-Each security-related prompt area was evaluated against the actual codebase. Below is a consolidated assessment organized by priority tier.
+### 1. Database Schema Security (Prompt 01)
+
+**Status: PASS**
+
+**Findings:**
+- 15 models with proper indexes for performance and security
+- Sybil prevention indexes verified: `idx_vl_sybil_ip` and `idx_vl_sybil_email` on `verification_logs`
+- Vote deduplication: `@@unique([verificationId, sourceIp])` on `VoteLog` model
+- Partial unique indexes on `provider_plan_acceptance` (managed via raw SQL)
+- `DataQualityAudit` model for tracking data integrity issues
+- No Row-Level Security (RLS) needed - single-tenant application with no user roles
+
+**Schema file:** `packages/backend/prisma/schema.prisma` (319 lines)
+
+**Checklist:**
+- [x] Primary keys defined on all models
+- [x] Indexes on frequently queried columns (city, state, zip, npi, taxonomy)
+- [x] Unique constraints on vote deduplication
+- [x] Foreign keys with appropriate onDelete/onUpdate behavior
+- [x] `expiresAt` indexed on verification_logs and provider_plan_acceptance for TTL queries
+- [x] No sensitive data stored without purpose (IPs stored only for anti-abuse)
 
 ---
 
-## Critical Priority Findings
+### 2. HIPAA Compliance Position (Prompt 02)
 
-### 01 - Database Schema Security
+**Status: PASS - HIPAA NOT REQUIRED**
 
-**Status: PASS**
-
-**Evidence from `packages/backend/prisma/schema.prisma`:**
-- 13 models with proper primary keys (NPI, auto-increment IDs, CUIDs)
-- Comprehensive indexing: 30+ indexes across all models for query performance and anti-abuse
-- Referential integrity via foreign key constraints (`@relation` with `onDelete`/`onUpdate` policies)
-- Sybil prevention indexes: `idx_vl_sybil_email` and `idx_vl_sybil_ip` on VerificationLog for duplicate detection
-- Vote uniqueness: `@@unique([verificationId, sourceIp])` on VoteLog prevents duplicate votes
-- Provider-plan uniqueness: `@@unique([providerNpi, planId])` on ProviderPlanAcceptance
-
-**No RLS required:** The application uses application-level authorization rather than row-level security. This is appropriate because there are no user accounts yet -- all data is public and all writes go through validated middleware.
-
-**Note:** The schema uses `@map()` annotations for PostgreSQL snake_case table/column names while maintaining camelCase in TypeScript, which is a good practice for type safety.
-
-### 02 - No HIPAA Compliance Required
-
-**Status: PASS**
-
-**Rationale verified in codebase:**
-- The database stores only publicly available NPI registry data (name, NPI number, specialty, practice address, phone)
-- No Protected Health Information (PHI) is collected or stored
-- No patient data, medical records, diagnoses, or treatment information exists in the schema
-- IP addresses and user agents are stored in `VerificationLog` for anti-abuse purposes only (not health data)
-- The application's purpose is provider directory verification, not patient care
-
-**Conclusion:** HIPAA compliance is not required. The stored data is equivalent to a public phone book for healthcare providers.
-
-### 08 - Rate Limiting
-
-**Status: PASS**
-
-**Evidence from `packages/backend/src/middleware/rateLimiter.ts` (header comment):**
-
-```
-Dual-mode rate limiting:
-1. REDIS MODE (distributed) - sliding window algorithm with sorted sets
-2. IN-MEMORY MODE (process-local) - fallback when Redis unavailable
-
-FAIL-OPEN BEHAVIOR: If Redis becomes unavailable during operation,
-requests are ALLOWED with a warning logged.
-```
-
-**Implementation details verified in `packages/backend/src/index.ts`:**
-- Default rate limiter applied globally: `app.use(defaultRateLimiter)` (200 req/hour)
-- Health check endpoint is placed BEFORE the rate limiter so monitoring tools are not blocked
-- `trust proxy` set to `1` for correct client IP extraction behind Cloud Run's load balancer
-
-**4-tier rate limiting:** The prompt references 4 tiers per endpoint. The `defaultRateLimiter` is the global tier; endpoint-specific rate limits (verification, voting, admin) are applied at the route level.
-
-**Risk assessment:** Fail-open is an intentional design choice prioritizing availability. During a Redis outage, the system falls back to allowing requests with logging, which is acceptable given the additional layers of CAPTCHA and sybil prevention.
-
-### 11 - Environment Secrets
-
-**Status: PASS**
-
-**Evidence from `packages/backend/src/index.ts` and `.github/workflows/deploy.yml`:**
-- `dotenv.config()` loads `.env` locally
-- Production secrets managed via GCP Secret Manager:
-  - `DATABASE_URL=DATABASE_URL:latest`
-  - `ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest`
-- No hardcoded secrets found in source code
-- `ADMIN_SECRET` referenced in code but removed from Cloud Run deploy (`--remove-secrets=ADMIN_SECRET`)
-- Workload Identity Federation for GitHub-to-GCP auth (no service account JSON keys)
-
-**Observation:** The `--remove-secrets=ADMIN_SECRET` flag in deploy.yml means admin endpoints return 503 in production. This is a deliberate choice that disables admin endpoints in production while allowing them in development.
+**Findings:**
+- Application stores only public NPI data from CMS NPPES registry
+- No Protected Health Information (PHI) stored
+- No patient records, diagnoses, or treatment information
+- Provider names, addresses, and NPI numbers are public data
+- Verification submissions contain no health information
+- `sourceIp` and `userAgent` stored for anti-abuse only (not health data)
 
 ---
 
-## High Priority Findings
+### 3. Authentication (Prompt 03)
 
-### 03 - Authentication
+**Status: PASS with notes**
 
-**Status: PASS (with noted limitation)**
+**Findings:**
+- **Admin authentication:** `X-Admin-Secret` header validated with `crypto.timingSafeEqual()` in `packages/backend/src/routes/admin.ts` (lines 21-55)
+- **Timing-safe comparison:** Correctly uses `Buffer.from()` and length check before `timingSafeEqual`
+- **No user authentication:** Public API by design - no user accounts yet
+- **Secret storage:** `ADMIN_SECRET` stored in GCP Secret Manager, injected at deploy time
+- **Graceful degradation:** Returns 503 if `ADMIN_SECRET` not configured (prevents accidental exposure)
 
-**Evidence from `packages/backend/src/routes/admin.ts`:**
-
+**Code verified:**
 ```typescript
-function adminAuthMiddleware(req: Request, res: Response, next: NextFunction) {
-  const adminSecret = process.env.ADMIN_SECRET;
-
-  // If ADMIN_SECRET is not configured, disable admin endpoints gracefully
-  if (!adminSecret) {
-    res.status(503).json({ ... });
-    return;
-  }
-
-  const providedSecret = req.headers['x-admin-secret'];
-
-  // Use timing-safe comparison to prevent timing attacks
-  const providedBuffer = Buffer.from(String(providedSecret || ''));
-  const secretBuffer = Buffer.from(adminSecret);
-
-  const isValid =
-    providedBuffer.length === secretBuffer.length &&
-    timingSafeEqual(providedBuffer, secretBuffer);
+const isValid =
+  providedBuffer.length === secretBuffer.length &&
+  timingSafeEqual(providedBuffer, secretBuffer);
 ```
 
-**Strengths:**
-- Uses Node.js `crypto.timingSafeEqual()` to prevent timing attacks
-- Checks buffer length before comparison (required by `timingSafeEqual`)
-- Graceful degradation when ADMIN_SECRET is not set (503 rather than crash)
-- Imports `timingSafeEqual` from `crypto` module directly
-
-**Limitation:** No user authentication system exists yet. All public endpoints are unauthenticated. This is appropriate for Phase 1 (public data only) but will need to be addressed before any user-specific features.
-
-### 06 - API Route Security
-
-**Status: PASS**
-
-**Evidence from `packages/backend/src/index.ts` and `routes/index.ts`:**
-- All routes are under `/api/v1` prefix
-- Global rate limiting via `defaultRateLimiter` middleware
-- CORS restricts origins to production domains and localhost in development
-- Body parsing limited to 100kb to prevent large payload attacks
-- CAPTCHA required on write operations (verification submit, voting)
-- Admin routes protected by `adminAuthMiddleware`
-- 404 handler catches unmatched routes with structured error response
-
-**Route structure:**
-| Route Group | Auth | Rate Limit | CAPTCHA |
-|------------|------|------------|---------|
-| `/api/v1/providers` | None (public data) | Global 200/hr | No |
-| `/api/v1/plans` | None (public data) | Global 200/hr | No |
-| `/api/v1/verify` (GET) | None | Global 200/hr | No |
-| `/api/v1/verify` (POST) | None | Stricter | Yes |
-| `/api/v1/admin` | X-Admin-Secret | Global 200/hr | No |
-
-### 07 - Input Validation
-
-**Status: PASS**
-
-**Evidence:**
-- `zod` is a direct dependency in both backend and frontend packages
-- The `AppError.badRequest()` factory method is used for validation failures
-- The error handler has dedicated Zod error processing that extracts field-level validation details:
-
-```typescript
-if (err.name === 'ZodError') {
-  const zodError = err as unknown as { errors: Array<{ path: string[]; message: string }> };
-  res.status(400).json({
-    error: {
-      message: 'Validation error',
-      code: 'VALIDATION_ERROR',
-      details: zodError.errors.map((e) => ({
-        field: e.path.join('.'),
-        message: e.message,
-      })),
-    },
-  });
-}
-```
-
-- Route files import `z` from `zod` for request validation schemas (verified in admin.ts)
-
-### 12 - Confidence Scoring Integrity
-
-**Status: PASS**
-
-**Evidence:**
-- `confidenceService.ts` implements the scoring algorithm
-- Unit tests exist in `__tests__/confidenceService.test.ts`
-- Documentation files in services directory: `CONFIDENCE_SCORING_EXPLAINED.md`, `CONFIDENCE_SCORING_V2.md`
-- Scoring feeds into `ProviderPlanAcceptance.confidenceScore` (integer field)
-- Sybil prevention (rate limiting + CAPTCHA + vote dedup + time windows) protects against score manipulation
-
-### 27 - CAPTCHA Integration
-
-**Status: PASS**
-
-**Evidence from `packages/backend/src/middleware/captcha.ts`:**
-
-```
-CAPTCHA Verification Middleware (Google reCAPTCHA v3)
-
-FAIL-OPEN vs FAIL-CLOSED TRADEOFF:
-
-FAIL-OPEN (CAPTCHA_FAIL_MODE=open) - Default:
-  - Allows requests through when Google API fails
-  - Prioritizes AVAILABILITY over security
-  - Mitigation: Fallback rate limiting is applied (3 requests/hour vs normal 10)
-
-FAIL-CLOSED (CAPTCHA_FAIL_MODE=closed):
-  - Blocks ALL requests when Google API fails
-```
-
-**Strengths:**
-- Configurable fail mode via environment variable
-- Fallback rate limiting when CAPTCHA service is unavailable (3 req/hr vs 10 req/hr)
-- Minimum score threshold configurable via `CAPTCHA_MIN_SCORE`
-- API timeout configurable via `CAPTCHA_API_TIMEOUT_MS`
-- Constants centralized in `config/constants.ts`
-
-### 36 - Sybil Attack Prevention
-
-**Status: PASS**
-
-**Evidence from database schema and middleware:**
-- **Layer 1 -- Rate limiting:** Global + per-endpoint rate limits
-- **Layer 2 -- CAPTCHA:** reCAPTCHA v3 on write operations
-- **Layer 3 -- Vote deduplication:** `@@unique([verificationId, sourceIp])` on VoteLog prevents same IP from voting twice on a verification
-- **Layer 4 -- Time windows:** Sybil prevention indexes on VerificationLog:
-  - `idx_vl_sybil_email`: Index on `[providerNpi, planId, submittedBy, createdAt]`
-  - `idx_vl_sybil_ip`: Index on `[providerNpi, planId, sourceIp, createdAt]`
-  - These enable efficient lookups to enforce per-IP and per-email submission limits within time windows
+**Checklist:**
+- [x] Timing-safe comparison prevents timing attacks
+- [x] Secret not hardcoded in source
+- [x] Secret injected via GCP Secret Manager
+- [x] 503 returned when secret not configured (fail-safe)
+- [x] 401 returned for invalid/missing secret
+- [ ] No secret rotation mechanism documented
 
 ---
 
-## Medium Priority Findings
+### 4. CSRF Protection (Prompt 04)
 
-### 04 - CSRF Protection
+**Status: PASS - NOT NEEDED YET**
 
-**Status: PASS (not applicable)**
+**Findings:**
+- No authentication cookies are used
+- API is stateless with header-based auth (X-Admin-Secret)
+- CORS whitelist prevents cross-origin requests from unauthorized domains
+- When user accounts are added, CSRF tokens will be needed
 
-**Rationale:** The application does not use cookie-based authentication. The admin endpoint uses an `X-Admin-Secret` header, and there are no user sessions. CSRF attacks require the browser to automatically attach credentials (cookies), which does not happen with header-based auth. CSRF protection will become necessary when/if cookie-based user authentication is implemented.
+---
 
-### 05 - Audit Logging
+### 5. Audit Logging (Prompt 05)
 
 **Status: PASS**
 
-**Evidence from `packages/backend/src/index.ts`:**
-- `requestLogger` middleware tracks usage without PII
-- `httpLogger` (pino-http) logs all HTTP requests
-- `requestIdMiddleware` generates correlation IDs for log tracing
-- Pino structured logging throughout (`logger.info`, `logger.warn`, `logger.error`)
+**Findings:**
+- **Pino structured logger** (`packages/backend/src/utils/logger.ts`): JSON output in production, pretty-print in development
+- **Request logger** (`packages/backend/src/middleware/requestLogger.ts`): Logs method, path, status, response time, rate limit info - **explicitly excludes PII** (no IP, no user agent, no identifying info)
+- **HTTP logger** via pino-http middleware for all requests
+- **Request ID middleware** for log correlation across the request lifecycle
+- **Admin actions logged:** All admin endpoints log actions with structured context
+- **CAPTCHA events logged:** Pass, fail, low score, API errors all logged with structured data
+- **Rate limit events logged:** Redis unavailable, transaction failures
 
 **PII handling:**
-- Application logs are PII-free (no patient data exists, no user accounts)
-- IP addresses and user agents stored in `VerificationLog` and `VoteLog` for anti-abuse detection only
-- Error logs include request path and method but not request bodies
+- Application logs: PII-free (confirmed in `requestLogger.ts` interface definition)
+- Database: `sourceIp`, `userAgent`, `submittedBy` stored in `verification_logs` for anti-abuse
+- API responses: PII stripped via `stripVerificationPII()` before returning
 
-### 09 - External API Security
+---
 
-**Status: PASS**
-
-**External APIs in use:**
-| API | Purpose | Security |
-|-----|---------|----------|
-| Google reCAPTCHA v3 | Bot prevention | Server-side verification, configurable timeout |
-| Anthropic Claude | Insurance card OCR | API key via GCP Secret Manager, server-side only |
-| PostHog | Frontend analytics | Client-side, public key |
-| NPI Registry (NPPES) | Provider data import | Public API, no auth needed |
-| Redis (via ioredis) | Rate limit state | Connection string via env, optional |
-
-- All API keys are managed through environment variables or GCP Secret Manager
-- No API keys are hardcoded in source
-- Anthropic API is called from a Next.js API route (server-side only), not exposed to the client
-
-### 21 - Security Vulnerabilities (Known)
+### 6. API Routes Security (Prompt 06)
 
 **Status: PASS**
 
-The prompt references "4 ZeroPath findings, all resolved." No unresolved security vulnerabilities were found in the codebase review. The code follows current security best practices for its technology stack.
+**All routes verified in `packages/backend/src/routes/`:**
 
-### 37 - Error Handling Security
+| Route | Methods | Rate Limit | Auth | CAPTCHA | Honeypot | Validation |
+|-------|---------|------------|------|---------|----------|------------|
+| `/api/v1/providers/search` | GET | searchRateLimiter (100/hr) | None (public) | No | No | Zod |
+| `/api/v1/providers/cities` | GET | defaultRateLimiter (200/hr) | None | No | No | Zod |
+| `/api/v1/providers/:npi` | GET | defaultRateLimiter (200/hr) | None | No | No | Zod |
+| `/api/v1/verify` | POST | verificationRateLimiter (10/hr) | None | Yes | Yes | Zod |
+| `/api/v1/verify/:id/vote` | POST | voteRateLimiter (10/hr) | None | Yes | Yes | Zod |
+| `/api/v1/verify/stats` | GET | defaultRateLimiter (200/hr) | None | No | No | None |
+| `/api/v1/verify/recent` | GET | defaultRateLimiter (200/hr) | None | No | No | Zod |
+| `/api/v1/verify/:npi/:planId` | GET | defaultRateLimiter (200/hr) | None | No | No | Zod |
+| `/api/v1/admin/*` | Various | defaultRateLimiter (200/hr) | X-Admin-Secret | No | No | Zod |
+
+**Global middleware chain (in order from `index.ts`):**
+1. `requestIdMiddleware` - UUID per request
+2. `httpLogger` - pino-http request logging
+3. `helmet()` - Security headers with strict CSP
+4. `cors()` - Whitelist-based CORS
+5. `express.json({ limit: '100kb' })` - Body size limit
+6. `express.urlencoded({ limit: '100kb' })` - URL-encoded body limit
+7. `defaultRateLimiter` - 200 req/hour global limit (applied after health check)
+8. `requestLogger` - PII-free request logging
+
+---
+
+### 7. Input Validation (Prompt 07)
 
 **Status: PASS**
 
-**Evidence from `packages/backend/src/middleware/errorHandler.ts`:**
+**Findings:**
+- **Zod schemas** on all endpoints that accept user input
+- **Verification submission** (`verify.ts`): NPI validated, planId validated, notes max 1000 chars, evidenceUrl max 500 chars, email validated, captchaToken and honeypot field
+- **Vote** (`verify.ts`): vote enum `['up', 'down']`, captchaToken, honeypot
+- **Search** (`providers.ts`): state 2-char uppercase, city 1-100 chars, zipCode 3-10 chars, name 1-200 chars, NPI 10-digit regex, entityType enum
+- **Pagination** limits enforced (1-100 range in `recentQuerySchema`)
 
-```typescript
-// Default error response
-const statusCode = 500;
-const message = process.env.NODE_ENV === 'production'
-  ? 'Internal server error'
-  : err.message;
+**Zod error handling:** `errorHandler.ts` catches `ZodError` by name and returns structured 400 with field-level error messages.
+
+---
+
+### 8. Rate Limiting (Prompt 08)
+
+**Status: PASS**
+
+**Findings from `packages/backend/src/middleware/rateLimiter.ts` (368 lines):**
+
+| Tier | Name | Limit | Window | Applied To |
+|------|------|-------|--------|------------|
+| 1 | default | 200/hr | 1 hour | All API routes |
+| 2 | search | 100/hr | 1 hour | Provider search |
+| 3 | verification | 10/hr | 1 hour | Verification submission |
+| 4 | vote | 10/hr | 1 hour | Vote submission |
+
+**Implementation details:**
+- **Sliding window algorithm** (not fixed window) prevents burst attacks at window boundaries
+- **Dual-mode:** Redis sorted sets for distributed deployments, in-memory Map for single-instance
+- **Fail-open:** Redis unavailable -> request allowed with `X-RateLimit-Status: degraded` header
+- **Standard headers:** `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, `Retry-After`
+- **Memory cleanup:** `setInterval` every 60 seconds removes expired entries
+- **Key generation:** Default `req.ip`, with `trust proxy: 1` set for Cloud Run
+
+---
+
+### 9. External APIs (Prompt 09)
+
+**Status: PASS**
+
+**External API dependencies identified:**
+1. **Google reCAPTCHA v3** - Token verification, 5s timeout, fail-open with fallback rate limiting
+2. **Google Cloud SQL** - PostgreSQL, connection via Cloud SQL proxy
+3. **Redis (ioredis)** - Optional, for distributed rate limiting
+4. **PostHog** - Frontend analytics (client-side only, `NEXT_PUBLIC_POSTHOG_KEY`)
+5. **Anthropic Claude API** - Used by frontend (`ANTHROPIC_API_KEY` in frontend deployment)
+
+**Security for each:**
+- reCAPTCHA: Secret key in GCP Secret Manager, not exposed to client
+- Cloud SQL: Connection string in GCP Secret Manager
+- Redis: Connection via `REDIS_URL` env var
+- PostHog: Public key only (no secret)
+- Anthropic: API key in GCP Secret Manager
+
+---
+
+### 10. Confidence Scoring Integrity (Prompt 12)
+
+**Status: PASS**
+
+**Findings from `packages/backend/src/services/confidenceService.ts` (512 lines):**
+
+**Manipulation resistance:**
+- Score requires 3+ verifications for HIGH confidence (research-based: Mortensen et al. 2015, JAMIA)
+- Agreement score penalizes conflicting data (0 points for <40% agreement)
+- Specialty-specific freshness thresholds prevent gaming via stale data
+- Sybil prevention prevents one actor from submitting multiple verifications
+
+**4-factor scoring (0-100):**
+1. Data source (0-25): CMS=25, Carrier=20, Crowdsource=15
+2. Recency (0-30): Tiered decay based on specialty freshness threshold
+3. Verification count (0-25): 0=0, 1=10, 2=15, 3+=25
+4. Agreement (0-20): Based on upvote/downvote ratio
+
+---
+
+### 11. CAPTCHA Integration (Prompt 27)
+
+**Status: PARTIAL PASS - Backend complete, frontend incomplete**
+
+**Backend (`packages/backend/src/middleware/captcha.ts`, 241 lines):**
+- [x] reCAPTCHA v3 verification with score threshold (0.5)
+- [x] 5-second API timeout with AbortController
+- [x] Fail-open mode with fallback rate limiting (3 req/hour)
+- [x] Fail-closed mode available via `CAPTCHA_FAIL_MODE=closed`
+- [x] Development/test bypass
+- [x] Structured logging for all outcomes
+- [x] Token from request body (`captchaToken`) or header (`x-captcha-token`)
+
+**Frontend (`packages/frontend/src/components/ProviderVerificationForm.tsx`, 800 lines):**
+- [ ] Does NOT send `captchaToken` in the POST body (line 107-115)
+- [ ] Does NOT import or use `react-google-recaptcha-v3`
+- [ ] Posts to `/api/verifications` instead of `/api/v1/verify`
+- [x] Honeypot field `website` is defined in Zod schema but not in the form
+
+**CRITICAL GAP:** The frontend verification form will fail in production because:
+1. No CAPTCHA token is generated or sent
+2. The API URL is wrong (`/api/verifications` vs `/api/v1/verify`)
+
+---
+
+### 12. Sybil Attack Prevention (Prompt 36)
+
+**Status: PASS**
+
+**4 layers verified:**
+
+1. **Rate Limiting** - 10 verifications/hour, 10 votes/hour per IP (sliding window)
+2. **Honeypot** - Hidden `website` field; bots that fill it get silent 200 response (`packages/backend/src/middleware/honeypot.ts`)
+3. **CAPTCHA** - reCAPTCHA v3 score >= 0.5 required in production
+4. **Vote Deduplication** - Unique constraint `[verificationId, sourceIp]` on VoteLog; Sybil check in `verificationService.ts` with 30-day window for same IP or email per provider-plan pair
+
+**Additional protections:**
+- Consensus threshold: 3 verifications + 60 confidence + 2:1 majority required to change status
+- Verification TTL: 6-month expiration prevents stale data accumulation
+
+---
+
+### 13. Error Handling Security (Prompt 37)
+
+**Status: PASS**
+
+**Findings from `packages/backend/src/middleware/errorHandler.ts` (189 lines):**
+- [x] `AppError` class with `isOperational` flag for expected vs unexpected errors
+- [x] Zod validation errors return 400 with field-level messages
+- [x] Prisma P2002 (duplicate) returns 409, P2025 (not found) returns 404
+- [x] Payload too large returns 413
+- [x] Default 500 error: Message hidden in production (`'Internal server error'`), shown in development
+- [x] **No stack traces in production** - only `err.message` used in non-production
+- [x] Request ID included in all error responses for correlation
+- [x] All errors logged with structured context via pino
+
+---
+
+## Security Architecture Summary
+
 ```
-
-**Strengths:**
-- `AppError` class with `isOperational` flag distinguishes expected errors from unexpected ones
-- Stack traces suppressed in production (generic "Internal server error" message)
-- Detailed error messages only in development mode
-- Specific handlers for:
-  - `AppError` instances (custom application errors)
-  - `ZodError` (validation, returns field-level details)
-  - `PayloadTooLargeError` (413 response)
-  - Prisma errors: `P2002` (duplicate/409), `P2025` (not found/404)
-- Request ID included in all error responses for log correlation
-- `asyncHandler` wrapper catches unhandled promise rejections in route handlers
-
-**Security headers via Helmet:**
-```typescript
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'none'"],
-      scriptSrc: ["'none'"],
-      frameAncestors: ["'none'"],
-      // ... strict CSP for JSON-only API
-    },
-  },
-  crossOriginEmbedderPolicy: true,
-  crossOriginOpenerPolicy: { policy: 'same-origin' },
-  crossOriginResourcePolicy: { policy: 'same-origin' },
-  referrerPolicy: { policy: 'no-referrer' },
-}));
+EXTERNAL REQUEST
+     |
+     v
+[1] CORS Whitelist (verifymyprovider.com, Cloud Run URLs)
+     |
+     v
+[2] Helmet.js (CSP: default-src 'none', frame-ancestors 'none', HSTS)
+     |
+     v
+[3] Body Size Limit (100kb)
+     |
+     v
+[4] Rate Limiting (4 tiers: 200/100/10/10 per hour)
+     |
+     v
+[5] Honeypot Check (silent 200 for bots)
+     |
+     v
+[6] reCAPTCHA v3 (score >= 0.5, fail-open with fallback)
+     |
+     v
+[7] Zod Input Validation (type-safe schemas on all inputs)
+     |
+     v
+[8] Business Logic (Sybil check, consensus threshold)
+     |
+     v
+[9] Prisma ORM (parameterized queries - SQL injection safe)
+     |
+     v
+[10] PII Stripping (sourceIp, userAgent, submittedBy removed)
+     |
+     v
+RESPONSE
 ```
 
 ---
 
-## CORS Configuration Review
+## CI/CD Security
 
-**File:** `packages/backend/src/index.ts`
-
-```typescript
-const ALLOWED_ORIGINS: string[] = [
-  'https://verifymyprovider.com',
-  'https://www.verifymyprovider.com',
-  'https://verifymyprovider-frontend-741434145252.us-central1.run.app',
-  process.env.FRONTEND_URL,
-].filter((origin): origin is string => Boolean(origin));
-
-if (process.env.NODE_ENV === 'development') {
-  ALLOWED_ORIGINS.push('http://localhost:3000', 'http://localhost:3001');
-}
-```
-
-**Assessment:**
-- Production origins are explicitly allowlisted (no wildcards)
-- Development origins only added in development mode
-- Requests with no origin are allowed (mobile apps, curl, server-to-server) -- this is standard practice for APIs
-- Blocked CORS attempts are logged for monitoring
-- Allowed headers include only necessary ones: `Content-Type`, `Authorization`, `X-Request-ID`, `X-Admin-Secret`
-- Credentials mode enabled (required for potential future cookie-based auth)
-
-**Minor observation:** The `X-Admin-Secret` header is exposed in allowed CORS headers. This is necessary for admin functionality but worth noting -- anyone inspecting network requests from the frontend can see this header name. However, since admin endpoints are disabled in production (ADMIN_SECRET removed), this is a non-issue currently.
+**GitHub Actions security measures verified:**
+- [x] Gitleaks secret scanning on every push/PR (`.github/workflows/security-scan.yml`)
+- [x] Workload Identity Federation for GCP auth (no long-lived service account keys)
+- [x] Secrets stored in GitHub Secrets and GCP Secret Manager
+- [x] Docker image tags include git SHA for traceability
+- [x] Smoke test on `/health` after backend deploy
+- [x] Minimal permissions (`contents: read`, `id-token: write`)
+- [ ] No `npm audit` in CI pipeline
+- [ ] No SAST/DAST tools in CI pipeline
+- [ ] No dependency vulnerability scanning (Dependabot/Renovate)
 
 ---
 
-## Consolidated Security Summary
+## Questions Answered
 
-### Defense-in-Depth Layers
+### 1. When was the last full security review?
+January 2026 - ZeroPath automated scan + manual code review. All 4 findings resolved.
 
-```
-Layer 1: Network / Infrastructure
-  - Cloud Run managed platform (Google handles OS patching, TLS termination)
-  - Workload Identity Federation (no service account keys)
-  - GCP Secret Manager (no hardcoded secrets)
-  - Trust proxy = 1 (correct IP extraction behind Cloud Run LB)
+### 2. Have there been any security incidents or near-misses?
+No incidents reported. The ZeroPath scan was proactive, not reactive.
 
-Layer 2: HTTP / Transport
-  - Helmet with strict CSP
-  - CORS allowlist (no wildcards)
-  - 100kb body size limit
-  - HTTPS enforced (upgradeInsecureRequests)
+### 3. Should we engage an external penetration tester?
+Recommended before public launch (Phase 3). For beta, the current layered defense is adequate. Focus areas: rate limiting bypass, CAPTCHA bypass, admin secret enumeration.
 
-Layer 3: Application / Request
-  - Rate limiting: 4 tiers, dual-mode Redis/in-memory
-  - CAPTCHA: reCAPTCHA v3 on write operations
-  - Input validation: Zod on all endpoints
-  - Request ID correlation
+### 4. Are there any compliance requirements beyond what's documented?
+No. The application handles only public NPI data. No HIPAA, GDPR (no EU users targeted), or PCI requirements apply.
 
-Layer 4: Business Logic
-  - Admin auth: timing-safe secret comparison
-  - Sybil prevention: IP dedup, email dedup, time windows
-  - Vote uniqueness: DB constraint prevents duplicate votes
-  - Confidence scoring: multi-factor, manipulation-resistant
-
-Layer 5: Error Handling / Logging
-  - No stack traces in production
-  - Structured error responses with error codes
-  - PII-free logging
-  - Graceful shutdown with timeout
-```
-
-### Risk Matrix
-
-| Risk | Severity | Likelihood | Mitigation Status |
-|------|----------|------------|-------------------|
-| Brute force / DDoS | High | Medium | Mitigated -- rate limiting + CAPTCHA |
-| Data poisoning (fake verifications) | Medium | Medium | Mitigated -- 4-layer sybil prevention |
-| Admin secret compromise | High | Low | Mitigated -- timing-safe comparison, disabled in production |
-| CORS bypass | Medium | Low | Mitigated -- strict allowlist, no wildcards |
-| SQL injection | High | Low | Mitigated -- Prisma ORM parameterized queries |
-| XSS | Medium | Low | Mitigated -- JSON-only API, strict CSP, Helmet |
-| Information leakage via errors | Medium | Medium | Mitigated -- generic messages in production |
-| Dependency vulnerabilities | Medium | Medium | Partially mitigated -- needs automated scanning |
-| Secret exposure in logs | Medium | Low | Mitigated -- PII-free logging, no secrets logged |
-
-### Recommendations
-
-1. **Add automated dependency scanning** -- Integrate `npm audit` or a tool like Snyk/Dependabot into CI to catch vulnerable dependencies automatically.
-
-2. **Add SAST scanning** -- Consider adding a static analysis security tool (e.g., Semgrep, CodeQL) to the GitHub Actions pipeline.
-
-3. **Confirm ADMIN_SECRET production intent** -- The `--remove-secrets=ADMIN_SECRET` in deploy.yml disables admin endpoints in production. Verify this is the desired behavior, or provide the secret if admin access is needed.
-
-4. **Monitor rate limit effectiveness** -- Add alerting when rate limits are triggered frequently, which could indicate an active attack.
-
-5. **Consider Content-Type validation** -- The API accepts `application/json` via `express.json()`, but there is no explicit middleware rejecting requests with unexpected Content-Type headers. This is low-risk but could be tightened.
-
-6. **Plan for user authentication** -- When user accounts are added, implement CSRF protection, session management, and password hashing. The current header-based admin auth is appropriate for its scope but does not scale to user-facing authentication.
-
-7. **Regular security audits** -- The prompt system (26 prompts covering security) is excellent for structured reviews. Consider running this audit quarterly or after significant feature additions.
+### 5. Should we implement automated security scanning (SAST/DAST) in CI?
+Yes. Recommended additions:
+- `npm audit --audit-level=high` as a CI gate
+- CodeQL or Semgrep for SAST
+- Dependabot for dependency updates
+- OWASP ZAP for DAST (after staging environment is active)
 
 ---
 
-## Audit Checklist Summary
+## Recommendations (Priority Order)
 
-| # | Prompt | Area | Verdict | Notes |
-|---|--------|------|---------|-------|
-| 01 | Database Schema | Schema security, indexes | PASS | 13 models, 30+ indexes, FK constraints |
-| 02 | HIPAA Compliance | Compliance position | PASS | Not required -- public data only |
-| 03 | Authentication | Auth strategy | PASS | Admin timing-safe; no user auth yet (Phase 1) |
-| 04 | CSRF | CSRF protection | PASS | Not applicable -- no cookie auth |
-| 05 | Audit Logging | Logging, PII | PASS | PII-free app logs, IPs for anti-abuse only |
-| 06 | API Routes | Route security | PASS | All rate-limited, CAPTCHA on writes |
-| 07 | Input Validation | Validation | PASS | Zod on all endpoints |
-| 08 | Rate Limiting | Rate limiting | PASS | 4-tier, dual-mode, fail-open |
-| 09 | External APIs | API security | PASS | Keys in Secret Manager, server-side only |
-| 11 | Env Secrets | Secret management | PASS | GCP Secret Manager, no hardcoded secrets |
-| 12 | Confidence Scoring | Algorithm integrity | PASS | 4-factor, tested, sybil-resistant |
-| 21 | Vulnerabilities | Known vulns | PASS | 4 ZeroPath findings resolved |
-| 27 | CAPTCHA | Bot prevention | PASS | reCAPTCHA v3, configurable fail mode |
-| 36 | Sybil Prevention | Anti-spam | PASS | 4 layers all implemented |
-| 37 | Error Handling | Error security | PASS | No stack traces in prod, structured responses |
-
-**Overall Security Grade: PASS -- Solid security posture for Phase 1**
-
-No critical or high-severity unresolved vulnerabilities found. The architecture follows security best practices with defense-in-depth across all layers. The primary area for improvement is expanding automated security testing in the CI/CD pipeline.
+1. **HIGH:** Complete frontend CAPTCHA integration before beta launch
+2. **HIGH:** Fix frontend API URL mismatch (`/api/verifications` -> `/api/v1/verify`)
+3. **MEDIUM:** Add `npm audit` to CI pipeline
+4. **MEDIUM:** Add Dependabot/Renovate for dependency updates
+5. **MEDIUM:** Document admin secret rotation procedure
+6. **LOW:** Add SAST tool (CodeQL/Semgrep) to CI
+7. **LOW:** Consider CAPTCHA fail-closed for production launch
+8. **LOW:** Add OWASP ZAP DAST scanning to staging environment

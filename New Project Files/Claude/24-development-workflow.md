@@ -1,15 +1,16 @@
 # VerifyMyProvider Development Workflow
 
-**Last Updated:** 2026-02-05
-**Generated From:** prompts/24-development-workflow.md
-
----
+**Last Updated:** 2026-02-06
 
 ## Golden Rule
 
-**ALL code changes happen in Claude Code -> Push to GitHub -> Auto-deploys to Cloud Run**
+**ALL code changes happen in Claude Code (local machine) -> Push to GitHub -> Auto-deploys via GitHub Actions to Google Cloud Run.**
 
-Never edit code in Google Cloud Shell. It is a dead end -- edits will not persist, will not trigger auto-deploy, and cannot be version controlled.
+Never edit code in Google Cloud Shell. It is a dead end:
+- Cloud Shell edits do not persist across sessions
+- Changes will not trigger the CI/CD pipeline
+- Code cannot be version controlled
+- Other developers/sessions cannot see the changes
 
 ---
 
@@ -18,103 +19,59 @@ Never edit code in Google Cloud Shell. It is a dead end -- edits will not persis
 ### Claude Code (Local Machine)
 
 **USE FOR:**
-- Writing and editing code (backend, frontend, shared)
-- Fixing bugs
-- Adding features
-- Running local tests (`npm test`, `npm run dev`)
-- Git commits and pushes
+- Writing and editing all source code
+- Fixing bugs and adding features
+- Running local tests (`npm test`)
+- Git operations (commit, push, branch)
+- Running database scripts (`npx tsx scripts/...`)
 - Prisma schema changes and migrations
+- Package management (`npm install`)
 - Code review and analysis
 
 **NEVER USE FOR:**
-- There are no restrictions -- Claude Code is the primary development tool for all code changes
+- Nothing off-limits. This is the primary development tool.
 
 ### Google Cloud Shell / gcloud CLI
 
 **USE FOR:**
-- Database commands (connecting to Cloud SQL, running SQL queries)
-- Checking Cloud Run logs (`gcloud run services logs read`)
-- GCP infrastructure changes (IAM, networking, secrets)
-- One-off admin tasks
-- Verifying deployment status
-- Managing GCP Secret Manager
+- Direct database queries via `psql` or `gcloud sql connect`
+- Checking Cloud Run deployment logs
+- GCP infrastructure changes (Cloud Run settings, Cloud SQL config)
+- Viewing secret values in Secret Manager
+- One-off admin tasks (scaling, restarts)
+- Monitoring Cloud Run metrics
 
 **NEVER USE FOR:**
-- Editing code
-- Making fixes that need to deploy
-- Any change that should be tracked in version control
+- Editing application source code
+- Making bug fixes that need to deploy
+- Installing npm packages
+- Running the application locally
 
 ---
 
 ## Development Flow
 
 ```
-  Local Machine                  GitHub                    Google Cloud
-  ============                  ======                    ============
-
-  Claude Code                    main branch               Cloud Run
-  (edit code)                    (push triggers)           (auto-deploy)
-       |                              |                         |
-       |   git push                   |                         |
-       |----------------------------->|                         |
-       |                              |  GitHub Actions         |
-       |                              |  deploy.yml             |
-       |                              |------------------------>|
-       |                              |  1. Build Docker image  |
-       |                              |  2. Push to Artifact    |
-       |                              |     Registry            |
-       |                              |  3. Deploy to Cloud Run |
-       |                              |                         |
-       |                              |  Backend deploys first  |
-       |                              |  Frontend deploys after |
-       |                              |  (depends on backend URL)|
+  +------------------+     +-----------+     +----------------+     +-------------+
+  |  Claude Code     | --> |  GitHub   | --> | GitHub Actions | --> | Cloud Run   |
+  |  (Local Dev)     |     |  (main)   |     | (CI/CD)        |     | (Production)|
+  +------------------+     +-----------+     +----------------+     +-------------+
+         |                                           |
+         | git push                         Tests -> Build -> Deploy
+         |                                  (backend then frontend)
+         |
+  +------------------+
+  |  Local Testing   |
+  |  npm run dev     |
+  |  npm test        |
+  +------------------+
 ```
 
----
-
-## Project Setup
-
-### Prerequisites
-- Node.js >= 20.0.0
-- npm (with workspaces support)
-- Docker (for local PostgreSQL)
-- Git
-
-### Initial Setup
-
-```bash
-# Clone the repository
-git clone https://github.com/breilly1296/HealthcareProviderDB-.git
-cd HealthcareProviderDB
-
-# Install dependencies (all workspaces)
-npm install
-
-# Start local PostgreSQL via Docker
-npm run docker:dev
-
-# Generate Prisma client
-npm run db:generate
-
-# Push schema to local database
-npm run db:push
-
-# Seed the database (optional)
-npm run db:seed
-```
-
-### Running Locally
-
-```bash
-# Start both backend and frontend concurrently
-npm run dev
-
-# Or start individually:
-npm run dev:backend    # Express API on http://localhost:3001
-npm run dev:frontend   # Next.js on http://localhost:3000
-```
-
-The `npm run dev` command first builds the shared package, then runs backend (`tsx watch`) and frontend (`next dev`) concurrently.
+**Deploy pipeline (from `.github/workflows/deploy.yml`):**
+1. **Test job:** Checkout -> Setup Node 20 -> `npm ci` -> `npm test` -> `npm run build`
+2. **Deploy Backend:** Auth to GCP -> Build Docker image -> Push to Artifact Registry -> Deploy to Cloud Run -> Smoke test `/health`
+3. **Deploy Frontend:** Auth to GCP -> Build Docker image (with backend URL as build arg) -> Push to Artifact Registry -> Deploy to Cloud Run
+4. **Summary:** Posts deployment status to GitHub Actions summary
 
 ---
 
@@ -122,94 +79,77 @@ The `npm run dev` command first builds the shared package, then runs backend (`t
 
 ### Fix a Bug
 
-1. Identify the bug (check logs, reproduce locally)
-2. Make the fix in Claude Code
-3. Test locally (`npm run dev` and verify)
-4. Run tests: `npm test`
-5. Commit and push:
-   ```bash
-   git add <changed-files>
-   git commit -m "fix: description of the fix"
-   git push origin main
-   ```
-6. GitHub Actions deploys automatically (~3-5 minutes)
-7. Verify the fix at the production URL
+1. Identify the bug (check Cloud Run logs or user report)
+2. Open Claude Code in the project directory (`C:\Users\breil\OneDrive\Desktop\HealthcareProviderDB`)
+3. Find and fix the relevant source file
+4. Run tests locally: `npm test` (from root or `packages/backend`)
+5. Commit: `git add <files> && git commit -m "Fix: description"`
+6. Push: `git push origin main`
+7. Monitor GitHub Actions for deployment status
+8. Verify fix on production (~5-10 minutes after push)
 
 ### Add a Feature
 
-1. Plan the feature (which packages need changes: backend, frontend, shared?)
-2. If schema changes are needed:
-   - Edit `packages/backend/prisma/schema.prisma`
-   - Run `npm run db:generate` to update the Prisma client
-   - Run `npm run db:push` (local) or create a migration with `npm run db:migrate`
-3. Implement backend changes (routes, services, middleware)
-4. Build shared types if needed: `npm run build:shared`
-5. Implement frontend changes (pages, components, hooks)
-6. Test locally
-7. Commit and push to deploy
+1. Plan the feature (which files, which routes, schema changes?)
+2. If schema changes needed: Edit `packages/backend/prisma/schema.prisma`
+3. Generate Prisma client: `npm run db:generate` (from root)
+4. Implement backend changes in `packages/backend/src/`
+5. Implement frontend changes in `packages/frontend/src/`
+6. Add Zod validation schemas for new endpoints
+7. Add rate limiting to new endpoints
+8. Run tests: `npm test`
+9. Commit and push
+10. Monitor deployment
 
 ### Run Database Queries
 
-**Local database (Docker):**
+**Via gcloud CLI (recommended for production):**
 ```bash
-# Start local PostgreSQL
-npm run docker:dev
-
-# Open Prisma Studio (GUI)
-npm run db:studio
-
-# Or connect directly:
-# Host: localhost:5432, User: postgres, Password: postgres, DB: healthcare_providers
+gcloud sql connect verifymyprovider-db --user=postgres --project=verifymyprovider-prod
+# Enter password from Proton Pass: "VerifyMyProvider GCP"
 ```
 
-**Production database (Google Cloud SQL):**
+**Via admin API endpoints:**
 ```bash
-# Connect via gcloud (from Cloud Shell or with gcloud CLI)
-gcloud sql connect verifymyprovider-db --user=postgres --project=verifymyprovider-prod
+# Get retention stats
+curl -H "X-Admin-Secret: <secret>" https://<backend-url>/api/v1/admin/retention/stats
 
-# Password is stored in Proton Pass under "VerifyMyProvider GCP"
+# Get expiration stats
+curl -H "X-Admin-Secret: <secret>" https://<backend-url>/api/v1/admin/expiration-stats
+
+# Get enrichment stats
+curl -H "X-Admin-Secret: <secret>" https://<backend-url>/api/v1/admin/enrichment/stats
+```
+
+**Via scripts (using DATABASE_URL env var):**
+```bash
+npx tsx scripts/check-import-status.ts
+npx tsx scripts/verify-data-quality.ts
+npx tsx scripts/normalize-city-names.ts  # dry run
 ```
 
 ### Check Deployment Status
 
-1. **GitHub Actions:** Check the "Deploy to Cloud Run" workflow at:
-   `https://github.com/breilly1296/HealthcareProviderDB-/actions`
-2. **GCP Console:** Check Cloud Run services in the GCP Console
-3. **Health endpoint:** `GET /health` on the backend URL returns database status, uptime, memory, and cache stats
+1. **GitHub Actions:** Go to `https://github.com/breilly1296/HealthcareProviderDB-/actions`
+2. **Cloud Run Console:** GCP Console -> Cloud Run -> verifymyprovider-backend / verifymyprovider-frontend
+3. **Health endpoint:** `curl https://<backend-url>/health`
+
+The deploy workflow includes a smoke test that hits `/health` after backend deployment. If it returns non-200, the deployment fails.
 
 ### View Logs
 
 ```bash
-# View backend logs (Cloud Run)
-gcloud run services logs read verifymyprovider-backend --region=us-central1 --limit=100
+# Backend logs (last 100 entries)
+gcloud logging read "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"verifymyprovider-backend\"" --limit=100 --project=verifymyprovider-prod
 
-# View frontend logs (Cloud Run)
-gcloud run services logs read verifymyprovider-frontend --region=us-central1 --limit=100
+# Frontend logs
+gcloud logging read "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"verifymyprovider-frontend\"" --limit=100 --project=verifymyprovider-prod
 
-# Filter for errors
-gcloud run services logs read verifymyprovider-backend --region=us-central1 --limit=50 --log-filter="severity>=ERROR"
-```
+# Filter for errors only
+gcloud logging read "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"verifymyprovider-backend\" AND severity>=ERROR" --limit=50 --project=verifymyprovider-prod
 
-### Run Tests
-
-```bash
-# Backend unit tests
-npm run test:backend
-
-# Backend tests with watch mode
-npm run test:backend -- --watch
-
-# Backend coverage report
-npm run test:backend -- --coverage
-
-# Frontend unit tests
-cd packages/frontend && npm test
-
-# Frontend E2E tests (Playwright)
-cd packages/frontend && npm run test:e2e
-
-# Playwright with browser UI
-cd packages/frontend && npm run test:e2e:ui
+# Filter for rate limiting events
+gcloud logging read "resource.type=\"cloud_run_revision\" AND jsonPayload.msg=\"Too many requests\"" --limit=50 --project=verifymyprovider-prod
 ```
 
 ---
@@ -218,126 +158,50 @@ cd packages/frontend && npm run test:e2e:ui
 
 | Task | Tool | Command/Action |
 |------|------|----------------|
-| Start dev environment | Claude Code | `npm run dev` |
-| Start local database | Claude Code | `npm run docker:dev` |
-| Stop local database | Claude Code | `npm run docker:dev:down` |
-| Run backend tests | Claude Code | `npm run test:backend` |
-| Run frontend E2E tests | Claude Code | `npm run test:e2e` (in frontend dir) |
-| Build all packages | Claude Code | `npm run build` |
-| Build shared package only | Claude Code | `npm run build:shared` |
-| Generate Prisma client | Claude Code | `npm run db:generate` |
-| Open Prisma Studio | Claude Code | `npm run db:studio` |
-| Push schema changes | Claude Code | `npm run db:push` |
-| Lint code | Claude Code | `npm run lint` |
-| Clean build artifacts | Claude Code | `npm run clean` |
-| Connect to production DB | gcloud CLI | `gcloud sql connect verifymyprovider-db ...` |
-| View production logs | gcloud CLI | `gcloud run services logs read ...` |
-| Check deployment | GitHub | Actions tab in repository |
-
----
-
-## All npm Scripts
-
-### Root (monorepo orchestration)
-
-| Script | Description |
-|--------|-------------|
-| `npm run dev` | Build shared, then run backend + frontend concurrently |
-| `npm run build` | Build all workspaces |
-| `npm run build:shared` | Build shared package only |
-| `npm run build:backend` | Build backend only |
-| `npm run build:frontend` | Build frontend only |
-| `npm run docker:dev` | Start local PostgreSQL container |
-| `npm run docker:dev:down` | Stop local PostgreSQL container |
-| `npm run docker:build` | Build production Docker images |
-| `npm run docker:up` | Start production Docker containers |
-| `npm run docker:down` | Stop production Docker containers |
-| `npm run db:generate` | Generate Prisma client |
-| `npm run db:push` | Push schema to database |
-| `npm run db:migrate` | Run Prisma migrations |
-| `npm run db:studio` | Open Prisma Studio GUI |
-| `npm run db:seed` | Seed database with initial data |
-| `npm run clean` | Remove build artifacts in all workspaces |
-| `npm run lint` | Lint all workspaces |
-| `npm run test` | Run backend tests |
-
-### Backend (`packages/backend`)
-
-| Script | Description |
-|--------|-------------|
-| `npm run dev` | Start with tsx watch (hot reload) |
-| `npm run build` | TypeScript compile |
-| `npm run start` | Start compiled `dist/index.js` |
-| `npm run test` | Run Jest tests |
-| `npm run test:watch` | Jest in watch mode |
-| `npm run test:coverage` | Jest with coverage report |
-
-### Frontend (`packages/frontend`)
-
-| Script | Description |
-|--------|-------------|
-| `npm run dev` | Next.js dev server on port 3000 |
-| `npm run build` | Next.js production build |
-| `npm run start` | Start production server |
-| `npm run lint` | Next.js lint |
-| `npm run test` | Jest unit tests |
-| `npm run test:e2e` | Playwright E2E tests |
-| `npm run test:e2e:ui` | Playwright with UI mode |
-| `npm run test:e2e:headed` | Playwright in headed browser |
-| `npm run postinstall` | Patches Next.js SWC for Windows ARM64 compatibility |
+| Edit code | Claude Code | Edit files directly |
+| Run tests | Claude Code | `npm test` from root |
+| Build locally | Claude Code | `npm run build` from root |
+| Dev server | Claude Code | `npm run dev` (concurrent backend + frontend) |
+| Commit & deploy | Claude Code | `git add . && git commit -m "msg" && git push` |
+| View deploy status | Browser | GitHub Actions page |
+| Connect to DB | gcloud CLI | `gcloud sql connect verifymyprovider-db --user=postgres` |
+| View backend logs | gcloud CLI | See log commands above |
+| Check health | curl/browser | `GET /health` on backend URL |
+| Clear cache | curl | `POST /api/v1/admin/cache/clear` with X-Admin-Secret |
+| Cleanup expired | curl | `POST /api/v1/admin/cleanup-expired` with X-Admin-Secret |
+| Generate Prisma | Claude Code | `npm run db:generate` |
+| Push schema | Claude Code | `npm run db:push` |
+| Run quality scripts | Claude Code | `npx tsx scripts/<script-name>.ts` |
 
 ---
 
 ## URLs
 
-- **Frontend (Production):** https://verifymyprovider.com
-- **Backend (Production):** https://verifymyprovider-backend-741434145252.us-central1.run.app (Cloud Run)
-- **Frontend (Cloud Run direct):** https://verifymyprovider-frontend-741434145252.us-central1.run.app
-- **GitHub:** https://github.com/breilly1296/HealthcareProviderDB-
-- **GCP Console:** https://console.cloud.google.com (project: verifymyprovider-prod)
+- **Frontend:** `https://verifymyprovider.com` (custom domain) / `https://verifymyprovider-frontend-741434145252.us-central1.run.app`
+- **Backend:** Cloud Run URL (check deploy output or GCP Console)
+- **GitHub:** `https://github.com/breilly1296/HealthcareProviderDB-`
+- **GCP Console:** Google Cloud Console -> Project: verifymyprovider-prod
 
 ---
 
 ## Credentials (Proton Pass: "VerifyMyProvider GCP")
 
-- **Database password:** Stored in Proton Pass
+- **Database password:** Stored in Proton Pass under "VerifyMyProvider GCP"
 - **Project ID:** `verifymyprovider-prod`
-- **Database instance:** `verifymyprovider-db` (Cloud SQL, us-central1)
-- **GCP secrets:** Managed via GCP Secret Manager (DATABASE_URL, ADMIN_SECRET, ANTHROPIC_API_KEY)
-
----
-
-## CI/CD Pipeline
-
-The project uses GitHub Actions with two workflows:
-
-### deploy.yml (Deploy to Cloud Run)
-- **Trigger:** Push to `main` branch, or manual dispatch
-- **Flow:**
-  1. Build backend Docker image and push to Artifact Registry
-  2. Deploy backend to Cloud Run (512Mi memory, 0-10 instances)
-  3. Build frontend Docker image (receives backend URL as build arg)
-  4. Deploy frontend to Cloud Run (512Mi memory, 0-10 instances)
-  5. Post-deployment summary
-- **Authentication:** Workload Identity Federation (no service account keys)
-- **Secrets injected:** DATABASE_URL, ANTHROPIC_API_KEY via GCP Secret Manager
-
-### playwright.yml (E2E Tests)
-- **Trigger:** Push or PR to `main` that changes `packages/frontend/**`
-- **Flow:** Install deps, build shared + frontend, run Playwright tests
-- **Artifacts:** Playwright report uploaded (30-day retention)
-
----
-
-## Docker Development Setup
-
-The `docker-compose.dev.yml` provides a local PostgreSQL 15 instance:
-- **Container name:** `healthcaredb-postgres-dev`
-- **Port:** 5432
-- **Credentials:** postgres / postgres
-- **Database:** `healthcare_providers`
-- **Persistence:** Named volume `postgres_data_dev`
-- **Health check:** `pg_isready` every 10 seconds
+- **Database instance:** `verifymyprovider-db` (Google Cloud SQL PostgreSQL)
+- **Region:** `us-central1`
+- **Secrets in GCP Secret Manager:**
+  - `DATABASE_URL` - PostgreSQL connection string
+  - `ADMIN_SECRET` - Admin API authentication
+  - `RECAPTCHA_SECRET_KEY` - Google reCAPTCHA v3
+  - `ANTHROPIC_API_KEY` - Claude API (used by frontend)
+  - `NEXT_PUBLIC_POSTHOG_KEY` - PostHog analytics (build-time)
+- **GitHub Secrets:**
+  - `GCP_WORKLOAD_IDENTITY_PROVIDER` - GCP auth
+  - `GCP_SERVICE_ACCOUNT` - GCP service account
+  - `GCP_PROJECT_ID` - Project ID
+  - `FRONTEND_URL` - Frontend URL for CORS
+  - `NEXT_PUBLIC_POSTHOG_KEY` - PostHog (build-time)
 
 ---
 
@@ -345,32 +209,61 @@ The `docker-compose.dev.yml` provides a local PostgreSQL 15 instance:
 
 ### Something Broke in Production
 
-1. Check Cloud Run logs for errors:
-   ```bash
-   gcloud run services logs read verifymyprovider-backend --region=us-central1 --limit=50 --log-filter="severity>=ERROR"
-   ```
-2. Check the `/health` endpoint to see if the database is connected
-3. Check GitHub Actions for recent deployment failures
-4. If a recent deploy caused it, proceed to rollback
+1. **Check health:** `curl https://<backend-url>/health` - if 503, database might be down
+2. **Check logs:** Filter for ERROR severity in Cloud Run logs
+3. **Check GitHub Actions:** Did a recent deploy fail?
+4. **If deploy caused it:** The previous revision is still available in Cloud Run - roll back via GCP Console
 
 ### Need to Rollback
 
-1. In GCP Console, go to Cloud Run -> select the service
-2. View Revisions tab -- previous revisions are still available
-3. Route 100% traffic back to the previous revision
-4. Fix the issue locally in Claude Code, then push a new commit
+**Via GCP Console (fastest):**
+1. Go to Cloud Run -> verifymyprovider-backend
+2. Click "Revisions" tab
+3. Route 100% traffic to the previous revision
+
+**Via git (code rollback):**
+1. `git revert HEAD` (reverts last commit)
+2. `git push origin main` (triggers new deploy with reverted code)
 
 ### Database Connection Lost
 
-1. Check Cloud SQL instance status in GCP Console
-2. Verify the Cloud SQL Auth Proxy connection (Cloud Run uses `--add-cloudsql-instances` flag)
-3. Check that the `DATABASE_URL` secret in GCP Secret Manager is correct
-4. If the instance is stopped, start it from the GCP Console
+1. Check Cloud SQL status in GCP Console
+2. Verify the Cloud SQL instance is running
+3. Check if the Cloud Run service has the correct Cloud SQL connection flag
+4. The health endpoint reports `database: "unhealthy"` when connection fails
+5. Cloud Run may need to be restarted to re-establish connection pools
+
+### High Rate Limit Hits
+
+1. Check logs for `Too many requests` messages
+2. Check `X-RateLimit-Status: degraded` headers (indicates Redis is down)
+3. Admin endpoint: `GET /api/v1/admin/cache/stats` shows current cache health
+4. Consider temporarily increasing rate limits in `packages/backend/src/middleware/rateLimiter.ts`
 
 ---
 
-## Windows ARM64 Notes
+## Monorepo Structure
 
-- The frontend uses a `postinstall` script (`scripts/patch-next-swc.js`) to patch Next.js SWC for Windows ARM64 + Node 24 compatibility
-- The `@next/swc-wasm-nodejs` package is included as a devDependency as the WASM fallback
-- OneDrive can corrupt native `.node` binaries; WASM fallbacks are more reliable on OneDrive-synced projects
+```
+HealthcareProviderDB/
+  packages/
+    backend/           # Express + Prisma API
+      src/
+        config/        # Constants, environment
+        lib/           # Prisma client, Redis client
+        middleware/     # Rate limiter, CAPTCHA, honeypot, error handler
+        routes/        # Express route handlers
+        schemas/       # Zod validation schemas
+        services/      # Business logic
+        utils/         # Logger, cache, helpers
+      prisma/          # Schema and migrations
+    frontend/          # Next.js 14.2 + React 18
+      src/
+        app/           # Next.js app router pages
+        components/    # React components
+        lib/           # Utilities
+    shared/            # Shared types/utilities
+  scripts/             # Database scripts (import, cleanup, quality)
+  .github/workflows/   # CI/CD (deploy, test, security-scan, playwright)
+  prompts/             # Project documentation prompts
+```

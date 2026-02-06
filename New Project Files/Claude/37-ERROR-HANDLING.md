@@ -1,175 +1,221 @@
-# Error Handling Review -- Analysis
+# Error Handling
 
-**Generated:** 2026-02-05
-**Source Prompt:** prompts/37-error-handling.md
-**Status:** Backend error handling is robust and well-structured. Frontend error files (ErrorContext, error boundary, errorUtils, api.ts) do not exist yet.
+**Last Updated:** 2026-02-06
 
----
+## Error Codes
 
-## Findings
+| Code | Status | Description | Handled In |
+|------|--------|-------------|------------|
+| `BAD_REQUEST` | 400 | Invalid request parameters | `AppError.badRequest()` |
+| `VALIDATION_ERROR` | 400 | Zod validation failed | `errorHandler` ZodError branch |
+| `CAPTCHA_REQUIRED` | 400 | Missing CAPTCHA token | `captcha.ts` |
+| `CAPTCHA_FAILED` | 400 | CAPTCHA verification failed | `captcha.ts` |
+| `UNAUTHORIZED` | 401 | Missing/invalid auth | `AppError.unauthorized()` |
+| `FORBIDDEN` | 403 | Action not allowed | `AppError.forbidden()` |
+| `NOT_FOUND` | 404 | Resource not found | `AppError.notFound()` |
+| `ROUTE_NOT_FOUND` | 404 | Unknown API route | `notFoundHandler()` |
+| `CONFLICT` | 409 | Duplicate action (Sybil) | `AppError.conflict()` |
+| `DUPLICATE_ENTRY` | 409 | Prisma P2002 unique violation | `errorHandler` Prisma branch |
+| `PAYLOAD_TOO_LARGE` | 413 | Request body too large | `errorHandler` PayloadTooLarge branch |
+| `TOO_MANY_REQUESTS` | 429 | Rate limit exceeded | `AppError.tooManyRequests()` |
+| `INTERNAL_ERROR` | 500 | Unexpected server error | Default handler |
+| `SERVICE_UNAVAILABLE` | 503 | Service temporarily down | `AppError.serviceUnavailable()` |
+| `ADMIN_NOT_CONFIGURED` | 503 | ADMIN_SECRET not set | `admin.ts` middleware |
 
-### Backend -- AppError Class
+## Backend Error Handling
 
-- **Prompt specifies:** AppError with `statusCode`, `code`, `isOperational` fields and seven factory methods (`badRequest`, `unauthorized`, `forbidden`, `notFound`, `conflict`, `tooManyRequests`, `serviceUnavailable`).
-- **Actual implementation** (`packages/backend/src/middleware/errorHandler.ts` lines 7-57):
-  - All three fields present: `statusCode` (number), `isOperational` (boolean), `code` (optional string).
-  - Constructor signature differs from prompt: actual uses `(message, statusCode, options: { isOperational?, code? })` instead of `(message, statusCode, code?)`. This is functionally equivalent but more extensible.
-  - All seven factory methods from the prompt are present: `badRequest`, `unauthorized`, `forbidden`, `notFound`, `conflict`, `tooManyRequests`, `serviceUnavailable`.
-  - **Additional factory method** not in prompt: `static internal()` for 500 errors with `isOperational: false`. This is a sensible addition.
-  - Factory methods in the actual code accept an optional `code` parameter, while the prompt shows hardcoded codes (e.g., `'BAD_REQUEST'`). In the actual code, the code is passed through but defaults to `undefined` rather than a named constant. This means `err.code` may be `undefined` unless the caller explicitly supplies one.
+### AppError Class (`errorHandler.ts`)
 
-**Verdict:**
-- &#x2705; AppError class exists with factory methods
-- &#x26A0;&#xFE0F; Factory methods do not assign default error codes. Prompt shows `code: 'BAD_REQUEST'` for `badRequest()`, but actual code passes `code` through as optional. If callers do not supply a code string, the error response `code` field will be `undefined`.
+**Verified implementation** at `packages/backend/src/middleware/errorHandler.ts`:
 
-### Backend -- asyncHandler Wrapper
+```typescript
+class AppError extends Error {
+  statusCode: number;
+  isOperational: boolean;
+  code?: string;
+}
+```
 
-- **Prompt specifies:** Function that wraps async handlers and forwards rejected promises to `next()`.
-- **Actual implementation** (lines 62-68): Matches exactly. Uses `Promise.resolve(fn(req, res, next)).catch(next)` pattern. Return type is typed as `RequestHandler` for better Express compatibility.
+**Factory methods verified**:
+- [x] `AppError.badRequest(message, code?)` -- 400
+- [x] `AppError.unauthorized(message?, code?)` -- 401 (default: "Unauthorized")
+- [x] `AppError.forbidden(message?, code?)` -- 403 (default: "Forbidden")
+- [x] `AppError.notFound(message?, code?)` -- 404 (default: "Resource not found")
+- [x] `AppError.conflict(message, code?)` -- 409
+- [x] `AppError.tooManyRequests(message?, code?)` -- 429 (default: "Too many requests")
+- [x] `AppError.serviceUnavailable(message?, code?)` -- 503 (default: "Service temporarily unavailable")
+- [x] `AppError.internal(message?, code?)` -- 500 (sets `isOperational: false`)
 
-**Verdict:**
-- &#x2705; asyncHandler implemented correctly and used consistently across all 5 route files (providers, verify, admin, locations, plans).
+### asyncHandler Wrapper
 
-### Backend -- asyncHandler Usage Across Routes
+**Verified**: Wraps async route handlers to catch rejected promises and forward to Express error handler via `next()`. Used consistently across all route files (admin.ts, plans.ts, etc.).
 
-Checked all route files for consistent usage:
+### Global Error Handler (`errorHandler`)
 
-| Route File | asyncHandler Used | AppError Used |
-|---|---|---|
-| `providers.ts` | Yes (3 handlers) | Yes (`AppError.notFound`) |
-| `verify.ts` | Yes (5 handlers) | Yes (`AppError.notFound`) |
-| `admin.ts` | Yes (7 handlers) | Yes (`AppError.unauthorized` in auth middleware) |
-| `locations.ts` | Yes (5 handlers) | Yes (`AppError.notFound`) |
-| `plans.ts` | Yes (6 handlers) | Yes (`AppError.notFound`) |
+**Verified error type handling**:
 
-**Verdict:**
-- &#x2705; Every async route handler across all route files is wrapped in `asyncHandler`.
-- &#x2705; `AppError.notFound()` used consistently for missing resources.
+1. **AppError**: Returns structured error with message, code, statusCode, and requestId
+2. **ZodError**: Returns 400 with `VALIDATION_ERROR` code and field-level details
+3. **PayloadTooLargeError**: Returns 413 with `PAYLOAD_TOO_LARGE` code
+4. **PrismaClientKnownRequestError**:
+   - P2002 (unique violation): Returns 409 with `DUPLICATE_ENTRY`
+   - P2025 (record not found): Returns 404 with `NOT_FOUND`
+5. **Default**: Returns 500 with `INTERNAL_ERROR`; hides actual error message in production
 
-### Backend -- Global Error Handler
+**Error response format inconsistency detected**:
+- AppError responses use: `{ error: { message, code, statusCode, requestId } }`
+- PayloadTooLarge response uses: `{ success: false, error: { message, code, statusCode } }`
+- The `success` field is inconsistently included (present in PayloadTooLarge, absent in AppError responses)
 
-- **Prompt specifies:** Handler for ZodError, AppError, and unexpected errors with generic message.
-- **Actual implementation** (lines 73-174): Handles **more** error types than the prompt specifies:
-  1. **AppError** (lines 88-98): Returns `err.statusCode`, `err.message`, `err.code`, plus `requestId`.
-  2. **ZodError** (lines 101-116): Returns 400 with `VALIDATION_ERROR` code and `details` array. Details format is slightly different from prompt: actual maps to `{ field, message }` instead of `{ path, message }`.
-  3. **PayloadTooLargeError** (lines 118-129): Returns 413 with `PAYLOAD_TOO_LARGE` code. Not in prompt.
-  4. **PrismaClientKnownRequestError** (lines 132-158): Handles `P2002` (unique constraint -> 409 DUPLICATE_ENTRY) and `P2025` (record not found -> 404). Not in prompt, but addresses one of the prompt's own questions ("Are there any unhandled error types? Prisma errors?").
-  5. **Default/unexpected** (lines 160-173): Returns 500 with generic message in production, actual error message in development.
+### Response Helpers (`responseHelpers.ts`)
 
-**Verdict:**
-- &#x2705; Global error handler exists and is comprehensive
-- &#x2705; ZodError handling present
-- &#x2705; Prisma errors handled (prompt identified this as a gap, but it is already implemented)
-- &#x2705; PayloadTooLargeError handled (extra coverage not in prompt)
+**Verified** at `packages/backend/src/utils/responseHelpers.ts`:
+- `sendSuccess(res, data, statusCode)` -- wraps data in `{ success: true, data }`
+- `sendPaginatedSuccess(res, items, total, page, limit, itemsKey)` -- adds pagination metadata
+- `buildPaginationMeta(total, page, limit)` -- computes totalPages and hasMore
 
-### Backend -- Error Response Format
+### Logging
 
-- **Prompt specifies:** `{ success: false, error: { message, code, statusCode } }`
-- **Actual implementation:** The error response format is **mostly consistent but has a discrepancy**:
-  - AppError responses (line 89): `{ error: { message, code, statusCode, requestId } }` -- note **no `success: false`** wrapper.
-  - ZodError responses (line 103): `{ error: { message, code, statusCode, requestId, details } }` -- also **no `success: false`** wrapper.
-  - Prisma error responses: Same pattern, **no `success: false`**.
-  - Default 500 responses: **No `success: false`**.
-  - PayloadTooLargeError (line 121): **Has `success: false`** -- the only error branch that includes it.
-  - The `adminAuthMiddleware` 503 response (admin.ts line 27): **Has `success: false`**.
+**Verified**: Uses `pino` logger via `logger.error()` in the error handler. Logs include:
+- `requestId` (from `req.id`)
+- Error object
+- Request path and method
 
-  Success responses consistently include `success: true`. Error responses from the global handler are **missing** the `success: false` field in most branches.
+### Route-Level 404 Handler (`notFoundHandler`)
 
-**Verdict:**
-- &#x26A0;&#xFE0F; Inconsistent `success` field in error responses. The prompt specifies `success: false` in all error responses. The actual global error handler omits it from AppError, ZodError, Prisma, and default branches. Only `PayloadTooLargeError` and the admin auth middleware include it.
-- &#x2705; Error responses include `requestId` (not specified in prompt, but a useful addition for debugging).
+**Verified**: Returns structured 404 response for unmatched routes with the method and path.
 
-### Backend -- No Stack Traces in Production
+## Frontend Error Handling
 
-- **Prompt specifies:** No stack traces leaked in production.
-- **Actual implementation** (lines 160-173): In production (`NODE_ENV === 'production'`), the default 500 handler returns `'Internal server error'`. In development, it returns `err.message`. **No branch ever includes `err.stack` in the response.**
-- The `Error.captureStackTrace` call in AppError (line 23) only sets the stack on the Error object for logging/debugging purposes; it is never serialized into the JSON response.
+### errorUtils.ts (`packages/frontend/src/lib/errorUtils.ts`)
 
-**Verdict:**
-- &#x2705; No stack traces in production responses. Verified across all error handler branches.
+**Comprehensive error utility module verified**:
 
-### Backend -- Error Logging
+**AppError interface** (frontend version -- different from backend):
+```typescript
+interface AppError {
+  message: string;
+  code?: string;
+  statusCode?: number;
+  retryable: boolean;
+  originalError?: unknown;
+}
+```
 
-- Errors are logged via `logger.error()` with structured context (`requestId`, `err`, `path`, `method`) on line 80-85.
-- The prompt's checklist marks "Error logging to monitoring service" as unchecked.
+**Key functions verified**:
+- `toAppError(error: unknown)` -- Converts any caught error to standardized AppError. Handles Error instances, plain objects, strings, and unknown types.
+- `getUserMessage(error)` -- Maps technical errors to user-friendly messages (e.g., 429 -> "Too many requests. Please wait a moment and try again.")
+- `getErrorVariant(error)` -- Maps errors to UI variants: 'network', 'server', 'not-found', 'validation', 'rate-limit', 'unknown'
+- `createErrorState(error)` -- Combines message, type, and retryable into a component-ready state object
+- `isRetryableStatus(status)` -- Checks if HTTP status indicates retryable error (408, 429, 500, 502, 503, 504)
+- `isNetworkError(message)` -- Pattern matches network-related error messages
+- `logError(context, error)` -- Logs errors with different detail levels for dev vs production
 
-**Verdict:**
-- &#x2705; Errors are logged with structured context
-- &#x26A0;&#xFE0F; No external monitoring service integration (Sentry, Cloud Error Reporting) -- matches prompt's own assessment
+### ErrorContext.tsx (`packages/frontend/src/context/ErrorContext.tsx`)
 
-### Backend -- 404 Not Found Handler
+**Verified implementation**:
+- Provides global error state via React Context
+- Exposes: `error`, `errorVariant`, `errorMessage`, `setError`, `clearError`, `showErrorToast`, `hasError`
+- `showErrorToast(error, duration)` -- Sets error with auto-dismiss after `duration` ms (default 5000)
+- Properly cleans up timeouts on unmount
+- Uses `toAppError()` and `getUserMessage()` from errorUtils
 
-- **Not in prompt** but present in actual code (lines 179-188): A dedicated `notFoundHandler` for unmatched routes, returning `ROUTE_NOT_FOUND` code with the method and path.
+### Error Boundary (`packages/frontend/src/app/error.tsx`)
 
-**Verdict:**
-- &#x2705; Additional coverage: unmatched routes get a proper JSON 404 response instead of Express's default HTML.
+**Verified** -- Next.js error boundary with:
+- User-friendly error message ("Something went wrong")
+- "Try Again" button (calls `reset()`)
+- "Go Home" link
+- Contact support email link
+- Development-only expandable error details (message, digest, stack trace)
+- TODO comment for error tracking service integration (Sentry, PostHog, LogRocket)
+- Does NOT currently report errors to any monitoring service
 
-### Backend -- Response Helpers
+### API Error Handling (`packages/frontend/src/lib/api.ts`)
 
-- `packages/backend/src/utils/responseHelpers.ts` provides `sendSuccess()`, `buildPaginationMeta()`, and `sendPaginatedSuccess()`.
-- These ensure consistent `{ success: true, data: ... }` format for success responses.
-- Used across routes (verify.ts, locations.ts, plans.ts, providers.ts).
+**Verified** -- `ApiError` class with:
+- `statusCode`, `code`, `details`, `retryAfter` properties
+- Helper methods: `isRateLimited()`, `isValidationError()`, `isNotFound()`, `isUnauthorized()`, `isRetryable()`
 
-**Verdict:**
-- &#x2705; Response helpers exist and enforce consistent success format.
+**Retry logic verified** (`fetchWithRetry`):
+- Retries on 429, 500, 502, 503, 504
+- Retries on network errors
+- Exponential backoff: `baseDelay * 2^attempt` (1s, 2s, 4s)
+- Respects `Retry-After` header (capped at 30s)
+- Does NOT retry aborted requests
+- Does NOT retry 4xx errors (except 429)
+- Max retries: 2 (3 total attempts)
 
-### Frontend -- Error Handling Files
+**Rate limit toast**: Automatically shows toast notification when rate-limited (after retries exhausted)
 
-The prompt references four frontend files:
-- `packages/frontend/src/lib/errorUtils.ts`
-- `packages/frontend/src/context/ErrorContext.tsx`
-- `packages/frontend/src/app/error.tsx`
-- `packages/frontend/src/lib/api.ts`
+## Checklist Verification
 
-**None of these files exist.** The `packages/frontend/src/` directory contains no `.ts` or `.tsx` files at all.
+### Backend
+- [x] AppError class with factory methods -- VERIFIED: 8 factory methods
+- [x] asyncHandler for async routes -- VERIFIED: catches rejected promises
+- [x] Global error handler middleware -- VERIFIED: handles AppError, ZodError, Prisma errors, PayloadTooLarge
+- [x] Zod validation error handling -- VERIFIED: returns field-level details
+- [x] Prisma error handling -- VERIFIED: P2002 (duplicate) and P2025 (not found)
+- [x] PayloadTooLarge handling -- VERIFIED: 413 response
+- [x] No stack traces in production -- VERIFIED: production uses generic "Internal server error" message
+- [x] Request ID in error responses -- VERIFIED: `requestId: req.id` in all structured errors
+- [x] Error logging via pino -- VERIFIED: `logger.error()` with context
+- [ ] Error logging to monitoring service -- NOT implemented
 
-**Verdict:**
-- &#x274C; Frontend error handling files do not exist. The `ErrorContext`, error boundary, `ApiError` class, and `fetchApi` wrapper described in the prompt are not implemented.
+### Frontend
+- [x] Error context for global state -- VERIFIED: `ErrorContext.tsx` with full state management
+- [x] Error boundary for crashes -- VERIFIED: `error.tsx` with dev details
+- [x] API error handling -- VERIFIED: `ApiError` class with retry logic
+- [x] Toast notifications for errors -- VERIFIED: rate limit toast in `api.ts`
+- [x] Error classification -- VERIFIED: `errorUtils.ts` with network/server/not-found/validation/rate-limit variants
+- [x] User-friendly error messages -- VERIFIED: `getUserMessage()` translates technical errors
+- [x] Retry mechanisms -- VERIFIED: `fetchWithRetry` with exponential backoff
+- [ ] Retry UI for transient errors -- Partial: `retryable` property exists but no generic retry button component
 
-### Error Codes Table
+### Monitoring
+- [ ] Error logging configured -- Uses console logging only (no external service)
+- [ ] Error alerts set up -- NOT implemented
+- [ ] Error dashboard created -- NOT implemented
 
-The prompt lists 11 error codes. Here is verification of which are actually used:
+## Questions Answered
 
-| Code | Status | Used In Code |
-|---|---|---|
-| `BAD_REQUEST` | 400 | Not directly -- factory exists but code not auto-assigned |
-| `VALIDATION_ERROR` | 400 | Yes (errorHandler.ts ZodError branch) |
-| `CAPTCHA_REQUIRED` | 400 | Not found in errorHandler.ts (may be in captcha middleware) |
-| `CAPTCHA_FAILED` | 400 | Not found in errorHandler.ts (may be in captcha middleware) |
-| `UNAUTHORIZED` | 401 | Factory exists; used in admin auth |
-| `FORBIDDEN` | 403 | Factory exists; no current usage found |
-| `NOT_FOUND` | 404 | Yes (Prisma P2025 branch, route notFoundHandler) |
-| `ROUTE_NOT_FOUND` | 404 | Yes (notFoundHandler, not in prompt's table) |
-| `CONFLICT` | 409 | Factory exists; `DUPLICATE_ENTRY` used for Prisma P2002 |
-| `DUPLICATE_ENTRY` | 409 | Yes (Prisma P2002 branch, not in prompt's table) |
-| `TOO_MANY_REQUESTS` | 429 | Factory exists; likely used by rate limiter middleware |
-| `PAYLOAD_TOO_LARGE` | 413 | Yes (not in prompt's table) |
-| `INTERNAL_ERROR` | 500 | Yes (default error branch) |
-| `SERVICE_UNAVAILABLE` | 503 | Factory exists; used as `ADMIN_NOT_CONFIGURED` in admin |
+### 1. Are all error codes documented?
+**Mostly.** The codebase uses 15 distinct error codes (listed in the table above). The prompt's error code table is accurate but missing:
+- `ROUTE_NOT_FOUND` (from `notFoundHandler`)
+- `DUPLICATE_ENTRY` (from Prisma P2002 handler)
+- `PAYLOAD_TOO_LARGE` (from body parser error handler)
+- `ADMIN_NOT_CONFIGURED` (from admin middleware)
 
-**Verdict:**
-- &#x26A0;&#xFE0F; Error codes in actual code do not always match the prompt's table. Additional codes exist (`ROUTE_NOT_FOUND`, `DUPLICATE_ENTRY`, `PAYLOAD_TOO_LARGE`, `ADMIN_NOT_CONFIGURED`). Some listed codes like `CAPTCHA_REQUIRED` and `CAPTCHA_FAILED` may live in the captcha middleware rather than the error handler.
+### 2. Is error logging configured?
+**Backend**: Yes, using `pino` structured logger. All errors are logged with request context (path, method, requestId). However, logs only go to stdout -- no external logging service (Cloud Logging, Sentry, etc.) is configured.
+**Frontend**: Console logging only via `logError()` function. The error boundary has a TODO comment for Sentry/PostHog integration.
 
----
+### 3. Are there any unhandled error types?
+**Identified gaps**:
+- **Prisma connection errors** (e.g., `PrismaClientInitializationError`): Not specifically handled -- would fall through to the default 500 handler
+- **Redis connection errors**: Handled via fail-open in rate limiter, but not surfaced through the error handler
+- **JSON parse errors**: Express's built-in body parser handles these, but they may not produce the standard error format
+- **File upload errors**: No specific handling for multipart/file upload errors
+- **Prisma P2003 (foreign key constraint)**: Not specifically handled
 
-## Summary
+### 4. Should we add retry logic?
+**Already implemented on the frontend** via `fetchWithRetry()` with exponential backoff. Backend does not have retry logic for database operations, which could be beneficial for transient PostgreSQL/Cloud SQL connection issues.
 
-The backend error handling implementation is more comprehensive than what the prompt describes. The `AppError` class, `asyncHandler` wrapper, and global `errorHandler` are all present and well-structured. The implementation goes beyond the prompt by handling Prisma-specific errors and payload-too-large errors, and includes a dedicated 404 handler for unmatched routes. All route files consistently use `asyncHandler` and `AppError`.
+### 5. Is there error monitoring?
+**No external monitoring is configured.** Both the frontend error boundary and backend error handler log to console/stdout only. The error boundary's TODO comment explicitly lists Sentry, PostHog error tracking, and LogRocket as planned integrations.
 
-Two notable gaps exist:
-1. The `success: false` field is inconsistently included in error responses (most branches omit it).
-2. The entire frontend error handling layer (ErrorContext, error boundary, API error class) does not exist yet -- no frontend source files were found.
+## Issues
+
+1. **Inconsistent response format**: AppError responses omit the `success` field, while PayloadTooLarge includes `success: false`. The `responseHelpers.ts` uses `{ success: true, data }` for success responses, but error responses don't consistently include `success: false`.
+2. **No external error monitoring**: All errors go to stdout/console only. No Sentry, Cloud Error Reporting, or similar service is configured.
+3. **Frontend error boundary lacks reporting**: The TODO in `error.tsx` (line 22-23) indicates error tracking integration is planned but not implemented.
+4. **Missing Prisma error codes**: Only P2002 and P2025 are handled; other common Prisma errors (P2003 foreign key, P2010 raw query, P2024 timeout) fall through to the generic 500 handler.
+5. **No request timeout handling**: No explicit request timeout middleware for long-running database queries.
 
 ## Recommendations
 
-1. **Add `success: false` to all error response branches** in `errorHandler.ts`. Currently only the `PayloadTooLargeError` branch and the admin auth middleware include it. For API consumer consistency, all error responses should include `success: false` at the top level.
-
-2. **Add default error codes to factory methods.** `AppError.badRequest("msg")` should default to `code: 'BAD_REQUEST'` rather than `undefined`. This ensures error responses always have a meaningful `code` field without requiring callers to remember to pass one.
-
-3. **Build the frontend error handling layer.** The four files referenced by the prompt (`errorUtils.ts`, `ErrorContext.tsx`, `error.tsx`, `api.ts`) do not exist. When the frontend is implemented, these should be created to provide consistent error display, an error boundary for React crashes, and a typed API client with error handling.
-
-4. **Document the additional error codes** (`ROUTE_NOT_FOUND`, `DUPLICATE_ENTRY`, `PAYLOAD_TOO_LARGE`, `ADMIN_NOT_CONFIGURED`) in the prompt's error codes table so API consumers have a complete reference.
-
-5. **Consider adding external error monitoring** (Sentry or Google Cloud Error Reporting) as noted in the prompt's own unchecked items. The structured logging via `logger.error()` is a good foundation, but a dedicated service would provide alerting, deduplication, and trend analysis.
-
-6. **Verify CAPTCHA error codes.** The prompt lists `CAPTCHA_REQUIRED` and `CAPTCHA_FAILED` but these were not found in `errorHandler.ts`. Confirm these are handled in the captcha middleware (`verifyCaptcha`) and that they follow the same response format.
+1. **Standardize error response format**: Always include `success: false` in error responses to match the `success: true` pattern in success responses. This makes client-side error detection consistent.
+2. **Add Sentry or Cloud Error Reporting**: Integrate an error monitoring service for both frontend and backend. PostHog could also capture errors via `posthog.capture('$exception', ...)`.
+3. **Handle additional Prisma errors**: Add handlers for P2003 (foreign key), P2024 (timeout), and connection errors.
+4. **Add request timeout middleware**: Implement a timeout for database-heavy requests (e.g., admin cleanup, confidence recalculation) to prevent hanging connections.
+5. **Add error event tracking to PostHog**: Since PostHog is already integrated, capture error events (without PII) for monitoring application health alongside usage analytics.

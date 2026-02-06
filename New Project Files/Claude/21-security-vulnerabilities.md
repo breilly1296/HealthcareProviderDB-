@@ -1,8 +1,7 @@
 # VerifyMyProvider Security Vulnerabilities
 
-**Last Updated:** 2026-02-05
-**Generated From:** prompts/21-security-vulnerabilities.md
-**Last Audit:** January 2026 by ZeroPath (automated scan) + manual code review
+**Last Updated:** 2026-02-06
+**Last Audit:** January 2026 by ZeroPath + Manual Code Review
 
 ---
 
@@ -10,18 +9,18 @@
 
 | Severity | Open | In Progress | Fixed |
 |----------|------|-------------|-------|
-| Critical | 0    | 0           | 1     |
-| High     | 0    | 0           | 1     |
-| Medium   | 0    | 0           | 2     |
-| Low      | 0    | 0           | 0     |
+| Critical | 0 | 0 | 1 |
+| High | 0 | 0 | 1 |
+| Medium | 0 | 0 | 2 |
+| Low | 0 | 0 | 0 |
 
-**Overall Status:** All known vulnerabilities from the January 2026 ZeroPath audit have been resolved. No new open vulnerabilities identified in the current codebase review.
+**All known vulnerabilities are resolved as of February 2026.**
 
 ---
 
 ## Open Vulnerabilities
 
-None. All identified vulnerabilities have been fixed as of January 2026.
+None. All identified vulnerabilities have been fixed.
 
 ---
 
@@ -37,39 +36,20 @@ None.
 
 **Fixed:** January 2026
 **Severity:** Medium (CVSS 7.1)
-**Found:** ZeroPath scan
+**Found:** ZeroPath automated scan
 
-**Description:** No rate limiting existed on verification and vote endpoints, allowing unlimited automated spam. An attacker could submit unlimited verifications and votes, poisoning crowdsourced confidence scores and destroying the integrity of the verification system.
+**Description:** No rate limiting existed on verification endpoints (`POST /api/v1/verify` and `POST /api/v1/verify/:id/vote`), allowing unlimited spam submissions that could poison crowdsourced data and manipulate confidence scores.
 
-**Exploit Scenario:**
-1. Attacker identifies `POST /api/v1/verify` and `POST /api/v1/verify/:id/vote` endpoints
-2. Automated script submits thousands of fake verifications per minute
-3. Confidence scores are manipulated to show incorrect insurance acceptance data
-4. Database fills with spam records, degrading search quality
-
-**Fix:** Multi-layered defense implemented:
-
-- **Rate Limiting (Layer 1):** IP-based sliding window rate limiting added via `rateLimiter.ts`
-  - Verification submissions: 10 requests/hour per IP
-  - Vote submissions: 10 requests/hour per IP
-  - Search: 100 requests/hour per IP
-  - Default API: 200 requests/hour per IP
-  - Dual-mode: Redis (distributed) or in-memory (single-instance)
-  - Fail-open behavior prioritizes availability
-
-- **CAPTCHA (Layer 2):** Google reCAPTCHA v3 integration via `captcha.ts`
-  - Score threshold: 0.5 (configurable via `CAPTCHA_MIN_SCORE`)
-  - Configurable fail mode: `CAPTCHA_FAIL_MODE=open|closed`
-  - Fallback rate limiting when Google API unavailable (3 requests/hour vs normal 10)
-  - Skipped in development/test environments
+**Fix:** Added comprehensive multi-layer protection:
+1. **IP-based rate limiting** via sliding window algorithm (10/hour for verify, 10/hour for vote, 100/hour for search, 200/hour for general)
+2. **Dual-mode implementation** - Redis for distributed deployments, in-memory fallback for single-instance
+3. **Fail-open behavior** when Redis is unavailable, with degraded headers logged
 
 **Files changed:**
-- Added: `packages/backend/src/middleware/rateLimiter.ts`
-- Added: `packages/backend/src/middleware/captcha.ts`
-- Modified: `packages/backend/src/routes/verify.ts` (rate limiters + CAPTCHA applied to POST routes)
-- Added: `packages/backend/src/config/constants.ts` (security-related constants)
+- Added: `packages/backend/src/middleware/rateLimiter.ts` (368 lines, sliding window algorithm)
+- Modified: `packages/backend/src/routes/verify.ts` (rate limiters applied to all endpoints)
 
-**Verification:** Rate limit headers are returned on all responses (`X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`). Exceeding the limit returns HTTP 429 with `Retry-After` header.
+**Verification:** Rate limit headers (`X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`) are returned on every response. 429 status returned when limit exceeded.
 
 ---
 
@@ -77,23 +57,27 @@ None.
 
 **Fixed:** January 2026
 **Severity:** Critical (CVSS 9.2)
-**Found:** ZeroPath scan
+**Found:** ZeroPath automated scan
 
-**Description:** Provider acceptance status could be changed by a single verification submission without meeting the required consensus threshold. This allowed a single user to flip a provider's insurance acceptance status.
+**Description:** Provider acceptance status could be changed without meeting the minimum verification threshold, allowing a single malicious verification to flip a provider's acceptance status.
 
-**Exploit Scenario:**
-1. Attacker submits a single false verification claiming a provider does/does not accept insurance
-2. Without threshold checks, the provider's acceptance status immediately changes
-3. Users see incorrect insurance acceptance data
-
-**Fix:** Consensus threshold enforcement implemented in `verificationService.ts`:
-- Minimum of 3 verifications required before any status change (`MIN_VERIFICATIONS_FOR_CONSENSUS = 3`)
-- Minimum confidence score of 60 required for status change (`MIN_CONFIDENCE_FOR_STATUS_CHANGE = 60`)
-- Consensus counting considers only non-expired verifications (6-month TTL)
+**Fix:** Added consensus requirements before status changes in `determineAcceptanceStatus()`:
+- Minimum 3 verifications required (`MIN_VERIFICATIONS_FOR_CONSENSUS = 3`)
+- Minimum 60 confidence score required (`MIN_CONFIDENCE_FOR_STATUS_CHANGE = 60`)
+- Clear 2:1 majority ratio required (`hasClearMajority` check)
+- New records start as `PENDING` until consensus is reached
 
 **Files changed:**
-- `packages/backend/src/services/verificationService.ts`
-- `packages/backend/src/config/constants.ts`
+- `packages/backend/src/services/verificationService.ts` - lines 163-185, `determineAcceptanceStatus()` function
+- `packages/backend/src/config/constants.ts` - threshold constants defined
+
+**Code snippet (fix):**
+```typescript
+const shouldUpdateStatus =
+  verificationCount >= MIN_VERIFICATIONS_FOR_CONSENSUS &&
+  confidenceScore >= MIN_CONFIDENCE_FOR_STATUS_CHANGE &&
+  hasClearMajority;
+```
 
 ---
 
@@ -103,12 +87,24 @@ None.
 **Severity:** Medium
 **Found:** Manual code review
 
-**Description:** Public verification API responses included personally identifiable information (PII) fields such as submitter email addresses and source IP addresses that should not be exposed to end users.
+**Description:** Public API responses for verification queries included PII fields (`sourceIp`, `userAgent`, `submittedBy`) that should not be exposed to end users.
 
-**Fix:** PII fields (`sourceIp`, `submittedBy`, `userAgent`) excluded from public-facing API response objects in verification service. Only non-PII fields (verification ID, votes, timestamps) are returned.
+**Fix:** Implemented PII stripping at two levels:
+1. **`stripVerificationPII()` function** in `verificationService.ts` (line 307-310) - strips `sourceIp`, `userAgent`, `submittedBy` from verification objects before returning
+2. **Prisma `select` clauses** in `getRecentVerifications()` and `getVerificationsForPair()` - explicitly exclude PII columns at the query level
 
 **Files changed:**
-- `packages/backend/src/services/verificationService.ts`
+- `packages/backend/src/services/verificationService.ts` - `stripVerificationPII()` helper, plus explicit `select` clauses on lines 632-666 and 716-734
+
+**Code snippet (fix):**
+```typescript
+function stripVerificationPII<T extends Record<string, unknown>>(
+  verification: T
+): Omit<T, 'sourceIp' | 'userAgent' | 'submittedBy'> {
+  const { sourceIp, userAgent, submittedBy, ...safe } = verification;
+  return safe;
+}
+```
 
 ---
 
@@ -118,126 +114,34 @@ None.
 **Severity:** High
 **Found:** Manual code review
 
-**Description:** A legacy verification endpoint at `src/api/routes.ts` existed without any security controls (no rate limiting, no CAPTCHA, no input validation). This endpoint predated the security overhaul and provided an unprotected path to the verification system.
+**Description:** A legacy verification endpoint at `src/api/routes.ts` lacked all security controls (no rate limiting, no input validation, no CAPTCHA, no Sybil prevention). This was the original route file before the security hardening of the `routes/verify.ts` replacement.
 
-**Fix:** Legacy endpoint removed entirely. All verification traffic now goes through the secured `packages/backend/src/routes/verify.ts` with full middleware stack.
+**Fix:** Removed the legacy endpoint entirely. All verification traffic now goes through `packages/backend/src/routes/verify.ts` which has full security controls.
 
 **Files changed:**
 - Removed: `src/api/routes.ts`
-- Modified: `src/index.ts` (removed legacy route registration)
+- Verified: `packages/backend/src/routes/index.ts` only references the secured routes
 
 ---
 
-## Current Security Posture
+## npm audit Results
 
-### Security Middleware Stack (Applied in Order)
+**Last Run:** 2026-02-06 (analysis of package.json)
 
-Based on analysis of `packages/backend/src/index.ts`:
-
-| Layer | Middleware | Purpose | File |
-|-------|-----------|---------|------|
-| 1 | Request ID | Log correlation for incident investigation | `middleware/requestId.ts` |
-| 2 | HTTP Logger | Structured request logging via pino | `middleware/httpLogger.ts` |
-| 3 | Helmet | Security headers (CSP, COEP, COOP, CORP, Referrer-Policy) | `index.ts` |
-| 4 | CORS | Origin allowlist (production domains only) | `index.ts` |
-| 5 | Body Parser | 100KB payload size limit | `index.ts` |
-| 6 | Rate Limiter | 200 req/hour default, stricter for write endpoints | `middleware/rateLimiter.ts` |
-| 7 | CAPTCHA | reCAPTCHA v3 on verification/vote endpoints | `middleware/captcha.ts` |
-| 8 | Zod Validation | Input schema validation on all routes | Route files |
-| 9 | Error Handler | Sanitized error responses (no stack traces in production) | `middleware/errorHandler.ts` |
-
-### Helmet Security Headers
-
-The backend is configured with strict Content Security Policy for a JSON-only API:
-
-```
-default-src: 'none'
-script-src: 'none'
-style-src: 'none'
-frame-ancestors: 'none'
-form-action: 'none'
-upgrade-insecure-requests: enabled
-cross-origin-embedder-policy: true
-cross-origin-opener-policy: same-origin
-cross-origin-resource-policy: same-origin
-referrer-policy: no-referrer
-```
-
-### CORS Configuration
-
-- **Production origins:** `verifymyprovider.com`, `www.verifymyprovider.com`, Cloud Run frontend URL
-- **Development:** `localhost:3000`, `localhost:3001` added only when `NODE_ENV=development`
-- **Blocked origins:** Logged with `CORS blocked request from origin` warning
-- **Allowed headers:** `Content-Type`, `Authorization`, `X-Request-ID`, `X-Admin-Secret`
-
-### Admin Endpoint Security
-
-File: `packages/backend/src/routes/admin.ts`
-
-- **Authentication:** `X-Admin-Secret` header validated using `crypto.timingSafeEqual()` to prevent timing attacks
-- **Graceful degradation:** Returns 503 if `ADMIN_SECRET` env var not configured (endpoints disabled)
-- **Buffer length check:** Handles unequal-length buffers before `timingSafeEqual` (which requires equal lengths)
-- **All admin routes** (`/cleanup-expired`, `/expiration-stats`, `/health`, `/cache/clear`, `/cache/stats`, `/cleanup/sync-logs`, `/retention/stats`) are protected by `adminAuthMiddleware`
-
-### Sybil Attack Prevention (4 Layers)
-
-File: `packages/backend/src/services/verificationService.ts`
-
-1. **IP-based deduplication:** Same IP cannot submit multiple verifications for the same provider-plan pair within 30 days
-2. **Email-based deduplication:** Same email cannot submit duplicates within 30 days
-3. **Rate limiting:** Max 10 verification submissions per hour per IP
-4. **CAPTCHA:** reCAPTCHA v3 bot detection with score threshold
-
-### Error Handling Security
-
-File: `packages/backend/src/middleware/errorHandler.ts`
-
-- **Production mode:** Generic "Internal server error" message returned for unhandled errors (no stack traces, no internal details)
-- **Development mode:** Full error messages returned for debugging
-- **Typed error handling:** Separate handlers for `AppError`, `ZodError`, `PayloadTooLargeError`, `PrismaClientKnownRequestError`
-- **Request IDs:** Included in all error responses for log correlation
-
----
-
-## Security Scan Results
-
-### Hardcoded Secrets Scan
-
-**Scan Date:** 2026-02-05
-**Method:** Pattern search for `sk-ant`, `password=`, hardcoded API keys
-
-**Result:** No hardcoded secrets found in `packages/backend/src/`.
-
-All secrets are loaded from environment variables:
-- `ADMIN_SECRET` (admin authentication)
-- `RECAPTCHA_SECRET_KEY` (CAPTCHA verification)
-- `DATABASE_URL` (database connection)
-- `REDIS_URL` (rate limiter backend)
-- `FRONTEND_URL` (CORS origin)
-
-### Sensitive Data Logging Scan
-
-**Scan Date:** 2026-02-05
-**Method:** Pattern search for `console.log` with password/token/secret
-
-**Result:** No sensitive data logging found. The codebase uses structured pino logging (`logger.info/warn/error`) instead of `console.log`, and no patterns were found that log passwords, tokens, or secrets.
-
-### Security TODO Scan
-
-**Scan Date:** 2026-02-05
-**Method:** Pattern search for `TODO.*security` and `FIXME.*security`
-
-**Result:** No open security TODOs found in `packages/backend/src/`.
-
----
-
-## npm Audit Results
-
-**Last Run:** Manual (run `cd packages/backend && npm audit` for current results)
+**Backend Dependencies (production):**
+- `express@^4.18.2` - Well-maintained, check for latest patches
+- `helmet@^7.1.0` - Security headers middleware
+- `cors@^2.8.5` - CORS handling
+- `zod@^3.22.4` - Input validation
+- `@prisma/client@^5.22.0` - ORM
+- `ioredis@^5.9.2` - Redis client
+- `pino@^10.3.0` - Structured logging
+- `dotenv@^16.3.1` - Environment loading
 
 **Action Items:**
-- [ ] Run `npm audit` as part of CI/CD pipeline
-- [ ] Address any critical/high severity findings
+- [ ] Run `npm audit` in CI pipeline to catch new CVEs automatically
+- [ ] The `security-scan.yml` GitHub Action runs Gitleaks for secret detection on every push/PR
+- [ ] Consider adding `npm audit --audit-level=high` as a CI gate
 
 ---
 
@@ -251,43 +155,69 @@ All secrets are loaded from environment variables:
 
 ## Accepted Risks
 
-| Vulnerability | Severity | Rationale | Mitigation |
-|---------------|----------|-----------|------------|
-| Rate limiter fail-open behavior | Low | Availability prioritized over strict rate limiting when Redis unavailable | Warning logged, `X-RateLimit-Status: degraded` header set. In-memory fallback for single-instance deployments. |
-| CAPTCHA fail-open (default mode) | Low | Users should not be blocked during Google API outages | Fallback rate limiting (3 req/hour vs normal 10), `X-Security-Degraded` header set, configurable to `CAPTCHA_FAIL_MODE=closed` for higher security |
-| No-origin CORS requests allowed | Low | Mobile apps, curl, and monitoring tools send requests without Origin header | Rate limiting still applies; all authenticated admin routes require `X-Admin-Secret` |
-| Admin auth via shared secret (not user accounts) | Medium | Pre-launch product; user account system not yet built | Timing-safe comparison, secret from environment variable, endpoints return 503 if not configured |
+| Vulnerability | Severity | Accepted By | Mitigation |
+|---------------|----------|-------------|------------|
+| CAPTCHA fail-open default | Low | Architecture decision | Fallback rate limit of 3 req/hour applied when Google API unavailable; `X-Security-Degraded` header set for monitoring |
+| Rate limiter fail-open on Redis failure | Low | Architecture decision | Availability prioritized over strict limiting; `X-RateLimit-Status: degraded` header logged for monitoring |
+| No user authentication for public API | Medium | Product decision | Public data only (no PHI); rate limiting + CAPTCHA + honeypot + Sybil prevention provide layered defense |
+| IP addresses stored in DB for anti-abuse | Low | Privacy trade-off | Required for Sybil prevention (30-day dedup window); not exposed in API responses |
 
 ---
 
 ## Security Improvements Made
 
 **January 2026:**
-- Added IP-based sliding window rate limiting (Redis + in-memory dual-mode)
-- Added Google reCAPTCHA v3 integration with configurable fail mode
-- Added Sybil attack prevention (IP + email deduplication with 30-day window)
-- Added verification consensus thresholds (min 3 verifications + min 60 confidence score)
-- Removed PII from public API responses
-- Removed legacy unprotected verification endpoint
-- Added Helmet with strict CSP for JSON API
-- Added CORS origin allowlist
-- Added timing-safe admin secret comparison
-- Added body parser size limits (100KB)
-- Added structured logging with request ID correlation
-- Added `trust proxy` for correct client IP behind Cloud Run load balancer
-- Added graceful shutdown with timeout protection
+- Rate limiting middleware added (dual-mode Redis/in-memory, 4 tiers)
+- CAPTCHA integration (reCAPTCHA v3, fail-open with fallback rate limiting)
+- Honeypot middleware for bot detection (silent 200 response to not alert bots)
+- Sybil attack prevention (IP dedup + email dedup + 30-day window)
+- Verification threshold enforcement (3 verifications + 60 confidence + 2:1 majority)
+- PII stripped from public API responses
+- Legacy vulnerable endpoint removed
+- Timing-safe comparison for admin secret (`timingSafeEqual` in `admin.ts`)
+- Helmet.js with strict CSP for JSON API
+- CORS whitelist (only verifymyprovider.com and Cloud Run URLs)
+- Request body size limits (100kb via `express.json({ limit: '100kb' })`)
+- Zod input validation on all endpoints
+- Structured logging with pino (PII-free request logs)
+- Request ID middleware for log correlation
+- Gitleaks GitHub Action for secret scanning
+
+**February 2026:**
+- `security-scan.yml` CI workflow running on every push/PR
+- DataQualityAudit model added for tracking data integrity
 
 ---
 
-## Recommendations for Next Security Audit
+## Current Security Architecture
 
-**Scheduled:** Before public beta launch
-**Tool:** ZeroPath (re-scan) + manual penetration testing
+```
+Request Flow:
+  Client -> CORS Check -> Helmet (CSP) -> Request ID -> Body Size Limit
+    -> Rate Limiter (4 tiers) -> Honeypot Check -> CAPTCHA (reCAPTCHA v3)
+      -> Zod Validation -> Route Handler -> Sybil Check -> DB
+        -> PII Strip -> Response
+```
+
+**Layers of defense on write endpoints (verify/vote):**
+1. CORS whitelist
+2. Body size limit (100kb)
+3. IP-based rate limiting (10/hour)
+4. Honeypot field check
+5. reCAPTCHA v3 score check (>= 0.5)
+6. Zod schema validation
+7. Sybil prevention (IP + email dedup, 30-day window)
+8. Consensus threshold (3 verifications, 60 confidence, 2:1 majority)
+
+---
+
+## Next Security Audit
+
+**Scheduled:** Before beta launch
+**Recommended Tool:** External penetration test or repeat ZeroPath scan
 **Focus Areas:**
-1. **Authentication system:** When user accounts are added, review session management, password hashing, and token handling
-2. **CAPTCHA effectiveness:** Monitor reCAPTCHA v3 score distribution to tune threshold
-3. **Rate limit effectiveness:** Review rate limit windows/thresholds based on actual traffic patterns
-4. **Dependency audit:** Run `npm audit` in CI/CD and address any new findings
-5. **SQL injection:** Verify all Prisma queries use parameterized inputs (currently enforced by Prisma ORM)
-6. **CORS policy review:** Ensure no new origins need to be added/removed as deployment changes
-7. **Redis security:** If Redis is deployed in production, ensure TLS and authentication are configured
+- Verify rate limiting effectiveness under load
+- Test CAPTCHA bypass scenarios
+- Review admin secret rotation
+- Evaluate need for CSRF protection (currently not needed - no auth cookies)
+- Consider automated SAST/DAST in CI pipeline

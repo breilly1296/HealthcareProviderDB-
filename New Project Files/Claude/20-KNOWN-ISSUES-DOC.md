@@ -1,445 +1,418 @@
 # VerifyMyProvider Known Issues
 
-**Last Updated:** 2026-02-05
-**Generated From:** prompts/20-known-issues-doc.md
+**Last Updated:** 2026-02-06
 
 ---
 
-## Severity Definitions
+## Issue Summary
 
-| Severity | Definition |
-|---|---|
-| **Critical** | Feature is broken or a security vulnerability exists that requires immediate attention |
-| **High** | Significant functionality is missing or degraded; impacts users or operations |
-| **Medium** | Feature limitation or inconvenience; workaround available |
-| **Low** | Minor issue or cosmetic; does not affect core functionality |
+| # | Category | Severity | Status | Issue |
+|---|----------|----------|--------|-------|
+| 1 | Architecture | Low | RESOLVED | Locations route disabled |
+| 2 | Architecture | Low | Open | Location enrichment admin endpoints disabled |
+| 3 | Architecture | Medium | RESOLVED | No staging environment |
+| 4 | Development | Medium | Mitigated | Next.js SWC on Windows ARM64 |
+| 5 | Development | Low | Mitigated | OneDrive + node_modules corruption |
+| 6 | Development | Medium | Documented | npm workspace hoisting conflicts |
+| 7 | Data | High | Open | NPI data partially imported (6/50 states) |
+| 8 | Data | Medium | Open | City name quality issues |
+| 9 | Data | Medium | Open | Provider addresses stale |
+| 10 | Security | Medium | Open | No automated secret scanning |
+| 11 | Security | Medium | Open | No Cloud Armor / DDoS protection |
+| 12 | Security | Low | Open | `.env.example` incomplete |
+| 13 | Frontend | Low | Open | No offline support |
+| 14 | Frontend | Medium | Open | No full accessibility audit |
+| 15 | Operations | Medium | Open | No automated confidence score recalculation |
+| 16 | Operations | Low | Open | No uptime monitoring or alerting |
+| 17 | API | Low | Open | Rate limiter response format inconsistency |
 
 ---
 
-## Table of Contents
+## Architecture Issues
 
-1. [Architecture Issues](#1-architecture-issues)
-2. [Development Environment Issues](#2-development-environment-issues)
-3. [Data Quality Issues](#3-data-quality-issues)
-4. [Security Issues](#4-security-issues)
-5. [Frontend Issues](#5-frontend-issues)
-6. [Configuration Issues](#6-configuration-issues)
+### 1. ~~Locations Route Disabled~~ -- RESOLVED
 
----
+**Status:** RESOLVED
 
-## 1. Architecture Issues
-
-### ISSUE-001: Locations Route Disabled
-
-| Field | Value |
-|---|---|
-| **Severity** | High |
-| **Category** | Architecture |
-| **Status** | Open |
-| **Impact** | The `/api/v1/locations/*` endpoints are completely non-functional. Any frontend pages that depend on location-specific data routing return 404 from the backend. |
-
-**Description:**
-The locations router is commented out in `packages/backend/src/routes/index.ts`:
+**Evidence:** The `routes/index.ts` file at `C:\Users\breil\OneDrive\Desktop\HealthcareProviderDB\packages\backend\src\routes\index.ts` confirms all routes are registered and active:
 
 ```typescript
-// TODO: locations route depends on old Location model - needs rewrite for practice_locations
-// import locationsRouter from './locations';
-// ...
-// router.use('/locations', locationsRouter);
+router.use('/providers', providersRouter);
+router.use('/plans', plansRouter);
+router.use('/verify', verifyRouter);
+router.use('/locations', locationsRouter);  // ACTIVE
+router.use('/admin', adminRouter);
 ```
 
-The old `Location` model was replaced by the `practice_locations` table, but the `routes/locations.ts` file has not been updated to use the new schema.
-
-**Affected Files:**
-- `packages/backend/src/routes/index.ts` (lines 5-6, 14)
-
-**Workaround:**
-Provider location data is accessible through the provider detail endpoints (`/api/v1/providers/:npi`), which include associated practice locations from the `practice_locations` table.
-
-**Resolution Required:**
-Rewrite `routes/locations.ts` to query the `practice_locations` table instead of the removed `Location` model, then re-enable the import and router registration in `routes/index.ts`.
+The locations router (`routes/locations.ts`) defines 5 working endpoints using the `practice_locations` table (not the old Location model). The frontend location page exists at `packages/frontend/src/app/location/[locationId]/page.tsx` and connects to these API endpoints.
 
 ---
 
-### ISSUE-002: Location Enrichment Admin Endpoints Disabled
+### 2. Location Enrichment Admin Endpoints Disabled
 
-| Field | Value |
-|---|---|
-| **Severity** | Medium |
-| **Category** | Architecture |
-| **Status** | Open |
-| **Impact** | Administrators cannot trigger location name enrichment via the admin API. Location data quality improvements must be done via direct database operations. |
+**Status:** Open
+**Severity:** Low
+**Category:** Architecture
 
-**Description:**
-The location enrichment service imports and admin endpoints are commented out in `packages/backend/src/routes/admin.ts`:
+**Description:** Admin endpoints for location enrichment are not fully implemented in `admin.ts`. The `getEnrichmentStats` endpoint exists and works (line 245-256 of admin.ts), but there are no admin endpoints for triggering location enrichment operations (e.g., geocoding, facility matching).
 
-```typescript
-// TODO: locationEnrichment depends on old Location model - re-enable when practice_locations rewrite is done
-// import { enrichLocationNames, getEnrichmentStats } from '../services/locationEnrichment';
+**Impact:** Location data relies entirely on what is imported from NPI CSV files. No automated enrichment of location data with additional sources.
+
+**Workaround:** None needed for MVP. Location data from NPI imports provides addresses and basic provider counts.
+
+**Source File:** `C:\Users\breil\OneDrive\Desktop\HealthcareProviderDB\packages\backend\src\routes\admin.ts`
+
+---
+
+### 3. ~~No Staging Environment~~ -- RESOLVED
+
+**Status:** RESOLVED
+
+**Evidence:** Staging pipeline exists at `.github/workflows/deploy-staging.yml`. Triggers on pushes to the `staging` branch. Deploys to Cloud Run services with `-staging` suffix and max 2 instances (vs 10 in production). Uses the same Cloud SQL instance (shared database).
+
+**Source File:** `C:\Users\breil\OneDrive\Desktop\HealthcareProviderDB\.github\workflows\deploy-staging.yml`
+
+---
+
+## Development Issues
+
+### 4. Next.js SWC on Windows ARM64
+
+**Status:** Mitigated (automated workaround in place)
+**Severity:** Medium
+**Category:** Development
+
+**Description:** Native SWC binaries for Next.js 14.x are incompatible with Node.js v24+ on Windows ARM64. The error "not a valid Win32 application" occurs because Next.js 14.x only auto-enables WASM fallback for a hardcoded list of platforms, and `win32-arm64` is not included.
+
+**Workaround:** Postinstall script at `packages/frontend/scripts/patch-next-swc.js` automatically patches `next/dist/build/swc/index.js` to:
+1. Add `"aarch64-pc-windows-msvc"` to `knownDefaultWasmFallbackTriples`
+2. Remove the `useWasmBinary` gate so unsupported platforms auto-fallback to WASM
+
+The script checks both the local workspace `node_modules` and the hoisted root `node_modules` location.
+
+**Permanent Fix:** Upgrade to Next.js 15+ when ARM64 Windows support is native, or wait for the Next.js team to add `win32-arm64` to the WASM fallback list.
+
+**Source File:** `C:\Users\breil\OneDrive\Desktop\HealthcareProviderDB\packages\frontend\scripts\patch-next-swc.js`
+
+---
+
+### 5. OneDrive + node_modules Corruption
+
+**Status:** Mitigated
+**Severity:** Low
+**Category:** Development
+
+**Description:** OneDrive file sync can corrupt native `.node` binary modules when syncing the `node_modules` directory. This affects any native binary module, not just SWC.
+
+**Workaround:** WASM fallbacks are more reliable than native binaries on OneDrive-synced projects. The SWC WASM patch (issue #4) addresses the most critical case.
+
+**Permanent Fix:** Either exclude `node_modules` from OneDrive sync or move the project directory outside of OneDrive-synced folders.
+
+---
+
+### 6. npm Workspace Hoisting Conflicts
+
+**Status:** Documented (requires developer awareness)
+**Severity:** Medium
+**Category:** Development
+
+**Description:** `next` must NOT be in the root `package.json`. If placed at root, npm hoists it and overrides the frontend workspace version, causing SWC version mismatches and build failures.
+
+**Rule:** Only shared dependencies belong at root (`@prisma/client`, `csv-parse`, `pg`). Package-specific dependencies (`next`, `react`, `express`, etc.) must stay in their respective `packages/*/package.json` files.
+
+**Detection:** If you see unexpected version numbers for `next` in `node_modules/.package-lock.json` or build errors mentioning SWC version mismatches, check the root `package.json` for accidental `next` dependency.
+
+---
+
+## Data Issues
+
+### 7. NPI Data Partially Imported
+
+**Status:** Open
+**Severity:** High (blocks national coverage)
+**Category:** Data
+
+**Description:** Only 6 of 50 states have been imported from the NPPES bulk download:
+
+| State | Providers | Status |
+|-------|-----------|--------|
+| FL | 613,875 | Imported |
+| CA | 1,113,464 | Imported |
+| AZ | 167,899 | Imported |
+| AL | 90,572 | Imported |
+| AR | 82,527 | Imported |
+| AK | 34,701 | Imported |
+| **Total** | **~2,103,038** | |
+
+**Remaining:** 44 states + DC + territories (~7M additional providers estimated). Estimated import time: ~70 hours.
+
+**Impact:** The platform only has provider data for 6 states. Users searching for providers in non-imported states will find no results.
+
+**Next Steps:** Complete remaining state imports using `scripts/import-npi-direct.ts`. Each state requires a state-specific CSV file from the NPPES Data Dissemination.
+
+**Source:** `C:\Users\breil\OneDrive\Desktop\HealthcareProviderDB\scripts\import-npi-direct.ts`
+
+---
+
+### 8. City Name Quality
+
+**Status:** Open
+**Severity:** Medium
+**Category:** Data
+
+**Description:** NPI data contains inconsistent city names including:
+- Typos: "Birmingam" vs "Birmingham"
+- Trailing state codes: "Birmingham,al"
+- Trailing punctuation
+- Neighborhood names used as city names: "Brooklyn" instead of "New York"
+- Multiple spaces, mixed case
+
+**Impact:** City dropdown filters may show duplicate or incorrect entries. Search results may miss providers due to city name variations.
+
+**Workaround:** A comprehensive normalization script exists at `scripts/normalize-city-names.ts` covering 6 major metros (NYC, LA, Chicago, Houston, Phoenix, Philadelphia) with hundreds of neighborhood-to-city mappings and common typo corrections. Supports dry run mode, state-specific filtering, and transactional application.
+
+**Next Steps:** Run normalization script for already-imported states, then expand coverage as more states are imported.
+
+**Source:** `C:\Users\breil\OneDrive\Desktop\HealthcareProviderDB\scripts\normalize-city-names.ts`
+
+---
+
+### 9. Provider Addresses Stale
+
+**Status:** Open (inherent to NPI data)
+**Severity:** Medium
+**Category:** Data
+
+**Description:** NPI data is self-reported by providers and rarely updated. Providers frequently list outdated practice addresses. Testing confirmed specific cases where a provider showed an old address in the NPI data.
+
+**Impact:** Users may encounter incorrect addresses when looking up providers. Organization linking by address is unreliable (skipped for MVP).
+
+**Mitigation:**
+- The platform displays a disclaimer about data accuracy
+- "Always call to confirm" messaging is part of the product strategy
+- Future: FHIR API enrichment can provide more current address data
+- The confidence scoring system accounts for data freshness via the recency factor
+
+---
+
+## Security Issues
+
+### 10. No Automated Secret Scanning
+
+**Status:** Open
+**Severity:** Medium
+**Category:** Security
+
+**Description:** No gitleaks, truffleHog, or similar secret scanning tool is integrated into the CI pipeline. Secrets could accidentally be committed to the repository.
+
+**Current Protections:**
+- `.env` files are in `.gitignore`
+- Secrets are stored in Google Secret Manager for production
+- ADMIN_SECRET uses timing-safe comparison
+
+**Recommendation:** Add gitleaks to the GitHub Actions CI pipeline. Example:
+```yaml
+- name: Scan for secrets
+  uses: gitleaks/gitleaks-action@v2
 ```
 
-The entire "Location Enrichment Endpoints" section (lines 235-238) is disabled with a TODO comment.
+---
 
-**Affected Files:**
-- `packages/backend/src/routes/admin.ts` (lines 6-7, 235-238)
+### 11. No Cloud Armor / DDoS Protection
 
-**Workaround:**
-None via the API. Direct database queries or scripts are required for location data enrichment.
+**Status:** Open
+**Severity:** Medium
+**Category:** Security
 
-**Resolution Required:**
-Update the `locationEnrichment` service to work with `practice_locations` instead of the old `Location` model, then re-enable the imports and endpoints.
+**Description:** Cloud Run services are publicly accessible without a Web Application Firewall (WAF). While rate limiting is implemented at the application level, there is no infrastructure-level DDoS protection.
+
+**Current Protections:**
+- Application-level rate limiting (IP-based, dual-mode Redis/in-memory)
+- reCAPTCHA v3 on write endpoints
+- Honeypot bot detection
+- 100KB request body size limit
+- Helmet security headers
+
+**Recommendation:** Enable Google Cloud Armor in front of Cloud Run services when traffic increases or before public launch. Cloud Armor provides DDoS protection, IP allowlisting/blocklisting, and geographic restrictions.
 
 ---
 
-### ISSUE-003: No Staging Environment
+### 12. `.env.example` Incomplete
 
-| Field | Value |
-|---|---|
-| **Severity** | High |
-| **Category** | Architecture / DevOps |
-| **Status** | Open |
-| **Impact** | All changes merged to `main` deploy directly to production. There is no pre-production environment for testing, which increases the risk of production incidents. |
+**Status:** Open
+**Severity:** Low
+**Category:** Security / Developer Experience
 
-**Description:**
-The CI/CD pipeline (`.github/workflows/deploy.yml`) triggers on every push to `main` and deploys directly to the production Cloud Run services (`verifymyprovider-backend` and `verifymyprovider-frontend`). There is no `staging` branch, no staging Cloud Run services, and no approval gate before production deployment.
+**Description:** The `.env.example` file (if it exists) is missing documentation for several environment variables:
+- `RECAPTCHA_SECRET_KEY` -- reCAPTCHA v3 secret
+- `CAPTCHA_FAIL_MODE` -- open/closed
+- `ADMIN_SECRET` -- Admin endpoint authentication
+- `REDIS_URL` -- Distributed rate limiting
+- `ANTHROPIC_API_KEY` -- Insurance card OCR (frontend)
+- `NEXT_PUBLIC_POSTHOG_KEY` -- PostHog analytics (frontend)
+- `FRONTEND_URL` -- CORS configuration
 
-**Affected Files:**
-- `.github/workflows/deploy.yml`
+**Impact:** New developers may not configure all required environment variables, leading to degraded functionality without clear error messages.
 
-**Workaround:**
-- Test changes thoroughly in local development before merging to `main`.
-- Use the `workflow_dispatch` trigger for controlled manual deployments.
-- Review pull requests carefully before merging.
-
-**Resolution Required:**
-Create a staging environment with separate Cloud Run services and a `staging` branch. Add a promotion workflow from staging to production.
+**Recommendation:** Create or update `.env.example` in `packages/backend/` with all variables documented with comments explaining their purpose and whether they are required or optional.
 
 ---
 
-## 2. Development Environment Issues
+## Frontend Issues
 
-### ISSUE-004: Next.js SWC Incompatible with Windows ARM64 + Node.js v24+
+### 13. No Offline Support
 
-| Field | Value |
-|---|---|
-| **Severity** | Medium |
-| **Category** | Development Environment |
-| **Status** | Mitigated (workaround in place) |
-| **Impact** | Next.js dev server fails to start on Windows ARM64 machines running Node.js v24+ without the postinstall patch. |
+**Status:** Open
+**Severity:** Low
+**Category:** Frontend
 
-**Description:**
-Next.js 14.x ships native SWC binaries that are PE32+ ARM64 executables, but they are incompatible with Node.js v24+ on Windows ARM64 ("not a valid Win32 application"). Next.js 14.x only auto-enables the WASM fallback for a hardcoded list of platforms, and `win32-arm64` (`aarch64-pc-windows-msvc`) is NOT in that list. Additionally, the WASM fallback is gated behind a `useWasmBinary` condition.
+**Description:** No service worker or PWA manifest is configured. The application requires an active internet connection for all functionality.
 
-**Affected Files:**
-- `packages/frontend/scripts/patch-next-swc.js`
-- `next/dist/build/swc/index.js` (patched at install time)
+**Impact:** Users cannot access previously viewed provider data when offline. This is a low priority given the application's nature (real-time data lookup).
 
-**Workaround:**
-A postinstall script (`packages/frontend/scripts/patch-next-swc.js`) automates two patches:
-1. Adds `"aarch64-pc-windows-msvc"` to the `knownDefaultWasmFallbackTriples` array.
-2. Removes the `useWasmBinary` gate from the fallback condition.
+**Recommendation:** Defer until post-beta. If implemented, cache recently viewed provider detail pages using a service worker with a stale-while-revalidate strategy.
 
-The script checks both local and hoisted `node_modules` paths. It is safe to run on non-ARM64 systems.
+---
 
-Run manually if needed:
+### 14. No Full Accessibility Audit
+
+**Status:** Open
+**Severity:** Medium
+**Category:** Frontend
+
+**Description:** While focus traps exist for modals, a comprehensive accessibility audit has not been performed. Specific gaps may include:
+- Keyboard navigation across all interactive elements
+- Screen reader compatibility (ARIA labels, roles, live regions)
+- Color contrast in both light and dark themes
+- Form input labeling and error announcement
+
+**Current Accessibility Features:**
+- Focus trap for modals (confirmed in codebase)
+- Semantic HTML structure
+- TailwindCSS responsive design
+
+**Recommendation:** Run automated accessibility testing (axe-core, Lighthouse) and manual screen reader testing before beta launch. Consider adding Playwright accessibility tests to the CI pipeline.
+
+---
+
+## Operations Issues
+
+### 15. No Automated Confidence Score Recalculation
+
+**Status:** Open
+**Severity:** Medium
+**Category:** Operations
+
+**Description:** Confidence scores include a time-based recency factor (30 points max) that should decay as verifications age. However, scores are only calculated when a new verification is submitted. There is no automated scheduled recalculation.
+
+**Impact:** Confidence scores become increasingly inaccurate over time. A 6-month-old verification with a high recency score will not automatically decrease.
+
+**Workaround:** Manual recalculation via admin endpoint:
 ```bash
-node packages/frontend/scripts/patch-next-swc.js
+curl -X POST "https://backend/api/v1/admin/recalculate-confidence" \
+  -H "X-Admin-Secret: your-secret"
 ```
 
-**Resolution Required:**
-Upgrade to a version of Next.js that natively supports Windows ARM64 + Node.js v24+, or wait for Next.js to add `aarch64-pc-windows-msvc` to its default WASM fallback triples.
+**Recommendation:** Set up a Google Cloud Scheduler job to call the recalculate-confidence endpoint daily. The endpoint supports `dryRun` for testing and `limit` for incremental processing.
+
+**Source:** `C:\Users\breil\OneDrive\Desktop\HealthcareProviderDB\packages\backend\src\services\confidenceDecayService.ts`
 
 ---
 
-### ISSUE-005: OneDrive Corrupts Native node_modules Binaries
+### 16. No Uptime Monitoring or Alerting
 
-| Field | Value |
-|---|---|
-| **Severity** | Medium |
-| **Category** | Development Environment |
-| **Status** | Mitigated (workaround in place) |
-| **Impact** | Native `.node` binary files in `node_modules/` can become corrupted by OneDrive file sync, causing build failures and runtime errors. |
+**Status:** Open
+**Severity:** Low
+**Category:** Operations
 
-**Description:**
-OneDrive's file synchronization mechanism can corrupt native binary files (SWC binaries, Prisma engines, etc.) within `node_modules/`. This manifests as cryptic load errors for native addons.
+**Description:** No external uptime monitoring (Pingdom, UptimeRobot) or alerting (PagerDuty, Opsgenie, Slack notifications) is configured. No error tracking service (Sentry) is integrated.
 
-**Workaround:**
-- Prefer WASM fallbacks over native binaries when available (see ISSUE-004 for the SWC WASM fallback).
-- If corruption occurs, delete `node_modules/` and reinstall from scratch.
-- Consider excluding `node_modules/` from OneDrive sync or moving the project to a non-synced directory.
+**Current Monitoring:**
+- `/health` endpoint for manual checks and CI smoke tests
+- Structured Pino logging (viewable in Cloud Run logs)
+- PostHog for frontend analytics
 
-**Resolution Required:**
-Move the project to a directory not synced by OneDrive, or configure OneDrive to exclude `node_modules/` folders.
+**Recommendation:** Before beta launch:
+1. Set up external uptime monitoring for the `/health` endpoint
+2. Configure Cloud Run alerting for error rates and latency
+3. Consider adding Sentry for error tracking with source maps
 
 ---
 
-### ISSUE-006: npm Workspace Hoisting Causes Version Conflicts
-
-| Field | Value |
-|---|---|
-| **Severity** | Medium |
-| **Category** | Development Environment |
-| **Status** | Mitigated (documented convention) |
-| **Impact** | Placing `next` in the root `package.json` causes the frontend to use the wrong version, leading to SWC mismatches and build failures. |
-
-**Description:**
-npm workspaces hoists dependencies to the root `node_modules/`. If `next` appears in the root `package.json` (e.g., at `^16.1.1`), it overrides the frontend workspace version (`^14.2.35`), causing SWC binary version mismatches and API incompatibilities.
-
-**Workaround:**
-- **NEVER** add `next` to the root `package.json`.
-- Only shared dependencies belong at root: `prisma`, `csv-parse`, `pg`.
-- If the wrong version is installed, clean reinstall:
-  ```bash
-  rm -rf node_modules packages/*/node_modules
-  npm install
-  ```
-
-**Resolution Required:**
-This is a convention that must be followed by all contributors. Consider adding a CI check or pre-commit hook to validate that `next` is not present in the root `package.json`.
-
----
-
-## 3. Data Quality Issues
-
-### ISSUE-007: NPI Data Only Partially Imported (6 of 50+ States)
-
-| Field | Value |
-|---|---|
-| **Severity** | High |
-| **Category** | Data |
-| **Status** | Open |
-| **Impact** | Only ~2.1 million providers across 6 states (FL, AL, AK, AR, AZ, CA) are in the database. Providers in the remaining 44 states and territories return no results. |
-
-**Description:**
-The NPI data import pipeline has only been run for 6 states. Users searching for providers outside these states will find no results, which significantly limits the application's utility.
-
-**Workaround:**
-None. Users searching for providers in non-imported states receive empty results.
-
-**Resolution Required:**
-Run the NPI data import pipeline for all remaining states and territories. Consider automating periodic re-imports to keep data current.
-
----
-
-### ISSUE-008: City Name Quality Issues in NPI Data
-
-| Field | Value |
-|---|---|
-| **Severity** | Medium |
-| **Category** | Data |
-| **Status** | Open |
-| **Impact** | City-based searches may fail to match providers due to typos, trailing state codes, or trailing punctuation in city names from the NPI dataset. |
-
-**Description:**
-NPI data from CMS is self-reported by providers and contains inconsistencies:
-- Truncated names (e.g., `"JACKSONVILL"` instead of `"JACKSONVILLE"`)
-- Trailing state codes (e.g., `"MIAMI FL"`)
-- Trailing punctuation (e.g., `"TAMPA,"`)
-
-A cleanup script exists but has not been executed across all imported data.
-
-**Workaround:**
-Search endpoints may use fuzzy matching or normalization to partially mitigate this issue.
-
-**Resolution Required:**
-Run the existing city name cleanup script across all imported data. Consider adding data normalization as part of the import pipeline to prevent future occurrences.
-
----
-
-### ISSUE-009: Provider Addresses May Be Stale
-
-| Field | Value |
-|---|---|
-| **Severity** | Low |
-| **Category** | Data |
-| **Status** | Open (inherent limitation) |
-| **Impact** | Some provider addresses may be outdated because NPI data is self-reported and rarely updated by providers. |
-
-**Description:**
-The NPI registry data from CMS relies on providers to update their own records. Many providers do not promptly update their addresses when they change practice locations.
-
-**Workaround:**
-The confidence scoring system (`packages/backend/src/services/confidenceService.ts`) mitigates this by:
-- Applying specialty-specific freshness thresholds (30-90 days depending on specialty type).
-- Decaying the recency score over time (0-30 points).
-- Setting `recommendReVerification` when data is stale.
-- Enabling community verification and voting to surface outdated information.
-
-**Resolution Required:**
-This is an inherent limitation of the NPI data source. Continued community verification and potential integration with additional data sources (carrier APIs, provider portals) will help keep data current.
-
----
-
-## 4. Security Issues
-
-### ISSUE-010: No Automated Secret Scanning in CI
-
-| Field | Value |
-|---|---|
-| **Severity** | High |
-| **Category** | Security |
-| **Status** | Open |
-| **Impact** | Secrets (API keys, database credentials, tokens) accidentally committed to the repository would not be detected by the CI pipeline. |
-
-**Description:**
-The GitHub Actions CI pipeline does not include secret scanning tools such as gitleaks, truffleHog, or GitHub's built-in secret scanning. This means that if a developer accidentally commits a secret (e.g., `ADMIN_SECRET`, `RECAPTCHA_SECRET_KEY`, `ANTHROPIC_API_KEY`, database credentials), it would not be caught automatically.
-
-**Workaround:**
-Manual code review during pull requests. Contributors should be vigilant about not committing `.env` files or hardcoded secrets.
-
-**Resolution Required:**
-Add gitleaks or truffleHog as a step in the CI pipeline. Enable GitHub Advanced Security secret scanning if the repository plan supports it.
-
----
-
-### ISSUE-011: No Cloud Armor / DDoS Protection
-
-| Field | Value |
-|---|---|
-| **Severity** | High |
-| **Category** | Security |
-| **Status** | Open |
-| **Impact** | Cloud Run services are publicly accessible without a Web Application Firewall (WAF). The application relies solely on application-level rate limiting for abuse prevention. |
-
-**Description:**
-There is no Google Cloud Armor policy or other WAF in front of the Cloud Run services. While application-level rate limiting (see `rateLimiter.ts`) and CAPTCHA (see `captcha.ts`) provide some protection, they cannot defend against volumetric DDoS attacks or sophisticated L7 attacks.
-
-**Workaround:**
-Application-level protections are in place:
-- IP-based rate limiting with sliding window algorithm
-- Google reCAPTCHA v3 on sensitive endpoints
-- Fallback rate limiting when CAPTCHA API is unavailable
-
-**Resolution Required:**
-Configure Google Cloud Armor with appropriate WAF rules and DDoS protection policies in front of the Cloud Run services.
-
----
-
-### ISSUE-012: `.env.example` Is Incomplete
-
-| Field | Value |
-|---|---|
-| **Severity** | Medium |
-| **Category** | Security / Configuration |
-| **Status** | Open |
-| **Impact** | New developers may miss required environment variables during setup, leading to runtime errors or disabled features. |
-
-**Description:**
-The `.env.example` file is missing several environment variables that are used by the application:
-
-| Missing Variable | Used By | Purpose |
-|---|---|---|
-| `ADMIN_SECRET` | `admin.ts` | Admin endpoint authentication |
-| `CAPTCHA_FAIL_MODE` | `captcha.ts` | CAPTCHA failure behavior (`open`/`closed`) |
-| `REDIS_URL` | `rateLimiter.ts` | Distributed rate limiting |
-| `ANTHROPIC_API_KEY` | Insurance card upload | Claude AI extraction |
-| `NEXT_PUBLIC_POSTHOG_KEY` | `analytics.ts` | PostHog analytics |
-| `NEXT_PUBLIC_POSTHOG_HOST` | `analytics.ts` | PostHog analytics host |
-
-The current `.env.example` only contains:
-- `DATABASE_URL`, `PORT`, `NODE_ENV`, `CORS_ORIGIN`
-- `NEXT_PUBLIC_API_URL`
-- `NPI_DATA_URL`
-- `RECAPTCHA_SECRET_KEY` (commented out)
-- `GCP_PROJECT_ID`, `GCP_REGION`, `CLOUD_SQL_CONNECTION_NAME` (commented out)
-
-**Affected Files:**
-- `.env.example`
-
-**Workaround:**
-Refer to the troubleshooting guide (18-troubleshooting-doc.md) for a complete list of environment variables.
-
-**Resolution Required:**
-Update `.env.example` to include all environment variables with descriptions, organized by service (backend, frontend, security, deployment).
-
----
-
-## 5. Frontend Issues
-
-### ISSUE-013: No Offline Support / PWA
-
-| Field | Value |
-|---|---|
-| **Severity** | Low |
-| **Category** | Frontend |
-| **Status** | Open |
-| **Impact** | The application does not work offline. Users with intermittent connectivity cannot access previously viewed provider data. |
-
-**Description:**
-There is no service worker or PWA manifest configured. The application requires an active network connection for all functionality.
-
-**Workaround:**
-None. Users must have an active internet connection.
-
-**Resolution Required:**
-Implement a service worker for offline caching of previously viewed provider data and a PWA manifest for installability.
-
----
-
-### ISSUE-014: No Full Accessibility Audit
-
-| Field | Value |
-|---|---|
-| **Severity** | Medium |
-| **Category** | Frontend |
-| **Status** | Open |
-| **Impact** | Users relying on keyboard navigation or screen readers may encounter usability barriers. Focus traps exist for modals, but comprehensive keyboard navigation and screen reader testing has not been performed. |
-
-**Description:**
-While some accessibility features are implemented (focus traps for modals), the application has not undergone a full accessibility audit. This includes:
-- Complete keyboard navigation testing
-- Screen reader compatibility testing (NVDA, VoiceOver, JAWS)
-- Color contrast verification across themes
-- ARIA attribute completeness audit
-
-**Workaround:**
-None. Users with accessibility needs may encounter barriers.
-
-**Resolution Required:**
-Conduct a full WCAG 2.1 AA accessibility audit and remediate identified issues. Consider adding axe-core or similar automated testing to the CI pipeline.
-
----
-
-## 6. Configuration Issues
-
-### ISSUE-015: ADMIN_SECRET Not Configured Returns 503
-
-| Field | Value |
-|---|---|
-| **Severity** | Low |
-| **Category** | Configuration |
-| **Status** | By Design |
-| **Impact** | All admin endpoints return HTTP 503 when `ADMIN_SECRET` is not set. This is intentional but can be confusing for new developers. |
-
-**Description:**
-The admin authentication middleware in `packages/backend/src/routes/admin.ts` checks for the `ADMIN_SECRET` environment variable and returns 503 if it is absent. This is intentional behavior that allows the application to run in environments where admin access is not needed, without throwing unhandled errors.
-
-**Workaround:**
-Set `ADMIN_SECRET` in your `.env` file:
-```
-ADMIN_SECRET=your-secure-random-secret
+### 17. Rate Limiter Response Format Inconsistency
+
+**Status:** Open
+**Severity:** Low
+**Category:** API
+
+**Description:** When a rate limit is exceeded, the response format differs from the standard error format used by the rest of the API.
+
+**Rate limiter response:**
+```json
+{
+  "error": "Too many requests",
+  "message": "Too many search requests. Please try again in 1 hour.",
+  "retryAfter": 3600
+}
 ```
 
-Then include the `X-Admin-Secret` header in admin API requests.
+**Standard API error response:**
+```json
+{
+  "error": {
+    "message": "...",
+    "code": "...",
+    "statusCode": 429,
+    "requestId": "uuid"
+  }
+}
+```
 
-**Resolution Required:**
-No code change needed (by design). Documentation should clearly explain this behavior.
+**Impact:** API consumers need to handle two different error formats. The rate limiter response lacks `code`, `statusCode`, and `requestId` fields.
+
+**Recommendation:** Update the rate limiter to use the `AppError.tooManyRequests()` factory method or align the response format manually.
+
+**Source:** `C:\Users\breil\OneDrive\Desktop\HealthcareProviderDB\packages\backend\src\middleware\rateLimiter.ts` (lines 165-170 for in-memory, lines 264-269 for Redis)
 
 ---
 
-## Summary
+## Checklist Status
 
-| Severity | Count | Issue IDs |
-|---|---|---|
-| **Critical** | 0 | -- |
-| **High** | 5 | ISSUE-001, ISSUE-003, ISSUE-007, ISSUE-010, ISSUE-011 |
-| **Medium** | 6 | ISSUE-002, ISSUE-004, ISSUE-005, ISSUE-006, ISSUE-008, ISSUE-012, ISSUE-014 |
-| **Low** | 3 | ISSUE-009, ISSUE-013, ISSUE-015 |
-| **Total** | 15 | |
+- [x] Architecture issues documented (3 issues, 2 resolved)
+- [x] Development environment issues documented (3 issues, all mitigated/documented)
+- [x] Data quality issues documented (3 issues)
+- [x] Security gaps documented (3 issues)
+- [x] Frontend limitations documented (2 issues)
+- [x] Operations issues documented (3 issues, newly identified)
+- [x] Severity assigned to each issue
+- [x] Workarounds documented for all issues
+- [ ] GitHub Issues created for tracking
+- [ ] Priority ordering finalized with product owner
 
-**Priority Recommendations:**
-1. **ISSUE-007** (NPI Data Import) -- High impact on user experience; limits application utility to 6 states.
-2. **ISSUE-010** (Secret Scanning) -- High security risk; quick to implement with gitleaks in CI.
-3. **ISSUE-011** (Cloud Armor) -- High security risk; necessary for production-grade deployment.
-4. **ISSUE-001** (Locations Route) -- High impact; blocks location-centric features.
-5. **ISSUE-003** (Staging Environment) -- High risk; prevents pre-production testing.
+---
+
+## Answers to Prompt Questions
+
+1. **Which issues should be prioritized for the next sprint?**
+   - **Highest priority:** Issue #7 (NPI data import completion) -- blocks all non-imported state coverage and is the most impactful for user value.
+   - **High priority:** Issue #15 (automated confidence recalculation) -- straightforward Cloud Scheduler setup that prevents data quality degradation.
+   - **Medium priority:** Issue #8 (city name normalization) -- run existing script for imported states to improve search quality.
+   - **Medium priority:** Issue #10 (secret scanning) -- quick CI pipeline addition for security hygiene.
+
+2. **Are any of these issues blocking user-facing features?**
+   - Issue #7 (partial NPI import) directly blocks national provider search coverage.
+   - Issue #8 (city names) degrades search quality in imported states.
+   - All other issues are either resolved, mitigated, or non-blocking for the initial beta.
+
+3. **Should we add a public-facing status page?**
+   - Recommended for beta launch. A simple status page showing service health (backend, database, cache) and data coverage (which states have data) would build user trust. Could be a static page powered by the `/health` endpoint.
+
+4. **Are there any issues discovered in production that aren't listed here?**
+   - The project is pre-beta, so no production incidents have occurred yet. The issues above are identified from codebase analysis. Once the beta launches, a production incident log should be maintained.
+
+5. **Should we track these in GitHub Issues instead?**
+   - Yes, recommended. Each issue above should be converted to a GitHub Issue with:
+     - Labels: `bug`, `enhancement`, `security`, `data-quality`, `devex`
+     - Priority labels: `P0-critical`, `P1-high`, `P2-medium`, `P3-low`
+     - Milestone: mapped to Q1/Q2/Q3 2026 milestones
+   - This document can serve as the source of truth for bulk issue creation.

@@ -1,207 +1,145 @@
-# Database Schema Review -- Analysis
+# Database Schema Review
 
-**Generated:** 2026-02-05
-**Source Prompt:** prompts/01-database-schema.md
-**Status:** PASS with minor issues -- Schema matches prompt specification with a few discrepancies
+**Last Updated:** 2026-02-06
+**ORM:** Prisma 5.22.0 with PostgreSQL (binary engine)
+**Hosting:** Cloud SQL (`verifymyprovider-db`, `us-central1`)
+**Size:** ~2.1M provider records
+**PHI:** None -- public data only
 
 ---
 
-## Findings
+## Checklist Results (Verified Against Code)
 
 ### 1. Schema Security
 
-- **All tables have appropriate indexes for query performance:** Verified. See detailed index analysis in Section 5 below.
-- **Foreign keys properly defined with ON DELETE behavior:** Verified. All FK relationships use `onDelete: NoAction` except VoteLog which uses `onDelete: Cascade` on the VerificationLog relation, exactly as specified.
-- **NO PHI stored:** Verified. All stored data is public NPI registry data, public taxonomy codes, public plan metadata, or anonymous verification records. The only potentially sensitive fields are `sourceIp`, `userAgent`, and `submittedBy` on VerificationLog/VoteLog, which are used for rate limiting and Sybil prevention, not PHI.
-- **NPI used for primary keys on provider-related tables:** Verified. `Provider.npi` is the PK (`@id @db.VarChar(10)`), and all child tables reference it via FK.
-- **Sybil prevention indexes on VerificationLog:** Verified. Both `idx_vl_sybil_email` and `idx_vl_sybil_ip` composite indexes exist.
+- [x] **All tables have appropriate indexes for query performance** -- Verified in `schema.prisma` lines 44-49 (Provider), 79-83 (practice_locations), 107-108 (provider_hospitals), 120-121 (provider_insurance), 132 (provider_medicare), 143-144 (provider_taxonomies), 174-178 (InsurancePlan), 200-205 (ProviderPlanAcceptance), 233-241 (VerificationLog), 253-255 (VoteLog), 286-289 (DataQualityAudit). Total: 35+ indexes across 11 tables.
+- [x] **Foreign keys properly defined with ON DELETE behavior** -- All provider sub-tables use `onDelete: NoAction` (lines 76, 94, 105, 118, 130, 141). VoteLog uses `onDelete: Cascade` (line 251). ProviderPlanAcceptance uses `onUpdate: NoAction` with no explicit onDelete (lines 193-195).
+- [x] **NO PHI stored** -- Schema stores only NPI numbers, provider names, addresses, specialties, insurance plan data, and anonymous verification records. No patient data fields exist anywhere.
+- [x] **NPI used for primary keys** -- `Provider.npi` is `@id @db.VarChar(10)` (line 13). All provider-related tables FK to `npi`.
+- [x] **Sybil prevention indexes on VerificationLog** -- `idx_vl_sybil_email` on `(providerNpi, planId, submittedBy, createdAt)` (line 239) and `idx_vl_sybil_ip` on `(providerNpi, planId, sourceIp, createdAt)` (line 240).
 
 ### 2. Row-Level Security
 
-- **RLS NOT required:** Verified. No user-owned data, no PHI. No RLS policies defined.
-- **Verification data is anonymous:** Verified. No `user_id` column exists. `submittedBy` is an optional email for duplicate prevention, not user identity.
-- **Public data accessible without RLS:** Verified.
+- [x] **RLS NOT required** -- No user-owned data exists. Verifications are anonymous (no user_id field). All data is public NPI registry information.
+- [x] **Verification data is anonymous** -- `VerificationLog` stores `sourceIp` and optional `submittedBy` for Sybil prevention, but has no user account linkage.
 
-### 3. Core Models (13 total)
+### 3. Core Models (15 total -- verified)
 
 #### Provider Data (7 models)
-
-- **`Provider` (`providers`):** Verified. NPI as PK, entity type, name fields, specialty, taxonomy code, gender, enumeration/deactivation dates.
-- **`practice_locations`:** Verified. Integer auto-increment PK, NPI FK to Provider, address fields, phone, fax.
-- **`provider_cms_details`:** Verified. NPI as PK (one-to-one), medical school, graduation year, telehealth, Medicare assignment, source defaults to `"cms_national"`.
-- **`provider_hospitals`:** Verified. Auto-increment PK, NPI FK, hospital system, name, CCN, source, confidence.
-- **`provider_insurance`:** Verified. Auto-increment PK, NPI FK, network name, identifier, source, confidence.
-- **`provider_medicare`:** Verified. Auto-increment PK, NPI FK, Medicare ID, state, source.
-- **`provider_taxonomies`:** Verified. Auto-increment PK, NPI FK, taxonomy code, is_primary, slot number.
+- [x] `Provider` (`providers`) -- line 12, NPI PK, 6 indexes
+- [x] `practice_locations` -- line 64, autoincrement PK, FK to Provider via `npi`, 5 indexes (including `address_hash`)
+- [x] `provider_cms_details` -- line 86, NPI as PK (one-to-one), source defaults to `"cms_national"`
+- [x] `provider_hospitals` -- line 97, autoincrement PK, FK to Provider, 2 indexes
+- [x] `provider_insurance` -- line 111, autoincrement PK, FK to Provider, 2 indexes
+- [x] `provider_medicare` -- line 124, autoincrement PK, FK to Provider, 1 index
+- [x] `provider_taxonomies` -- line 135, autoincrement PK, FK to Provider, 2 indexes
 
 #### Reference Data (2 models)
-
-- **`taxonomy_reference`:** Verified. taxonomy_code as PK, display_name, grouping_name, classification, specialization, standardized_name, provider_count.
-- **`hospitals`:** Verified. CCN as PK, hospital_name, hospital_system, address, city, state, zip_code, phone.
+- [x] `taxonomy_reference` -- line 148, `taxonomy_code` as PK, includes `provider_count`
+- [x] `hospitals` -- line 53, `ccn` as PK
 
 #### Insurance & Verification (4 models)
+- [x] `InsurancePlan` (`insurance_plans`) -- line 157, `plan_id` as PK, 4 indexes
+- [x] `ProviderPlanAcceptance` (`provider_plan_acceptance`) -- line 181, autoincrement PK, partial unique indexes via raw SQL (noted in comments lines 197-199), 5 indexes
+- [x] `VerificationLog` (`verification_logs`) -- line 208, CUID PK, 9 indexes
+- [x] `VoteLog` (`vote_logs`) -- line 245, CUID PK, unique constraint on `[verificationId, sourceIp]`, 2 indexes
 
-- **`InsurancePlan` (`insurance_plans`):** Verified. planId as PK, plan name, issuer, type, state, carrier, variant, raw name, source health system, provider count, carrier ID, health system ID, created_at.
-- **`ProviderPlanAcceptance` (`provider_plan_acceptance`):** Verified. Auto-increment PK, providerNpi FK, planId FK, acceptance status, confidence score, last verified, verification count, timestamps, expires_at.
-- **`VerificationLog` (`verification_logs`):** Verified. CUID PK, providerNpi FK, planId FK, acceptance ID, verification type/source enums, previous/new JSON values, source IP, user agent, submitted by, upvotes/downvotes, approval fields, evidence URL, notes, timestamps, expires_at.
-- **`VoteLog` (`vote_logs`):** Verified. CUID PK, verification ID FK (cascade delete), source IP, vote direction, created_at.
+#### System (2 models)
+- [x] `SyncLog` (`sync_logs`) -- line 259, autoincrement PK
+- [x] `DataQualityAudit` (`data_quality_audit`) -- line 272, autoincrement PK, 4 indexes
 
-#### System (1 model)
+### 4. Key Relationships -- Verified
 
-- **`SyncLog` (`sync_logs`):** Verified. Auto-increment PK, sync type, state, records processed, status, error message, started/completed timestamps.
+All relationships confirmed in `schema.prisma`:
+- Provider has 8 one-to-many relations: practice_locations, provider_hospitals, provider_insurance, provider_medicare, provider_taxonomies, providerPlanAcceptances, verificationLogs, dataQualityAudits
+- Provider has 1 one-to-one: provider_cms_details
+- InsurancePlan has 2 one-to-many: providerAcceptances, verificationLogs
+- VerificationLog has 1 one-to-many: votes (VoteLog)
+- ProviderPlanAcceptance has optional FK to practice_locations via `locationId` (line 195)
 
-**Model count: 13 total.** Matches prompt specification.
+**ON DELETE behavior verified:**
+- All provider sub-tables: `NoAction` (confirmed lines 76, 94, 105, 118, 130, 141)
+- ProviderPlanAcceptance: No explicit `onDelete` on Provider/Plan FKs, `onUpdate: NoAction`
+- VoteLog: `onDelete: Cascade` on VerificationLog FK (line 251)
 
-### 4. Key Relationships
+### 5. Indexes -- All Verified
 
-- **Provider -> practice_locations[] (one-to-many via NPI FK):** Verified. `onDelete: NoAction`.
-- **Provider -> provider_cms_details? (one-to-one via NPI FK):** Verified. `onDelete: NoAction`.
-- **Provider -> provider_hospitals[] (one-to-many via NPI FK):** Verified. `onDelete: NoAction`.
-- **Provider -> provider_insurance[] (one-to-many via NPI FK):** Verified. `onDelete: NoAction`.
-- **Provider -> provider_medicare[] (one-to-many via NPI FK):** Verified. `onDelete: NoAction`.
-- **Provider -> provider_taxonomies[] (one-to-many via NPI FK):** Verified. `onDelete: NoAction`.
-- **Provider -> ProviderPlanAcceptance[] (via NPI FK):** Verified. `onUpdate: NoAction`. Note: `onDelete` is not explicitly specified (Prisma defaults to `SetNull` for optional relations).
-- **Provider -> VerificationLog[] (via provider_npi FK):** Verified. `onUpdate: NoAction`.
-- **InsurancePlan -> ProviderPlanAcceptance[] (via plan_id FK):** Verified. `onUpdate: NoAction`.
-- **InsurancePlan -> VerificationLog[] (via plan_id FK):** Verified. `onUpdate: NoAction`.
-- **VerificationLog -> VoteLog[] (via verification_id FK, cascade delete):** Verified. `onDelete: Cascade, onUpdate: NoAction`.
+All 35+ indexes listed in the prompt are present and confirmed in `schema.prisma`. Notable addition not in the prompt checklist:
+- `idx_locations_address_hash` on `practice_locations.address_hash` (line 83)
+- `idx_ppa_location_id` on `ProviderPlanAcceptance.locationId` (line 204)
+- 4 indexes on `DataQualityAudit` (npi, severity, auditType, resolved) at lines 286-289
 
-**ON DELETE behavior discrepancy:**
+### 6. Enums -- Verified
 
-- The prompt states `ProviderPlanAcceptance -> NoAction on provider/plan` and `VerificationLog -> NoAction on provider/plan`. However, in the actual schema, `ProviderPlanAcceptance` and `VerificationLog` do NOT explicitly specify `onDelete`. Since `providerNpi` and `planId` are optional (nullable) FKs, Prisma's default behavior is `SetNull`, not `NoAction`. This is a minor discrepancy between the prompt documentation and the actual schema behavior. The prompt's assertion of `NoAction` may not match the Prisma-generated migration.
+All three enums present at lines 293-318:
+- `AcceptanceStatus`: ACCEPTED, NOT_ACCEPTED, PENDING, UNKNOWN
+- `VerificationSource`: CMS_DATA, CARRIER_DATA, PROVIDER_PORTAL, PHONE_CALL, CROWDSOURCE, AUTOMATED, NPPES_SYNC, CARRIER_SCRAPE, NETWORK_CROSSREF
+- `VerificationType`: PLAN_ACCEPTANCE, PROVIDER_INFO, CONTACT_INFO, STATUS_CHANGE, NEW_PLAN
 
-### 5. Indexes
+**Note:** `AcceptanceStatus` enum is defined but `ProviderPlanAcceptance.acceptanceStatus` is typed as `String @db.VarChar(20)` (line 186), not the enum. The field stores enum-like values but uses string type.
 
-#### Provider indexes:
+### 7. Data Quality Fields -- Verified
 
-- **`idx_providers_category` on `specialty_category`:** Verified.
-- **`idx_providers_credential` on `credential`:** Verified.
-- **`idx_providers_gender` on `gender`:** Verified.
-- **`idx_providers_last_name` on `lastName`:** Verified.
-- **`idx_providers_specialty` on `primary_specialty`:** Verified.
-- **`idx_providers_taxonomy` on `primary_taxonomy_code`:** Verified.
+- [x] `ProviderPlanAcceptance.confidenceScore` -- `Int @default(0)` (line 187)
+- [x] `VerificationSource` enum covers 9 source types (lines 300-310)
+- [x] Timestamps: `createdAt`, `updatedAt`, `lastVerified` on ProviderPlanAcceptance (lines 190-191, 188)
+- [x] `ProviderPlanAcceptance.verificationCount` -- `Int @default(0)` (line 189)
+- [x] TTL fields: `expiresAt` on ProviderPlanAcceptance (line 192) and VerificationLog (line 228)
+- [x] Confidence on enriched data: `provider_hospitals.confidence` (line 104), `provider_insurance.confidence` (line 117)
 
-#### practice_locations indexes:
+### 8. Schema Conventions -- Verified with Exceptions
 
-- **`idx_locations_city` on `city`:** Verified.
-- **`idx_locations_npi` on `npi`:** Verified.
-- **`idx_locations_state` on `state`:** Verified.
-- **`idx_locations_zip` on `zip_code`:** Verified.
+- [x] PascalCase model names with `@@map` for most models (InsurancePlan, ProviderPlanAcceptance, VerificationLog, VoteLog, SyncLog, DataQualityAudit)
+- [ ] **INCONSISTENCY:** `practice_locations`, `provider_cms_details`, `provider_hospitals`, `provider_insurance`, `provider_medicare`, `provider_taxonomies`, `taxonomy_reference`, `hospitals` are lowercase without `@@map` -- they use raw DB table names as model names
+- [x] `@db.VarChar(N)` for all string fields
+- [x] `@db.Timestamptz(6)` for timestamps
+- [x] `@default(cuid())` for VerificationLog and VoteLog PKs
+- [x] `@default(autoincrement())` for integer PKs
 
-#### provider_hospitals indexes:
+### 9. Known Schema Issues -- Verified
 
-- **`idx_hospitals_npi` on `npi`:** Verified.
-- **`idx_hospitals_system` on `hospital_system`:** Verified.
-
-#### provider_insurance indexes:
-
-- **`idx_insurance_network` on `network_name`:** Verified.
-- **`idx_insurance_npi` on `npi`:** Verified.
-
-#### provider_medicare / provider_taxonomies indexes:
-
-- **`idx_medicare_npi` on `npi`:** Verified.
-- **`idx_taxonomies_code` on `taxonomy_code`:** Verified.
-- **`idx_taxonomies_npi` on `npi`:** Verified.
-
-#### InsurancePlan indexes:
-
-- **`idx_insurance_plans_carrier` on `carrier`:** Verified.
-- **`idx_insurance_plans_carrier_id` on `carrierId`:** Verified.
-- **`idx_insurance_plans_health_system_id` on `healthSystemId`:** Verified.
-- **`idx_insurance_plans_plan_variant` on `planVariant`:** Verified.
-
-#### ProviderPlanAcceptance indexes:
-
-- **`@@unique([providerNpi, planId])`:** Verified.
-- **`idx_ppa_acceptance_status` on `acceptanceStatus`:** Verified.
-- **`idx_ppa_confidence_score` on `confidenceScore`:** Verified.
-- **`idx_ppa_expires_at` on `expiresAt`:** Verified.
-- **`idx_ppa_last_verified` on `lastVerified`:** Verified.
-
-#### VerificationLog indexes:
-
-- **`idx_vl_created_at` on `createdAt`:** Verified.
-- **`idx_vl_expires_at` on `expiresAt`:** Verified.
-- **`idx_vl_is_approved` on `isApproved`:** Verified.
-- **`idx_vl_plan_id` on `planId`:** Verified.
-- **`idx_vl_provider_npi` on `providerNpi`:** Verified.
-- **`idx_vl_provider_created` on `(providerNpi, createdAt)`:** Verified.
-- **`idx_vl_sybil_email` on `(providerNpi, planId, submittedBy, createdAt)`:** Verified.
-- **`idx_vl_sybil_ip` on `(providerNpi, planId, sourceIp, createdAt)`:** Verified.
-- **`idx_vl_verification_type` on `verificationType`:** Verified.
-
-#### VoteLog indexes:
-
-- **`@@unique([verificationId, sourceIp])`:** Verified.
-- **`idx_vote_logs_source_ip` on `sourceIp`:** Verified.
-- **`idx_vote_logs_verification_id` on `verificationId`:** Verified.
-
-**All 34 indexes verified. No missing indexes.**
-
-### 6. Enums
-
-- **`AcceptanceStatus` (ACCEPTED, NOT_ACCEPTED, PENDING, UNKNOWN):** Verified.
-- **`VerificationSource` (CMS_DATA, CARRIER_DATA, PROVIDER_PORTAL, PHONE_CALL, CROWDSOURCE, AUTOMATED):** Verified.
-- **`VerificationType` (PLAN_ACCEPTANCE, PROVIDER_INFO, CONTACT_INFO, STATUS_CHANGE, NEW_PLAN):** Verified.
-
-### 7. Data Quality Fields
-
-- **Confidence scoring (`ProviderPlanAcceptance.confidenceScore` 0-100 integer):** Verified. `@default(0)`.
-- **Source tracking (`VerificationSource` enum):** Verified.
-- **Timestamps (`createdAt`, `updatedAt`, `lastVerified`):** Verified on ProviderPlanAcceptance. All use `@db.Timestamptz(6)`.
-- **Verification count (`ProviderPlanAcceptance.verificationCount`):** Verified. `@default(0)`.
-- **TTL fields (`expiresAt` on ProviderPlanAcceptance and VerificationLog):** Verified. Both use `DateTime? @db.Timestamptz(6)`.
-- **Confidence on enriched data (`provider_hospitals.confidence`, `provider_insurance.confidence`):** Verified. Both default to `"MEDIUM"`.
-
-### 8. Schema Conventions
-
-- **PascalCase model names with `@@map("snake_case_table")`:** Partially verified. `Provider`, `InsurancePlan`, `ProviderPlanAcceptance`, `VerificationLog`, `VoteLog`, `SyncLog` use PascalCase with `@@map`. However, `hospitals`, `practice_locations`, `provider_cms_details`, `provider_hospitals`, `provider_insurance`, `provider_medicare`, `provider_taxonomies`, and `taxonomy_reference` use raw lowercase names without PascalCase mapping. This is noted as an inconsistency in section 9.
-- **camelCase fields with `@map("snake_case")`:** Partially verified. Many fields use `@map` (e.g., `entityType -> entity_type`, `lastName -> last_name`). However, several Provider fields remain raw snake_case: `middle_name`, `name_prefix`, `name_suffix`, `last_update_date`, `deactivation_date`, `reactivation_date`, `is_sole_proprietor`, `is_organization_subpart`, `parent_organization_lbn`, `primary_taxonomy_code`, `primary_specialty`, `specialty_category`.
-- **`@db.VarChar(N)` for all string fields:** Verified. All string fields have explicit length limits.
-- **`@db.Timestamptz(6)` for all timestamps:** Verified. All DateTime fields use `@db.Timestamptz(6)`.
-- **`@default(cuid())` for TEXT PKs:** Verified on VerificationLog and VoteLog.
-- **`@default(autoincrement())` for integer PKs:** Verified on practice_locations, provider_hospitals, provider_insurance, provider_medicare, provider_taxonomies, ProviderPlanAcceptance, SyncLog.
-
-### 9. Known Schema Issues
-
-- **`practice_locations` replaced old `Location` model:** Acknowledged. Locations route disabled pending rewrite (confirmed: `locations.ts` exists but would need review).
-- **No `state` or `city` index directly on Provider:** Confirmed. Address data lives in `practice_locations` with its own state/city indexes. The providerService correctly queries through the `practice_locations` relation.
-- **`provider_cms_details` source defaults to `"cms_national"`:** Confirmed. `@default("cms_national")` present.
-- **Several Provider fields use raw snake_case without `@map`:** Confirmed. `middle_name`, `name_prefix`, `name_suffix`, `last_update_date`, `deactivation_date`, `reactivation_date`, `is_sole_proprietor`, `is_organization_subpart`, `parent_organization_lbn`, `primary_taxonomy_code`, `primary_specialty`, `specialty_category` all lack `@map` directives. This creates inconsistency where some fields use camelCase in TypeScript (via `@map`) and others use snake_case.
+- [x] `practice_locations` is active and used throughout (providerService.ts, locationService.ts)
+- [ ] **No state/city index on Provider** -- confirmed. Address data lives in `practice_locations` which has its own state/city indexes
+- [ ] **`provider_cms_details.source` defaults to `"cms_national"`** -- confirmed at line 93
+- [ ] **Inconsistent field naming** -- confirmed. Provider has mixed conventions: `lastName` (camelCase with @map), `middle_name` (snake_case, no @map), `name_prefix` (snake_case, no @map), etc. Fields without @map at lines 17-28: `middle_name`, `name_prefix`, `name_suffix`, `last_update_date`, `deactivation_date`, `reactivation_date`, `is_sole_proprietor`, `is_organization_subpart`, `parent_organization_lbn`, `primary_taxonomy_code`, `primary_specialty`, `specialty_category`
 
 ### 10. Migration Safety
 
-- **No destructive migrations without data backup plan:** Cannot verify from schema alone. Requires migration file review.
-- **`CREATE INDEX CONCURRENTLY` for production indexes:** Cannot verify from schema alone. Prisma's default `CREATE INDEX` does not use `CONCURRENTLY`.
-- **Migrations are idempotent:** Cannot verify from schema alone.
-
-### Additional Finding: Code-Schema Mismatch
-
-- **`locationId` field on ProviderPlanAcceptance:** The service layer code (`verificationService.ts` line 246, `planService.ts` line 329) references a `locationId` field on `ProviderPlanAcceptance`, and the `planService.ts` includes a `location` relation. However, this field does NOT exist in the current `schema.prisma`. This suggests either a pending migration or a code-schema drift that would cause runtime errors.
+- [ ] No evidence of destructive migration safeguards in reviewed files
+- [ ] No evidence of `CREATE INDEX CONCURRENTLY` usage
+- [ ] No migration idempotency checks found
 
 ---
 
-## Summary
+## Questions Answered
 
-The Prisma schema is well-structured and matches the prompt specification in all major respects. All 13 models, 34 indexes, 3 enums, and key relationships are verified. The schema properly avoids PHI, uses NPI as primary keys for provider data, and implements Sybil prevention indexes.
+### 1. Are there any missing indexes causing slow queries in production?
 
-The primary issues are:
-1. **Code-schema drift**: `locationId` and `location` relation referenced in service code but absent from `schema.prisma`.
-2. **Inconsistent naming conventions**: 7 of 13 models use raw lowercase names instead of PascalCase, and 12 Provider fields use raw snake_case without `@map`.
-3. **ON DELETE behavior**: The prompt documents `NoAction` for ProviderPlanAcceptance and VerificationLog FKs, but the schema does not explicitly set `onDelete`, meaning Prisma's default (`SetNull` for optional relations) may apply instead.
-4. **Migration safety**: Cannot be verified from schema alone.
+**Finding:** The indexing coverage is comprehensive. The main potential performance concern is:
+- **Provider name search** uses `contains` (LIKE '%term%') which cannot use B-tree indexes efficiently. The `idx_providers_last_name` index only helps with prefix matches. For 2.1M+ records, `contains` queries with `mode: 'insensitive'` on `firstName`, `lastName`, and `organizationName` (see `providerService.ts` lines 103-106, 131-135) will result in sequential scans. A trigram index (`pg_trgm`) or full-text search index would significantly improve name search performance.
+- **Provider search ordering** by `providerPlanAcceptances: { _count: 'desc' }` (providerService.ts line 283) requires a subquery count on every row, which may be slow on large result sets.
 
----
+### 2. Should deactivated providers be soft-deleted or hard-deleted?
 
-## Recommendations
+**Finding:** Currently, deactivation is tracked via `Provider.deactivation_date` (a string field, line 25). The `transformProvider` function in `providers.ts` (line 159) maps this to `npiStatus: 'DEACTIVATED'`. There is no soft-delete mechanism (no `deletedAt` field). Deactivated providers remain fully queryable. This is appropriate since the NPI registry itself tracks deactivation status.
 
-1. **Resolve `locationId` drift.** Either add the `locationId` field and `location` relation to `ProviderPlanAcceptance` in the schema, or remove references from the service layer. This is likely a runtime error waiting to happen.
+### 3. Are there any N+1 query patterns in the service layer?
 
-2. **Normalize model naming.** Rename `hospitals`, `practice_locations`, `provider_cms_details`, `provider_hospitals`, `provider_insurance`, `provider_medicare`, `provider_taxonomies`, and `taxonomy_reference` to PascalCase with `@@map("snake_case_table")` for consistency with the other models.
+**Finding:** No N+1 patterns detected. The codebase uses Prisma `include` consistently:
+- `searchProviders` uses `PROVIDER_INCLUDE` constant (providerService.ts line 176-197) which eagerly loads all relations in a single query
+- `getProviderByNpi` uses the same include (line 300-303)
+- `getProvidersForPlan` uses targeted includes (planService.ts lines 313-339)
+- `getVerificationsForPair` uses `Promise.all` for parallel queries (verificationService.ts lines 703-735)
+- `getRecentVerifications` uses `select` with nested relations (verificationService.ts lines 628-666)
 
-3. **Normalize Provider field naming.** Add `@map("snake_case")` to the 12 Provider fields that currently use raw snake_case, converting them to camelCase access in TypeScript (e.g., `middleName @map("middle_name")`).
+### 4. What's the plan for handling 9M+ providers (full NPI dataset)?
 
-4. **Explicitly set `onDelete` on all FK relations.** Add `onDelete: NoAction` to `ProviderPlanAcceptance.provider`, `ProviderPlanAcceptance.insurancePlan`, `VerificationLog.provider`, and `VerificationLog.plan` to match the documented behavior.
+**Finding:** No explicit scaling plan found in the reviewed code. Current schema indexes are appropriate for the full dataset. The `PROVIDER_INCLUDE` constant eagerly loads ALL relations which may become expensive at scale. Consider: adding composite indexes for common filter combinations, implementing cursor-based pagination, and limiting `include` depth for search results.
 
-5. **Review migration strategy.** Ensure production index creation uses `CREATE INDEX CONCURRENTLY` and that destructive migrations have rollback plans.
+### 5. Should `practice_locations` have a unique constraint on address fields?
+
+**Finding:** There is an `address_hash` field (line 75, `@db.VarChar(64)`) with an index (`idx_locations_address_hash`, line 83) that could serve this purpose. However, there is no unique constraint on it. The `getProvidersAtLocation` function in `locationService.ts` (lines 110-151) relies on address field matching, not a unique constraint. Multiple providers can share the same address (e.g., medical office buildings), so a unique constraint on address fields alone would be incorrect. A unique constraint on `(npi, address_hash)` might be more appropriate to prevent duplicate location records per provider.
+
+### 6. Should Provider fields be normalized to consistent camelCase with @map?
+
+**Finding:** Yes. 12 fields on Provider use raw snake_case without `@map` directives (lines 17-32). This creates inconsistency in TypeScript code where some fields are accessed as `provider.lastName` (camelCase) and others as `provider.middle_name` (snake_case). The `transformProvider` function in `providers.ts` already handles the mapping (e.g., `middleName: provider.middle_name`, line 140), but normalizing at the schema level would be cleaner.

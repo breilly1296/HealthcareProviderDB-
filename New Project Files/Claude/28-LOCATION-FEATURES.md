@@ -1,131 +1,172 @@
-# Location Features -- Analysis
+# Location Features Review
 
-**Generated:** 2026-02-05
-**Source Prompt:** prompts/28-location-features.md
-**Status:** Partially disabled. The `practice_locations` table is active and populated, but the locations API route is commented out. Backend services (`locationService.ts`, `locationEnrichment.ts`) reference the old `Location` model which no longer exists in the Prisma schema. Frontend components exist but cannot function without a working API.
+**Last Updated:** 2026-02-06
+**Status:** Active -- API and frontend exist, but enrichment/metadata features are incomplete
 
 ---
 
-## Findings
+## Route Registration: VERIFIED
 
-### Database -- practice_locations (Active Schema)
+The locations route is registered in `packages/backend/src/routes/index.ts` at line 13:
+```typescript
+router.use('/locations', locationsRouter);
+```
 
-- **Table created with address fields**
-  Verified. `packages/backend/prisma/schema.prisma` lines 62-79 define the `practice_locations` model with `id`, `npi`, `address_type`, `address_line1`, `address_line2`, `city`, `state`, `zip_code`, `phone`, and `fax`.
+All 5 API endpoints are implemented in `packages/backend/src/routes/locations.ts`:
 
-- **Provider-location relationship via NPI FK**
-  Verified. Line 73: `providers Provider @relation(fields: [npi], references: [npi], onDelete: NoAction, onUpdate: NoAction)`.
-
-- **Indexes on city, state, zip_code, npi**
-  Verified. Lines 75-78 define indexes: `idx_locations_city`, `idx_locations_npi`, `idx_locations_state`, `idx_locations_zip`.
-
-- **No unique constraint on address**
-  Confirmed. There is no `@@unique` directive on the `practice_locations` model. Duplicate address rows for different providers (or even the same provider) are permitted.
-
-- **No facility/health system metadata fields**
-  Confirmed. The model contains only raw address data plus `phone` and `fax`. There are no `name`, `health_system`, `facility_type`, or `provider_count` columns.
-
-- **address_type field**
-  Verified. Line 65: `address_type String? @default("practice") @db.VarChar(10)`. This distinguishes practice vs. mailing addresses, which the old `Location` model did not support.
-
-### API Routes (Disabled)
-
-- **Route file exists but is commented out in routes/index.ts**
-  Verified. `packages/backend/src/routes/index.ts`:
-  - Line 5: `// import locationsRouter from './locations';` (commented out)
-  - Line 14: `// router.use('/locations', locationsRouter);` (commented out)
-  - Line 5 includes the TODO comment: "locations route depends on old Location model - needs rewrite for practice_locations"
-
-- **locations.ts route file exists and is fully coded**
-  Verified. `packages/backend/src/routes/locations.ts` (187 lines) defines all five endpoints:
-  - `GET /search` (lines 40-69) -- search locations with filters
-  - `GET /health-systems` (lines 76-91) -- distinct health systems
-  - `GET /stats/:state` (lines 97-105) -- location stats by state
-  - `GET /:locationId` (lines 111-130) -- location detail
-  - `GET /:locationId/providers` (lines 136-185) -- providers at a location
-
-  All endpoints import from `locationService.ts` which references `prisma.location` -- a model that no longer exists in the schema.
-
-- **locationService.ts needs rewrite for practice_locations schema**
-  Confirmed. `packages/backend/src/services/locationService.ts` (194 lines) uses:
-  - `prisma.location.findMany` (line 66)
-  - `prisma.location.count` (line 72)
-  - `prisma.location.findUnique` (line 87)
-  - `prisma.location.aggregate` (line 148)
-  - `prisma.location.groupBy` (line 185)
-  - `Prisma.LocationWhereInput` type (line 40)
-  - `location.providerCount` (line 91, 46)
-  - `location.healthSystem` (line 45)
-
-  All of these reference the removed `Location` model with its `providerCount`, `healthSystem`, `facilityType`, and `name` fields. None of these fields exist on `practice_locations`.
-
-- **locationEnrichment.ts needs rewrite**
-  Confirmed. `packages/backend/src/services/locationEnrichment.ts` (453 lines) references:
-  - `prisma.location.findMany` (line 294)
-  - `prisma.location.update` (line 344)
-  - `prisma.location.count` (lines 438-439)
-  - `prisma.provider.findMany({ where: { locationId } })` (line 183) -- Provider no longer has a `locationId` field
-  - `location.name`, `location.healthSystem`, `location.facilityType` (lines 297-300, 393-427)
-
-  The entire enrichment service is built around the old model's concept of grouped locations with metadata.
-
-- **All 5 endpoints non-functional**
-  Confirmed. Even if the route were re-enabled, every service call would fail at runtime because `prisma.location` is undefined (no `Location` model in schema).
-
-### Frontend (Partially Exists)
-
-- **Location detail page exists**
-  Referenced in prompt at `/location/[locationId]/page.tsx`. Not directly read but noted as existing per prompt documentation.
-
-- **LocationCard component exists**
-  Referenced in prompt. Likely renders location data fetched from the disabled API.
-
-- **ColocatedProviders component**
-  Referenced in prompt at `packages/frontend/src/components/provider-detail/ColocatedProviders.tsx`. Uses colocated provider logic that relied on the old `locationId` FK on the Provider model.
-
-- **Frontend pages may error without working API endpoints**
-  Confirmed. Any frontend page that calls `/api/v1/locations/*` would receive a 404 since the route is not registered.
-
-### Key Differences: Old Location vs. practice_locations
-
-| Aspect | Old `Location` (Removed) | Current `practice_locations` |
+| Endpoint | Status | Rate Limiter |
 |---|---|---|
-| **Relationship direction** | Many providers -> one location (grouped by shared address) | One provider -> many locations (flat, per-NPI) |
-| **Grouping** | Automatic via unique address constraint | None -- duplicate addresses allowed |
-| **Metadata** | `name`, `healthSystem`, `facilityType`, `providerCount` | None -- raw address + phone/fax only |
-| **Unique constraint** | `@@unique([addressLine1, city, state, zipCode])` | None |
-| **Address type** | Implicit (all practice) | Explicit `address_type` field (practice/mailing) |
-| **Provider FK direction** | Provider had `locationId` FK | `practice_locations` has `npi` FK to Provider |
+| `GET /api/v1/locations/search` | Active | searchRateLimiter (100/hr) |
+| `GET /api/v1/locations/health-systems` | Active | defaultRateLimiter (200/hr) |
+| `GET /api/v1/locations/stats/:state` | Active | defaultRateLimiter (200/hr) |
+| `GET /api/v1/locations/:locationId` | Active | defaultRateLimiter (200/hr) |
+| `GET /api/v1/locations/:locationId/providers` | Active | defaultRateLimiter (200/hr) |
 
-### What `provider_hospitals` Offers
-
-The `provider_hospitals` model (schema lines 92-104) already stores `hospital_system` and `hospital_name` linked by NPI. This partially overlaps with the old `Location` model's `healthSystem` field. A rewrite could leverage `provider_hospitals` data to enrich location-level health system information.
+All endpoints have Zod validation schemas, pagination support, and proper error handling.
 
 ---
 
-## Summary
+## Database Schema: VERIFIED
 
-The location feature is in a frozen state. The database table (`practice_locations`) is active and populated with raw address data for providers, but it fundamentally differs from the old `Location` model -- it is a flat one-to-many (provider -> addresses) table without grouping, facility names, or health system metadata.
+The `practice_locations` model in `packages/backend/prisma/schema.prisma` (lines 64-84) matches the prompt description with one addition:
 
-Three backend files (`locations.ts`, `locationService.ts`, `locationEnrichment.ts`) are fully coded but reference a `Location` Prisma model that no longer exists. The route is correctly commented out in `routes/index.ts` to prevent runtime errors. Frontend components (`LocationCard`, location detail page, `ColocatedProviders`) exist but will fail or show empty data without the API.
+```prisma
+model practice_locations {
+  id            Int      @id @default(autoincrement())
+  npi           String   @db.VarChar(10)
+  address_type  String?  @default("practice") @db.VarChar(10)
+  address_line1 String?  @db.VarChar(200)
+  address_line2 String?  @db.VarChar(200)
+  city          String?  @db.VarChar(100)
+  state         String?  @db.VarChar(2)
+  zip_code      String?  @db.VarChar(10)
+  phone         String?  @db.VarChar(20)
+  fax           String?  @db.VarChar(20)
+  address_hash  String?  @map("address_hash") @db.VarChar(64)  // <-- NEW FIELD
+  ...
+}
+```
 
-The core challenge for re-implementation is that `practice_locations` stores individual provider-address rows, while the old model grouped providers by shared address. Re-enabling the feature requires either building a grouping abstraction (view, materialized view, or query-time aggregation) or creating a new `locations_metadata` table that sits alongside `practice_locations`.
+**Finding:** The `address_hash` column exists in the schema but is explicitly excluded from service queries via the `locationSelect` object in both `locationService.ts` and `locationEnrichment.ts`. Comments state: "avoid address_hash -- not yet migrated." This suggests Phase 2 address normalization work is planned but not yet active.
+
+### Indexes
+- `idx_locations_city` on `city`
+- `idx_locations_npi` on `npi`
+- `idx_locations_state` on `state`
+- `idx_locations_zip` on `zip_code`
+- `idx_locations_address_hash` on `address_hash`
+
+### Relationship
+- `practice_locations` has a `providerPlanAcceptances` relation (via `ProviderPlanAcceptance.locationId`)
+- This means insurance acceptance can be tracked per-location, not just per-provider
+
+---
+
+## Service Layer: VERIFIED
+
+### locationService.ts
+Five well-structured service functions:
+
+1. **`searchLocations`** -- Filters by state (required), city (case-insensitive contains), zipCode (prefix match). Returns paginated results with provider brief details.
+2. **`getLocationById`** -- Returns single location with provider detail (including credential).
+3. **`getProvidersAtLocation`** -- Core co-location logic. Matches on `address_line1 + city + state + zip_code` (case-insensitive). Returns paginated list of all providers sharing the same physical address. Gracefully handles null `address_line1`.
+4. **`getHealthSystems`** -- Queries `provider_hospitals.hospital_system` distinct values, optionally filtered by state/city via providers' practice locations.
+5. **`getLocationStats`** -- Returns total locations, distinct cities, distinct zip codes, and total distinct providers for a state.
+
+### locationEnrichment.ts
+Four enrichment functions:
+
+1. **`enrichLocationWithHospitalData`** -- Joins a location's NPI to `provider_hospitals` for hospital affiliation data. Read-only (no writes to practice_locations).
+2. **`getEnrichmentStats`** -- Returns aggregate stats: total locations, providers with/without hospital affiliations, distinct hospital systems, locations by state.
+3. **`findColocatedProviders`** -- Finds providers at the same address via case-insensitive match on all 4 address fields.
+4. **`getLocationHealthSystem`** -- Returns the first `hospital_system` found for a given NPI.
+
+---
+
+## Frontend Components: VERIFIED
+
+### Location Detail Page (`/location/[locationId]/page.tsx`)
+- Full-featured page with breadcrumbs, location header, specialty filter, provider list, and pagination
+- References `location.name`, `location.healthSystem`, `location.facilityType`, and `location.providerCount` from the `Location` TypeScript type
+- Client-side specialty filtering across 16 specialty categories
+- Google Maps link for directions
+- Proper error handling with retry for network/server errors, "not found" state
+
+### LocationCard Component
+- Links to `/location/[locationId]`
+- Displays: name (or address as fallback), address lines, city/state/zip, health system, provider count
+- Google Maps link with `e.stopPropagation()` to prevent card navigation
+- Uses `toDisplayCase`, `toAddressCase`, `toTitleCase` formatters
+
+### ColocatedProviders Component
+- Lazy-loads via `IntersectionObserver` (100px rootMargin) -- good performance pattern
+- Fetches co-located providers via `providerApi.getColocated(npi, { limit: 10 })`
+- Displays location info block with name, health system, facility type, address, provider count
+- Shows up to 10 co-located providers with links to their detail pages
+- "View all" link when total exceeds 10 (links to search page filtered by location)
+- Hides entirely if no co-located providers found or on error -- keeps the page clean
+- Uses standardized error handling (`toAppError`, `getUserMessage`, `logError`)
+
+---
+
+## Checklist Verification
+
+### Database -- practice_locations (ACTIVE)
+- [x] Table created with address fields -- **VERIFIED** in schema.prisma
+- [x] Provider-location relationship via NPI FK -- **VERIFIED**: `providers Provider @relation(fields: [npi], references: [npi])`
+- [x] Indexes on city, state, zip_code, npi -- **VERIFIED**: 4 indexes plus address_hash
+- [ ] No unique constraint on address -- **CONFIRMED**: duplicate addresses remain possible
+- [ ] No facility/health system metadata fields -- **CONFIRMED**: no `facility_name`, `health_system`, or `facility_type` columns on `practice_locations`
+
+### API Routes (ACTIVE)
+- [x] Route file registered in `routes/index.ts` -- **VERIFIED** at line 13
+- [x] `locationService.ts` active -- **VERIFIED**: 5 functions, all using Prisma queries
+- [x] `locationEnrichment.ts` active -- **VERIFIED**: 4 functions, enrichment from `provider_hospitals`
+- [x] All 5 endpoints functional -- **VERIFIED**: each with Zod validation and rate limiting
+
+### Frontend (PARTIALLY EXISTS)
+- [x] Location detail page exists -- **VERIFIED**: `/location/[locationId]/page.tsx` (289 lines)
+- [x] `LocationCard` component exists -- **VERIFIED**: 80 lines, links to detail page
+- [x] `ColocatedProviders` component exists -- **VERIFIED**: 178 lines, lazy-loaded
+- [x] Frontend pages connected to working API endpoints -- **VERIFIED**: uses `locationApi.getProviders()`
+- [ ] Link from provider detail to location page -- **NOT FOUND**: ColocatedProviders links to search, not to `/location/[id]`
+
+### Data Quality (NOT STARTED)
+- [ ] Location/facility names not populated -- **CONFIRMED**: `practice_locations` has no `name` field; frontend references `location.name` from the TypeScript type but it is populated from enrichment
+- [ ] Health systems not tagged -- **CONFIRMED**: enrichment from `provider_hospitals` exists but is runtime-only (not written back)
+- [ ] Facility types not categorized -- **CONFIRMED**: no facility_type column in schema
+- [ ] Duplicate addresses not merged -- **CONFIRMED**: no unique constraint, no grouping mechanism
+- [ ] Address normalization not implemented -- **CONFIRMED**: `address_hash` column exists but is excluded from queries ("not yet migrated")
+
+---
+
+## Questions Answered
+
+### 1. Which rewrite option to pursue?
+**Recommendation: Option A (Build Location Abstraction on Top).** The `address_hash` column already exists in the schema (though not yet active), suggesting the team is already moving toward address normalization. A materialized view grouping by normalized address would avoid schema migration while enabling the grouping needed for facility-level views. The enrichment service already performs runtime joins to `provider_hospitals` for health system data.
+
+### 2. Is the location feature a priority for the next phase?
+The feature is **architecturally complete** -- routes, services, enrichment, and frontend all exist and work. The gap is data quality: no facility names, no health system tagging on the location itself, and no address deduplication. The `address_hash` column in the schema signals this was planned. Priority should be moderate -- it adds significant user value but requires a data backfill before it is truly useful.
+
+### 3. Should co-located providers use a simple address match instead of a Location FK?
+**Currently using address match.** The `getProvidersAtLocation` function in `locationService.ts` performs a case-insensitive match on `address_line1 + city + state + zip_code`. This works but is fragile (e.g., "123 Main St" vs "123 Main Street"). The `address_hash` column would solve this if populated with normalized address hashes. The `ProviderPlanAcceptance.locationId` FK already exists for location-specific insurance verification.
+
+### 4. What percentage of providers share addresses?
+Cannot be determined from code alone -- this requires a database query. The `getLocationStats` function provides total locations vs. distinct providers per state, which would give a ratio. The `findColocatedProviders` function in the enrichment service exists specifically to answer this question at runtime.
+
+### 5. Should health system identification come from `provider_hospitals` table instead?
+**It already does.** The `getHealthSystems` function in `locationService.ts` queries `provider_hospitals.hospital_system`, and `enrichLocationWithHospitalData` joins provider NPIs to their hospital affiliations. The `getLocationHealthSystem` function returns the health system for a given NPI. This is the correct approach since `provider_hospitals` is the authoritative source for hospital/health system affiliations.
 
 ---
 
 ## Recommendations
 
-1. **Do not re-enable the locations route without a service rewrite.** Uncommenting the route in `index.ts` will cause immediate runtime errors because `prisma.location` does not exist.
+1. **Activate `address_hash`**: Populate the column with normalized address hashes (lowercase, abbreviation-expanded, whitespace-normalized) and use it for co-location grouping instead of raw address matching.
 
-2. **Choose a rewrite strategy.** The prompt outlines three options:
-   - **Option A (Recommended for quick wins):** Create a PostgreSQL view or materialized view that groups `practice_locations` by normalized address. Add a separate `locations_metadata` table for facility names, health systems, and facility types. This avoids schema migration on the main table.
-   - **Option B:** Restore a `Location` model alongside `practice_locations` with FK linking. Clean separation but more complex migration.
-   - **Option C:** Add columns (`facility_name`, `health_system`, `facility_type`) directly to `practice_locations`. Simplest code change but creates data duplication across rows sharing the same address.
+2. **Add location-to-location navigation**: The `ColocatedProviders` component currently links overflow to search results. Add a direct link to `/location/[id]` for the location itself.
 
-3. **Leverage `provider_hospitals` for health system identification.** The `hospital_system` field in `provider_hospitals` contains health system names (e.g., "HCA Healthcare") that could populate location-level metadata without external data sources.
+3. **Create a materialized view** for grouped locations (unique addresses with provider counts, facility names from `provider_hospitals`, health systems). Refresh periodically or on data import.
 
-4. **Address normalization is prerequisite for grouping.** Before any grouping strategy works, addresses must be normalized (e.g., "123 Main St" vs "123 Main Street" vs "123 MAIN ST"). Consider using a library or PostgreSQL function for address standardization.
+4. **Fix the frontend type mismatch**: The `Location` TypeScript type includes `name`, `healthSystem`, `facilityType`, and `providerCount` fields that do not exist on `practice_locations`. These need to come from enrichment joins or computed values in the API response.
 
-5. **ColocatedProviders component can work without the full Location feature.** A simple address-match query on `practice_locations` (same `address_line1`, `city`, `state`, `zip_code`, different `npi`) could power the colocated providers feature without rebuilding the entire location abstraction.
-
-6. **Prioritize based on user value.** If location browsing (all providers at a hospital) is not a near-term priority, consider implementing only the colocated-providers query and deferring the full location search/browse feature.
+5. **Add location search mode**: The breadcrumb in the detail page links to `/search?mode=locations`, confirming a location search mode is expected in the frontend search page.

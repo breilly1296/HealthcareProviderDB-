@@ -1,83 +1,238 @@
-# TTL & Data Expiration Strategy — Analysis
+# TTL & Data Expiration
 
-**Generated:** 2026-02-05
-**Source Prompt:** prompts/32-ttl-data-expiration.md
-**Status:** Fully Implemented -- TTL on verifications and plan acceptances with cleanup endpoints and stats
+**Last Updated:** 2026-02-06
+**TTL Duration:** 6 months (180 days, `VERIFICATION_TTL_MS = 6 * 30 * MS_PER_DAY`)
+
+## Current Status
+
+| Metric | Value |
+|--------|-------|
+| TTL constant | `VERIFICATION_TTL_MS` = 15,552,000,000 ms (180 days) |
+| Schema: expiresAt on VerificationLog | Present, nullable, indexed |
+| Schema: expiresAt on ProviderPlanAcceptance | Present, nullable, indexed |
+| Admin cleanup endpoint | Active, secured with X-Admin-Secret |
+| Admin stats endpoint | Active, secured with X-Admin-Secret |
+| Backfill script | Complete, supports dry-run and apply modes |
+
+## Cleanup Schedule
+- Frequency: Designed for hourly (via Cloud Scheduler)
+- Cloud Scheduler: **Not configured** (no Cloud Scheduler job found in codebase)
+- Last run: Unknown
+- Records cleaned: Unknown
+
+## Backfill Status
+- Backfill script: Complete (`scripts/backfill-verification-ttl.ts`)
+- Records with TTL: Unknown (requires database query)
+- Backfill needed: Likely yes (script exists specifically for this purpose)
 
 ---
 
-## Findings
+## Schema Verification
 
-### Schema (`packages/backend/prisma/schema.prisma`)
+### ProviderPlanAcceptance (lines 181-206 of schema.prisma)
+```prisma
+expiresAt DateTime? @map("expires_at") @db.Timestamptz(6)
+```
+- **Index**: `idx_ppa_expires_at` -- **VERIFIED** for efficient cleanup queries
+- **Also indexed**: `lastVerified` (`idx_ppa_last_verified`) for recency queries
 
-#### ProviderPlanAcceptance
-- [x] **expiresAt field** -- `expiresAt DateTime? @map("expires_at") @db.Timestamptz(6)` on line 186. Nullable to support legacy records without TTL.
-- [x] **lastVerified field** -- `lastVerified DateTime? @map("last_verified") @db.Timestamptz(6)` on line 182.
-- [x] **Index on expiresAt** -- `@@index([expiresAt], map: "idx_ppa_expires_at")` on line 193. Enables efficient cleanup queries.
-- [x] **Index on lastVerified** -- `@@index([lastVerified], map: "idx_ppa_last_verified")` on line 194.
+### VerificationLog (lines 208-243 of schema.prisma)
+```prisma
+expiresAt DateTime? @map("expires_at") @db.Timestamptz(6)
+```
+- **Index**: `idx_vl_expires_at` -- **VERIFIED** for efficient cleanup queries
+- **Also indexed**: `createdAt` (`idx_vl_created_at`) for ordering
 
-#### VerificationLog
-- [x] **expiresAt field** -- `expiresAt DateTime? @map("expires_at") @db.Timestamptz(6)` on line 218. Nullable for legacy records.
-- [x] **Index on expiresAt** -- `@@index([expiresAt], map: "idx_vl_expires_at")` on line 224. Enables efficient cleanup queries.
+### Cascade Behavior
+- `ProviderPlanAcceptance.provider` -> `onUpdate: NoAction` (no cascade set for onDelete, defaults to Prisma behavior)
+- `VerificationLog.provider` -> `onUpdate: NoAction`
+- `VoteLog.verification` -> `onDelete: Cascade` -- votes are deleted when their parent verification is deleted
+- **Finding**: The prompt mentions `SetNull` cascades, but the actual schema uses `NoAction` for provider and plan relations. The `VoteLog` -> `VerificationLog` cascade is `onDelete: Cascade`, meaning vote logs are automatically cleaned up when expired verification logs are deleted.
 
-#### VoteLog
-- [x] **Cascade delete on verification** -- `@relation(fields: [verificationId], references: [id], onDelete: Cascade)` on line 241. When a verification log is deleted during cleanup, associated votes are automatically removed.
+---
 
-#### Cascade Behavior
-- [ ] **SetNull on Provider delete** -- The prompt claims `SetNull` cascade for `ProviderPlanAcceptance.providerNpi` and `VerificationLog.providerNpi`. However, the schema shows `@relation(fields: [providerNpi], references: [npi], onUpdate: NoAction)` with no explicit `onDelete` for ProviderPlanAcceptance (line 187) and `onUpdate: NoAction` for VerificationLog (line 220). Prisma defaults to `Restrict` when `onDelete` is not specified, meaning provider deletion would fail if related records exist -- not silently set to null.
+## TTL Calculation -- VERIFIED
 
-### TTL Calculation (`packages/backend/src/services/verificationService.ts`)
-- [x] **TTL constant** -- Uses `VERIFICATION_TTL_MS` from `config/constants.ts`, defined as `6 * 30 * MS_PER_DAY` = 180 days (6 months). Research-documented: "12% annual provider turnover."
-- [x] **getExpirationDate()** -- `new Date(Date.now() + VERIFICATION_TTL_MS)`. Applied consistently to both verification logs and plan acceptances.
-- [x] **TTL on verification creation** -- `submitVerification()` passes `expiresAt: getExpirationDate()` to `prisma.verificationLog.create()` (line 397).
-- [x] **TTL on acceptance creation** -- `upsertAcceptance()` passes `expiresAt: getExpirationDate()` on both create (line 251) and update (line 229) paths.
-- [x] **TTL filter on queries** -- `notExpiredFilter()` helper returns `{ OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }` -- includes legacy records (null) and non-expired records. Used in `getRecentVerifications()`, `getVerificationsForPair()`, and `countVerificationConsensus()`.
-- [x] **includeExpired option** -- `getRecentVerifications()` and `getVerificationsForPair()` accept `{ includeExpired?: boolean }` parameter, defaulting to false.
-- [x] **expiresAt exposed in API** -- Selected in query results for transparency (line 645, line 730).
-- [x] **Acceptance expiration check** -- `getVerificationsForPair()` calculates `isAcceptanceExpired` boolean (line 739-741).
+**Location**: `packages/backend/src/services/verificationService.ts`
 
-### Cleanup Implementation (`packages/backend/src/services/verificationService.ts`)
-- [x] **cleanupExpiredVerifications()** -- Full implementation at lines 768-855. Counts expired records, then deletes in batches.
-- [x] **Dry run mode** -- When `dryRun: true`, returns counts without deleting.
-- [x] **Batch size** -- Accepts `batchSize` parameter (default 1000). Includes safety check to break infinite loops (`if (deleteResult.count < batchSize) break`).
-- [x] **Handles both tables** -- Deletes from both `verificationLog` and `providerPlanAcceptance`.
-- [x] **Null-safe filter** -- Uses `{ expiresAt: { lt: now, not: null } }` to avoid deleting legacy records without TTL.
-- [ ] **Batch size not enforced per query** -- The `batchSize` parameter is accepted but the actual `deleteMany` call does not use `take: batchSize`. It deletes ALL matching records in a single query. The while loop and batchSize comparison provide a safety net but don't actually batch the deletes. This could cause issues with very large backlogs.
+```typescript
+export const VERIFICATION_TTL_MS = 6 * 30 * MS_PER_DAY; // From constants.ts
 
-### Expiration Stats (`packages/backend/src/services/verificationService.ts`)
-- [x] **getExpirationStats()** -- Lines 860-920. Returns comprehensive stats including: total, withTTL, expired, expiringWithin7Days, expiringWithin30Days for both verificationLogs and planAcceptances. Uses 10 parallel Prisma queries.
+export function getExpirationDate(): Date {
+  return new Date(Date.now() + VERIFICATION_TTL_MS);
+}
+```
 
-### Admin Endpoints (`packages/backend/src/routes/admin.ts`)
-- [x] **POST /admin/cleanup-expired** -- Lines 68-94. Protected by `adminAuthMiddleware`. Accepts `dryRun` and `batchSize` query params. Returns structured cleanup results with human-readable message.
-- [x] **GET /admin/expiration-stats** -- Lines 102-113. Protected by `adminAuthMiddleware`. Returns stats from `getExpirationStats()`.
-- [x] **Admin auth with timing-safe comparison** -- Uses `crypto.timingSafeEqual()` to prevent timing attacks. Returns 503 when `ADMIN_SECRET` not configured (graceful degradation).
-- [x] **GET /admin/health (includes retention)** -- Lines 121-182. Includes `verificationLogExpiringSoon` count.
-- [x] **GET /admin/retention/stats** -- Lines 325-431. Comprehensive retention stats across all log types including verification logs (7-day/30-day expiring), sync logs (90-day retention), plan acceptances, and vote logs.
-- [x] **POST /admin/cleanup/sync-logs** -- Lines 255-317. Separate cleanup for sync_logs with configurable retention days (default 90).
+**Where TTL is applied:**
+1. **New verifications** (`submitVerification`): `expiresAt: getExpirationDate()` on both `verificationLog.create()` and `providerPlanAcceptance.create()`/`update()`
+2. **Acceptance updates** (`upsertAcceptance`): TTL is refreshed on every new verification: `expiresAt: getExpirationDate()`
+
+**Finding**: The TTL is refreshed (extended) every time a new verification is submitted for the same provider-plan pair. This means actively verified data never expires -- only stale, unverified data expires after 6 months.
+
+---
+
+## Expired Record Filtering -- VERIFIED
+
+The `notExpiredFilter()` helper function handles both legacy records (no TTL) and active TTL:
+
+```typescript
+function notExpiredFilter(): Prisma.VerificationLogWhereInput {
+  return {
+    OR: [
+      { expiresAt: null },              // Legacy records without TTL
+      { expiresAt: { gt: new Date() } }, // Not yet expired
+    ],
+  };
+}
+```
+
+This filter is applied in:
+- `countVerificationConsensus()` -- only counts non-expired verifications for consensus
+- `getRecentVerifications()` -- excludes expired by default (`includeExpired` option)
+- `getVerificationsForPair()` -- excludes expired by default (`includeExpired` option)
+
+**Finding**: The filter correctly handles backward compatibility with records that predate TTL implementation by treating `expiresAt: null` as non-expired.
+
+---
+
+## Admin Endpoints -- VERIFIED
+
+### `POST /api/v1/admin/cleanup-expired`
+- **Authentication**: `adminAuthMiddleware` with timing-safe comparison of `X-Admin-Secret`
+- **Query params**: `dryRun=true`, `batchSize=1000`
+- **Implementation**: Calls `cleanupExpiredVerifications()` from verificationService
+- **Response**: Counts of expired and deleted records for both tables
+
+### `GET /api/v1/admin/expiration-stats`
+- **Authentication**: Same admin auth
+- **Response**: Total, withTTL, expired, expiringWithin7Days, expiringWithin30Days for both tables
+
+### `GET /api/v1/admin/retention/stats` (additional, not in prompt)
+- Comprehensive retention statistics across all log types
+- Includes verification logs, sync logs, plan acceptances, and vote logs
+- Shows oldest/newest records, expiring counts at 7 and 30 day horizons
+
+### `GET /api/v1/admin/health` (additional, not in prompt)
+- Includes retention metrics: verification log total, expiring in 7 days, oldest record
+- Also shows sync log and vote log totals
+
+---
+
+## Cleanup Implementation -- VERIFIED
+
+**Location**: `verificationService.ts`, `cleanupExpiredVerifications()` (lines 767-854)
+
+```typescript
+export async function cleanupExpiredVerifications(options) {
+  // 1. Count expired records (both tables)
+  // 2. If dryRun, return counts only
+  // 3. Delete expired verification logs in batches
+  // 4. Delete expired plan acceptances in batches
+  // 5. Return cleanup statistics
+}
+```
+
+**Key implementation details:**
+- **Batch deletion**: Uses `while` loop with `deleteMany()`, breaks when `count === 0` or `count < batchSize`
+- **Safety**: `expiresAt: { lt: now, not: null }` -- only deletes records with explicit TTL that have expired, never legacy records
+- **VoteLog cascade**: Deleting a `VerificationLog` automatically cascades to its `VoteLog` entries (confirmed in schema)
+- **Dry run**: Returns counts without executing any deletes
+
+**Potential issue**: The `batchSize` parameter is accepted but not used as a `take` limit in the `deleteMany()` query. The `deleteMany()` call deletes all matching records in one operation, and the `batchSize` is only used as a loop break condition. This means the "batching" is not truly batched -- it relies on Prisma's `deleteMany` to handle all records at once, then checks if fewer than `batchSize` were deleted as a termination condition.
+
+---
+
+## Backfill Script -- VERIFIED
+
+**Location**: `scripts/backfill-verification-ttl.ts` (271 lines)
+
+**Quality: Excellent.** Production-ready script with:
+- **Dry run mode** (default): `npx tsx scripts/backfill-verification-ttl.ts`
+- **Apply mode**: `npx tsx scripts/backfill-verification-ttl.ts --apply`
+- **Transaction safety**: All updates wrapped in `BEGIN`/`COMMIT` with `ROLLBACK` on error
+- **Before/after reporting**: Shows table stats before and after backfill
+- **Expiry breakdown**: Shows already-expired, expiring < 1 month, 1-3 months, > 3 months
+- **Two-phase PPA update**: First updates records with `last_verified` (uses `last_verified + 6 months`), then updates records without `last_verified` (uses `created_at + 6 months`)
+- **VL update**: Updates all records missing TTL with `created_at + 6 months`
+- **Direct SQL**: Uses `pg` Pool (not Prisma) for raw SQL performance
+
+**Corresponding SQL file also exists**: `scripts/backfill-verification-ttl.sql`
+
+---
+
+## Checklist Verification
+
+### Schema
+- [x] expiresAt field on ProviderPlanAcceptance -- **VERIFIED**: `expires_at` Timestamptz(6), nullable
+- [x] expiresAt field on VerificationLog -- **VERIFIED**: `expires_at` Timestamptz(6), nullable
+- [x] Index on expiresAt for efficient cleanup -- **VERIFIED**: `idx_ppa_expires_at` and `idx_vl_expires_at`
+- [x] Cascade behavior -- **PARTIALLY VERIFIED**: VoteLog cascades on VerificationLog delete. Provider/Plan relations use `NoAction` (not `SetNull` as prompt states)
+
+### Admin Endpoints
+- [x] POST /admin/cleanup-expired -- **VERIFIED**: With dry run, batch size, admin auth
+- [x] GET /admin/expiration-stats -- **VERIFIED**: Comprehensive stats with 7-day and 30-day horizons
+- [x] Dry run mode -- **VERIFIED**: Returns counts without deleting
+- [x] Batch size configuration -- **PARTIALLY VERIFIED**: Parameter accepted but not used as true batch limit
+
+### Automation
+- [ ] Cloud Scheduler job configured -- **NOT CONFIGURED**: No Cloud Scheduler config found
+- [ ] Monitoring on cleanup failures -- **NOT CONFIGURED**: No alerting found
+- [ ] Alerting on large backlogs -- **NOT CONFIGURED**
 
 ### Backfill
-- [x] **Backfill script exists** -- `scripts/backfill-verification-ttl.ts` and `scripts/backfill-verification-ttl.sql` both exist.
-- [ ] **Backfill run status unknown** -- Cannot determine from code whether the backfill has been executed against the production database.
+- [ ] TTL backfill script run -- **SCRIPT EXISTS** but execution status unknown
+- [ ] All records have expiresAt -- **UNKNOWN**: Requires database query
 
-### Cloud Scheduler
-- [ ] **Not verifiable from code** -- Cloud Scheduler configuration is infrastructure, not in the codebase. The endpoint is designed for it (POST with `X-Admin-Secret` header) but whether the job is actually configured cannot be determined from source analysis.
+---
 
-## Summary
+## Questions Answered
 
-The TTL and data expiration strategy is thoroughly implemented at the code level. Both `VerificationLog` and `ProviderPlanAcceptance` have `expiresAt` fields with database indexes for efficient queries. The verification service consistently sets TTL on creation and update, and filters out expired records by default in all query methods while preserving backward compatibility with legacy null-TTL records. The cleanup function supports dry run, batch processing, and both tables. Admin endpoints provide cleanup trigger, expiration stats, and comprehensive retention monitoring.
+### 1. Is Cloud Scheduler configured?
+**No.** No Cloud Scheduler configuration was found in the codebase. The admin cleanup endpoint is ready to be called by a scheduler (accepts POST with admin secret header), but the scheduler job itself has not been set up. The endpoint documentation in `admin.ts` says "Designed to be called by Cloud Scheduler" confirming the intent.
 
-The implementation is more thorough than what the prompt describes: the `notExpiredFilter()` helper gracefully handles legacy records, expiration status is exposed transparently in API responses, and retention stats include 7-day and 30-day lookahead windows.
+### 2. Has backfill been run?
+**Unknown from code alone.** The backfill script (`scripts/backfill-verification-ttl.ts`) is complete and production-ready. It supports dry-run mode for safe preview. The script's existence of the "nothing to do" early exit path suggests it was designed to be idempotent and run multiple times.
+
+### 3. What's the current expiration backlog?
+**Unknown from code alone.** The `GET /api/v1/admin/expiration-stats` endpoint provides this information at runtime. The `GET /api/v1/admin/retention/stats` endpoint provides even more detailed breakdown including 7-day and 30-day horizons.
+
+### 4. Should TTL be configurable?
+**Currently hardcoded at 6 months.** The constant `VERIFICATION_TTL_MS` in `constants.ts` is well-documented with research justification (12% annual provider turnover). Making it configurable via environment variable would be low-effort:
+```typescript
+export const VERIFICATION_TTL_MS = parseInt(process.env.VERIFICATION_TTL_DAYS || '180') * MS_PER_DAY;
+```
+
+**Different TTL per source**: Not currently implemented but would add value. CMS data (government-verified) could have a longer TTL (12 months) while crowdsource data keeps the 6-month TTL. The `dataSource` field on VerificationLog already supports this differentiation.
+
+### 5. Should we notify before expiration?
+**Not currently implemented.** The `recommendReVerification` metadata from the confidence scoring service already identifies records approaching staleness (80% of freshness threshold). This could be surfaced in the UI to encourage re-verification before expiration. Email notification would require user authentication (currently absent).
+
+---
+
+## Issues
+
+1. **No Cloud Scheduler**: The cleanup endpoint exists but no automated scheduling is configured. Expired records accumulate until manually cleaned.
+
+2. **Batch deletion is not truly batched**: The `cleanupExpiredVerifications` function uses a while loop but `deleteMany()` deletes all matching records in one call. For large backlogs, this could be a heavy database operation.
+
+3. **Cascade behavior differs from documentation**: The prompt states `SetNull` cascades for Provider/Plan deletes, but the actual schema uses `NoAction`. This means deleting a provider would fail if they have verification logs or plan acceptances (foreign key constraint), rather than setting the FK to null.
+
+4. **Legacy records never expire**: The `notExpiredFilter()` treats `expiresAt: null` as non-expired. Until the backfill script is run, all pre-TTL records remain indefinitely.
+
+5. **No confidence recalculation on TTL refresh**: When `expiresAt` is extended via a new verification, the TTL is refreshed but the confidence score recalculation uses the new verification data. However, the admin `recalculate-confidence` endpoint exists for bulk recalculation with time-based decay.
+
+---
 
 ## Recommendations
 
-1. **Fix batch delete implementation** -- The `cleanupExpiredVerifications()` function accepts a `batchSize` parameter but does not actually limit each `deleteMany` call. For large backlogs, this could cause long-running transactions. Add `take: batchSize` to the Prisma queries or use raw SQL with `LIMIT`.
+1. **Configure Cloud Scheduler**: Create the hourly cleanup job targeting `POST /api/v1/admin/cleanup-expired` with the admin secret. Start with `dryRun=true` to verify before enabling actual deletion.
 
-2. **Verify cascade behavior** -- The prompt claims `SetNull` cascade on provider/plan delete, but the schema uses `NoAction` for `onUpdate` and defaults to `Restrict` for `onDelete`. If providers are ever removed from the database, related records will block deletion. Either add explicit `onDelete: SetNull` or document that providers are never deleted.
+2. **Run the backfill script**: Execute `npx tsx scripts/backfill-verification-ttl.ts` in dry-run mode first, review the output, then run with `--apply`.
 
-3. **Run backfill if not done** -- The backfill scripts exist but there is no record of execution. Run against production with a dry-run first to identify records missing `expiresAt`. Monitor the count of records with `expiresAt: null` via the `/admin/expiration-stats` endpoint.
+3. **Implement true batch deletion**: Replace the current `deleteMany()` loop with `DELETE ... LIMIT $batchSize` using raw SQL, or use Prisma's `findMany` + `deleteMany` with `take` to truly batch the operation.
 
-4. **Configure Cloud Scheduler** -- The cleanup endpoint is ready but the prompt's checklist shows Cloud Scheduler as unconfigured. Set up a Cloud Scheduler job to POST to `/api/v1/admin/cleanup-expired` hourly with the `X-Admin-Secret` header.
+4. **Add monitoring**: Set up alerts on the `GET /api/v1/admin/expiration-stats` endpoint. Alert when expired records exceed a threshold (e.g., > 1000) indicating the cleanup job may not be running.
 
-5. **Add monitoring alerts** -- Set up alerts for: (a) cleanup failures (non-200 responses from the endpoint), (b) large expired record backlogs (e.g., > 1000 expired records pending cleanup), (c) backfill completeness (records still having null expiresAt).
+5. **Make TTL configurable**: Move from hardcoded constant to environment variable to enable per-environment tuning without code changes.
 
-6. **Add locationId to schema** -- The `verificationService.ts` code references `locationId` on `ProviderPlanAcceptance` (lines 246, 349-351, 361) but this field does not exist in `schema.prisma`. This suggests either the field was removed during a schema refactor or needs to be added. The code will silently fail to match location-specific records.
+6. **Add source-based TTL**: Implement different TTL durations based on verification source (CMS: 12 months, carrier: 9 months, crowdsource: 6 months).

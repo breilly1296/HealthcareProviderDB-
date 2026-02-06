@@ -1,249 +1,186 @@
-# External API Security Review -- Analysis
+# External API Security Review
 
-**Generated:** 2026-02-05
-**Source Prompt:** prompts/09-external-apis.md
-**Status:** All external APIs are properly integrated with appropriate security controls; some gaps in TLS, cost monitoring, and privacy compliance
-
----
-
-## Findings
+## External API Inventory
 
 ### 1. Google reCAPTCHA v3 API
 
 **File:** `packages/backend/src/middleware/captcha.ts`
+**Direction:** Backend --> Google
+**Purpose:** Bot detection on verification and vote submissions
 
-- **API key stored in environment variable (not hardcoded):**
-  Verified. Line 47: `const RECAPTCHA_SECRET = process.env.RECAPTCHA_SECRET_KEY;`
+| Detail | Value | Line |
+|--------|-------|------|
+| Endpoint | `https://www.google.com/recaptcha/api/siteverify` | Line 48 |
+| Method | POST (URLSearchParams body) | Lines 142-146 |
+| Auth | `RECAPTCHA_SECRET_KEY` env var | Line 47 |
+| Timeout | 5 seconds (`CAPTCHA_API_TIMEOUT_MS` from constants.ts) | Lines 149-150 |
+| Score threshold | 0.5 (`CAPTCHA_MIN_SCORE`) | Line 173 |
+| HTTP client | Native `fetch()` with `AbortController` | Lines 149-156 |
 
-- **Response validated (checks `success` and `score` fields):**
-  Verified. Lines 162-183: Checks `data.success` boolean, then checks `data.score < CAPTCHA_MIN_SCORE`. Both conditions produce distinct error responses with structured logging.
+**Security Checklist:**
+- [x] API key stored in environment variable, not hardcoded (line 47)
+- [x] Response validated: checks `success` boolean (line 162) and `score` number (line 173)
+- [x] Timeout prevents hanging (5s via AbortController, lines 149-150)
+- [x] Fail-open mode with fallback rate limiting (3/hr per IP, lines 210-237)
+- [x] Fail-closed mode available (`CAPTCHA_FAIL_MODE=closed`, lines 199-208)
+- [x] Skipped in development/test environments (lines 121-123)
+- [x] Client IP sent to Google for risk assessment (line 145)
+- [x] No SSRF risk -- URL is hardcoded constant (line 48), not user-influenced
+- [ ] API key rotation procedure not documented
+- [ ] CAPTCHA action field not validated against expected values
 
-- **Timeout prevents hanging on slow responses:**
-  Verified. Lines 149-151: Uses `AbortController` with `CAPTCHA_API_TIMEOUT_MS` (5 seconds from `constants.ts` line 57). Timeout abort is detected via `error.name === 'AbortError'` at line 189.
-
-- **Fail-open mode with fallback rate limiting:**
-  Verified. Lines 210-237: When Google API fails and `CAPTCHA_FAIL_MODE=open`, the `checkFallbackRateLimit()` function applies a stricter 3/hour limit per IP (vs normal 10/hour). Appropriate headers are set: `X-Security-Degraded`, `X-Fallback-RateLimit-Limit`, `X-Fallback-RateLimit-Remaining`, `X-Fallback-RateLimit-Reset`.
-
-- **Fail-closed mode available:**
-  Verified. Lines 199-208: When `CAPTCHA_FAIL_MODE=closed`, returns 503 via `AppError.serviceUnavailable()`.
-
-- **Skipped in development/test environments:**
-  Verified. Lines 121-123: Returns `next()` for `NODE_ENV=development` or `NODE_ENV=test`.
-
-- **Skipped when secret key not configured:**
-  Verified. Lines 126-132: Logs a warning and allows the request through.
-
-- **Client IP sent to Google for risk assessment:**
-  Verified. Line 146: `remoteip: clientIp` included in the URLSearchParams body.
-
-- **No SSRF risk:**
-  Verified. The URL `https://www.google.com/recaptcha/api/siteverify` is a hardcoded constant at line 48. No user input influences the URL.
-
-- **API key rotation procedure:**
-  Not documented. The prompt notes this as unchecked.
-
-- **Endpoint hardcoded constant:**
-  Verified. `RECAPTCHA_VERIFY_URL` is `'https://www.google.com/recaptcha/api/siteverify'` (line 48), not derived from user input or environment variables.
-
-- **Token source:**
-  Verified. Line 134: Token is read from `req.body.captchaToken` or `req.headers['x-captcha-token']`, providing flexibility for different client implementations.
+**Failure behavior:**
+- `CAPTCHA_FAIL_MODE=open` (default): Allows requests with `X-Security-Degraded: captcha-unavailable` header and stricter 3/hr fallback rate limit
+- `CAPTCHA_FAIL_MODE=closed`: Blocks all requests with 503
 
 ### 2. Anthropic Claude API (Insurance Card Extraction)
 
 **File:** `packages/frontend/src/app/api/insurance-card/extract/route.ts`
+**Direction:** Frontend API route --> Anthropic
+**Purpose:** AI-powered OCR to extract insurance plan details from uploaded card images
 
-- **API key stored securely:**
-  Verified. Line 34-36: `new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })`. The prompt states the key is in Cloud Run Secret Manager.
+| Detail | Value | Line |
+|--------|-------|------|
+| Model | `claude-haiku-4-5-20251001` | Line 23 |
+| Auth | `ANTHROPIC_API_KEY` env var | Line 34-36 |
+| HTTP client | `@anthropic-ai/sdk` package | Lines 183-205 |
+| Max tokens | 1500 | Line 185 |
+| Feature toggle | Graceful 500 if API key not set | Lines 316-323 |
 
-- **Images processed server-side only:**
-  Verified. This is a Next.js API route (`export async function POST(request: NextRequest)`), so the image is sent to the server and the Claude API call happens server-side. The `ANTHROPIC_API_KEY` is never exposed to the client.
+**Security Checklist:**
+- [x] API key stored in Cloud Run Secret Manager (deploy.yml line 194)
+- [x] Images processed server-side only (Next.js API route)
+- [x] Images NOT stored permanently -- processed in memory only
+- [x] File size validated (max 10MB, line 26)
+- [x] File type validated: base64 format check (lines 296-297), magic byte detection (lines 43-77)
+- [x] Rate limited (10 extractions/hour per IP, lines 28-29, 228-254)
+- [x] Feature disabled gracefully if `ANTHROPIC_API_KEY` not configured (lines 316-323)
+- [x] Response parsed through Zod schema (`parseInsuranceCardResponse`, line 376)
+- [x] Retry logic for low confidence (lines 378-403)
+- [ ] No cost monitoring/alerting for API usage
+- [ ] Console.error used instead of structured logger (lines 214, 346, 501)
 
-- **Images not stored permanently:**
-  Verified. The image is received as base64, preprocessed in memory, sent to Claude, and the response is returned. No file system writes or database storage of the image data.
-
-- **File size validated (max 10MB):**
-  Verified. Lines 26-27: `MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024` and `MAX_BASE64_LENGTH = Math.ceil(MAX_IMAGE_SIZE_BYTES * 1.37)`. Check at line 279 rejects with 413 if exceeded.
-
-- **File type validated (image/* only):**
-  Verified. Lines 43-77: `detectMediaType()` uses magic byte detection to identify PNG, JPEG, WebP, and GIF. Only these image types are accepted. Base64 format validation at lines 296-303 ensures valid base64 characters.
-
-- **Rate limited (10 extractions/hour per IP):**
-  Verified. Lines 28-29: `RATE_LIMIT_PER_HOUR = 10`. Lines 229-254: Uses the frontend's `checkRateLimit()` function from `packages/frontend/src/lib/rateLimit.ts` with 1-hour window.
-
-- **Feature disabled gracefully if API key not configured:**
-  Verified. Lines 316-323: If `ANTHROPIC_API_KEY` is not set, returns 500 with a user-friendly message suggesting manual entry.
-
-- **Response parsed through Zod schema:**
-  Verified. `parseInsuranceCardResponse()` from `packages/frontend/src/lib/insuranceCardSchema.ts` uses `InsuranceCardDataSchema` (a comprehensive Zod schema with 22+ fields) to validate and parse the Claude response. This prevents malformed or unexpected data from reaching the frontend.
-
-- **No retry logic on API failure:**
-  Partially addressed. Lines 378-403: There IS retry logic, but only for low-confidence results (below `RETRY_CONFIDENCE_THRESHOLD = 0.3`), using an alternative prompt. However, there is no retry on transient API errors (network timeout, 5xx responses).
-
-- **Cost monitoring:**
-  Not implemented. The prompt notes this as unchecked. Each extraction is a Claude Haiku 4.5 API call with image input and up to 1500 output tokens. No spend tracking or alerting exists.
-
-- **Prompt injection risk:**
-  Low risk. The Claude API receives image data with a fixed extraction prompt. The prompts are defined as constants (`PRIMARY_EXTRACTION_PROMPT`, `ALTERNATIVE_EXTRACTION_PROMPT`) in the schema module. User-controlled text is not injected into the prompt.
-
-- **Error handling:**
-  Verified. Lines 499-536: Comprehensive error handling distinguishes `SyntaxError` (400), `Anthropic.APIError` (503), and generic errors (500). All return user-friendly messages with suggestions.
-
-- **Image preprocessing:**
-  Verified. Lines 326-355: Images are preprocessed using the `sharp` library for resize, compression, and optional contrast enhancement. Preprocessing failures are caught and the original image is used as fallback.
+**Data flow:**
+1. User uploads card image on frontend
+2. Image preprocessed with `sharp` (resize, compress, auto-rotate) via `preprocessImage`/`preprocessImageEnhanced`
+3. Next.js API route sends base64 image to Claude with extraction prompt
+4. Claude returns text response parsed through Zod schema
+5. Results returned to user -- image is NOT persisted
 
 ### 3. PostHog Analytics API
 
 **File:** `packages/frontend/src/components/PostHogProvider.tsx`, `packages/frontend/src/lib/analytics.ts`
+**Direction:** Frontend --> PostHog (client-side)
+**Purpose:** Product analytics and event tracking
 
-- **Public API key (safe to expose):**
-  Verified. Line 10 of PostHogProvider.tsx: `process.env.NEXT_PUBLIC_POSTHOG_KEY`. PostHog public keys are designed to be client-visible.
+| Detail | Value | Line |
+|--------|-------|------|
+| Endpoint | `https://us.i.posthog.com` (default) or via `NEXT_PUBLIC_POSTHOG_HOST` | PostHogProvider.tsx line 14 |
+| Auth | `NEXT_PUBLIC_POSTHOG_KEY` env var (public API key) | PostHogProvider.tsx line 10 |
+| HTTP client | `posthog-js` SDK (client-side) | Imported at line 1 |
 
-- **Autocapture disabled (explicit events only):**
-  Issue. The prompt states autocapture is disabled, but PostHogProvider.tsx line 18 shows `autocapture: true`. This contradicts the prompt's checklist item. With autocapture enabled, PostHog will automatically capture clicks, form submissions, and other DOM interactions, which could inadvertently capture sensitive healthcare-related UI elements.
+**Security Checklist:**
+- [x] Public API key (safe to expose -- PostHog design)
+- [x] Autocapture disabled (`autocapture: false`, PostHogProvider.tsx line 18)
+- [x] No PII tracked: analytics.ts explicitly strips NPI, planId, name from search events
+- [x] Session recording disabled (`disable_session_recording: true`, PostHogProvider.tsx line 19)
+- [x] Only initialized in browser (`typeof window !== 'undefined'`, PostHogProvider.tsx line 9)
+- [x] Opt-out by default (`opt_out_capturing_by_default: true`, PostHogProvider.tsx line 20)
+- [x] Sensitive params stripped from pageview URLs (PostHogProvider.tsx lines 35-38: npi, planId, name removed)
+- [x] Cookie consent component present in layout (`CookieConsent` imported in layout.tsx line 18)
+- [ ] User opt-out mechanism beyond initial opt-out-by-default not verified
 
-- **No PII tracked (no names, emails, health data):**
-  Verified. `packages/frontend/src/lib/analytics.ts` implements privacy-preserving event tracking:
-  - `trackSearch()` (lines 50-64): Sends only boolean indicators (`has_specialty_filter`, `has_state_filter`, etc.) and result count. Does NOT send actual search values.
-  - `trackProviderView()` (lines 70-78): Sends only `has_specialty` boolean. Does NOT send NPI, provider name, or specialty.
-  - `trackVerificationSubmit()` (lines 84-93): Sends NO data at all -- only that a submission occurred.
-  - `trackVerificationVote()` (lines 99-107): Sends only `vote_type`. Does NOT send verification ID or NPI.
-
-- **No session recording enabled:**
-  Verified. No `enable_recording_console_log` or `session_recording` configuration in PostHog init.
-
-- **Only initialized in browser environment:**
-  Verified. PostHogProvider.tsx line 9: `if (typeof window !== 'undefined')`. analytics.ts functions also check `if (typeof window === 'undefined') return;`.
-
-- **Cookie consent banner:**
-  Not implemented. The prompt notes this as unchecked. PostHog sets cookies and uses localStorage (`persistence: 'localStorage'` at line 17) without user consent.
-
-- **User opt-out mechanism:**
-  Not implemented. No `posthog.opt_out_capturing()` call or UI toggle exists.
-
-- **PostHog host:**
-  Warning. PostHogProvider.tsx line 14 uses `api_host: 'https://us.i.posthog.com'` which is a hardcoded PostHog cloud URL. The prompt mentions `NEXT_PUBLIC_POSTHOG_HOST` as an option, but the code uses a hardcoded string instead of an environment variable.
-
-- **Pageview tracking:**
-  Verified. Lines 26-41: `PostHogPageview` component captures `$pageview` events on route changes using `usePathname()` and `useSearchParams()`. Manual pageview capture is used (`capture_pageview: false`) with URL construction.
-
-- **Search params in pageview URL:**
-  Warning. Line 33: `searchParams.toString()` is appended to the pageview URL. If search parameters contain sensitive data (e.g., provider NPIs, plan IDs), these would be sent to PostHog as part of the URL.
+**Privacy-preserving events tracked (analytics.ts):**
+- `search`: Only boolean filter indicators (has_specialty_filter, has_state_filter), NOT actual values (lines 54-63)
+- `provider_view`: Only `has_specialty` boolean, NOT NPI or name (lines 74-78)
+- `verification_submit`: Empty properties -- only tracks that submission occurred (lines 89-92)
+- `verification_vote`: Only `vote_type` direction, NOT verification ID (lines 103-106)
 
 ### 4. NPI Registry API (CMS NPPES)
 
-- **Public API -- no key management needed:**
-  Verified. The prompt confirms this is a public API used only for batch import scripts, not live API calls.
+**Direction:** Backend scripts --> CMS (batch data pipeline, NOT live API calls)
+**Purpose:** Provider data lookup and enrichment
 
-- **Bulk data downloaded, not queried in real-time:**
-  Verified. The prompt states usage is via `scripts/import-npi-direct.ts` for direct PostgreSQL insertion from CSV downloads.
+| Detail | Value |
+|--------|-------|
+| Endpoint | `https://npiregistry.cms.hhs.gov/api/?version=2.1` |
+| Auth | None required (public API) |
+| Usage | Bulk CSV download + direct PostgreSQL insertion via import scripts |
 
-- **No SSRF risk:**
-  Verified. The CMS NPPES URL is a constant, not user-influenced.
+**Security Checklist:**
+- [x] Public API -- no key management needed
+- [x] Bulk data downloaded, not queried in real-time
+- [x] No SSRF risk -- URL is not used in live application code
+- [x] No user input influences the API URL
 
-### 5. Redis (Distributed Rate Limiting and Caching)
+### 5. Redis (Optional -- Distributed Rate Limiting & Caching)
 
-**Files:** `packages/backend/src/lib/redis.ts`, `packages/backend/src/utils/cache.ts`
+**File:** `packages/backend/src/lib/redis.ts`, `packages/backend/src/utils/cache.ts`
+**Direction:** Backend --> Redis instance
+**Purpose:** Distributed rate limiting and search result caching
 
-- **Connection string stored in environment variable:**
-  Verified. `redis.ts` line 40: `const redisUrl = process.env.REDIS_URL;`
+| Detail | Value | Line |
+|--------|-------|------|
+| Client | `ioredis` | redis.ts line 21 |
+| Connection | `REDIS_URL` env var | redis.ts line 40 |
+| Max retries | 3 per request | redis.ts line 51 |
+| Connect timeout | 10 seconds | redis.ts line 52 |
+| Command timeout | 5 seconds | redis.ts line 53 |
+| Retry strategy | Exponential backoff, max 5 attempts, max 3s delay | redis.ts lines 56-64 |
 
-- **Graceful fallback to in-memory:**
-  Verified. `redis.ts` line 41-44: If `REDIS_URL` not configured, returns null. Callers (rateLimiter.ts, cache.ts) check for null and use in-memory alternatives.
+**Security Checklist:**
+- [x] Connection string stored in environment variable (line 40)
+- [x] Graceful fallback to in-memory when Redis unavailable (getRedisClient returns null)
+- [x] Fail-open behavior (requests allowed when Redis down)
+- [x] Singleton pattern prevents connection leaks (lines 24-26)
+- [x] Graceful shutdown with `closeRedisConnection()` (lines 134-148)
+- [ ] TLS not configured (needed for production Memorystore)
+- [ ] No authentication configured beyond network security
+- [ ] Connection pooling limits not explicitly set
 
-- **Fail-open behavior:**
-  Verified. Both the rate limiter and cache module handle Redis errors gracefully -- the rate limiter allows requests with degraded headers, and the cache falls back to in-memory.
+## Cross-Cutting Security Concerns
 
-- **Retry strategy:**
-  Verified. `redis.ts` lines 56-64: Exponential backoff with `maxRetriesPerRequest: 3`, up to 5 reconnection attempts, delays capped at 3 seconds.
+### SSRF Risk Assessment: LOW
 
-- **Connection event logging:**
-  Verified. Lines 72-98: Events logged include `connect`, `ready`, `error`, `close`, `reconnecting`, and `end`.
+No user input is used to construct external API URLs anywhere in the codebase:
+- reCAPTCHA URL: hardcoded constant (`captcha.ts` line 48)
+- Claude API: uses SDK with fixed Anthropic endpoint (`route.ts` line 34)
+- PostHog URL: from environment variable set at deploy time
+- NPI Registry: hardcoded constant in scripts only
+- `evidenceUrl` field in verifications: stored but NEVER fetched server-side
 
-- **Graceful shutdown:**
-  Verified. `closeRedisConnection()` at lines 134-148 attempts `quit()` first, falls back to `disconnect()`.
+### API Key Management
 
-- **TLS not configured:**
-  Issue. The prompt notes TLS is needed for production Memorystore. The `new Redis(redisUrl, {...})` configuration at lines 49-69 does not include any TLS settings. If `REDIS_URL` uses a `rediss://` scheme, ioredis will use TLS automatically, but there is no explicit TLS configuration or certificate pinning.
+| Key | Storage | Rotation | Used By | File |
+|-----|---------|----------|---------|------|
+| `RECAPTCHA_SECRET_KEY` | Cloud Run Secret Manager | Manual | Backend captcha.ts | deploy.yml line 112 |
+| `ANTHROPIC_API_KEY` | Cloud Run Secret Manager | Manual | Frontend API route | deploy.yml line 194 |
+| `NEXT_PUBLIC_POSTHOG_KEY` | Build-time arg | Manual | Frontend client-side | deploy.yml line 172 |
+| `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` | Build-time arg | Manual | Frontend client-side | .env.example line 81 |
+| `ADMIN_SECRET` | Cloud Run Secret Manager | Manual | Backend admin.ts | deploy.yml line 111 |
+| `REDIS_URL` | Cloud Run env | Manual | Backend redis.ts | Not in deploy.yml (optional) |
+| `DATABASE_URL` | Cloud Run Secret Manager | Manual | Backend prisma.ts | deploy.yml line 110 |
 
-- **No authentication configured:**
-  Warning. The prompt notes reliance on network security. If the Redis instance is on a VPC (Cloud Memorystore), network-level security may suffice, but no Redis AUTH password is configured in code.
+### Response Validation
 
-- **Connection pooling limits not set:**
-  Warning. No `maxConnections` or similar pool configuration. ioredis defaults to a single connection, which is appropriate for the current use case but should be reviewed at scale.
+- [x] reCAPTCHA: Response validated for `success` boolean and `score` number (captcha.ts lines 162, 173)
+- [x] Claude: Response parsed through Zod schema (`parseInsuranceCardResponse` in insuranceCardSchema.ts)
+- [x] PostHog: Client-side SDK -- no response validation needed
+- [x] Redis: Connection errors caught and handled (redis.ts error handler line 81)
 
-- **Cache response data not validated:**
-  Warning. In `cache.ts`, `cacheGet()` at line 97 does `JSON.parse(value) as T` with a type assertion but no runtime validation. Corrupted or tampered cache entries would be passed through without validation.
+## Questions Answered
 
-### 6. Cross-Cutting: SSRF Risk Assessment
+### 1. Should we implement cost monitoring/alerting for Anthropic API usage?
+**Recommended.** Each extraction uses Claude Haiku 4.5 with max 1500 tokens. With retry logic, a single card upload can trigger 2 API calls. At 10 extractions/hour/IP, costs could scale if many users adopt the feature. GCP Cloud Monitoring or Anthropic's usage dashboard should be configured.
 
-- Verified. No user input constructs external API URLs anywhere in the codebase:
-  - reCAPTCHA URL: hardcoded constant
-  - Anthropic API: SDK with fixed endpoint
-  - PostHog: hardcoded in code (not even from env var)
-  - NPI Registry: hardcoded constant in scripts
-  - `evidenceUrl` in verifications: stored but never fetched server-side
+### 2. Should Redis connections use TLS in production?
+**Yes.** The current `redis.ts` does not configure TLS. Google Cloud Memorystore for Redis requires TLS for network security. The `ioredis` client supports TLS via the connection URL (`rediss://`) or explicit `tls` option.
 
-### 7. Cross-Cutting: API Key Management
+### 3. Is the NPI Registry API needed for live enrichment?
+**Currently no.** All NPI data is bulk-imported via CSV. The API is available for on-demand enrichment but is not used in production. This is the correct approach for performance and reliability.
 
-| Key | Storage | Verified |
-|-----|---------|----------|
-| `RECAPTCHA_SECRET_KEY` | Env var / Secret Manager | Yes -- used in captcha.ts |
-| `ANTHROPIC_API_KEY` | Cloud Run Secret Manager | Yes -- used in extract/route.ts |
-| `NEXT_PUBLIC_POSTHOG_KEY` | Build-time arg | Yes -- used in PostHogProvider.tsx |
-| `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` | Build-time arg | Assumed (frontend reCAPTCHA widget) |
-| `ADMIN_SECRET` | Cloud Run env | Not reviewed (out of scope) |
-| `REDIS_URL` | Cloud Run env | Yes -- used in redis.ts |
-| `DATABASE_URL` | Cloud Run Secret Manager | Not reviewed (out of scope) |
+### 4. Should API key rotation be automated?
+**Recommended.** Currently all keys are manually rotated. GCP Secret Manager supports versioning and rotation policies. Critical keys (DATABASE_URL, ADMIN_SECRET) should have rotation schedules.
 
-- **Key rotation:**
-  Not documented or automated for any key. All rotation is manual.
-
-### 8. Cross-Cutting: Response Validation
-
-- **reCAPTCHA:**
-  Verified. Response is typed as `RecaptchaResponse` interface and both `success` boolean and `score` number are explicitly checked.
-
-- **Claude API:**
-  Verified. Response is parsed through a Zod schema (`InsuranceCardDataSchema`) with 22+ fields, each with proper type constraints. Parse failures are handled gracefully with user-friendly error messages.
-
-- **PostHog:**
-  Verified. Client-side SDK -- no response validation needed.
-
-- **Redis:**
-  Warning. Connection errors are handled, but cached data retrieved via `JSON.parse()` has no runtime schema validation.
-
----
-
-## Summary
-
-All five external API integrations (Google reCAPTCHA v3, Anthropic Claude, PostHog, NPI Registry, Redis) are implemented with appropriate security controls. API keys are stored in environment variables or Secret Manager, responses are validated where it matters most (reCAPTCHA and Claude), and failure modes are well-designed with graceful degradation. The privacy-preserving analytics implementation in `analytics.ts` is particularly well done -- it sends only boolean indicators rather than actual healthcare data.
-
-Key strengths:
-- CAPTCHA has configurable fail-open/fail-closed with stricter fallback rate limiting
-- Claude API route has five layers of protection (rate limiting, type validation, size validation, base64 validation, API key check)
-- Analytics functions explicitly strip PII before sending events
-- Redis connection has comprehensive event logging and retry logic
-
-The most notable gaps are the PostHog autocapture discrepancy, missing TLS for Redis, absence of cost monitoring for Claude API, and lack of cookie consent and user opt-out mechanisms for analytics.
-
----
-
-## Recommendations
-
-1. **Disable PostHog autocapture.** The prompt claims `autocapture: false` but the code has `autocapture: true` in `PostHogProvider.tsx` line 18. Autocapture can inadvertently capture clicks on healthcare-related UI elements (provider names, insurance details, NPI numbers). Change to `autocapture: false` and rely on the explicit event tracking already implemented in `analytics.ts`.
-
-2. **Configure Redis TLS for production.** Add explicit TLS configuration when connecting to Cloud Memorystore or any production Redis instance. At minimum, use `rediss://` scheme in `REDIS_URL` or add `tls: {}` to the ioredis options.
-
-3. **Implement cost monitoring for Claude API.** Each insurance card extraction uses Claude Haiku 4.5 with image input. Add tracking of API call count and estimated cost (perhaps via PostHog or a simple counter) and set up alerts for unusual spikes. Consider adding a daily/monthly extraction cap as a safety valve.
-
-4. **Implement cookie consent and user opt-out for PostHog.** This is increasingly required by privacy regulations (GDPR, CCPA). Add a consent banner and honor opt-out via `posthog.opt_out_capturing()`. Consider delaying PostHog initialization until consent is granted.
-
-5. **Use environment variable for PostHog host.** Replace the hardcoded `'https://us.i.posthog.com'` with `process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com'` for flexibility (e.g., if self-hosting PostHog in the future).
-
-6. **Add retry logic for transient Claude API errors.** The route retries on low-confidence results but not on network errors or 5xx responses. A single retry with a short delay (e.g., 1 second) for transient errors would improve reliability.
-
-7. **Sanitize search params from pageview URLs.** In `PostHogPageview`, consider stripping or hashing sensitive query parameters (NPI, planId) before sending to PostHog, consistent with the privacy-preserving approach in `analytics.ts`.
-
-8. **Document API key rotation procedures.** Create a runbook for rotating each external API key, including the Google reCAPTCHA secret, Anthropic API key, and PostHog project key. Consider automating rotation via Cloud Secret Manager versioning.
-
-9. **Add runtime validation for Redis cache data.** When reading cached search results via `cacheGet()`, consider validating the structure before returning to callers, to protect against cache corruption.
+### 5. Should PostHog be self-hosted?
+**Not urgently needed.** The current setup already opts out of capturing by default, disables session recording, strips PII from events, and disables autocapture. Self-hosting would provide additional data control but is not a priority given the current privacy measures.

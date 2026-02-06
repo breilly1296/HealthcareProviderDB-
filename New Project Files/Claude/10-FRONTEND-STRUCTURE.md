@@ -1,259 +1,188 @@
-# Frontend Structure Review -- Analysis
+# Frontend Structure Review
 
-**Generated:** 2026-02-05
-**Source Prompt:** prompts/10-frontend-structure.md
-**Status:** Mostly Accurate -- prompt closely matches codebase with minor omissions and one inaccuracy
+## Technology Stack (Verified)
 
----
+| Technology | Version | Purpose |
+|-----------|---------|---------|
+| Next.js | 14.2 (App Router) | Framework |
+| React | 18.3 | UI library |
+| TailwindCSS | 3.3.6 | Styling (configured in `packages/frontend/tailwind.config.ts`) |
+| @tanstack/react-query | 5.x | Server state management |
+| lucide-react | -- | Icons |
+| react-hot-toast | -- | Toast notifications |
+| focus-trap-react | -- | Modal accessibility |
+| posthog-js | -- | Analytics |
+| @anthropic-ai/sdk | -- | Insurance card OCR |
+| sharp | -- | Server-side image processing |
+| zod | -- | Validation (insurance card schema) |
 
-## Findings
+## Pages (App Router) -- Verified
 
-### Technology Stack
+| Route | File | Description | Verified |
+|-------|------|-------------|----------|
+| `/` | `app/page.tsx` | Home -- Hero, WhyItMatters, HowItWorks, Confidence, CTA | Yes (directory exists) |
+| `/search` | `app/search/page.tsx` | Provider search with form, results, filters, pagination | Yes |
+| `/provider/[npi]` | `app/provider/[npi]/page.tsx` | Provider detail page | Yes |
+| `/location/[locationId]` | `app/location/[locationId]/page.tsx` | Location detail page | Yes |
+| `/insurance` | `app/insurance/page.tsx` | Insurance plan browser / card scanner | Yes |
+| `/research` | `app/research/page.tsx` | Research/methodology page | Yes |
+| `/about` | `app/about/page.tsx` | About page | Yes |
+| `/privacy` | `app/privacy/page.tsx` | Privacy policy | Yes |
+| `/terms` | `app/terms/page.tsx` | Terms of service | Yes |
+| `/disclaimer` | `app/disclaimer/page.tsx` | Medical disclaimer | Yes |
 
-- [x] **Next.js 14.2 (App Router)** -- Verified. `next.config.js` uses App Router conventions; standalone output configured.
-- [x] **React 18.3** -- Verified via imports and hooks usage throughout.
-- [x] **TailwindCSS 3.3.6 + PostCSS** -- Verified. `tailwind.config.ts` exists with `darkMode: 'class'` and custom primary color palette.
-- [x] **@tanstack/react-query 5.x** -- Verified. `QueryProvider.tsx` and `queryClient.ts` present with proper configuration (5min staleTime, 10min gcTime).
-- [x] **lucide-react** -- Referenced in component imports.
-- [x] **react-hot-toast** -- Verified. `ToastProvider.tsx` present in components; `api.ts` imports `toast` from `react-hot-toast`.
-- [x] **focus-trap-react** -- Listed in stack.
-- [x] **posthog-js** -- Verified. `PostHogProvider.tsx` initializes PostHog with `NEXT_PUBLIC_POSTHOG_KEY`.
-- [x] **@anthropic-ai/sdk** -- Verified. Used in `app/api/insurance-card/extract/route.ts` with Claude Haiku 4.5.
-- [x] **sharp** -- Verified. Listed in `serverComponentsExternalPackages` in `next.config.js`.
-- [x] **zod** -- Verified. Used in `admin.ts` imports; `insuranceCardSchema.ts` exists.
-- [x] **SWC Patch** -- Verified. `next.config.js` sets `swcMinify: false` and disables turbopack for ARM64 compatibility.
+**Layout:** `app/layout.tsx` -- Root layout wrapping: `PostHogProvider` > `QueryProvider` > `ThemeProvider` > `CompareProvider` > `ErrorProvider` > `ToastProvider` + `GlobalErrorBanner` + `Header` + `Disclaimer` (banner) + main content + `Footer` + `ScrollToTop` + `CompareBar` + `CookieConsent` + `BottomNav`
 
-### Pages (App Router)
+**Error Handling:** `app/error.tsx` -- Error boundary (confirmed present)
 
-| Route | Prompt Claims | Actual Status |
-|-------|---------------|---------------|
-| `/` | `app/page.tsx` -- Home | Verified. Renders HeroSection, WhyItMattersSection, HowItWorksSection, ConfidenceSection, CTASection. |
-| `/search` | `app/search/page.tsx` -- Provider search | Verified. Complex page with SearchForm, ProviderCard, FilterDrawer, pagination. |
-| `/provider/[npi]` | `app/provider/[npi]/page.tsx` -- Provider detail | Verified. File exists at `app/provider/[npi]/page.tsx`. |
-| `/location/[locationId]` | `app/location/[locationId]/page.tsx` -- Location detail | Verified. File exists at `app/location/[locationId]/page.tsx`. |
-| `/insurance` | `app/insurance/page.tsx` -- Insurance plan browser | Verified. File exists. |
-| `/research` | `app/research/page.tsx` -- Research/methodology | Verified. File exists. |
-| `/about` | `app/about/page.tsx` -- About page | Verified. File exists. |
-| `/privacy` | `app/privacy/page.tsx` -- Privacy policy | Verified. File exists. |
-| `/terms` | `app/terms/page.tsx` -- Terms of service | Verified. File exists. |
-| `/disclaimer` | `app/disclaimer/page.tsx` -- Medical disclaimer | Verified. File exists. |
+**API Route:** `app/api/insurance-card/extract/route.ts` -- Claude API for insurance card OCR
 
-- [x] **Layout:** `app/layout.tsx` wraps with Header, ThemeToggle (via ThemeProvider), BottomNav, ToastProvider, PostHogProvider, QueryProvider, CompareProvider, ErrorProvider, Disclaimer banner, GlobalErrorBanner, Footer, ScrollToTop, CompareBar. This matches the prompt's description.
-- [x] **Error Handling:** `app/error.tsx` exists as a client-side error boundary with try-again and go-home buttons.
-- [x] **API Route:** `app/api/insurance-card/extract/route.ts` exists and uses Claude Haiku 4.5 for card OCR.
+**Sitemap:** `app/sitemap.ts` -- Dynamic sitemap generation
 
-Warning: There is an empty `(main)` route group directory at `app/(main)/` containing empty subdirectories for insurance, location, privacy, research, and terms. These appear to be remnants of a prior refactoring. The actual page files live directly under `app/insurance/`, `app/privacy/`, etc. The prompt does not mention this artifact.
+## Component Architecture (Verified from layout.tsx)
 
-### Component Architecture
+### Root Layout Components (`app/layout.tsx` lines 149-187)
+- `PostHogProvider` -- Analytics wrapper (conditionally initializes)
+- `QueryProvider` -- React Query provider
+- `ThemeProvider` -- Dark/light mode context
+- `CompareProvider` -- Provider comparison state
+- `ErrorProvider` -- Global error state
+- `ToastProvider` -- Toast notifications
+- `GlobalErrorBanner` -- Global error display
+- `Header` -- Main navigation header
+- `Disclaimer` (banner variant) -- Medical disclaimer banner
+- `Footer` -- Inline footer component with quick links, legal links, OwnMyHealth
+- `ScrollToTop` -- Scroll-to-top button
+- `CompareBar` -- Sticky comparison bar
+- `CookieConsent` -- Cookie consent banner
+- `BottomNav` -- Mobile bottom navigation
 
-#### Home Page (`components/home/`)
-- [x] `HeroSection.tsx` -- Verified
-- [x] `WhyItMattersSection.tsx` -- Verified
-- [x] `HowItWorksSection.tsx` -- Verified
-- [x] `ConfidenceSection.tsx` -- Verified
-- [x] `CTASection.tsx` -- Verified
-- [x] `index.ts` barrel export -- Verified (not mentioned in prompt but exists)
+### State Management (Verified)
 
-#### Search & Results
-- [x] `SearchForm.tsx` -- Verified
-- [x] `ProviderCard.tsx` -- Verified
-- [x] `ProviderCardSkeleton.tsx` -- Verified (actual file exports `SearchResultsSkeleton`)
-- [x] `RecentSearches.tsx` -- Verified
+**Server State -- React Query:**
+`packages/frontend/src/components/providers/QueryProvider.tsx` wraps the app.
 
-#### Filtering
-- [x] `FilterButton.tsx` -- Verified
-- [x] `FilterDrawer.tsx` -- Verified
-- [x] `ui/SearchableSelect.tsx` -- Verified
+Custom hooks in `packages/frontend/src/hooks/`:
+- `useProviderSearch.ts` -- Search providers with caching
+- `useCities.ts` -- Get cities for a state
+- `useInsurancePlans.ts` -- Get insurance plans
+- `useHealthSystems.ts` -- Get health systems
+- `useRecentSearches.ts` -- Get recent searches
+- `useCompare.ts` -- Compare context consumer
+- `useSearchForm.ts` -- Search form state
+- `hooks/search/` -- Directory for search-specific hooks (useFilterState, useSearchExecution, useSearchParams)
 
-#### Provider Detail (`components/provider-detail/`)
-- [x] `ProviderHeroCard.tsx` -- Verified
-- [x] `ProviderHeader.tsx` -- Verified
-- [x] `ProviderSidebar.tsx` -- Verified
-- [x] `ProviderPlansSection.tsx` -- Verified
-- [x] `AboutProvider.tsx` -- Verified
-- [x] `ColocatedProviders.tsx` -- Verified
-- [x] `InsuranceList.tsx` -- Verified
-- [x] `ConfidenceGauge.tsx` -- Verified
-- [x] `ScoreBreakdown.tsx` -- Verified
-- [x] `index.ts` barrel export -- Present but not listed in prompt
+**Client State -- React Context:**
+`packages/frontend/src/context/`:
+- `CompareContext.tsx` -- Provider comparison (add/remove/clear, max 4)
+- `ErrorContext.tsx` -- Global error state
+- `ThemeContext.tsx` -- Dark/light/system theme
 
-#### Verification & Voting
-- [x] `ProviderVerificationForm.tsx` -- Verified
-- [x] `VerificationButton.tsx` -- Verified
-- [x] `provider/VerificationTimeline.tsx` -- Verified
-- [x] `provider/VerificationCallToAction.tsx` -- Verified
+### API Client (`packages/frontend/src/lib/api.ts`)
 
-Warning: `components/provider/PlanAcceptanceCard.tsx` exists in the codebase but is NOT listed in the prompt. This is an omission.
+Centralized API client with comprehensive error handling:
 
-#### Comparison (`components/compare/`)
-- [x] `CompareBar.tsx` -- Verified
-- [x] `CompareCheckbox.tsx` -- Verified
-- [x] `CompareModal.tsx` -- Verified
-- [x] `index.ts` barrel export -- Present but not listed
+**Features verified from code:**
+- [x] Retry logic: max 2 retries with exponential backoff (lines 34-39)
+- [x] `ApiError` class with `statusCode`, `code`, `details`, `retryAfter` (lines 51-91)
+- [x] Rate limit detection: extracts `Retry-After` from 429 responses (lines 133-150)
+- [x] Toast notification on rate limit (lines 344-349)
+- [x] `X-Cache` header reading for backend cache status
+- [x] Network error detection and retry (lines 114-127)
+- [x] Abort error handling (no retry on cancelled requests, lines 107-109)
 
-#### Confidence & Scoring
-- [x] `ConfidenceBadge.tsx` -- Verified
-- [x] `ConfidenceScoreBreakdown.tsx` -- Verified
-- [x] `provider/ConfidenceScoreExplainer.tsx` -- Verified
-- [x] `provider/ResearchExplainer.tsx` -- Verified
+**API namespaces (lines 397-661):**
+- `api.providers` -- search, getByNpi, getCities, getPlans, getColocated
+- `api.plans` -- search, getGrouped, getIssuers, getPlanTypes, getById, getProviders
+- `api.verify` -- submit, vote, getStats, getRecent, getForPair
+- `api.locations` -- search, getHealthSystems, getById, getProviders, getStats
 
-#### Insurance
-- [x] `InsuranceCardUploader.tsx` -- Verified
+### Utilities (`packages/frontend/src/lib/`)
 
-#### UI Components
-- [x] `Header.tsx` -- Verified
-- [x] `BottomNav.tsx` -- Verified
-- [x] `ThemeToggle.tsx` -- Verified
-- [x] `ScrollToTop.tsx` -- Verified
-- [x] `LoadingSpinner.tsx` -- Verified
-- [x] `EmptyState.tsx` -- Verified
-- [x] `ErrorMessage.tsx` -- Verified
-- [x] `FreshnessWarning.tsx` -- Verified
-- [x] `WelcomeBackBanner.tsx` -- Verified
-- [x] `SaveProfileButton.tsx` -- Verified
-- [x] `Disclaimer.tsx` -- Verified
-- [x] `LocationCard.tsx` -- Verified
-- [x] `GlobalErrorBanner.tsx` -- Verified
-- [x] `ui/Skeleton.tsx` -- Verified
-- [x] `ui/Shimmer.tsx` -- Verified
+| File | Purpose | Verified |
+|------|---------|----------|
+| `analytics.ts` | PostHog event tracking (privacy-preserving) | Yes (read fully) |
+| `api.ts` | Centralized API client with retry logic | Yes (read fully) |
+| `imagePreprocess.ts` | Image preprocessing for insurance card upload | Yes (referenced in route.ts) |
+| `insuranceCardSchema.ts` | Insurance card Zod schema + extraction prompts | Yes (referenced in route.ts) |
+| `rateLimit.ts` | Client-side rate limiting for API route | Yes (referenced in route.ts) |
 
-Warning: The following files exist in components but are NOT mentioned in the prompt:
-- `components/ToastProvider.tsx` -- Toast notification wrapper (referenced in layout)
-- `components/PostHogProvider.tsx` -- PostHog analytics wrapper (referenced in layout)
-- `components/index.ts` -- Top-level barrel export
-- `components/ui/index.ts` -- UI barrel export
+## Next.js Configuration (`packages/frontend/next.config.js`)
 
-#### Icons & Illustrations
-- [x] `icons/Icons.tsx` -- Verified
-- [x] `illustrations/SearchLandingIllustration.tsx` -- Verified
-- [x] `illustrations/NoResultsIllustration.tsx` -- Verified
+- `reactStrictMode: true`
+- `output: 'standalone'` (Docker deployments)
+- `swcMinify: false` (ARM64 compatibility)
+- `serverComponentsExternalPackages: ['sharp', 'detect-libc']`
+- Security headers applied to all routes:
+  - `X-Content-Type-Options: nosniff`
+  - `X-Frame-Options: DENY`
+  - `X-XSS-Protection: 1; mode=block`
+  - `Referrer-Policy: strict-origin-when-cross-origin`
+  - `Permissions-Policy: camera=(), microphone=(), geolocation=()`
+  - CSP is **commented out** (was blocking API requests)
+
+## Tailwind Configuration (`packages/frontend/tailwind.config.ts`)
+
+- Dark mode: `class` strategy
+- Custom colors: `primary` (blue scale), `confidence` (high=green, medium=yellow, low=red)
+- Font sizes: 18px base for older demographic accessibility
+- Custom animations: shimmer, slide-up, modal-enter, fade-in
+
+## Checklist Verification
+
+### Pages
+- [x] Home with marketing sections (page.tsx + home/ components)
+- [x] Search with results and filters (search/page.tsx)
+- [x] Provider detail with full information (provider/[npi]/page.tsx)
+- [x] Insurance browser (insurance/page.tsx)
+- [x] Legal pages -- privacy, terms, disclaimer (all confirmed in app/)
+- [x] About and research pages (about/page.tsx, research/page.tsx)
+- [x] Error boundary (error.tsx)
 
 ### State Management
+- [x] React Query for server state (QueryProvider.tsx)
+- [x] React Context for client state (CompareContext, ErrorContext, ThemeContext)
+- [x] URL parameter sync for search (hooks/search/ directory)
+- [x] No Redux or other state library needed
 
-#### Server State (React Query)
-- [x] `providers/QueryProvider.tsx` wraps app in `QueryClientProvider` -- Verified in layout.tsx
+### Data Fetching
+- [x] Centralized API client with retry logic (lib/api.ts, fetchWithRetry)
+- [x] React Query hooks for all data needs (hooks/ directory)
+- [x] Error handling with ApiError class (api.ts lines 51-91)
+- [x] Rate limit detection (api.ts lines 133-150, 344-349)
 
-#### Custom Hooks
-- [x] `useProviderSearch` -- Verified at `hooks/useProviderSearch.ts`
-- [x] `useCities` -- Verified at `hooks/useCities.ts`
-- [x] `useInsurancePlans` -- Verified at `hooks/useInsurancePlans.ts`
-- [x] `useHealthSystems` -- Verified at `hooks/useHealthSystems.ts`
-- [x] `useRecentSearches` -- Verified at `hooks/useRecentSearches.ts`
+### UX
+- [x] Dark/light mode (ThemeContext.tsx, tailwind darkMode: 'class')
+- [x] Mobile-responsive with bottom navigation (BottomNav in layout.tsx)
+- [x] Loading skeletons (ProviderCardSkeleton, ui/Skeleton, ui/Shimmer)
+- [x] Empty states (EmptyState component)
+- [x] Toast notifications (react-hot-toast via ToastProvider)
+- [x] Scroll-to-top (ScrollToTop in layout.tsx)
+- [x] Welcome back banner (WelcomeBackBanner component listed)
+- [x] Cookie consent (CookieConsent in layout.tsx)
+- [ ] Offline support / service worker -- NOT implemented
+- [ ] PWA manifest -- NOT implemented
 
-#### Client State (React Context)
-- [x] `context/CompareContext.tsx` -- Verified
-- [x] `context/ErrorContext.tsx` -- Verified
-- [x] `context/ThemeContext.tsx` -- Verified
+### Accessibility
+- [x] Focus trap for modals (focus-trap-react dependency)
+- [x] 18px base font size for older demographic (tailwind.config.ts line 33)
+- [ ] Full keyboard navigation audit -- NOT completed
+- [ ] Screen reader testing -- NOT completed
+- [ ] ARIA labels on all interactive elements -- NOT verified
 
-#### Search State (Custom Hooks)
-- [x] `hooks/useSearchForm.ts` -- Verified
-- [x] `hooks/search/useFilterState.ts` -- Verified
-- [x] `hooks/search/useSearchExecution.ts` -- Verified
-- [x] `hooks/search/useSearchParams.ts` -- Verified
+## Questions Answered
 
-Warning: The prompt lists search hooks at `hooks/useFilterState.ts`, `hooks/useSearchExecution.ts`, `hooks/useSearchParams.ts` without the `search/` subdirectory. The actual files are in `hooks/search/`. The prompt should note the `hooks/search/` subdirectory.
+### 1. Should the location detail page be removed or hidden until the API is re-enabled?
+The location detail page (`app/location/[locationId]/page.tsx`) exists and the backend location routes are fully functional with rate limiting and validation. The location API appears to be enabled. If it was previously disabled, it has been re-enabled.
 
-#### Compare State
-- [x] `hooks/useCompare.ts` -- Verified
+### 2. Is the comparison feature being used? Should it persist to localStorage?
+The comparison feature uses React Context (`CompareContext.tsx`) for state management. Based on the layout, `CompareBar` is rendered globally. The state does NOT persist to localStorage -- it resets on page refresh. Adding localStorage persistence would improve UX for users comparing providers across sessions.
 
-#### Barrel Exports
-- [x] `hooks/index.ts` -- Verified (not mentioned in prompt)
-- [x] `hooks/search/index.ts` -- Verified (not mentioned in prompt)
+### 3. Should we add loading states for all page transitions?
+The app uses React Query which provides `isLoading`/`isFetching` states. Loading skeletons exist for provider cards. A global page transition indicator (e.g., NProgress or Next.js loading.tsx files) is not implemented.
 
-### API Client (`lib/api.ts`)
-- [x] Centralized API client with retry logic -- Verified. `DEFAULT_RETRY_OPTIONS` uses exponential backoff, retries on 429/500/502/503/504.
-- [x] `ApiError` class with statusCode, code, details, retryAfter -- Verified.
-- [x] Rate limit detection from 429 responses -- Verified via `retryableStatuses: [429, ...]`.
-- [x] Cache headers (X-Cache) -- Claimed in prompt; would need full file review to confirm.
-- [x] `providerApi.search()`, `.getByNpi()`, `.getCities()` -- API client methods present.
-- [x] `planApi.search()`, `.getById()`, `.getProvidersForPlan()`, `.getGrouped()`, `.getIssuers()`, `.getTypes()` -- Present.
-- [x] `verifyApi.submit()`, `.vote()`, `.getStats()`, `.getRecent()`, `.getPair()` -- Present.
-- [x] `healthApi.getCities()`, `.getRecentSearches()` -- Present.
+### 4. Are there performance bottlenecks in the search flow?
+Backend search results are cached for 5 minutes (providers.ts line 269). The frontend uses React Query caching. The API client includes retry with exponential backoff. Potential bottleneck: no search debouncing is built into the API client (though `lib/debounce.ts` utility exists for use in components).
 
-### Utilities
-
-- [x] `lib/analytics.ts` -- Verified
-- [x] `lib/constants.ts` -- Verified. Contains page sizes, confidence thresholds, freshness thresholds, acceptance status, states list.
-- [x] `lib/debounce.ts` -- Verified
-- [x] `lib/errorUtils.ts` -- Verified
-- [x] `lib/imagePreprocess.ts` -- Verified
-- [x] `lib/insuranceCardSchema.ts` -- Verified
-
-Warning: The following `lib/` files exist but are NOT mentioned in the prompt:
-- `lib/provider-utils.ts` -- Specialty labels and provider formatting utilities
-- `lib/queryClient.ts` -- QueryClient instance configuration
-- `lib/rateLimit.ts` -- In-memory rate limiter for Next.js API routes
-- `lib/utils.ts` -- Generic utility functions (e.g., `cn()` for class names)
-- `lib/__tests__/` -- Test directory
-
-### Types
-- The prompt mentions `packages/frontend/src/types/` but does not inventory files. Actual content:
-  - `types/index.ts` -- Main type exports
-  - `types/insurance.ts` -- Insurance-specific types
-
-### Checklist Verification
-
-#### Pages
-- [x] Home with marketing sections -- Verified
-- [x] Search with results and filters -- Verified
-- [x] Provider detail with full information -- Verified
-- [x] Insurance browser -- Verified
-- [x] Legal pages (privacy, terms, disclaimer) -- Verified
-- [x] About and research pages -- Verified
-- [x] Error boundary -- Verified
-
-#### State Management
-- [x] React Query for server state -- Verified
-- [x] React Context for client state (compare, error, theme) -- Verified
-- [x] URL parameter sync for search -- Verified (useSearchParams in hooks/search/)
-- [x] No Redux or other state library needed -- Verified
-
-#### Data Fetching
-- [x] Centralized API client with retry logic -- Verified
-- [x] React Query hooks for all data needs -- Verified
-- [x] Error handling with ApiError class -- Verified
-- [x] Rate limit detection -- Verified
-
-#### UX
-- [x] Dark/light mode -- Verified (ThemeContext + ThemeToggle + Tailwind `dark:` classes)
-- [x] Mobile-responsive with bottom navigation -- Verified (BottomNav + `pb-20 md:pb-0` padding)
-- [x] Loading skeletons -- Verified (ProviderCardSkeleton, Skeleton, Shimmer)
-- [x] Empty states -- Verified (EmptyState component)
-- [x] Toast notifications -- Verified (react-hot-toast + ToastProvider)
-- [x] Scroll-to-top -- Verified (ScrollToTop component)
-- [x] Welcome back banner -- Verified (WelcomeBackBanner component)
-- [ ] Offline support / service worker -- Correctly marked as missing
-- [ ] PWA manifest -- Correctly marked as missing
-
-#### Accessibility
-- [x] Focus trap for modals -- Listed in technology stack
-- [ ] Full keyboard navigation audit -- Correctly marked as pending
-- [ ] Screen reader testing -- Correctly marked as pending
-- [ ] ARIA labels on all interactive elements -- Correctly marked as pending
-
----
-
-## Summary
-
-The prompt is a highly accurate representation of the frontend structure. All 10 pages, 40+ components, 9+ hooks, 3 context providers, and the API client described in the prompt exist in the codebase. The technology stack description is correct. The checklist items accurately reflect the current state of implementation.
-
-There are a few minor gaps:
-
-1. **Missing components from prompt inventory:** `PlanAcceptanceCard.tsx`, `ToastProvider.tsx`, `PostHogProvider.tsx`, and barrel export files (`index.ts`) are present in the codebase but not listed.
-2. **Hook path inaccuracy:** Search-related hooks (`useFilterState`, `useSearchExecution`, `useSearchParams`) live in `hooks/search/` subdirectory, not directly under `hooks/`.
-3. **Missing lib files from prompt:** `provider-utils.ts`, `queryClient.ts`, `rateLimit.ts`, `utils.ts`, and a `__tests__/` directory exist but are not documented.
-4. **Empty route group artifact:** An empty `(main)` route group directory exists as a leftover from a prior refactoring.
-5. **Types directory not inventoried:** The prompt references the directory but does not list its contents (`index.ts`, `insurance.ts`).
-
----
-
-## Recommendations
-
-1. **Update prompt component inventory** to include `PlanAcceptanceCard.tsx`, `ToastProvider.tsx`, and `PostHogProvider.tsx`.
-2. **Fix hook paths** in the prompt to show the `hooks/search/` subdirectory for filter/execution/params hooks.
-3. **Add missing lib files** (`provider-utils.ts`, `queryClient.ts`, `rateLimit.ts`, `utils.ts`) to the utilities section.
-4. **Delete empty `(main)` route group** directories at `app/(main)/` to avoid confusion.
-5. **Inventory `types/` directory** in the prompt (currently just referenced without details).
-6. **Consider removing or hiding** the `/location/[locationId]` page if the API remains disabled, as the prompt already flags this question.
-7. **Address accessibility gaps** -- the prompt correctly identifies keyboard navigation, screen reader, and ARIA audits as pending work.
-8. **CSP re-enablement** -- `next.config.js` has Content-Security-Policy commented out with a note it was blocking API requests. This should be addressed for production security.
+### 5. Should we implement server-side rendering for SEO on provider detail pages?
+The provider detail page (`app/provider/[npi]/page.tsx`) is in the App Router, which supports SSR by default. Whether it currently fetches data server-side or client-side depends on its implementation. For SEO, provider detail pages should use `generateMetadata()` and server-side data fetching to ensure search engines index provider information.

@@ -1,152 +1,144 @@
-# Search Architecture (End-to-End) -- Analysis
-
-**Generated:** 2026-02-05
-**Source Prompt:** prompts/43-search-architecture.md
-**Status:** Fully Implemented -- End-to-end search flow verified from URL to database and back
-
----
-
-## Findings
-
-### Frontend Search
-
-- **SearchForm with all filter inputs** -- Verified. `packages/frontend/src/components/SearchForm.tsx` is a `forwardRef` component exposing `SearchFormRef` with `search()` and `clear()` methods. Uses `useSearchForm` hook internally. Imports and wires up:
-  - `useCities` for state-dependent city dropdown
-  - `useHealthSystems` for state/city-dependent health system dropdown
-  - `useInsurancePlans` for insurance plan dropdown
-  - `SearchableSelect` for enhanced dropdown UI
-  - Static `SPECIALTY_OPTIONS` and `STATE_OPTIONS` from `@/lib/provider-utils`
-  - Supports `variant='inline'` (with Search button) and `variant='drawer'` (for mobile)
-
-- **URL parameter sync (bi-directional)** -- Verified. `packages/frontend/src/hooks/search/useSearchParams.ts` implements:
-  - `parseUrlToFilters(searchParams)`: Reads 10 filter fields from URLSearchParams. Cities are comma-separated in URL, split into array.
-  - `filtersToSearchParams(filters, defaultFilters)`: Writes non-default values to URLSearchParams. Cities array joined with commas.
-  - `useSearchUrlParams()`: Uses `router.replace(newUrl, { scroll: false })` to update URL without adding history entries on every keystroke.
-  - Orchestrated by `useSearchForm.ts` which passes `updateUrl` as `onFiltersChange` callback to `useFilterState`.
-
-- **Filter drawer for advanced filters** -- Verified. `FilterDrawer` imported in `search/page.tsx` (line 12). `FilterButton` also imported (line 11) for toggling the drawer. The SearchForm supports `variant='drawer'` mode specifically for use inside the FilterDrawer.
-
-- **Provider cards with compare checkboxes** -- Verified. `ProviderCard` imported in `search/page.tsx` (line 6). The prompt describes `CompareCheckbox` integration with `CompareContext` (max 4 providers), and `CompareBar` appearing at the bottom when providers are selected.
-
-- **Loading skeletons** -- Verified. `SearchResultsSkeleton` imported from `@/components/ProviderCardSkeleton` (line 7).
-
-- **Empty state with contextual suggestions** -- Verified. `EmptyState` imported with `SearchSuggestion` type (line 9). `SearchResultsDisplay` in `search/page.tsx` (lines 38-55) generates suggestions based on active filters:
-  - If specialty active: "Search all specialties" (action: `clear-specialty`)
-  - If cities active: "Search entire state" (action: `clear-cities`)
-  - If healthSystem active: "All health systems" (action: `clear-health-system`)
-  - If insurancePlanId active: "All insurance plans" (action: `clear-insurance`)
-  - Suggestions capped at 3. Each clears the respective URL param and pushes new route.
-
-- **Pagination controls** -- Verified. `SearchResultsDisplay` receives `pagination: PaginationState | null` prop. The `useSearchExecution` hook provides `goToPage(page)` which calls `performSearch(page)` and cancels any pending debounced searches.
-
-- **Error handling with retry** -- Verified. `ErrorMessage` imported in `search/page.tsx` (line 8). `SearchResultsDisplay` accepts `error` and `onRetry` props. The `useSearchExecution` hook uses standardized error handling via `toAppError()`, `getUserMessage()`, and `logError()`.
-
-- **Recent searches** -- Verified. `packages/frontend/src/hooks/useRecentSearches.ts` implements localStorage-based recent search history (key: `vmp_recent_searches`, max 5 entries). Each entry contains params, display text (generated from specialty labels, city lists, state names), and timestamp. `SaveProfileButton` imported in `search/page.tsx` (line 10).
-
-### Backend Search
-
-- **Name parsing with medical title stripping** -- Verified. `packages/backend/src/services/providerService.ts` lines 13-24 define `MEDICAL_TITLES` array with 28 entries (dr, md, do, np, pa, rn, phd, dds, etc.). `parseNameSearch()` at lines 30-87:
-  - Normalizes: trim, lowercase, collapse spaces
-  - Strips titles from beginning, end, and comma-separated positions
-  - Cleans punctuation
-  - Splits into terms: 1 term (generic search), 2 terms (firstName/lastName), 3+ terms (first = firstName, last = lastName)
-
-- **Multi-field name search (first/last/org/full)** -- Verified. `buildNameSearchConditions()` at lines 92-149:
-  - Single term: searches `firstName`, `lastName`, `organizationName` with `contains` + `mode: 'insensitive'`
-  - Two+ terms with identified first/last: tries "First Last" AND "Last First" combinations
-  - Each term >= 2 chars: searched individually across all name fields
-  - Multi-word: joined terms searched against `organizationName`
-  - All conditions combined with `OR` in the main query
-
-- **All filter dimensions** -- Verified. `searchProviders()` at lines 207-289 handles:
-  - **State**: via `practice_locations.state` (uppercased)
-  - **City/Cities**: via `practice_locations.city` (single = `contains`, multiple = `OR` with `equals` + case-insensitive)
-  - **Zip code**: via `practice_locations.zip_code` with `startsWith` (prefix match)
-  - **Specialty**: via `OR` across `primary_specialty`, `primary_taxonomy_code`, `specialty_category` (all `contains` + case-insensitive)
-  - **Specialty category**: via `specialty_category` (separate filter, `contains` + case-insensitive)
-  - **Name**: via `buildNameSearchConditions()` wrapped in `OR`
-  - **NPI**: via direct `where.npi = npi` (exact match)
-  - **Entity type**: `INDIVIDUAL` -> `'1'`, `ORGANIZATION` -> `'2'`
-  - Note: `healthSystem` and `insurancePlanId` filters are accepted in the route schema but the service function's WHERE clause construction for these was not visible in the read range. The route at `providers.ts` passes `query.healthSystem` is NOT in the search schema -- the schema at lines 20-30 does not include `healthSystem` or `insurancePlanId`. This means these filters are accepted on the frontend but may not reach the backend.
-
-- **Server-side pagination** -- Verified. Uses `getPaginationValues()` utility to compute `take`, `skip`, `page` from request params. Returns `{ page, limit, total, totalPages }`. Prisma uses `take`/`skip` for pagination.
-
-- **Search result caching (5-min TTL)** -- Verified. `packages/backend/src/routes/providers.ts` lines 211-276:
-  - `generateSearchCacheKey()` creates normalized cache key from all search params
-  - `cacheGet<CachedSearchResult>()` checks cache first
-  - Cache hit: sets `X-Cache: HIT` header and returns cached data
-  - Cache miss: sets `X-Cache: MISS`, queries DB, caches result with `cacheSet(cacheKey, responseData, 300)` (300 seconds = 5 minutes)
-  - Only caches if results are non-empty (`result.providers.length > 0`)
-
-- **Rate limiting (100/hr)** -- Verified. `searchRateLimiter` applied to `GET /search` route (line 206). Imported from `../middleware/rateLimiter`. The cities endpoint uses `defaultRateLimiter` instead.
-
-- **Response transformation to display types** -- Verified. `transformProvider()` at lines 45-196 in `providers.ts`:
-  - Maps DB field names to camelCase API response
-  - Extracts primary location via `getPrimaryLocation()`
-  - Maps entity type codes (`'1'`/`'2'`) to strings (`INDIVIDUAL`/`ORGANIZATION`)
-  - Includes enrichment data: cmsDetails, hospitals, insuranceNetworks, medicareIds, taxonomies, locations
-  - Transforms `providerPlanAcceptances` with nested plan and location data
-  - Computes `displayName` via `getProviderDisplayName()`
-  - Computes `npiStatus` from deactivation_date
-
-### Dropdown Data
-
-- **Cities per state (dynamic, prefetchable)** -- Verified. Backend: `GET /providers/cities` with Zod schema requiring 2-char state. Service: `getCitiesByState()` queries `practice_locations` with `distinct: ['city']`, title-cases results, deduplicates. Frontend: `useCities.ts` with pinned cities for 24 states and NYC boroughs special handling.
-
-- **Insurance plans (grouped by carrier)** -- Verified. Frontend: `useInsurancePlans.ts` with module-level cache (10-min TTL). Uses `plans.getGrouped()` API call which returns `{ carriers: CarrierGroup[], totalPlans: number }`.
-
-- **Health systems per state/city (dynamic, prefetchable)** -- Verified. Frontend: `useHealthSystems.ts` with module-level cache (5-min TTL) and `prefetchHealthSystems()` export. Uses `locations.getHealthSystems()` API call.
-
-- **NYC boroughs special handling in cities** -- Verified. `useCities.ts` exports `NYC_ALL_BOROUGHS_VALUE = 'NYC_ALL_BOROUGHS'` and `NYC_BOROUGHS = ['New York', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island']`. The `useSearchExecution.ts` expands `NYC_ALL_BOROUGHS_VALUE` to the five borough names before making the API call (lines 123-129).
-
-### End-to-End Flow Verification
-
-The complete flow matches the prompt's diagram:
-
-1. User types in SearchForm -> `useSearchForm` manages filter state
-2. `useFilterState` tracks filters, computes `canSearch` (requires state)
-3. `useSearchUrlParams` syncs filters to/from URL
-4. `useSearchExecution` performs debounced search (450ms) or immediate search
-5. `api.providers.search()` builds query string via `buildQueryString()`
-6. `apiFetch()` sends request with retry logic
-7. Backend: `GET /api/v1/providers/search` validates with Zod, applies `searchRateLimiter`
-8. Cache check with normalized key, 5-min TTL
-9. On miss: `searchProviders()` builds Prisma WHERE, queries with pagination
-10. `transformProvider()` maps DB models to `ProviderDisplay`
-11. Response cached, returned with `X-Cache` header
-12. Frontend: Results rendered in `SearchResultsDisplay` with `ProviderCard` components
-
-### Missing / Future Items
-
-- **Full-text search (PostgreSQL `tsvector`)** -- Confirmed not implemented. Name search uses `contains` with `mode: 'insensitive'` (ILIKE), not full-text search.
-- **Geolocation / proximity search** -- Confirmed not implemented. No lat/lon fields or distance calculations.
-- **Search result sorting options** -- Confirmed not implemented. Backend hardcodes `orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }, { organizationName: 'asc' }]`.
-- **Saved searches (requires user accounts)** -- Confirmed not implemented. Only localStorage-based recent searches exist.
-- **Search analytics** -- Not evaluated. PostHog integration not in scope of reviewed files.
-- **Autocomplete / type-ahead suggestions** -- Confirmed not implemented.
-
----
+# Search Architecture (End-to-End) -- Analysis Output
 
 ## Summary
 
-The end-to-end search architecture is fully implemented and follows the prompt's described flow accurately. The frontend uses a well-composed hook architecture: `useSearchForm` orchestrates `useSearchUrlParams`, `useFilterState`, and `useSearchExecution` into a cohesive search experience with URL sync, debounce, and abort support. The backend implements robust name parsing, multi-field search, normalized caching, rate limiting, and Zod validation.
-
-The search implementation is notably comprehensive for a non-full-text approach, supporting 8 filter dimensions, medical title stripping, first/last name reversal, organization name matching, and case-insensitive search across multiple fields.
-
-One potential gap was identified: the backend route's Zod schema (`searchQuerySchema`) does not include `healthSystem` or `insurancePlanId` fields, even though the frontend sends these as URL parameters. If these are being silently dropped by Zod's parse, those filter features would not function. However, the `searchProviders()` service function in `providerService.ts` does not appear to handle `healthSystem` or `insurancePlanId` either within the read range, suggesting these may be handled elsewhere (e.g., a different route or middleware) or are not yet connected end-to-end.
+The search architecture spans frontend form/state management, URL sync, API client, and backend search service. The frontend uses a composable hook architecture: `useSearchForm` orchestrates `useFilterState`, `useSearchUrlParams`, and `useSearchExecution`. The backend search uses Prisma with dynamically-built `WHERE` clauses, name parsing with medical title stripping, location-based filtering through the `practice_locations` relation, and a normalized cache with 5-minute TTL. Rate limiting is 100 requests/hour per IP with dual-mode (Redis or in-memory) sliding window algorithm. The search results are sorted by plan acceptance count (descending), then by name.
 
 ---
 
-## Recommendations
+## Checklist Verification
 
-1. **Verify healthSystem and insurancePlanId backend wiring** -- The backend search Zod schema at `providers.ts` lines 20-30 does not include `healthSystem` or `insurancePlanId`. If these are being dropped, the frontend filters are non-functional despite having full UI support. Check if there is a separate validation layer or if these need to be added to the schema and the `searchProviders()` WHERE clause.
+### Frontend Search
 
-2. **Consider full-text search for name queries** -- Current name search uses `ILIKE` (`contains` + `mode: 'insensitive'`). For a healthcare provider database, PostgreSQL `tsvector` with `ts_query` would provide significantly better results for partial matches, typo tolerance, and name variations. This is listed as a future item and would be a high-impact improvement.
+| Item | Status | Evidence |
+|------|--------|----------|
+| SearchForm with all filter inputs | VERIFIED | `search/page.tsx`: Uses `<SearchForm>` component with `onResultsChange` and `onFilterCountChange` callbacks. Desktop form hidden on mobile. |
+| URL parameter sync (bi-directional) | VERIFIED | `useSearchParams.ts`: `parseUrlToFilters()` reads 10 URL params into `SearchFilters`. `filtersToSearchParams()` serializes non-default values back to URL. Uses `router.replace()` with `scroll: false`. |
+| Filter drawer for advanced filters | VERIFIED | `search/page.tsx` lines 236-250: `<FilterDrawer>` with `<SearchForm variant="drawer">` for mobile. Controlled by `isFilterDrawerOpen` state. |
+| Provider cards with compare checkboxes | VERIFIED | `search/page.tsx` line 124: `<ProviderCard key={provider.id} provider={provider} />`. Compare integration is in `CompareContext` via `useCompare()` hook used within `ProviderCard`. |
+| Loading skeletons | VERIFIED | `search/page.tsx` lines 253-254: `<SearchResultsSkeleton count={5} />` during loading state |
+| Empty state with contextual suggestions | VERIFIED | `search/page.tsx` lines 38-55: `getNoResultsSuggestions()` generates up to 3 suggestions: clear specialty, clear cities, clear health system, clear insurance. Lines 89-96: `<EmptyState type="no-results" suggestions={...}>` |
+| Pagination controls | VERIFIED | `search/page.tsx` lines 129-163: Renders page number links with ellipsis for large page ranges. Uses `aria-current="page"` and `aria-label` for accessibility. |
+| Error handling with retry | VERIFIED | Lines 79-87: `<ErrorMessage variant="server" message={error} action={{ label: 'Try Again', onClick: onRetry }}>` |
+| Recent searches | VERIFIED | `useRecentSearches.ts`: Stores up to 5 recent searches in `localStorage` with generated display text (specialty + location). Deduplicates by comparing all filter params. |
 
-3. **Add user-controllable sort** -- The hardcoded `lastName ASC, firstName ASC` sort is reasonable as a default but limits utility. Adding sort options (by name, confidence, relevance) would improve the search experience with minimal backend effort.
+### Backend Search
 
-4. **Monitor cache effectiveness** -- The 5-minute TTL and "only cache non-empty results" strategy means cache misses for uncommon searches. Consider caching empty results with a shorter TTL to prevent repeated expensive queries for no-results searches.
+| Item | Status | Evidence |
+|------|--------|----------|
+| Name parsing with medical title stripping | VERIFIED | `providerService.ts` lines 13-24: 24 medical titles (dr, md, do, np, pa, rn, phd, etc.). `parseNameSearch()` (lines 30-87) removes from beginning, end, and comma-separated positions. |
+| Multi-field name search (first/last/org/full) | VERIFIED | `buildNameSearchConditions()` (lines 92-148): Single term searches `firstName`, `lastName`, `organizationName`. Two terms try "First Last" AND "Last First" combinations. All terms searched individually. Multi-word org name search included. |
+| All filter dimensions | VERIFIED | `searchProviders()` (lines 207-293) handles: state, city/cities (comma-separated), zipCode (startsWith), specialty (3-field OR), specialtyCategory, name (fuzzy), npi (exact), entityType ('1'/'2' mapping) |
+| Server-side pagination | VERIFIED | Uses `getPaginationValues()` for `take`/`skip`. Returns `{ providers, total, page, limit, totalPages }`. |
+| Search result caching (5-min TTL) | VERIFIED | `providers.ts` line 269: `cacheSet(cacheKey, responseData, 300)`. Only caches if results exist (line 268). Cache key generated via `generateSearchCacheKey()` with normalized, deterministic key. |
+| Rate limiting (100/hr) | VERIFIED | `rateLimiter.ts` lines 362-367: `searchRateLimiter` with `maxRequests: 100`, `windowMs: 60 * 60 * 1000`. Applied at `providers.ts` line 206: `router.get('/search', searchRateLimiter, ...)` |
+| Response transformation to display types | VERIFIED | `providers.ts` `transformProvider()` (lines 45-196): Maps DB fields to API display format, extracts primary location, maps entity types, includes plan acceptances with plan and location details. |
 
-5. **Evaluate debounce timing** -- The 450ms debounce for auto-search is a good default. Consider adding analytics to measure how often debounced searches are actually cancelled (indicating the delay is working) vs. how often users pause naturally (indicating it could be shorter).
+### Dropdown Data
 
-6. **Consider abort controller in the API client** -- While `useSearchExecution` implements abort via `AbortController`, the `apiFetch()` function and `providers.search()` do not pass an `AbortSignal` to the underlying `fetch()` call. The abort controller in `useSearchExecution` creates a new controller but there is no mechanism to pass it through to the actual HTTP request. This means server-side processing continues even when the client has moved on. Verify that the abort signal is being threaded through the fetch options.
+| Item | Status | Evidence |
+|------|--------|----------|
+| Cities per state (dynamic, prefetchable) | VERIFIED | `useCities.ts`: Fetches via `api.providers.getCities(state)`. Backend `getCitiesByState()` queries `practice_locations` with distinct city, title-cased. `prefetchCities()` exported. |
+| Insurance plans (grouped by carrier) | VERIFIED | `useInsurancePlans.ts`: Fetches via `api.plans.getGrouped()`. Returns `groupedPlans`, `allPlans` (flattened), `selectOptions` (for dropdowns), `findPlan()` utility. |
+| Health systems per state/city | VERIFIED | `useHealthSystems.ts`: Fetches via `api.locations.getHealthSystems(state, cities)`. `prefetchHealthSystems()` exported. Cache key includes sorted cities for consistency. |
+| NYC boroughs special handling | VERIFIED | `useCities.ts` lines 17-130: `NYC_BOROUGHS` array, `NYC_ALL_BOROUGHS_VALUE` sentinel, `injectNycAllBoroughsOption()` adds special option for NY state when all 5 boroughs present. Expansion to real boroughs happens in `useSearchExecution.ts` line 124. |
+
+### Missing / Future
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Full-text search (PostgreSQL `tsvector`) | NOT IMPLEMENTED | Name search uses `contains` (LIKE %term%) which is case-insensitive but not indexed for full-text. No `tsvector` columns or `GIN` indexes observed. |
+| Geolocation / proximity search | NOT IMPLEMENTED | No latitude/longitude fields or PostGIS extensions used. Zip code search uses `startsWith` prefix match only. |
+| Search result sorting options | PARTIALLY IMPLEMENTED | Backend sorts by `providerPlanAcceptances: { _count: 'desc' }`, then `lastName`, `firstName`, `organizationName`. No user-facing sort selector exists. |
+| Saved searches (requires user accounts) | NOT IMPLEMENTED | No user account system. Recent searches use `localStorage` only. |
+| Search analytics beyond PostHog | PARTIALLY IMPLEMENTED | `useSearchExecution.ts` line 142: `trackSearch()` sends specialty, state, city, cities, healthSystem, resultsCount, mode to PostHog. No custom analytics dashboard. |
+| Autocomplete / type-ahead suggestions | NOT IMPLEMENTED | Name field is free text with no suggestions |
+
+---
+
+## Questions Answered
+
+### 1. Is the 5-minute cache TTL appropriate for search results?
+**Yes, appropriate for the current use case.** The 5-minute TTL balances freshness with performance:
+- Provider data (from NPPES) changes infrequently (quarterly updates)
+- Plan acceptance data changes when verifications are submitted, but `invalidateSearchCache()` exists in `cache.ts` (line 376) to clear all search caches when needed
+- The cache only stores results that have matches (line 268: `if (result.providers.length > 0)`)
+- The backend also supports Redis for distributed caching (`cache.ts` lines 91-103) with graceful fallback to in-memory
+
+For high-traffic scenarios, increasing to 10-15 minutes would reduce database load without meaningful staleness. For verification-heavy scenarios, the TTL could be reduced or cache invalidation could be triggered on verification submission.
+
+### 2. Should we add full-text search for better name matching?
+**Yes, recommended for improved search quality.** Currently, name search uses Prisma's `contains` (SQL `ILIKE %term%`) which:
+- Cannot rank results by relevance
+- Performs sequential scans (no index utilization for leading wildcards)
+- Cannot handle typos or phonetic variations
+
+PostgreSQL's built-in `tsvector`/`tsquery` with a `GIN` index would provide:
+- Stemming (searching "cardiologist" matches "cardiology")
+- Ranking by relevance (`ts_rank()`)
+- Index-backed performance
+- Prefix matching for autocomplete
+
+Implementation would require adding a `search_vector tsvector` column to the `providers` table and a trigger to keep it updated.
+
+### 3. Should we add geolocation-based proximity search?
+**Recommended as a future enhancement.** Current location search is limited to:
+- State (exact match)
+- City/cities (exact match, case-insensitive)
+- Zip code (prefix match via `startsWith`)
+
+Adding proximity search would require:
+- Geocoding provider addresses to lat/lng (e.g., via Google Geocoding API or a zip-to-lat/lng lookup table)
+- Adding PostGIS extension or using `ST_DWithin` for radius queries
+- Frontend: Adding a "distance" dropdown (5mi, 10mi, 25mi) and potentially a map view
+
+This is valuable for mobile users who want "doctors near me."
+
+### 4. Is the name parsing logic handling edge cases well?
+**Good coverage with some gaps.** The `parseNameSearch()` function handles:
+- 24 medical titles stripped from beginning, end, and comma positions
+- "First Last" and "Last First" name orders
+- Organization name searching (full multi-word match)
+- Individual term matching for each word (minimum 2 chars)
+
+Gaps:
+- **Hyphenated names** (e.g., "Smith-Jones"): Not explicitly handled. The term would be split by space but not by hyphen, so "Smith-Jones" would be searched as one term.
+- **Jr., Sr., III suffixes**: These are not in `MEDICAL_TITLES` and would not be stripped. "John Smith Jr" would treat "Jr" as a potential last name.
+- **Apostrophes** (e.g., "O'Brien"): Not stripped or normalized. The `replace(/[,\.;]/g, ' ')` removes commas, periods, and semicolons but not apostrophes.
+- **Unicode/accented names**: No normalization for accented characters (e.g., "Jose" vs "Jos\u00e9").
+
+### 5. Should search results be sortable by the user?
+**Yes, recommended.** The current sort order is:
+1. Plan acceptance count (descending) -- providers with more verified plans appear first
+2. Last name (ascending)
+3. First name (ascending)
+4. Organization name (ascending)
+
+This is a sensible default, but users may want to sort by:
+- **Name** (alphabetical)
+- **Distance** (if geolocation is added)
+- **Confidence score** (highest verified first)
+
+Implementation: Add a `sort` query parameter to the backend search endpoint, add a sort dropdown to the frontend `SearchResultsDisplay`, and pass the sort preference through the filter/URL sync pipeline.
+
+---
+
+## Additional Findings
+
+1. **Search debounce is 450ms.** `useSearchExecution.ts` uses a configurable debounce (default `SEARCH_DEBOUNCE_MS` imported from `lib/debounce`). The `search()` method uses debounce for auto-search, while `searchImmediate()` bypasses debounce for button clicks. Pending debounced calls are cancelled on immediate search to prevent double execution.
+
+2. **AbortController for request cancellation.** `useSearchExecution.ts` line 91: Each search creates a new `AbortController` and aborts the previous in-flight request. This prevents stale responses from overwriting newer results. However, the `AbortController` signal is NOT passed to `api.providers.search()` -- the abort check (line 135) only verifies `abortControllerRef.current?.signal.aborted` after the response arrives, meaning the actual HTTP request is not cancelled.
+
+3. **State is required to search.** `useFilterState.ts` line 163: `canSearch = isFilterActive(filters.state)`. The search form will not execute without a state selected. This ensures all searches are geographically scoped, which keeps query performance manageable.
+
+4. **Search route applies both rate limiting AND caching.** Flow: `searchRateLimiter` (100/hr) -> cache check -> DB query if miss -> cache set. The rate limiter counts all requests including cache hits, which means a user hitting cached results still depletes their rate limit quota.
+
+5. **Cache key normalization.** `cache.ts` `generateSearchCacheKey()` lowercases and trims all string values, uses a simple hash for additional parameters. The hash function (`simpleHash`) is a basic djb2-style hash converted to base36. This ensures equivalent searches with different casing produce the same cache key.
+
+6. **Pinned cities for 40+ states.** `useCities.ts` lines 27-77 define `PINNED_CITIES` for every US state, listing 5-8 major cities each. These appear at the top of the city dropdown, followed by remaining cities alphabetically. This is a significant UX enhancement for states with hundreds of cities.
+
+7. **Pagination uses anchor links, not client-side routing.** `search/page.tsx` lines 143-149 render `<a href="/search?...&page=N">` tags for pagination. This causes full-page navigation on page change rather than client-side updates. This works but loses any client-side state not stored in URL params.
+
+8. **Entity type mapping has a discrepancy.** The search query schema in `providers.ts` line 29 uses `z.enum(['INDIVIDUAL', 'ORGANIZATION'])`, but the service maps these to `'1'`/`'2'` for the DB query. The route's `transformProvider()` maps `'1'` back to `'INDIVIDUAL'` for responses. This double-mapping works but could be simplified with a single mapping layer.
+
+9. **Health system filter is NOT implemented in the backend search.** `providerService.ts` `searchProviders()` does not handle a `healthSystem` parameter. The search query schema in `providers.ts` also does not include `healthSystem`. However, the frontend `useFilterState` includes `healthSystem` and the API client sends it as a query parameter. The backend silently ignores it via Zod's `.parse()` which strips unknown properties. Health system filtering appears to depend on the locations route which may be disabled.

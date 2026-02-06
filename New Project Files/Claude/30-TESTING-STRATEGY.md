@@ -1,84 +1,196 @@
-# Testing Strategy — Analysis
+# Testing Strategy
 
-**Generated:** 2026-02-05
-**Source Prompt:** prompts/30-testing-strategy.md
-**Status:** Partially Implemented -- Infrastructure is configured but test coverage is minimal
+**Last Updated:** 2026-02-06
+
+## Test Coverage
+
+| Area | Coverage | Status |
+|------|----------|--------|
+| Backend Services | Unknown (no coverage report) | Partial |
+| Backend Routes | 0% | Not started |
+| Frontend Libs | Unknown | Partial |
+| Frontend Components | 0% | Not started |
+| E2E | 2 spec files | Partial |
+
+## Test Counts
+- Backend unit tests: 4 files (confidenceService, providerService, planService, verificationService)
+- Frontend unit tests: 6 files (errorUtils, constants, debounce, imagePreprocess, insuranceCardSchema, formatName)
+- E2E tests: 2 files (smoke.spec.ts, flows.spec.ts)
+- Total test files: 12
 
 ---
 
-## Findings
+## Test Configuration: VERIFIED
 
-### Setup
-- [x] **Jest configured for backend** -- `packages/backend/jest.config.js` exists with `ts-jest` preset, `node` environment, and roots in `<rootDir>/src`. Coverage collection configured for all `.ts` files excluding `.d.ts` and `index.ts`.
-- [x] **Jest configured for frontend** -- `packages/frontend/jest.config.js` exists with `jsdom` environment, Babel transform via `babel.config.jest.js`, `@/` path alias mapping, CSS mock via `__mocks__/styleMock.js`, and coverage collection for all `.ts`/`.tsx` files.
-- [x] **Playwright configured for E2E** -- `packages/frontend/playwright.config.ts` exists with `./e2e` test directory, Chromium-only project, webServer integration (dev/start), HTML+list reporters, trace/screenshot/video on failure, 30s test timeout.
-- [x] **CI pipeline runs E2E tests** -- `.github/workflows/playwright.yml` runs on push/PR to `main` for `packages/frontend/**` paths. Installs Chromium, builds shared + frontend, runs E2E, uploads report artifact.
-- [ ] **CI pipeline does NOT run unit tests** -- The `deploy.yml` workflow deploys directly without running Jest unit tests. No dedicated unit test CI workflow exists.
-- [ ] **Coverage reports not generated in CI** -- No CI step produces or uploads Jest coverage reports. Coverage can only be run locally via `npm run test:coverage`.
+### Root Jest Config (`jest.config.js`)
+- Uses `projects` configuration with a single `frontend` project
+- Test environment: `jsdom`
+- Module mapper: `@/` to `src/`, CSS mocks
+- Transform: Babel with custom Jest config (`babel.config.jest.js`)
+- Excludes: `node_modules`, `.next`, `e2e`
+- **Note**: Only configures frontend -- backend uses its own standalone config
 
-### Backend Tests
-- [x] **Confidence service tests** -- `packages/backend/src/services/__tests__/confidenceService.test.ts` exists with 40+ tests across 8 describe blocks covering: data source scoring, recency decay, specialty-based decay rates, verification count, community agreement, overall score calculation, confidence level assignment, confidence level description, and metadata calculations. Uses `jest.useFakeTimers()` for deterministic date testing.
-- [ ] **Verification service tests** -- No test file found at `packages/backend/src/services/__tests__/verificationService.test.ts`. This is a critical gap given the service handles verification submission, Sybil prevention, consensus logic, voting, and TTL cleanup.
-- [ ] **Provider service tests** -- No test file found. `providerService.ts` is untested.
-- [ ] **Rate limiter tests** -- No test file at `packages/backend/src/middleware/__tests__/`. Both Redis and in-memory rate limiting modes are untested.
-- [ ] **CAPTCHA middleware tests** -- No test file at `packages/backend/src/middleware/__tests__/`.
+### Backend Jest Config (`packages/backend/jest.config.js`)
+- Preset: `ts-jest`
+- Environment: `node`
+- Roots: `src`
+- Coverage: Collects from `src/**/*.ts`, excludes `.d.ts` and `index.ts`
+- Coverage directory: `coverage`
+- Verbose output enabled
 
-### Frontend Tests
-- [x] **Utility function tests (partial)** -- `packages/frontend/src/lib/__tests__/` contains 5 test files: `constants.test.ts`, `debounce.test.ts`, `errorUtils.test.ts`, `imagePreprocess.test.ts`, `insuranceCardSchema.test.ts`.
-- [ ] **SearchForm component tests** -- No `packages/frontend/src/components/__tests__/` directory exists.
-- [ ] **ProviderCard component tests** -- Not found.
-- [ ] **Hook tests (useProviderSearch)** -- No `packages/frontend/src/hooks/__tests__/` directory exists.
+### Frontend Jest Config (`packages/frontend/jest.config.js`)
+- Environment: `node` (not `jsdom` -- mismatch with root config)
+- Module mapper: `@/` to `src/`, CSS mocks
+- Transform: Babel with custom Jest config
+- Coverage: Collects from `src/**/*.{ts,tsx}`, excludes `.d.ts` and `index.ts`
 
-### E2E Tests
-- [x] **Search flow (smoke)** -- `packages/frontend/e2e/smoke.spec.ts` contains 4 smoke tests: homepage loads, search page loads, basic search interaction, provider detail page loads. These are minimal smoke tests rather than full flow tests.
-- [ ] **Provider detail page (full)** -- Only a basic "loads or shows not found" test exists in the smoke spec.
-- [ ] **Verification submission** -- Not tested in E2E.
-- [ ] **Error handling** -- Not tested in E2E.
+### Playwright Config (`packages/frontend/playwright.config.ts`)
+- Test directory: `e2e/`
+- Parallel execution, 2 retries on CI
+- Single browser: Chromium only
+- Base URL: `http://localhost:3000`
+- Trace/screenshot/video on failure
+- 30s test timeout, 5s assertion timeout
+- **Dual web server setup**:
+  - Mock API server (`e2e/mock-api.mjs`) on port 3001
+  - Next.js frontend on port 3000
+- Mock API allows E2E tests to run without the real backend
 
-### Test Infrastructure Details
+### Vitest Config
+- A `vitest.config.ts` file exists at the root but was not read (not referenced in any prompt). Its presence suggests possible migration planning or parallel usage.
 
-| Component | File | Status |
-|-----------|------|--------|
-| Backend Jest Config | `packages/backend/jest.config.js` | Configured |
-| Frontend Jest Config | `packages/frontend/jest.config.js` | Configured |
-| Playwright Config | `packages/frontend/playwright.config.ts` | Configured |
-| Backend test script | `npm run test:backend` | Works (delegates to Jest) |
-| Frontend test script | `npm run test:frontend` | Not defined in root; uses `npm run test -w frontend` |
-| E2E test script | `npm run test:e2e` | Defined in frontend package.json |
-| Root test script | `npm test` | Only runs backend tests |
-| CI unit tests | Not configured | Missing |
-| CI E2E tests | `.github/workflows/playwright.yml` | Configured |
-| CI deploy | `.github/workflows/deploy.yml` | No test gate |
+---
 
-### Test Counts (Actual)
+## Backend Tests: DETAILED ANALYSIS
 
-| Category | Count | Files |
-|----------|-------|-------|
-| Backend unit tests | ~40 tests | 1 file (confidenceService.test.ts) |
-| Frontend unit tests | ~unknown | 5 files (lib/__tests__/) |
-| E2E tests | 4 tests | 1 file (smoke.spec.ts) |
-| **Total test files** | **7** | |
+### `confidenceService.test.ts` -- VERIFIED (646 lines)
+**Quality: Excellent.** Comprehensive unit test suite covering:
+- Data source scoring (CMS_NPPES=25, CARRIER_API=20, CROWDSOURCE=15, null=10)
+- Recency decay (day 0 through day 200+, progressive decay verification)
+- Specialty-based decay rates (mental health vs radiology, primary care vs hospital-based)
+- Verification count scoring (0 through 10, diminishing returns at 3)
+- Community agreement scoring (100% through 0%, all tier boundaries)
+- Overall score calculation (sum verification, clamping 0-100, perfect/poor inputs)
+- Confidence level assignment (VERY_HIGH through VERY_LOW, capping with < 3 verifications)
+- Confidence level descriptions (research notes, verification thresholds)
+- Metadata calculations (isStale, daysUntilStale, recommendReVerification)
+- Uses `jest.useFakeTimers()` for deterministic date testing
 
-## Summary
+### `providerService.test.ts` -- EXISTS
+File exists at `packages/backend/src/services/__tests__/providerService.test.ts`.
 
-The project has testing infrastructure properly configured across all three layers (Jest backend, Jest frontend, Playwright E2E) but the actual test coverage is thin. The backend has one comprehensive test file for the confidence scoring algorithm (~40 tests), the frontend has 5 utility test files, and there is a single E2E smoke test file with 4 basic page-load tests.
+### `planService.test.ts` -- EXISTS
+File exists at `packages/backend/src/services/__tests__/planService.test.ts`.
 
-Critical business logic in `verificationService.ts` (verification submission, Sybil prevention, consensus determination, voting, TTL cleanup) has zero test coverage. No route handlers, middleware, or React components are tested. The CI deploy pipeline does not gate on test passage -- it deploys directly on push to main.
+### `verificationService.test.ts` -- EXISTS
+File exists at `packages/backend/src/services/__tests__/verificationService.test.ts`.
+
+## Frontend Tests: DETAILED ANALYSIS
+
+### `errorUtils.test.ts` -- EXISTS
+Tests for error utility functions.
+
+### `constants.test.ts` -- EXISTS
+Tests for frontend constants.
+
+### `debounce.test.ts` -- EXISTS
+Tests for debounce utility.
+
+### `imagePreprocess.test.ts` -- EXISTS
+Tests for Sharp-based image preprocessing.
+
+### `insuranceCardSchema.test.ts` -- EXISTS
+Tests for Zod schema validation and confidence scoring.
+
+### `formatName.test.ts` -- EXISTS
+Tests for name formatting utilities (toDisplayCase, toAddressCase, toTitleCase).
+
+## E2E Tests
+
+### `smoke.spec.ts` -- EXISTS
+Basic smoke tests verifying the app loads.
+
+### `flows.spec.ts` -- EXISTS
+User flow tests (likely search, provider detail).
+
+---
+
+## CI Status
+- Tests in CI: **Unknown** -- No CI configuration files (`.github/workflows/`, `cloudbuild.yaml`) were reviewed
+- Blocking deploys: **Unknown**
+- Coverage reporting: **Not configured** -- Backend Jest config has `collectCoverageFrom` but no CI integration
+
+---
+
+## Questions Answered
+
+### 1. What's the current test coverage?
+
+**Backend:** Coverage collection is configured in `jest.config.js` (`collectCoverageFrom: ['src/**/*.ts']`) but no coverage reports were found. There are 4 test files covering services (confidenceService, providerService, planService, verificationService). No tests exist for routes, middleware (rateLimiter, captcha, errorHandler), or utility functions.
+
+**Frontend:** Coverage collection is configured (`collectCoverageFrom: ['src/**/*.{ts,tsx}']`). There are 6 test files covering library/utility functions. No tests exist for React components, hooks, or context providers.
+
+### 2. What areas are untested?
+
+**Critical untested paths:**
+- **Backend routes**: No route handler tests (providers, plans, verify, locations, admin)
+- **Backend middleware**: No tests for rateLimiter, captcha, errorHandler
+- **Backend Redis**: No tests for redis.ts or distributed rate limiting behavior
+- **Frontend components**: No tests for SearchForm, ProviderCard, LocationCard, CompareModal, InsuranceCardUploader, ColocatedProviders
+- **Frontend hooks**: No tests for useCompare, useProviderSearch, or any custom hooks
+- **Frontend context**: No tests for CompareContext, ErrorContext
+
+**Edge cases not covered:**
+- Rate limiter failover behavior (Redis to in-memory)
+- CAPTCHA fail-open vs fail-closed modes
+- TTL expiration and cleanup logic
+- Sybil attack prevention
+- Location co-location matching edge cases
+
+### 3. Are tests running in CI?
+
+**Cannot confirm.** No CI pipeline configuration was reviewed. The Playwright config has CI-specific settings (`forbidOnly`, `retries: 2`, `workers: 1`), suggesting CI integration was planned. The mock API server for E2E tests (`e2e/mock-api.mjs`) enables CI testing without a real backend.
+
+### 4. What's the test database strategy?
+
+**Backend tests mock Prisma.** The `providerService.test.ts`, `planService.test.ts`, and `verificationService.test.ts` files likely mock the Prisma client since no test database configuration was found. The `confidenceService.test.ts` uses pure function testing (no database at all).
+
+**E2E tests use a mock API.** Playwright config starts `e2e/mock-api.mjs` on port 3001, providing canned responses without requiring a real PostgreSQL database.
+
+### 5. Are there flaky tests?
+
+**Cannot determine from code review alone.** No flaky test tracking or retry patterns are present in the Jest configs. The Playwright config has `retries: 2` on CI, which could mask flaky tests.
+
+---
+
+## Known Issues
+
+1. **Root vs frontend Jest config mismatch**: Root config sets `testEnvironment: 'jsdom'` for the frontend project, but the standalone frontend config sets `testEnvironment: 'node'`. Running tests from root vs. from `packages/frontend` may behave differently.
+
+2. **No component tests**: Zero React component tests exist. The SearchForm, ProviderCard, and CompareModal components are complex interactive components that would benefit from testing.
+
+3. **No middleware tests**: The rateLimiter middleware contains significant logic (sliding window algorithm, Redis vs in-memory selection, fail-open behavior) that is entirely untested.
+
+4. **Coverage not enforced**: Neither Jest config has coverage thresholds (`coverageThreshold`) configured. Tests can be added without meeting any minimum coverage bar.
+
+5. **Single browser in E2E**: Playwright only tests Chromium. No Firefox or Safari/WebKit testing configured.
+
+---
 
 ## Recommendations
 
-1. **Add unit test CI gate** -- Create a `.github/workflows/test.yml` that runs `npm run test:backend` and `npm run test:frontend` on every PR, blocking merge on failure. The deploy workflow should depend on test passage.
+1. **Add coverage thresholds**: Configure `coverageThreshold` in both Jest configs to enforce minimums (suggest: 60% for backend services, 40% for frontend components).
 
-2. **Prioritize verificationService tests** -- This is the most critical untested code. Test `submitVerification` (validation, Sybil checks, consensus logic), `voteOnVerification` (duplicate prevention, count updates), and `cleanupExpiredVerifications` (TTL enforcement, dry run mode). Mock Prisma for isolation.
+2. **Add route handler tests**: Create integration tests for the 5 main API route files using `supertest` or similar. The admin routes are especially important since they handle data cleanup.
 
-3. **Add rate limiter tests** -- Test both Redis and in-memory modes, sliding window behavior, fail-open behavior, and the pre-configured limiter configurations.
+3. **Add middleware tests**: The rate limiter has well-defined behavior (sliding window, fail-open, Redis/memory selection) that is ideal for unit testing. Mock the Redis client and verify each code path.
 
-4. **Add admin route tests** -- Test `cleanup-expired`, `expiration-stats`, `health`, and `cache/clear` endpoints, including admin secret authentication (timing-safe comparison, 503 when unconfigured).
+4. **Add React component tests**: Prioritize testing the compare feature (CompareContext, CompareCheckbox, CompareBar, CompareModal) since it has complex state management and user interactions.
 
-5. **Expand E2E tests beyond smoke** -- The current E2E tests only verify pages load. Add tests for the full search-to-detail flow, verification submission form, comparison feature, and error states.
+5. **Add cross-browser E2E**: Add Firefox and WebKit projects to Playwright config, at minimum for smoke tests.
 
-6. **Add frontend component tests** -- Start with `CompareCheckbox`, `CompareBar`, and `CompareModal` since they have well-defined state management via `CompareContext`. The context's max-4 limit, add/remove/clear behavior, and sessionStorage persistence are all testable.
+6. **Resolve config mismatch**: Either remove the root `jest.config.js` or ensure the frontend standalone config matches the root project settings (particularly `testEnvironment`).
 
-7. **Add root `test:frontend` script** -- The root `package.json` only has `test` and `test:backend`. Add `test:frontend` to make running frontend tests discoverable.
+7. **Set up CI pipeline**: Configure GitHub Actions or Cloud Build to run `npm test` and `npm run test:e2e` on every PR, with coverage reporting.
 
-8. **Enable coverage reporting** -- Integrate coverage output into CI (e.g., upload to Codecov or similar). Set minimum coverage thresholds to prevent regression.
+8. **Add hook tests**: The `useCompare` hook (via CompareContext) has session storage persistence, max limit enforcement, and SSR safety -- all testable with `@testing-library/react`.

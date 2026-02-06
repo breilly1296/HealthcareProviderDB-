@@ -1,83 +1,201 @@
-# Redis Caching & Rate Limiting — Analysis
+# Redis & Caching
 
-**Generated:** 2026-02-05
-**Source Prompt:** prompts/31-redis-caching.md
-**Status:** Fully Implemented -- Dual-mode rate limiting and caching with Redis/in-memory fallback
+**Last Updated:** 2026-02-06
+**Mode:** Dual-mode (Redis when REDIS_URL configured, in-memory fallback otherwise)
+
+## Configuration
+- REDIS_URL: Not configured in docker-compose.yml (no Redis service defined)
+- Redis Provider: None deployed (no Redis in docker-compose)
+- TLS: Not configured (no TLS options in Redis client setup)
+
+## Rate Limiters
+
+| Limiter | Limit | Window | Applied To |
+|---------|-------|--------|------------|
+| `defaultRateLimiter` | 200/hr | 1 hour | General API routes, location detail/stats/health-systems |
+| `searchRateLimiter` | 100/hr | 1 hour | Search endpoints (providers, locations) |
+| `verificationRateLimiter` | 10/hr | 1 hour | Verification submission |
+| `voteRateLimiter` | 10/hr | 1 hour | Voting on verifications |
+
+## Health Status
+- Redis connected: No (no REDIS_URL in docker-compose)
+- Failover events (24h): N/A
+- Current keys: N/A
 
 ---
 
-## Findings
+## Redis Client (`redis.ts`) -- VERIFIED
 
-### Redis Client (`packages/backend/src/lib/redis.ts`)
-- [x] **Singleton pattern** -- `getRedisClient()` uses a `connectionAttempted` flag to ensure only one connection attempt per process. Returns cached `redisClient` on subsequent calls.
-- [x] **ioredis dependency** -- Uses `ioredis` (v5.9.2) as the Redis client library.
-- [x] **Retry logic with exponential backoff** -- `retryStrategy` retries up to 5 times with `Math.min(times * 200, 3000)` delay (200ms, 400ms, 600ms... capped at 3s). Returns `null` after 5 attempts to stop retrying.
-- [x] **Connection state tracking** -- Maintains `isConnected` boolean updated by `ready`, `error`, `close`, and `end` event handlers. Exposed via `isRedisConnected()`.
-- [x] **Status reporting** -- `getRedisStatus()` returns `{ configured, connected, status }` for health checks.
-- [x] **Graceful shutdown** -- `closeRedisConnection()` calls `redis.quit()` with fallback to `redis.disconnect()` on error. Resets singleton state.
-- [x] **Connection timeouts** -- `connectTimeout: 10000` (10s), `commandTimeout: 5000` (5s).
-- [x] **Structured logging** -- Uses pino logger with context objects (not console.log).
-- [ ] **TLS support** -- Not explicitly configured. The connection URL would need to use `rediss://` protocol for TLS, but no explicit TLS options are set in the client config.
+**Implementation quality: Good.** Singleton pattern with proper lifecycle management.
 
-### Rate Limiting (`packages/backend/src/middleware/rateLimiter.ts`)
-- [x] **Dual-mode architecture** -- `createRateLimiter()` auto-selects Redis or in-memory based on `getRedisClient()` return value. Mode selection logged once per limiter name.
-- [x] **Sliding window algorithm (both modes)** -- In-memory uses array of timestamps per client key; Redis uses sorted sets (`ZADD` with timestamp scores, `ZREMRANGEBYSCORE` to prune, `ZCARD` to count).
-- [x] **Redis sorted set transactions** -- Uses `redis.multi()` pipeline: (1) remove old entries, (2) add current request with `now-randomId` member, (3) count entries, (4) set TTL. Atomic execution.
-- [x] **Fail-open behavior** -- Three fail-open paths: (a) Redis not connected at request time, (b) Redis transaction returns null, (c) Redis throws exception. All set `X-RateLimit-Status: degraded` header and call `next()`.
-- [x] **Rate limit response headers** -- Both modes set `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`. On 429, also sets `Retry-After`.
-- [x] **Periodic in-memory cleanup** -- `setInterval` every 60s removes timestamps older than 1 hour from all stores. Prevents memory leaks for long-running processes.
-- [x] **Skip function support** -- Both modes support `skip: (req) => boolean` to bypass rate limiting per request.
-- [x] **Custom key generator** -- Both modes support `keyGenerator: (req) => string`. Defaults to `req.ip || 'unknown'`.
-- [x] **429 JSON response** -- Returns `{ error, message, retryAfter }` on rate limit exceeded.
+Key findings:
+- **Singleton pattern**: `getRedisClient()` attempts connection only once per process (`connectionAttempted` flag)
+- **Connection settings**: `maxRetriesPerRequest: 3`, `connectTimeout: 10000ms`, `commandTimeout: 5000ms`
+- **Retry strategy**: Exponential backoff (`times * 200`, capped at 3000ms), gives up after 5 attempts
+- **Event handlers**: `connect`, `ready`, `error`, `close`, `reconnecting`, `end` -- all logged via structured logger
+- **Connection state tracking**: `isConnected` boolean updated on `ready`/`error`/`close`/`end` events
+- **Status check**: `isRedisConnected()` verifies `isConnected && redisClient !== null && redisClient.status === 'ready'`
+- **Graceful shutdown**: `closeRedisConnection()` uses `quit()` with fallback to `disconnect()`, resets all state
+- **Status reporting**: `getRedisStatus()` returns `{ configured, connected, status }` for health checks
 
-### Pre-Configured Rate Limiters
-| Name | Limit | Window | Verified |
-|------|-------|--------|----------|
-| `defaultRateLimiter` | 200 req | 1 hour | Matches prompt |
-| `searchRateLimiter` | 100 req | 1 hour | Matches prompt |
-| `verificationRateLimiter` | 10 req | 1 hour | Matches prompt |
-| `voteRateLimiter` | 10 req | 1 hour | Matches prompt |
+### Difference from prompt description:
+The prompt describes `initRedis()` with `lazyConnect: true`. The actual implementation uses `getRedisClient()` with `lazyConnect: false` and `enableReadyCheck: true`. This is better -- the client connects eagerly and validates the connection on startup rather than delaying connection issues to the first request.
 
-### Cache Utility (`packages/backend/src/utils/cache.ts`)
-- [x] **Dual-mode caching** -- `cacheGet`/`cacheSet`/`cacheDelete` try Redis first, fall back to in-memory Map. This extends Redis beyond rate limiting as the prompt's "Future Considerations" suggested.
-- [x] **TTL-based expiration** -- Default TTL is 300 seconds (5 minutes). Redis uses `SETEX`; in-memory stores `expiresAt` timestamp.
-- [x] **Cache statistics** -- Tracks hits, misses, sets, deletes, size, and mode. Exposed via `getCacheStats()`.
-- [x] **Pattern deletion** -- `cacheDeletePattern()` uses Redis `SCAN` (not `KEYS`) for production safety. Falls back to regex matching on in-memory Map.
-- [x] **Search cache key generation** -- `generateSearchCacheKey()` normalizes search params (lowercase, trim) and generates deterministic keys with a simple hash for additional params.
-- [x] **Search cache invalidation** -- `invalidateSearchCache()` clears all `search:*` keys, called when verifications are submitted.
-- [x] **Periodic cleanup** -- 60-second interval removes expired entries from in-memory cache.
+---
 
-### Docker Compose (`docker-compose.yml`)
-- [ ] **No Redis service** -- The `docker-compose.yml` only defines `db` (PostgreSQL), `backend`, and `frontend` services. No Redis container is configured. This is consistent with the fallback design but means local development always uses in-memory mode.
+## Rate Limiter (`rateLimiter.ts`) -- VERIFIED
 
-### Admin Cache Endpoints (`packages/backend/src/routes/admin.ts`)
-- [x] **POST /admin/cache/clear** -- Clears all cache entries, returns deleted count.
-- [x] **GET /admin/cache/stats** -- Returns cache statistics including hit rate calculation.
+**Implementation quality: Excellent.** Well-documented dual-mode system with proper algorithm choice.
 
-## Summary
+### Architecture
+```
+createRateLimiter(options)
+  |
+  +-- REDIS_URL configured? --> createRedisRateLimiter() [distributed]
+  |
+  +-- No REDIS_URL?        --> createInMemoryRateLimiter() [process-local]
+```
 
-The Redis integration is well-implemented with a robust dual-mode architecture. The rate limiting middleware uses a proper sliding window algorithm in both Redis (sorted sets) and in-memory (timestamp arrays) modes, with consistent fail-open behavior across three potential failure points. The cache utility extends Redis beyond rate limiting to support search result caching with TTL, pattern deletion, and invalidation on verification submission.
+### In-Memory Rate Limiter
+- **Algorithm**: Sliding window with timestamp arrays
+- **Storage**: `Map<string, number[]>` per limiter name
+- **Cleanup**: `setInterval` every 60 seconds, removes expired entries
+- **Key generation**: Default is `req.ip`, customizable via `keyGenerator`
+- **Skip function**: Optional `skip` callback to bypass rate limiting
+- **Headers**: Sets `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`
+- **Documentation**: Excellent inline comments explaining sliding window vs fixed window trade-offs
 
-The implementation exceeds what the prompt describes as "Not Implemented" under "Additional Caching" -- search result caching and cache invalidation are actually already built in `cache.ts`. The code is production-quality with structured logging, connection state tracking, graceful shutdown, and comprehensive error handling.
+### Redis Rate Limiter
+- **Algorithm**: Sliding window using Redis sorted sets
+- **Transaction**: Atomic pipeline with `multi()`:
+  1. `ZREMRANGEBYSCORE` -- remove entries outside window
+  2. `ZADD` -- add current request with timestamp + random suffix
+  3. `ZCARD` -- count requests in window
+  4. `EXPIRE` -- set key TTL for cleanup
+- **Key format**: `ratelimit:{name}:{clientIp}`
+- **Fail-open**: If Redis unavailable or transaction fails, allows request with `X-RateLimit-Status: degraded` header
+- **Error handling**: Catches Redis errors, logs with structured logger, fails open
+
+### Auto-Selection
+- `createRateLimiter()` factory checks `getRedisClient()` and selects mode
+- Mode selection logged once per limiter name (avoids log spam)
+- Tracks modes in `limiterModes` Map
+
+---
+
+## CAPTCHA Middleware (`captcha.ts`) -- VERIFIED
+
+**Implementation quality: Excellent.** Comprehensive fallback system with configurable fail mode.
+
+Key findings:
+- **Dual fail mode**: `CAPTCHA_FAIL_MODE=open` (default) or `closed`, configurable via environment variable
+- **Fail-open behavior**: When Google reCAPTCHA API is unavailable:
+  - Applies stricter fallback rate limiting (3 requests/hour vs normal 10)
+  - Sets `X-Security-Degraded: captcha-unavailable` header
+  - Sets fallback rate limit headers
+- **Fail-closed behavior**: Blocks all requests with 503 when API unavailable
+- **Score threshold**: `CAPTCHA_MIN_SCORE = 0.5` (reCAPTCHA v3 scores 0.0-1.0)
+- **API timeout**: 5 seconds via `AbortController`
+- **Skips in dev/test**: Bypasses verification in development and test environments
+- **Graceful when unconfigured**: Logs warning and passes through if `RECAPTCHA_SECRET_KEY` not set
+- **Fallback store cleanup**: `setInterval` at `RATE_LIMIT_CLEANUP_INTERVAL_MS` (1 minute)
+
+---
+
+## Docker Compose -- VERIFIED
+
+**Finding: No Redis service in docker-compose.yml.** The compose file defines only:
+- `db` (PostgreSQL 15)
+- `backend` (Node.js API)
+- `frontend` (Next.js)
+
+No `REDIS_URL` environment variable is passed to the backend service. This means:
+- Production is running in **in-memory rate limiting mode**
+- Rate limits are process-local and reset on container restart
+- No distributed rate limiting across multiple backend instances
+
+---
+
+## Checklist Verification
+
+### Implementation
+- [x] Redis client with retry logic -- **VERIFIED**: Exponential backoff, 5 max attempts, structured logging
+- [x] Sliding window algorithm -- **VERIFIED**: Both Redis (sorted sets) and in-memory (timestamp arrays)
+- [x] In-memory fallback -- **VERIFIED**: Automatic selection when REDIS_URL not configured
+- [x] Fail-open behavior -- **VERIFIED**: Redis unavailable = allow request + degraded header
+- [x] Rate limit headers -- **VERIFIED**: X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset
+- [x] Automatic cleanup -- **VERIFIED**: 60-second interval for in-memory, EXPIRE command for Redis
+
+### Production Readiness
+- [ ] Redis deployed (Memorystore) -- **NOT DEPLOYED**: No Redis service in docker-compose
+- [ ] Connection string in secrets -- **NOT CONFIGURED**: No REDIS_URL in environment
+- [ ] TLS enabled -- **NOT CONFIGURED**: No TLS options in Redis client
+- [ ] Memory limits configured -- **N/A**: No Redis deployed
+- [ ] Monitoring alerts -- **NOT CONFIGURED**: No alerting infrastructure found
+
+### Testing
+- [ ] Test Redis mode -- **NOT TESTED**: No test files for rateLimiter.ts
+- [ ] Test in-memory mode -- **NOT TESTED**
+- [ ] Test failover behavior -- **NOT TESTED**
+- [ ] Load test rate limits -- **NOT DONE**
+
+---
+
+## Questions Answered
+
+### 1. Is Redis deployed in production?
+**No.** The docker-compose.yml has no Redis service, and no `REDIS_URL` is passed to the backend. The application is running entirely on in-memory rate limiting. This is sufficient for single-instance deployments but will not work correctly when scaling to multiple backend instances.
+
+### 2. What are the Redis resource limits?
+**N/A.** Redis is not deployed. When deployed, the sorted set approach uses O(n) memory per client per limiter, where n = maxRequests. For the current configuration: worst case per client = 200 entries (default limiter) * 4 limiters = 800 sorted set members per IP.
+
+### 3. Is Redis persistence enabled?
+**N/A.** Redis is not deployed. For rate limiting only, persistence is not needed -- data loss on restart is acceptable since rate limit windows will naturally refill.
+
+### 4. Are there Redis monitoring alerts?
+**No.** No monitoring or alerting infrastructure was found in the codebase. The Redis client logs connection events via the structured logger, but no external monitoring is configured.
+
+### 5. Should we use Redis for other caching?
+**Yes, when deployed.** The codebase already has an in-memory cache system (`packages/backend/src/utils/cache.ts` referenced in `admin.ts` via `cacheClear()` and `getCacheStats()`). Good candidates for Redis caching:
+- **Search results**: Common state/city/specialty combinations
+- **Provider details**: Cache by NPI (read-heavy, write-rare)
+- **Cities/specialties lists**: Near-static reference data
+- **Session data**: If authentication is added
+
+---
+
+## Issues
+
+1. **No Redis in production**: The dual-mode system is well-implemented but running entirely in fallback mode. Rate limits are per-process and reset on restart.
+
+2. **CAPTCHA fallback store is in-memory**: The CAPTCHA fallback rate limiting (`fallbackStore`) uses a process-local Map. If the backend scales to multiple instances without Redis, the fallback limits are ineffective.
+
+3. **No Redis in docker-compose**: Developers cannot test Redis mode locally without manually adding a Redis service or running Redis separately.
+
+4. **No TLS configuration**: The Redis client does not configure TLS options. When deploying to Google Cloud Memorystore, in-transit encryption may be required.
+
+---
 
 ## Recommendations
 
-1. **Add Redis to docker-compose** -- Add a Redis service to `docker-compose.yml` and `docker-compose.dev.yml` so developers can test distributed rate limiting locally:
+1. **Add Redis to docker-compose**: Add a Redis service for local development and testing:
    ```yaml
    redis:
      image: redis:7-alpine
      ports:
        - "6379:6379"
    ```
+   And add `REDIS_URL: redis://redis:6379` to the backend environment.
 
-2. **Configure TLS for production Redis** -- If using Google Cloud Memorystore, enable in-transit encryption. Add explicit TLS options to the ioredis config when `REDIS_URL` uses `rediss://` protocol.
+2. **Deploy Redis for production**: Use Google Cloud Memorystore (Basic tier, 1GB) for production. Configure `REDIS_URL` as a secret in Cloud Run/GKE.
 
-3. **Add Redis health to admin endpoints** -- The `/admin/health` endpoint includes cache stats but does not report Redis connection status. Include `getRedisStatus()` in the health response for monitoring.
+3. **Add TLS support**: Add TLS options to the Redis client configuration for production connections:
+   ```typescript
+   tls: process.env.REDIS_TLS === 'true' ? {} : undefined
+   ```
 
-4. **Consider provider detail caching** -- `cache.ts` supports arbitrary key-value caching. Provider detail pages (by NPI) are read-heavy and could benefit from short-TTL caching to reduce database load.
+4. **Write rate limiter tests**: The sliding window algorithm has well-defined behavior that is straightforward to test. Mock the Redis client for Redis mode tests; test in-memory mode directly.
 
-5. **Add rate limiter tests** -- Both Redis and in-memory modes have zero test coverage. Test the sliding window behavior, fail-open paths, header values, and 429 responses.
+5. **Move to Redis-backed caching**: Replace the in-memory cache (`cache.ts`) with Redis-backed caching to share cached data across instances and survive restarts.
 
-6. **Monitor in-memory cache size** -- The in-memory fallback has no size limit. Under sustained load without Redis, the Map could grow unbounded. Consider adding a max-size eviction policy (LRU) for the in-memory fallback.
-
-7. **Clarify Redis deployment status** -- The prompt's checklist shows "Redis deployed (Memorystore)" as unchecked. Confirm whether Redis is deployed in production or if the system is running entirely in in-memory mode.
+6. **Add Redis health to admin endpoint**: The admin health endpoint already reports cache stats. Add Redis connection status from `getRedisStatus()`.

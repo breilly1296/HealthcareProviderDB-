@@ -1,135 +1,243 @@
-# Provider Comparison Feature — Analysis
+# Provider Comparison
 
-**Generated:** 2026-02-05
-**Source Prompt:** prompts/33-provider-comparison.md
-**Status:** Fully Implemented -- Comparison feature with context, components, persistence, and accessibility
+**Last Updated:** 2026-02-06
+**Status:** Implemented
+
+## Features
+- [x] Add up to MAX_COMPARE_PROVIDERS (constant from `lib/constants`)
+- [x] Side-by-side comparison in modal with table layout
+- [x] Remove from compare (with auto-close when < 2 remain)
+- [x] Clear all
+- [x] Session persistence via sessionStorage
+- [x] Best-value highlighting across providers
+
+## Components
+- CompareContext -- Implemented (157 lines)
+- CompareCheckbox -- Implemented (71 lines)
+- CompareBar -- Implemented (159 lines)
+- CompareModal -- Implemented (453 lines)
+- useCompare hook -- Re-export from context (5 lines)
 
 ---
 
-## Findings
+## CompareContext (`context/CompareContext.tsx`) -- VERIFIED
 
-### CompareContext (`packages/frontend/src/context/CompareContext.tsx`)
-- [x] **Context created** -- `CompareContext` created with `createContext<CompareContextType | undefined>(undefined)`.
-- [x] **CompareProvider interface** -- Comprehensive type with `npi`, `name`, `specialty`, `healthSystem`, `address`, `city`, `state`, `zip`, `confidenceScore?`, `acceptanceStatus?`, `verificationCount?`, `lastVerified?`, `phone?`. More fields than the prompt specified.
-- [x] **addProvider function** -- Uses `useCallback` with functional state update. Checks `prev.length >= MAX_COMPARE_PROVIDERS` and `prev.some(p => p.npi === provider.npi)` for duplicate prevention.
-- [x] **removeProvider function** -- `useCallback` with `filter(p => p.npi !== npi)`.
-- [x] **clearAll function** -- `useCallback` with `setSelectedProviders([])`.
-- [x] **isSelected function** -- `useCallback` with `selectedProviders.some(p => p.npi === npi)`. Depends on `[selectedProviders]`.
-- [x] **canAddMore computed** -- `selectedProviders.length < MAX_COMPARE_PROVIDERS`.
-- [x] **Duplicate prevention** -- Checked in `addProvider` via `prev.some(p => p.npi === provider.npi)`.
-- [x] **useCompare hook** -- Defined in the same file (line 151). Throws descriptive error if used outside provider.
+### State Management
+- **Storage**: `sessionStorage` (persists across page navigations, clears on tab close)
+- **Storage key**: `verifymyprovider-compare`
+- **SSR-safe**: Uses `mounted` state flag; only reads sessionStorage after `useEffect`
+- **Error handling**: Comprehensive -- handles `SyntaxError` (corrupt JSON), `DOMException` (security/quota), and validates parsed data is an array
 
-### Max Provider Limit
-- [!] **MAX_COMPARE_PROVIDERS = 3, not 4** -- `packages/frontend/src/lib/constants.ts` defines `MAX_COMPARE_PROVIDERS = 3`. The prompt states "up to 4 providers" but the implementation limits to 3. This is a discrepancy between the spec and implementation.
+### Provider Data Model
+```typescript
+interface CompareProvider {
+  npi: string;
+  name: string;
+  specialty: string;
+  healthSystem: string | null;
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+  confidenceScore?: number;
+  acceptanceStatus?: string;
+  verificationCount?: number;
+  lastVerified?: string | null;
+  phone?: string | null;
+}
+```
 
-### State Persistence
-- [x] **sessionStorage persistence** -- Uses `sessionStorage` (not localStorage) with key `verifymyprovider-compare`. Reads on mount via `useEffect`, writes on every state change.
-- [x] **SSR-safe initialization** -- Checks `typeof window === 'undefined'` before accessing `sessionStorage`. Uses `mounted` state flag to prevent SSR hydration mismatches.
-- [x] **Error handling on storage** -- Comprehensive error handling for `SyntaxError` (corrupt JSON), `DOMException` (quota exceeded, security errors). Uses `logError()` utility for structured error reporting. Removes corrupted data automatically.
-- [x] **Array validation** -- Validates parsed JSON is an array before using it, resetting if not.
+### API
+- `addProvider(provider)` -- Prevents duplicates (by NPI) and exceeding max
+- `removeProvider(npi)` -- Filters by NPI
+- `clearAll()` -- Resets to empty array
+- `isSelected(npi)` -- Boolean check
+- `canAddMore` -- `selectedProviders.length < MAX_COMPARE_PROVIDERS`
 
-### CompareCheckbox (`packages/frontend/src/components/compare/CompareCheckbox.tsx`)
-- [x] **Toggle behavior** -- Adds on click if `canAddMore`, removes if `selected`. Uses `e.preventDefault()` and `e.stopPropagation()` to avoid parent click handlers.
-- [x] **Disabled state** -- `disabled={!selected && !canAddMore}` prevents adding when at limit.
-- [x] **Visual feedback** -- Shows checkmark icon + "Added" when selected, plus icon + "Compare" when not. Uses distinct color schemes for selected/disabled/default states.
-- [x] **aria-pressed attribute** -- `aria-pressed={selected}` for screen readers.
-- [x] **Dynamic aria-label** -- Different labels for selected ("Remove X from comparison"), disabled ("Remove a provider to add another"), and default ("Add X to comparison") states.
-- [x] **Focus ring** -- `focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2` with dark mode offset.
+### Performance
+- All callbacks wrapped in `useCallback` to prevent unnecessary re-renders
+- `isSelected` depends on `selectedProviders` array (recalculates when selection changes)
 
-### CompareBar (`packages/frontend/src/components/compare/CompareBar.tsx`)
-- [x] **Fixed positioning** -- Desktop: `fixed bottom-6 right-6 z-40` as floating card. Mobile: `fixed bottom-16 left-0 right-0 z-40` as full-width bar above BottomNav.
-- [x] **Hidden when empty** -- Returns `null` when `count === 0`.
-- [x] **Requires 2+ to compare** -- `canCompare = count >= 2`. Compare button disabled when only 1 provider selected.
-- [x] **Provider initials display** -- Shows circular initials for each provider. Mobile limits to first 3 (`slice(0, 3)`).
-- [x] **Clear all button** -- Calls `clearAll()` from context.
-- [x] **Compare button** -- Opens `CompareModal` via local `isModalOpen` state.
-- [x] **Responsive design** -- Separate desktop (floating card, `hidden md:flex`) and mobile (full-width bar, `md:hidden`) layouts.
-- [x] **Animation** -- Uses `animate-slide-up` class for entrance animation.
-- [x] **Aria label** -- `aria-label={Compare ${count} providers}` on compare button.
+### Naming conflict note
+The context file exports both `CompareProvider` as an interface AND as a React component (the provider wrapper). This could cause confusion but TypeScript distinguishes between type and value exports.
 
-### CompareModal (`packages/frontend/src/components/compare/CompareModal.tsx`)
-- [x] **Focus trap** -- Uses `focus-trap-react` library with `FocusTrap` wrapper. `initialFocus` set to close button, `allowOutsideClick: true`.
-- [x] **Escape key handling** -- `handleKeyDown` listener closes modal on Escape. Registered/cleaned up in `useEffect`.
-- [x] **Body scroll lock** -- `document.body.style.overflow = 'hidden'` on open, restored on cleanup.
-- [x] **Backdrop click to close** -- `handleBackdropClick` checks `e.target === e.currentTarget` to close on backdrop click.
-- [x] **Dialog role and aria** -- `role="dialog"`, `aria-modal="true"`, `aria-labelledby="compare-modal-title"`.
-- [x] **Remove individual providers** -- "Remove" button per provider in header. Auto-closes modal if fewer than 2 providers remain after removal.
-- [x] **Side-by-side table layout** -- HTML `<table>` with sticky headers and sticky left attribute column. Responsive with `min-w-[200px]` per provider column.
-- [x] **Best value highlighting** -- `getBestIndices()` function computes which providers have the "best" value per row. Supports `highest` (numeric), `mostRecent` (date), `status` (ordered), and `hasValue` comparison types. Skips highlighting when all values are equal.
+---
 
-### Comparison Fields Displayed
+## CompareCheckbox (`compare/CompareCheckbox.tsx`) -- VERIFIED
 
-| Field | Displayed | Highlight Type |
-|-------|-----------|---------------|
-| Specialty | Yes | None (usually same) |
-| Health System | Yes | hasValue |
-| Location (address, city, state, zip) | Yes | None (subjective) |
-| Confidence Score | Yes | highest |
-| Acceptance Status | Yes | status (ACCEPTED > PENDING > UNKNOWN) |
-| Verification Count | Yes | highest |
-| Last Verified | Yes | mostRecent |
-| Phone | Yes | None |
+- Imports `useCompare` and `CompareProvider` type from `@/hooks/useCompare` (which re-exports from context)
+- **Event handling**: `e.preventDefault()` and `e.stopPropagation()` -- prevents parent card navigation when clicking the checkbox
+- **Disabled state**: When not selected AND at max capacity
+- **Accessibility**:
+  - `aria-pressed={selected}` for toggle button semantics
+  - Dynamic `aria-label` with provider name and action description
+  - `title` attribute when disabled explains why
+- **Visual states**: Three distinct styles (selected/primary blue, disabled/gray, available/gray with hover)
+- **Icons**: Checkmark when added, plus sign when available
 
-The prompt listed "Provider name", "Credential", and "Accepted plans" as displayed fields. In the actual implementation:
-- **Provider name** -- Shown in the header row (not a comparison row).
-- **Credential** -- Not displayed in comparison rows.
-- **Accepted plans** -- Not displayed; the comparison shows acceptance status and verification count instead.
-- **Health System**, **Verification Count**, **Last Verified** -- Additional fields not in the prompt but present in implementation.
+---
 
-### useCompare Hook (`packages/frontend/src/hooks/useCompare.ts`)
-- [x] **Re-export pattern** -- Simply re-exports `useCompare` and `CompareProvider` type from `@/context/CompareContext`. Clean import path for consumers.
+## CompareBar (`compare/CompareBar.tsx`) -- VERIFIED
 
-### Component Barrel Export (`packages/frontend/src/components/compare/index.ts`)
-- [x] **Barrel exports** -- Exports `CompareCheckbox`, `CompareBar`, `CompareModal`.
+### Responsive Design
+- **Desktop** (md+): Floating card in bottom-right corner with initials, count, Compare button, Clear button
+- **Mobile** (<md): Full-width bar above bottom navigation with compact layout
+- **Animation**: `animate-slide-up` class for entry animation
+
+### Behavior
+- Returns `null` when no providers selected (completely hidden)
+- Compare button disabled when `count < 2` (need at least 2 to compare)
+- Shows provider initials in overlapping circles (`-space-x-2`)
+- Mobile shows max 3 initials (`.slice(0, 3)`)
+- Opens CompareModal when Compare clicked
+
+---
+
+## CompareModal (`compare/CompareModal.tsx`) -- VERIFIED
 
 ### Accessibility
-- [x] **Keyboard navigation** -- Escape to close modal, focus trap within modal, all interactive elements are buttons (natively focusable).
-- [x] **Screen reader support** -- `aria-pressed`, `aria-label`, `aria-modal`, `aria-labelledby`, `role="dialog"`. Dynamic labels reflect current state.
-- [x] **Focus management** -- `FocusTrap` component manages focus. Close button receives initial focus via `closeButtonRef`. Focus rings visible only on keyboard navigation (`focus-visible`).
+- **Focus trap**: Uses `focus-trap-react` library (FocusTrap component)
+- **Initial focus**: Close button receives focus when modal opens
+- **Escape key**: Closes modal via `keydown` event listener
+- **Backdrop click**: Closes modal when clicking outside
+- **ARIA**: `role="dialog"`, `aria-modal="true"`, `aria-labelledby="compare-modal-title"`
+- **Body scroll lock**: `document.body.style.overflow = 'hidden'` while open
 
-### Prompt Checklist Verification
+### Comparison Table
+The modal displays a table with providers as columns and attributes as rows:
 
-#### Context
-- [x] CompareContext created
-- [x] Add/remove/clear functions
-- [x] Max provider limit (3, not 4 as prompt states)
-- [x] Duplicate prevention
+| Row | Data Source | Highlighting |
+|-----|------------|--------------|
+| Specialty | `provider.specialty` | None (usually same) |
+| Health System | `provider.healthSystem` | `hasValue` -- highlights providers with an affiliation |
+| Location | `provider.address + city/state/zip` | None (subjective) |
+| Confidence | `provider.confidenceScore` | `highest` -- green highlight on best score |
+| Status | `provider.acceptanceStatus` | `status` -- ranked ACCEPTED > PENDING > UNKNOWN |
+| Verifications | `provider.verificationCount` | `highest` -- most verifications highlighted |
+| Last Verified | `provider.lastVerified` | `mostRecent` -- most recent date highlighted |
+| Phone | `provider.phone` | None |
 
-#### Components
-- [x] CompareCheckbox on provider cards
-- [x] CompareBar fixed at bottom
-- [x] CompareModal for side-by-side
-- [x] Empty state handling (bar hidden when 0, requires 2+ to compare)
-- [x] Mobile responsive modal (separate mobile/desktop bar layouts, scrollable modal)
+### Best-Value Highlighting Algorithm (`getBestIndices`)
+Supports 4 comparison types:
+1. **`highest`**: Numeric comparison (used for confidenceScore, verificationCount)
+2. **`mostRecent`**: Date comparison (used for lastVerified)
+3. **`status`**: Ordered ranking ACCEPTED=3 > PENDING=2 > UNKNOWN=1
+4. **`hasValue`**: Boolean -- highlights providers that have a value vs. those that do not
 
-#### UX
-- [x] Visual feedback when added (checkmark + "Added" text)
-- [x] Disabled state when at limit
-- [x] Clear all option
-- [x] Remove individual providers
-- [ ] Drag to reorder (not implemented)
+**Smart behavior**: Returns empty array (no highlighting) when:
+- All values are equal (no differentiation needed)
+- All values are null/undefined (no winner)
+- All providers have the value (for `hasValue` type)
 
-#### Accessibility
-- [x] Keyboard navigation (Escape, Tab via focus trap)
-- [x] Screen reader support (ARIA attributes throughout)
-- [x] Focus management in modal (focus-trap-react)
+### Visual Design
+- Max width: 4xl (max-w-4xl)
+- Max height: 90vh with scrollable body
+- Sticky header row and left column for scrollability
+- Alternating row backgrounds
+- Green background on best-value cells
+- Remove button per provider in header
+- Auto-closes when removing a provider drops count below 2
 
-## Summary
+### Helper Functions
+- `getConfidenceColor(score)` -- Returns color classes based on CONFIDENCE_THRESHOLDS constant (HIGH/MEDIUM thresholds)
+- `getAcceptanceColor(status)` -- Green for ACCEPTED, yellow for PENDING, gray for others
+- `formatRelativeDate(dateString)` -- Today, Yesterday, N days/weeks/months/years ago
+- `ProviderInitial` -- Circular avatar with first letter of name
 
-The provider comparison feature is fully implemented and exceeds the prompt's specification in several areas. The core flow (add providers, view comparison bar, open modal) works as described. The implementation includes session storage persistence (not just ephemeral state), comprehensive error handling for storage operations, SSR-safe hydration, focus trapping, responsive desktop/mobile layouts, and intelligent best-value highlighting in the comparison table.
+---
 
-The main discrepancy is the max provider limit: the prompt specifies 4, but the constant `MAX_COMPARE_PROVIDERS` is set to 3. The comparison fields differ from the prompt's list -- the implementation adds health system, verification count, and last verified date while omitting credential and accepted plans.
+## Checklist Verification
+
+### Context
+- [x] CompareContext created -- **VERIFIED**: Full implementation with sessionStorage
+- [x] Add/remove/clear functions -- **VERIFIED**: All three with proper state management
+- [x] Max provider limit -- **VERIFIED**: Uses `MAX_COMPARE_PROVIDERS` from constants
+- [x] Duplicate prevention -- **VERIFIED**: Checks `prev.some(p => p.npi === provider.npi)` before adding
+
+### Components
+- [x] CompareCheckbox on provider cards -- **VERIFIED**: With event propagation prevention
+- [x] CompareBar fixed at bottom -- **VERIFIED**: Desktop floating + mobile full-width
+- [x] CompareModal for side-by-side -- **VERIFIED**: Table-based comparison with 8 attribute rows
+- [ ] Empty state handling -- **PARTIALLY**: Bar hides when empty, modal requires 2+ providers, but no empty state message in modal
+- [x] Mobile responsive modal -- **VERIFIED**: Scrollable table with sticky headers, mobile-friendly bar
+
+### UX
+- [x] Visual feedback when added -- **VERIFIED**: Checkmark icon + "Added" text + primary color
+- [x] Disabled state when at limit -- **VERIFIED**: Gray styling + "Remove a provider to add another" tooltip
+- [x] Clear all option -- **VERIFIED**: In both desktop and mobile bars
+- [x] Remove individual providers -- **VERIFIED**: Remove button in modal header per provider
+- [ ] Drag to reorder -- **NOT IMPLEMENTED**
+
+### Accessibility
+- [x] Keyboard navigation -- **VERIFIED**: FocusTrap, escape key handler
+- [x] Screen reader support -- **VERIFIED**: aria-pressed, aria-label, aria-modal, role="dialog"
+- [x] Focus management in modal -- **VERIFIED**: Initial focus on close button, focus trap active
+
+---
+
+## Questions Answered
+
+### 1. Is the 4 provider limit appropriate?
+The limit is stored in `MAX_COMPARE_PROVIDERS` from `lib/constants`. The modal uses `max-w-4xl` width and `min-w-[200px]` per provider column, allowing up to 4 columns comfortably. 4 is appropriate for the current table layout. Allowing more on larger screens would require a responsive limit or horizontal scrolling (which the current implementation already supports via `overflow-auto`).
+
+### 2. Should comparison persist across sessions?
+**Currently uses sessionStorage** -- persists across page navigations within the same tab but clears when the tab is closed. This is a reasonable middle ground:
+- localStorage would persist across sessions (useful if users bookmark and return)
+- Server-side would require authentication (not currently implemented)
+- sessionStorage avoids stale comparisons from old sessions
+
+The prompt incorrectly states comparison is "Not persisted" -- it IS persisted in sessionStorage, which is an improvement over the initial design.
+
+### 3. What additional fields should be compared?
+Current fields compared: Specialty, Health System, Location, Confidence, Status, Verifications, Last Verified, Phone.
+
+**Missing fields that could add value:**
+- **Insurance acceptance match**: If the user has specified their insurance plan, show whether each provider accepts it
+- **Distance from user**: If the user has provided a location/zip code
+- **Credential**: Already in the `CompareProvider` interface but not displayed in modal
+- **Telehealth availability**: Available in `provider_cms_details.telehealth`
+- **Medical school / graduation year**: Available in `provider_cms_details`
+
+### 4. Should we add comparison sharing?
+**Not currently implemented.** Options:
+- **URL-based sharing**: Encode NPI list in URL params (`/compare?npis=123,456,789`) -- simplest approach, no authentication needed
+- **PDF export**: Would require server-side rendering or client-side PDF library
+- **Social sharing**: Low priority for healthcare provider comparison
+
+### 5. Mobile experience improvements?
+**Currently implemented**: Full-width bar, compact initials, scrollable table. The modal table scrolls horizontally on mobile.
+
+**Potential improvements:**
+- Card-based layout on mobile (stacked cards instead of table columns)
+- Swipe between providers
+- Collapsible comparison rows
+
+---
+
+## Issues
+
+1. **Naming collision**: `CompareProvider` is used as both a TypeScript interface name and a React component name in `CompareContext.tsx`. The type is exported and used in `CompareCheckbox.tsx` and `CompareModal.tsx`, while the component wraps children with the context provider.
+
+2. **No deep link support**: The comparison state is only in sessionStorage. Users cannot share a comparison via URL or return to it after closing the tab.
+
+3. **No loading state for provider data**: The `CompareProvider` interface stores a snapshot of provider data at the time of selection. If the provider's data changes (e.g., confidence score update), the comparison shows stale data.
+
+4. **Missing credential display**: The `CompareProvider` interface does not include `credential`, though the comparison could benefit from showing provider credentials (MD, DO, NP, etc.).
+
+5. **Table not ideal for mobile**: While the table scrolls horizontally on mobile, a card-based comparison view would be more natural for small screens.
+
+---
 
 ## Recommendations
 
-1. **Reconcile max provider limit** -- Decide whether the limit should be 3 or 4. If 4, update `MAX_COMPARE_PROVIDERS` in `packages/frontend/src/lib/constants.ts` and ensure the modal table layout handles 4 columns well. The modal uses `max-w-4xl` which may be tight for 4 provider columns at `min-w-[200px]` each.
+1. **Add URL-based sharing**: Encode selected NPIs in URL search params so comparisons can be bookmarked and shared. On page load, fetch provider data for any NPIs in the URL.
 
-2. **Add credential to comparison** -- The prompt lists credential as a comparison field but it is not displayed. Consider adding it as a row if the `CompareProvider` interface includes credential data, or add the field to the interface.
+2. **Add credential to comparison**: Include the `credential` field in the `CompareProvider` interface and add a row to the comparison table.
 
-3. **Consider localStorage over sessionStorage** -- Current implementation uses `sessionStorage` which is tab-scoped and lost when the tab closes. The prompt's "Future Enhancement" suggests `localStorage` for persistence across sessions. This is a UX trade-off: sessionStorage prevents stale comparisons but localStorage lets users resume.
+3. **Add insurance match row**: If the user has searched with a specific insurance plan, show whether each provider accepts that plan. This is the most valuable comparison metric for the use case.
 
-4. **Add comparison analytics** -- Track how often the comparison feature is used (providers compared, modal opened, time spent). PostHog is already integrated in the frontend.
+4. **Consider card view for mobile**: Below `md` breakpoint, render providers as swipeable cards instead of table columns. Each card would show all attributes for one provider.
 
-5. **Add drag to reorder** -- Listed as unchecked in the prompt. Consider a library like `@dnd-kit/core` for accessible drag-and-drop reordering of providers in the comparison.
+5. **Fix naming collision**: Rename the React component from `CompareProvider` to `CompareProviderWrapper` or `CompareContextProvider` to distinguish it from the TypeScript interface.
 
-6. **Add unit tests for CompareContext** -- Test the max limit enforcement, duplicate prevention, sessionStorage read/write, error recovery from corrupt storage, and SSR-safe initialization. The context has well-defined behavior that is straightforward to test with React Testing Library's `renderHook`.
+6. **Add localStorage option**: Offer a "Keep for later" toggle that moves storage from sessionStorage to localStorage for persistence across sessions.

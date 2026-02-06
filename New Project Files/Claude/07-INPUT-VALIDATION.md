@@ -1,255 +1,115 @@
-# Input Validation Review -- Analysis
+# Input Validation
 
-**Generated:** 2026-02-05
-**Source Prompt:** prompts/07-input-validation.md
-**Status:** Strong. Zod validation is applied consistently across all active route endpoints. Shared schemas are centralized in `commonSchemas.ts`. Error handler properly formats Zod validation errors with field-level details. Minor gaps in admin route validation.
+## Validation Status
 
----
+**Overall: STRONG** -- All API endpoints use Zod schema validation on inputs. Validation is centralized through shared schemas (`commonSchemas.ts`) and route-specific schemas. The global error handler properly catches and formats Zod validation errors as 400 responses with field-level detail.
 
-## Findings
+## Validation Library
 
-### Shared Schema Validation (`schemas/commonSchemas.ts`)
+- **Zod** is used consistently across all route files
+- Schemas are parsed with `.parse()` which throws `ZodError` on failure
+- The global `errorHandler` in `packages/backend/src/middleware/errorHandler.ts` (lines 100-116) catches `ZodError` by name and returns structured 400 responses with per-field error details
 
-| Schema | Validation Rules | Used By | Status |
-|--------|-----------------|---------|--------|
-| `paginationSchema` | `page`: coerce to int, min 1, default 1; `limit`: coerce to int, min 1, max 100, default 20 | providers.ts, plans.ts, locations.ts, verify.ts | Verified |
-| `npiParamSchema` | `npi`: string, exactly 10 chars, regex `/^\d+$/` ("NPI must be exactly 10 digits") | providers.ts, verify.ts | Verified |
-| `stateQuerySchema` | `state`: string, exactly 2 chars, `.toUpperCase()`, optional | plans.ts, locations.ts | Verified |
-| `planIdParamSchema` | `planId`: string, min 1, max 50 | plans.ts, verify.ts | Verified |
+## Shared Schemas (`packages/backend/src/schemas/commonSchemas.ts`)
 
-- Verified: Type exports provided for TypeScript consumers (`PaginationInput`, `NpiParamInput`, `StateQueryInput`, `PlanIdParamInput`).
+| Schema | Validation Rules | Used In |
+|--------|-----------------|---------|
+| `paginationSchema` | `page`: coerced int, min 1, default 1; `limit`: coerced int, min 1, max 100, default 20 | providers, plans, locations, verify |
+| `npiParamSchema` | `npi`: string, exactly 10 chars, regex `^\d+$` ("NPI must be exactly 10 digits") | providers, verify |
+| `stateQuerySchema` | `state`: string, exactly 2 chars, `.toUpperCase()`, optional | plans, locations |
+| `planIdParamSchema` | `planId`: string, min 1, max 50 | plans, verify |
 
-### Per-Endpoint Validation Analysis
+## Route-Specific Validation
 
-#### Provider Routes (`routes/providers.ts`)
+### `providers.ts` (`packages/backend/src/routes/providers.ts`)
 
-**GET `/search`** -- Verified
-```
-searchQuerySchema = z.object({
-  state: z.string().length(2).toUpperCase().optional(),
-  city: z.string().min(1).max(100).optional(),
-  cities: z.string().min(1).max(500).optional(),
-  zipCode: z.string().min(3).max(10).optional(),
-  specialty: z.string().min(1).max(200).optional(),
-  specialtyCategory: z.string().min(1).max(100).optional(),
-  name: z.string().min(1).max(200).optional(),
-  npi: z.string().length(10).regex(/^\d+$/).optional(),
-  entityType: z.enum(['INDIVIDUAL', 'ORGANIZATION']).optional(),
-}).merge(paginationSchema)
-```
-- All string fields have `min(1)` (prevents empty strings) and `max()` bounds (prevents oversized inputs).
-- `state` uses `.toUpperCase()` for normalization.
-- `entityType` uses `z.enum()` for strict allow-list.
-- `npi` in search has same 10-digit regex as `npiParamSchema`.
+| Endpoint | Schema | Fields Validated |
+|----------|--------|-----------------|
+| `GET /search` | `searchQuerySchema` merged with `paginationSchema` | `state` (2-char, uppercase, optional), `city` (1-100, optional), `cities` (1-500, optional), `zipCode` (3-10, optional), `specialty` (1-200, optional), `specialtyCategory` (1-100, optional), `name` (1-200, optional), `npi` (10-digit regex, optional), `entityType` (enum INDIVIDUAL/ORGANIZATION, optional) |
+| `GET /cities` | inline `stateSchema` | `state` (2-char, uppercase, required) |
+| `GET /:npi` | `npiParamSchema` | `npi` (10-digit regex) |
 
-**GET `/cities`** -- Verified
-```
-stateSchema = z.object({
-  state: z.string().length(2).toUpperCase(),
-})
-```
-- Inline schema (not from commonSchemas). State is **required** here (no `.optional()`), which is correct since cities need a state filter.
+### `verify.ts` (`packages/backend/src/routes/verify.ts`)
 
-**GET `/:npi`** -- Verified
-- Uses `npiParamSchema.parse(req.params)` -- 10-digit regex validation on URL param.
+| Endpoint | Schema | Fields Validated |
+|----------|--------|-----------------|
+| `POST /` | `submitVerificationSchema` | `npi` (10-digit), `planId` (1-50), `acceptsInsurance` (boolean, required), `acceptsNewPatients` (boolean, optional), `locationId` (positive int, optional), `notes` (max 1000, optional), `evidenceUrl` (valid URL, max 500, optional), `submittedBy` (email, max 200, optional), `captchaToken` (string, optional), `website` (string, optional -- honeypot) |
+| `POST /:verificationId/vote` | `verificationIdParamSchema` + `voteSchema` | `verificationId` (min 1), `vote` (enum up/down), `captchaToken` (optional), `website` (optional -- honeypot) |
+| `GET /stats` | none (no params) | N/A |
+| `GET /recent` | `recentQuerySchema` | `limit` (coerced int, 1-100, default 20), `npi` (10-digit, optional), `planId` (1-50, optional) |
+| `GET /:npi/:planId` | `pairParamsSchema` | `npi` (10-digit), `planId` (1-50) |
 
-#### Plan Routes (`routes/plans.ts`)
+### `plans.ts` (`packages/backend/src/routes/plans.ts`)
 
-**GET `/search`** -- Verified
-```
-searchQuerySchema = z.object({
-  issuerName: z.string().min(1).max(200).optional(),
-  planType: z.string().min(1).max(20).optional(),
-  search: z.string().min(1).max(200).optional(),
-  state: z.string().length(2).toUpperCase().optional(),
-}).merge(paginationSchema)
-```
+| Endpoint | Schema | Fields Validated |
+|----------|--------|-----------------|
+| `GET /search` | `searchQuerySchema` + `paginationSchema` | `issuerName` (1-200, optional), `planType` (1-20, optional), `search` (1-200, optional), `state` (2-char, optional) |
+| `GET /grouped` | inline schema | `search` (1-200, optional), `state` (2-char, optional) |
+| `GET /meta/issuers` | `stateQuerySchema` | `state` (2-char, optional) |
+| `GET /meta/types` | `stateQuerySchema` + inline | `state` (2-char, optional), `issuerName` (1-200, optional) |
+| `GET /:planId/providers` | `planIdParamSchema` + `paginationSchema` | `planId` (1-50), `page`, `limit` |
+| `GET /:planId` | `planIdParamSchema` | `planId` (1-50) |
 
-**GET `/grouped`** -- Verified
-```
-z.object({
-  search: z.string().min(1).max(200).optional(),
-  state: z.string().length(2).toUpperCase().optional(),
-})
-```
-- Inline schema with appropriate bounds.
+### `locations.ts` (`packages/backend/src/routes/locations.ts`)
 
-**GET `/meta/issuers`** -- Verified
-- Uses `stateQuerySchema.parse(req.query)` -- optional 2-char state.
+| Endpoint | Schema | Fields Validated |
+|----------|--------|-----------------|
+| `GET /search` | `searchQuerySchema` + `paginationSchema` | `state` (2-char, required), `city` (1-100, optional), `zipCode` (3-10, optional) |
+| `GET /health-systems` | `healthSystemsQuerySchema` | `state` (2-char, optional), `city` (1-100, optional) |
+| `GET /stats/:state` | `stateParamSchema` | `state` (2-char, required) |
+| `GET /:locationId` | `locationIdSchema` | `locationId` (coerced positive int) |
+| `GET /:locationId/providers` | `locationIdSchema` + `paginationSchema` | `locationId` (coerced positive int), `page`, `limit` |
 
-**GET `/meta/types`** -- Verified
-```
-stateQuerySchema.extend({
-  issuerName: z.string().min(1).max(200).optional(),
-})
-```
-- Extends shared schema with additional field.
+### `admin.ts` (`packages/backend/src/routes/admin.ts`)
 
-**GET `/:planId/providers`** -- Verified
-- Uses `planIdParamSchema.parse(req.params)` (min 1, max 50) + `paginationSchema.parse(req.query)`.
+- Admin endpoints validate `X-Admin-Secret` header via `adminAuthMiddleware` with timing-safe comparison (`timingSafeEqual` from `crypto` -- line 48)
+- `POST /recalculate-confidence`: validates `limit` as positive integer (line 469)
+- Other admin endpoints use inline query param parsing (dryRun, batchSize, retentionDays)
 
-**GET `/:planId`** -- Verified
-- Uses `planIdParamSchema.parse(req.params)` (min 1, max 50).
+### Insurance Card Extraction (`packages/frontend/src/app/api/insurance-card/extract/route.ts`)
 
-#### Verification Routes (`routes/verify.ts`)
+| Check | Validation |
+|-------|-----------|
+| Image presence | `!image` returns 400 |
+| Image type | `typeof image !== 'string'` returns 400 |
+| Image size | `image.length > MAX_BASE64_LENGTH` (10MB * 1.37) returns 413 |
+| Base64 format | regex `/^[A-Za-z0-9+/]+=*$/` returns 400 |
+| Minimum size | `base64Data.length < 100` returns 400 |
 
-**POST `/`** -- Verified
-```
-submitVerificationSchema = npiParamSchema.merge(planIdParamSchema).extend({
-  acceptsInsurance: z.boolean(),
-  acceptsNewPatients: z.boolean().optional(),
-  notes: z.string().max(1000).optional(),
-  evidenceUrl: z.string().url().max(500).optional(),
-  submittedBy: z.string().email().max(200).optional(),
-  captchaToken: z.string().optional(),
-})
-```
-- `acceptsInsurance` is required boolean -- correct.
-- `notes` has max 1000 char limit.
-- `evidenceUrl` uses `z.string().url()` for URL format validation.
-- `submittedBy` uses `z.string().email()` for email format validation.
-- Inherits NPI (10-digit) and planId (min 1, max 50) from shared schemas.
+## Questions Answered
 
-**POST `/:verificationId/vote`** -- Verified
-```
-verificationIdParamSchema = z.object({
-  verificationId: z.string().min(1),
-})
-voteSchema = z.object({
-  vote: z.enum(['up', 'down']),
-  captchaToken: z.string().optional(),
-})
-```
-- `vote` restricted to enum `['up', 'down']` -- prevents arbitrary values.
-- `verificationId` has min 1 but no max length constraint.
+### 1. Are NPIs validated (10-digit format)?
+**YES.** The shared `npiParamSchema` at `packages/backend/src/schemas/commonSchemas.ts` line 22-24 enforces: `z.string().length(10).regex(/^\d+$/, 'NPI must be exactly 10 digits')`. This is used in `providers.ts` (line 306), `verify.ts` (lines 23, 48), and all routes accepting NPI parameters. Note: The Luhn check digit algorithm (which CMS uses for NPI validation) is NOT implemented -- only format validation is performed.
 
-**GET `/stats`** -- Verified (no validation needed)
-- No query parameters, no body. Calls `getVerificationStats()` directly.
+### 2. Are UUIDs validated before database queries?
+**PARTIALLY.** Verification IDs use CUID format (from Prisma `@default(cuid())`), and `verificationIdParamSchema` validates them as `z.string().min(1)` at `verify.ts` line 41. Plan IDs are validated as `z.string().min(1).max(50)`. Location IDs are validated as `z.coerce.number().int().positive()`. However, there is no strict UUID/CUID format regex -- just length and presence checks.
 
-**GET `/recent`** -- Verified
-```
-recentQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-  npi: npiParamSchema.shape.npi.optional(),
-  planId: planIdParamSchema.shape.planId.optional(),
-})
-```
-- Reuses NPI and planId shapes from shared schemas as optional filters.
+### 3. Are strings sanitized?
+**PARTIALLY.** String inputs have max length limits enforced (e.g., `name` max 200, `notes` max 1000, `evidenceUrl` max 500). State codes are uppercased with `.toUpperCase()`. However, there is no explicit HTML/XSS sanitization since the API returns JSON only (no HTML rendering on the backend). Prisma's parameterized queries prevent the string content from being interpreted as SQL.
 
-**GET `/:npi/:planId`** -- Verified
-```
-pairParamsSchema = npiParamSchema.merge(planIdParamSchema)
-```
-- Validates both URL params via shared schemas.
+### 4. Are file uploads validated (if any)?
+**YES.** The insurance card extraction endpoint (`packages/frontend/src/app/api/insurance-card/extract/route.ts`) validates: type (must be string/base64), size (max 10MB), format (valid base64 characters via regex), minimum size (at least 100 chars), and media type is detected via magic bytes. Rate limited to 10 extractions per hour per IP.
 
-#### Admin Routes (`routes/admin.ts`)
+### 5. Are there any SQL injection risks?
+**NO.** All database queries use Prisma ORM which generates parameterized queries. No raw SQL is used in the route handlers. The only raw query is `prisma.$queryRaw\`SELECT 1\`` in the health check endpoint (`index.ts` line 121), which takes no user input.
 
-**POST `/cleanup-expired`** -- Warning
-- `dryRun` parsed as `req.query.dryRun === 'true'` (simple string comparison, not Zod).
-- `batchSize` parsed as `parseInt(req.query.batchSize as string) || 1000` (not Zod validated).
-- No bounds checking on batchSize -- a very large value could cause performance issues.
+## Issues Found
 
-**GET `/expiration-stats`** -- Verified
-- No query parameters needed. Auth-only.
+1. **No NPI Luhn check digit validation** -- The NPI format is validated (10 digits) but the Luhn algorithm check digit is not verified. Invalid NPIs like `0000000000` would pass validation.
 
-**GET `/health`** -- Verified
-- No query parameters needed. Auth-only.
+2. **Weak verification ID validation** -- `verificationIdParamSchema` only checks `z.string().min(1)`. A CUID format regex would be more appropriate.
 
-**POST `/cache/clear`** -- Verified
-- No query parameters needed. Auth-only.
+3. **No `evidenceUrl` domain restriction** -- The `evidenceUrl` field in verification submissions accepts any valid URL. While it is stored but never fetched server-side (eliminating SSRF), it could be used for phishing links in the UI if displayed as clickable.
 
-**GET `/cache/stats`** -- Verified
-- No query parameters needed. Auth-only.
+4. **Admin `batchSize` parameter** -- In `admin.ts` line 73, `batchSize` is parsed with `parseInt()` without Zod, defaulting to 1000. Similarly, `retentionDays` at line 278. These should use Zod for consistency.
 
-**POST `/cleanup/sync-logs`** -- Warning
-- `dryRun` parsed as `req.query.dryRun === 'true'` (not Zod).
-- `retentionDays` parsed as `parseInt(req.query.retentionDays as string) || 90` (not Zod validated).
-- No bounds checking on retentionDays -- setting to 0 would delete all records.
-
-**GET `/retention/stats`** -- Verified
-- No query parameters needed. Auth-only.
-
-#### Location Routes (`routes/locations.ts`) -- DISABLED
-
-All 5 endpoints in the disabled file have proper Zod validation:
-- `searchQuerySchema` with field bounds
-- `locationIdSchema` with `z.coerce.number().int().positive()`
-- `stateParamSchema` with required 2-char state
-- These are currently non-functional since the route is commented out in `index.ts`.
-
-### Validation Infrastructure
-
-#### Error Handler (`middleware/errorHandler.ts`) -- Verified
-
-The global error handler at line 101 catches `ZodError` by name and returns structured 400 responses:
-```json
-{
-  "error": {
-    "message": "Validation error",
-    "code": "VALIDATION_ERROR",
-    "statusCode": 400,
-    "requestId": "...",
-    "details": [
-      { "field": "state", "message": "String must contain exactly 2 character(s)" }
-    ]
-  }
-}
-```
-- Field-level error details are mapped from `zodError.errors` with `path.join('.')` and `message`.
-- Request ID included for correlation.
-
-#### Payload Size Limit -- Verified
-
-`express.json({ limit: '100kb' })` at `index.ts` line 88 prevents large payload attacks. The error handler catches `PayloadTooLargeError` and returns a 413 response.
-
-### Prompt Question Responses
-
-**1. Are NPIs validated (10-digit format)?**
-- Verified: `npiParamSchema` uses `z.string().length(10).regex(/^\d+$/)`. Applied in `providers.ts` (`:npi` param), `verify.ts` (POST body and `/:npi/:planId` params), and the provider search schema (optional NPI filter).
-
-**2. Are UUIDs validated before database queries?**
-- Partially: `verificationId` is validated as `z.string().min(1)` but does not enforce UUID format specifically. Since verification IDs use `@default(cuid())` (not UUID format), this is acceptable -- CUIDs are string-based and `min(1)` prevents empty values. However, there is no `max()` length constraint.
-
-**3. Are strings sanitized?**
-- All string inputs have `max()` length constraints (100-1000 chars depending on field).
-- Prisma ORM handles SQL parameterization, preventing injection.
-- There is no explicit HTML/XSS sanitization of string values (e.g., `notes`, `name`). Since this is a JSON API (no HTML rendering on the backend), the risk is limited to stored XSS if values are rendered unsanitized on the frontend.
-
-**4. Are file uploads validated (if any)?**
-- No file upload endpoints exist in the codebase. Not applicable.
-
-**5. Are there any SQL injection risks? (Prisma should prevent)**
-- Verified: All database access goes through Prisma, which uses parameterized queries. The only raw SQL is the health check `prisma.$queryRaw\`SELECT 1\`` which has no user input. No SQL injection risk found.
-
-### Type Coercion Handling
-
-- Verified: `z.coerce.number()` is used for pagination params (`page`, `limit`) and `recentQuerySchema.limit`, correctly handling query string-to-number conversion.
-- Verified: `z.string().toUpperCase()` normalizes state codes.
-- Verified: `locationIdSchema` uses `z.coerce.number().int().positive()` for numeric URL params.
-
----
-
-## Summary
-
-Input validation is implemented thoroughly across the codebase using Zod. Every active public-facing endpoint validates its inputs through Zod's `.parse()` method, which throws `ZodError` on failure. The global error handler catches these errors and returns structured 400 responses with field-level details. Shared schemas (`commonSchemas.ts`) ensure consistent validation of NPI numbers (10-digit regex), pagination bounds (page min 1, limit 1-100), plan IDs (1-50 chars), and state codes (2-char uppercase). String length limits are applied to all text fields. Prisma ORM provides parameterized queries, eliminating SQL injection risk. The only gaps are in admin route query parameters (`batchSize`, `retentionDays`, `dryRun`) which use `parseInt` instead of Zod, and the missing max-length constraint on `verificationId`.
+5. **CSP disabled on frontend** -- In `packages/frontend/next.config.js` line 14, the Content-Security-Policy header is commented out ("CSP disabled - was blocking API requests"). This removes a layer of XSS protection.
 
 ## Recommendations
 
-1. **Add Zod validation to admin query parameters.** Replace `parseInt()` and string comparison with Zod schemas for `batchSize`, `retentionDays`, and `dryRun`. Example:
-   ```typescript
-   const cleanupQuerySchema = z.object({
-     dryRun: z.enum(['true', 'false']).default('false'),
-     batchSize: z.coerce.number().int().min(1).max(10000).default(1000),
-   });
-   ```
-   This adds bounds checking (preventing `batchSize=999999999` or `retentionDays=0`).
-
-2. **Add a max-length constraint to `verificationId`** in `verify.ts`. CUIDs are 25 characters, so `z.string().min(1).max(30)` would be appropriate. This prevents an attacker from sending an excessively long string as the verification ID.
-
-3. **Consider adding XSS sanitization for stored text fields** (`notes`, `evidenceUrl`, `submittedBy`). While the backend serves only JSON and Prisma prevents SQL injection, a stored XSS attack could execute if the frontend renders these values without escaping. A library like `xss` or `DOMPurify` (server-side) could strip malicious content.
-
-4. **Consider adding Luhn check digit validation to NPI numbers.** The current validation checks format (10 digits) but not the NPI check digit algorithm. An invalid check digit indicates a typo or fabricated NPI. This would catch bad data before it hits the database.
-
-5. **Add a `captchaToken` min-length constraint.** Currently `captchaToken: z.string().optional()` accepts any string including an empty one (though the CAPTCHA middleware would reject it). Adding `.min(1)` would provide defense-in-depth.
-
-6. **Document validation patterns for future contributors.** The current approach (Zod `.parse()` in route handlers with shared schemas in `commonSchemas.ts`) is consistent but not documented. Consider adding a brief comment in the schemas file explaining the convention.
+1. Add NPI Luhn check digit validation to `npiParamSchema` for stronger data integrity
+2. Add CUID format regex to `verificationIdParamSchema` (e.g., `/^c[a-z0-9]{24}$/`)
+3. Consider URL domain restrictions or nofollow/noopener rendering for `evidenceUrl` on the frontend
+4. Migrate admin endpoint inline parsing to Zod schemas for consistency
+5. Re-enable CSP on the frontend with properly configured directives for reCAPTCHA and API domains
+6. Add request body size limits to the insurance card extraction endpoint (JSON body limit via Next.js config)

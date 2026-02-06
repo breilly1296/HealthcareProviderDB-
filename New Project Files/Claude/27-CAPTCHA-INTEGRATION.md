@@ -1,120 +1,300 @@
-# CAPTCHA Integration -- Analysis
+# CAPTCHA Integration
 
-**Generated:** 2026-02-05
-**Source Prompt:** prompts/27-captcha-integration.md
-**Status:** Backend fully implemented; frontend integration incomplete -- no reCAPTCHA token generation or error handling in the verification form.
+**Last Updated:** 2026-02-06
+**Status:** Backend COMPLETE, Frontend INCOMPLETE
 
 ---
 
-## Findings
+## Configuration
 
-### Implementation (Backend Middleware)
+| Setting | Value | Source | Notes |
+|---------|-------|--------|-------|
+| Score Threshold | 0.5 | `packages/backend/src/config/constants.ts` line 52 | Scores below this are blocked as likely bots |
+| Fail Mode | open (default) | `CAPTCHA_FAIL_MODE` env var | Requests allowed with fallback rate limiting when Google API unavailable |
+| API Timeout | 5,000ms | `packages/backend/src/config/constants.ts` line 57 | AbortController terminates request after 5s |
+| Fallback Rate Limit | 3 req/hour | `packages/backend/src/config/constants.ts` line 62 | Applied when CAPTCHA API is unavailable and fail mode is open |
+| Fallback Window | 1 hour | `packages/backend/src/config/constants.ts` line 67 | Window for fallback rate limiting |
+| Cleanup Interval | 60 seconds | `RATE_LIMIT_CLEANUP_INTERVAL_MS` | Expired fallback rate limit entries cleaned up |
 
-- **Google reCAPTCHA v3 middleware created**
-  Verified. `packages/backend/src/middleware/captcha.ts` exports `verifyCaptcha`, a complete Express middleware that validates tokens against `https://www.google.com/recaptcha/api/siteverify`.
+---
 
-- **Score threshold configurable**
-  Verified. The `CAPTCHA_MIN_SCORE` constant is imported from `packages/backend/src/config/constants.ts` and set to `0.5`. The middleware compares `data.score` against this value at line 173.
+## Protected Endpoints
 
-- **API timeout configured (5 seconds)**
-  Verified. `CAPTCHA_API_TIMEOUT_MS` is set to `5 * MS_PER_SECOND` (5000ms) in `constants.ts`. The middleware uses `AbortController` with `setTimeout` to enforce this timeout (lines 149-151).
+| Endpoint | Method | Rate Limit | CAPTCHA | Honeypot |
+|----------|--------|------------|---------|----------|
+| `/api/v1/verify` | POST | 10/hour | Yes | Yes (`website` field) |
+| `/api/v1/verify/:verificationId/vote` | POST | 10/hour | Yes | Yes (`website` field) |
 
-- **Fail-open mode with fallback rate limiting**
-  Verified. When `CAPTCHA_FAIL_MODE` is `'open'` (default), the catch block at line 210 calls `checkFallbackRateLimit(clientIp)` which enforces 3 requests per hour per IP. Headers `X-Security-Degraded`, `X-Fallback-RateLimit-Limit`, `X-Fallback-RateLimit-Remaining`, and `X-Fallback-RateLimit-Reset` are set on the response.
+**Middleware chain for protected endpoints:**
+```
+verificationRateLimiter -> honeypotCheck('website') -> verifyCaptcha -> asyncHandler
+```
 
-- **Fail-closed mode available**
-  Verified. When `CAPTCHA_FAIL_MODE` is `'closed'`, line 205 returns a `serviceUnavailable` error with the message "Security verification temporarily unavailable."
+---
 
-- **Development/test mode bypass**
-  Verified. Lines 121-123 check `NODE_ENV` and call `next()` immediately for development or test environments.
+## Backend Implementation Details
 
-- **Logging for monitoring**
-  Verified. The middleware uses structured logging via `logger` for:
-  - Verification failure (line 163, `warn`)
-  - Low score / possible bot (line 174, `warn`)
-  - Google API error (line 191, `error`)
-  - Fail-closed blocking (line 201, `warn`)
-  - Fail-open fallback rate limit exceeded (line 220, `warn`)
-  - Fail-open allowing request (line 231, `warn`)
+**File:** `packages/backend/src/middleware/captcha.ts` (241 lines)
 
-### Integration (Route Registration)
+### Token Extraction
+The middleware accepts CAPTCHA tokens from two locations:
+```typescript
+const captchaToken = req.body.captchaToken || req.headers['x-captcha-token'];
+```
 
-- **Applied to verification submission (POST /api/v1/verify)**
-  Verified. In `packages/backend/src/routes/verify.ts`, the `POST '/'` handler chains `verificationRateLimiter` then `verifyCaptcha` at line 57-58.
+### Environment Bypass
+CAPTCHA is completely skipped in non-production environments:
+```typescript
+if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
+  return next();
+}
+```
 
-- **Applied to voting endpoint (POST /api/v1/verify/:verificationId/vote)**
-  Verified. The `POST '/:verificationId/vote'` handler chains `voteRateLimiter` then `verifyCaptcha` at lines 91-92.
+### Missing Secret Handling
+If `RECAPTCHA_SECRET_KEY` is not configured, a warning is logged but the request proceeds:
+```typescript
+if (!RECAPTCHA_SECRET) {
+  logger.warn({
+    endpoint: req.path,
+    method: req.method,
+  }, 'CAPTCHA not configured - RECAPTCHA_SECRET_KEY missing, skipping verification');
+  return next();
+}
+```
 
-- **captchaToken in Zod schemas**
-  Verified. Both `submitVerificationSchema` (line 29) and `voteSchema` (line 33) include `captchaToken: z.string().optional()`. The token is marked optional because in dev/test mode the middleware skips validation.
+### Google API Call
+- Uses native `fetch()` with `AbortController` for timeout
+- Sends `secret`, `response` (token), and `remoteip` to Google's verify endpoint
+- Handles both verification failure and low score separately
 
-### Frontend Integration
+### Fail-Open Behavior (Default)
+When Google API is unavailable:
+1. Fallback rate limiting applied (3 req/hour per IP)
+2. `X-Security-Degraded: captcha-unavailable` header set
+3. `X-Fallback-RateLimit-*` headers set
+4. Request is allowed if within fallback limit
+5. Logged as warning for monitoring
 
-- **Frontend sends token in request body**
-  NOT IMPLEMENTED. `ProviderVerificationForm.tsx` does not import or use `react-google-recaptcha` or any reCAPTCHA library. The `handleSubmit` function (line 104) sends a JSON body with `npi`, `planId`, `phoneReached`, etc. but does NOT include a `captchaToken` field. The form also does not use the `/api/v1/verify` backend endpoint -- it posts to `/api/verifications` (a Next.js API route), which may or may not proxy to the backend.
+### Fail-Closed Behavior
+When `CAPTCHA_FAIL_MODE=closed`:
+1. Returns 503 "Security verification temporarily unavailable"
+2. All requests blocked until Google API recovers
 
-- **Frontend handles CAPTCHA errors**
-  NOT IMPLEMENTED. There is no handling for `CAPTCHA_REQUIRED`, `CAPTCHA_FAILED`, or `FORBIDDEN` error codes in the form. The only error handling is a generic `alert('Failed to submit verification. Please try again.')` at line 125.
+---
 
-- **`NEXT_PUBLIC_RECAPTCHA_SITE_KEY` usage**
-  NOT FOUND. No reference to `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` exists in the verification form component. No `<script>` tag or library loads the Google reCAPTCHA script.
+## Frontend Implementation Status
 
-### Configuration Constants
+**File:** `packages/frontend/src/components/ProviderVerificationForm.tsx` (800 lines)
 
-- **CAPTCHA_MIN_SCORE = 0.5**
-  Verified. `constants.ts` line 52.
+### Current State (INCOMPLETE)
 
-- **CAPTCHA_API_TIMEOUT_MS = 5000**
-  Verified. `constants.ts` line 57.
+The frontend verification form does NOT currently integrate with reCAPTCHA. Specific gaps:
 
-- **CAPTCHA_FALLBACK_MAX_REQUESTS = 3**
-  Verified. `constants.ts` line 62.
+1. **No reCAPTCHA library imported** - The component does not use `react-google-recaptcha-v3` or any other reCAPTCHA client library.
 
-- **CAPTCHA_FALLBACK_WINDOW_MS = 3600000 (1 hour)**
-  Verified. `constants.ts` line 67 (`MS_PER_HOUR`).
+2. **No CAPTCHA token generated** - The `handleSubmit` function (lines 94-129) sends a POST request without a `captchaToken` field:
+   ```typescript
+   // Current code (line 104-116):
+   const response = await fetch('/api/verifications', {
+     method: 'POST',
+     headers: { 'Content-Type': 'application/json' },
+     body: JSON.stringify({
+       npi: providerNpi,
+       planId: planId,
+       phoneReached: formData.contactedProvider,
+       phoneCorrect: formData.phoneAccurate,
+       acceptsInsurance: formData.acceptsSpecificPlan === 'YES',
+       acceptsNewPatients: formData.acceptsSpecificPlan !== 'NOT_ACCEPTING_NEW',
+       scheduledAppointment: false,
+       // MISSING: captchaToken
+       // MISSING: website (honeypot field)
+     }),
+   });
+   ```
 
-- **RATE_LIMIT_CLEANUP_INTERVAL_MS = 60000 (1 minute)**
-  Verified. `constants.ts` line 76. Used in the `setInterval` cleanup in `captcha.ts` line 67.
+3. **Wrong API URL** - Posts to `/api/verifications` instead of the correct backend URL. The backend expects `POST /api/v1/verify`. The frontend build uses `NEXT_PUBLIC_API_URL` build arg pointing to the backend Cloud Run URL.
+
+4. **No error handling for CAPTCHA-specific errors** - The catch block (lines 123-128) shows a generic alert. It does not handle `CAPTCHA_REQUIRED`, `CAPTCHA_FAILED`, or `FORBIDDEN` error codes.
+
+### What Needs to Be Done
+
+1. Install `react-google-recaptcha-v3` in the frontend package
+2. Add `<GoogleReCaptchaProvider>` wrapper component with `NEXT_PUBLIC_RECAPTCHA_SITE_KEY`
+3. Use `useGoogleReCaptcha` hook in `ProviderVerificationForm`
+4. Call `executeRecaptcha('verify')` before form submission
+5. Include `captchaToken` in the POST body
+6. Include `website: ''` honeypot field in the POST body
+7. Fix the API URL to use the correct backend endpoint
+8. Handle CAPTCHA-specific error responses (`CAPTCHA_REQUIRED`, `CAPTCHA_FAILED`, `FORBIDDEN`)
+
+### Environment Variables Required
+
+| Variable | Location | Purpose |
+|----------|----------|---------|
+| `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` | Frontend build | reCAPTCHA site key (public, safe to expose) |
+| `RECAPTCHA_SECRET_KEY` | Backend (GCP Secret Manager) | reCAPTCHA secret key (private, never exposed) |
+
+---
+
+## Error Responses
+
+### Token Missing (400)
+```json
+{
+  "error": {
+    "message": "CAPTCHA token required for verification submissions",
+    "code": "CAPTCHA_REQUIRED",
+    "statusCode": 400
+  }
+}
+```
+**Note:** Uses `AppError.badRequest()` which returns the error via the global error handler with request ID.
+
+### Verification Failed (400)
+```json
+{
+  "error": {
+    "message": "CAPTCHA verification failed",
+    "statusCode": 400
+  }
+}
+```
+
+### Low Score / Bot Detected (403)
+```json
+{
+  "error": {
+    "message": "Request blocked due to suspicious activity",
+    "statusCode": 403
+  }
+}
+```
+
+### Service Unavailable (503) - Fail-Closed Only
+```json
+{
+  "error": {
+    "message": "Security verification temporarily unavailable. Please try again in a few minutes.",
+    "statusCode": 503
+  }
+}
+```
+
+### Fallback Rate Limit Exceeded (429) - Fail-Open Only
+```json
+{
+  "error": {
+    "message": "Too many requests while security verification is unavailable. Please try again later.",
+    "statusCode": 429
+  }
+}
+```
+
+---
+
+## Score Interpretation
+
+| Score Range | Interpretation | Action | Backend Response |
+|-------------|----------------|--------|-----------------|
+| 0.9 - 1.0 | Very likely human | Allow | 200/201 |
+| 0.7 - 0.9 | Likely human | Allow | 200/201 |
+| 0.5 - 0.7 | Uncertain | Allow (at threshold) | 200/201 |
+| 0.3 - 0.5 | Likely bot | Block | 403 |
+| 0.0 - 0.3 | Very likely bot | Block | 403 |
+
+---
+
+## Monitoring
+
+### Log Patterns
+
+```
+# Successful verification (score passes threshold)
+[CAPTCHA] No specific success log - request simply proceeds to next middleware
+
+# Low score blocked
+CAPTCHA low score - possible bot (score: 0.3, threshold: 0.5, ip: x.x.x.x)
+
+# Google API error - fail-open
+CAPTCHA Google API error - verification unavailable (failMode: open)
+CAPTCHA FAIL-OPEN: Allowing request with fallback rate limiting
+
+# Google API error - fail-closed
+CAPTCHA FAIL-CLOSED: Blocking request due to API unavailability
+
+# Fallback rate limit exceeded
+CAPTCHA FAIL-OPEN: Fallback rate limit exceeded (limit: 3, window: 1 hour)
+
+# Token missing
+(handled by AppError.badRequest - logged via global error handler)
+
+# CAPTCHA not configured
+CAPTCHA not configured - RECAPTCHA_SECRET_KEY missing, skipping verification
+```
+
+### Metrics to Track
+- CAPTCHA pass rate (should be >90% for legitimate traffic)
+- Average reCAPTCHA score (should be >0.7 for human traffic)
+- Google API error rate (should be <1%)
+- Fallback rate limit hits (should be 0 normally)
+- Token-missing rate (indicates frontend not sending tokens)
+
+---
+
+## Checklist Status
+
+### Implementation
+- [x] Google reCAPTCHA v3 middleware created (`packages/backend/src/middleware/captcha.ts`)
+- [x] Score threshold configurable (0.5 default in `config/constants.ts`)
+- [x] API timeout configured (5 seconds via AbortController)
+- [x] Fail-open mode with fallback rate limiting (3 req/hour)
+- [x] Fail-closed mode available (`CAPTCHA_FAIL_MODE=closed`)
+- [x] Development/test mode bypass
+- [x] Structured logging for all outcomes via pino
+
+### Integration
+- [x] Applied to verification submission (`POST /api/v1/verify`)
+- [x] Applied to voting endpoint (`POST /api/v1/verify/:verificationId/vote`)
+- [ ] **Frontend does NOT send token in request body** (CRITICAL GAP)
+- [ ] **Frontend does NOT handle CAPTCHA-specific errors**
+- [ ] **Frontend uses wrong API URL**
 
 ### Monitoring
-
-- **Logging on verification failure** -- Verified (line 163)
-- **Logging on low score** -- Verified (line 174)
-- **Logging on Google API errors** -- Verified (line 191)
-- **Alerting on high failure rate** -- NOT IMPLEMENTED. There is no alerting mechanism; only log output.
-
-### Security Considerations
-
-- **Token accepted from body and header**: Line 134 reads `req.body.captchaToken || req.headers['x-captcha-token']`, providing flexibility for API consumers.
-- **Client IP forwarded to Google**: The `remoteip` parameter is sent to Google at line 145, allowing Google to factor in IP reputation.
-- **Secret key not hardcoded**: Read from `process.env.RECAPTCHA_SECRET_KEY` at line 47.
-- **Graceful skip when unconfigured**: If `RECAPTCHA_SECRET` is falsy, the middleware logs a warning and continues (line 126-132). This is appropriate for development but should be verified in production.
-
-### Potential Issues
-
-- **In-memory fallback store**: The `fallbackStore` Map at line 64 is in-process memory. In a multi-instance deployment, each instance has its own store, making the 3-request-per-hour limit per-instance rather than global. This is acceptable for low-traffic scenarios but should be noted for scaling.
-- **`setInterval` leak potential**: The cleanup interval at line 67 runs indefinitely. In serverless environments or during hot reloads, this could accumulate. Not a critical issue for a traditional Express server.
+- [x] Logging on verification failure
+- [x] Logging on low score
+- [x] Logging on Google API errors
+- [x] Logging on fallback rate limit hits
+- [ ] No alerting on high failure rate
+- [ ] No metrics dashboard for CAPTCHA events
 
 ---
 
-## Summary
+## Questions Answered
 
-The backend CAPTCHA implementation is thorough and well-architected. The middleware correctly implements Google reCAPTCHA v3 with configurable score thresholds, dual fail modes (open/closed), fallback rate limiting, AbortController-based timeouts, and structured logging. Both protected endpoints (`POST /verify` and `POST /verify/:id/vote`) correctly chain the middleware.
+### 1. Is the score threshold (0.5) appropriate?
+**Answer:** 0.5 is Google's recommended threshold for most use cases. It is a reasonable default. For VerifyMyProvider, where the cost of blocking a legitimate user is high (lost verification data), keeping 0.5 is appropriate. If bot traffic is detected, the threshold can be raised to 0.7 via `CAPTCHA_MIN_SCORE` constant.
 
-The critical gap is on the frontend. `ProviderVerificationForm.tsx` does not generate reCAPTCHA tokens, does not send them with requests, and does not handle CAPTCHA-related error responses. Additionally, the form submits to `/api/verifications` (a Next.js route) rather than the backend `/api/v1/verify` endpoint, so it is unclear whether the backend CAPTCHA middleware is actually invoked for form submissions.
+### 2. Should FAIL-CLOSED be used for any endpoints?
+**Answer:** Currently all endpoints use FAIL-OPEN, which is appropriate for a user-facing application where availability is prioritized. For the admin endpoints, CAPTCHA is not applied (they use `X-Admin-Secret` header auth instead). Consider FAIL-CLOSED for financial or high-security endpoints if they are added in the future.
+
+### 3. Is the frontend properly integrated?
+**Answer:** **No.** The `ProviderVerificationForm.tsx` does not generate or send reCAPTCHA tokens. This is the most critical gap identified in this audit. In production, verification submissions will receive a 400 error with `CAPTCHA_REQUIRED` code unless:
+- `RECAPTCHA_SECRET_KEY` is not set (CAPTCHA silently skipped with warning)
+- `NODE_ENV` is not `production`
+
+### 4. Are there any legitimate users being blocked?
+**Answer:** Cannot determine yet - no verification traffic in production (pre-beta). Once launched, monitor the CAPTCHA logs for low-score events on what appear to be legitimate requests.
+
+### 5. Should we implement CAPTCHA challenges?
+**Answer:** Not recommended at this stage. reCAPTCHA v3 is invisible (no user interaction), which is ideal for the binary verification flow. Adding v2 challenges would break the "under 2 minutes" promise of the verification form. Consider v2 fallback only if v3 scores are consistently low for legitimate users.
 
 ---
 
 ## Recommendations
 
-1. **Complete frontend reCAPTCHA integration**: Install `react-google-recaptcha-v3`, load the site key from `NEXT_PUBLIC_RECAPTCHA_SITE_KEY`, execute `grecaptcha.execute()` before form submission, and include the resulting token as `captchaToken` in the request body.
-
-2. **Add CAPTCHA error handling in the form**: Handle HTTP 400 (`CAPTCHA_REQUIRED`, `CAPTCHA_FAILED`) and 403 (`FORBIDDEN`) responses with user-friendly messages rather than a generic alert.
-
-3. **Verify request routing**: Confirm whether `/api/verifications` (the Next.js API route the form calls) proxies to the backend `/api/v1/verify` endpoint. If it does not, the CAPTCHA middleware is never invoked for user-submitted verifications.
-
-4. **Consider Redis for fallback rate limiting**: If the backend runs multiple instances, the in-memory `fallbackStore` allows each instance to independently grant 3 requests per hour. Switch to a shared store (Redis) for accurate global rate limiting.
-
-5. **Add alerting for high CAPTCHA failure rates**: The prompt checklist notes this is missing. Integrate with a monitoring service to alert when CAPTCHA API errors or low-score blocks exceed a threshold.
-
-6. **Audit production `RECAPTCHA_SECRET_KEY` configuration**: The middleware silently skips CAPTCHA when the secret is not set. Ensure production deployments have this variable configured and consider failing loudly (refusing to start) if it is absent in production.
+1. **CRITICAL:** Integrate `react-google-recaptcha-v3` in the frontend before beta launch
+2. **CRITICAL:** Fix the API URL in `ProviderVerificationForm.tsx`
+3. **HIGH:** Add CAPTCHA error handling in the frontend (show user-friendly messages for each error code)
+4. **MEDIUM:** Add monitoring/alerting for CAPTCHA failure rates
+5. **LOW:** Consider raising threshold from 0.5 to 0.7 if bot traffic is detected after launch
+6. **LOW:** Evaluate whether FAIL-CLOSED should be used for admin endpoints (currently they use header-based auth, not CAPTCHA)

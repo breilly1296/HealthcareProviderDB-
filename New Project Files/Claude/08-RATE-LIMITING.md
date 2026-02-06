@@ -1,179 +1,155 @@
-# Rate Limiting Review -- Analysis
+# Rate Limiting Review
 
-**Generated:** 2026-02-05
-**Source Prompt:** prompts/08-rate-limiting.md
-**Status:** Tier 1 COMPLETE, Tier 2 PARTIALLY COMPLETE -- implementation is solid and matches prompt specifications
+## Implementation Status
 
----
+**Tier 1: COMPLETE** -- Custom dual-mode rate limiter deployed with sliding window algorithm.
+**Tier 2: PARTIALLY COMPLETE** -- CAPTCHA and honeypot implemented; fingerprinting not yet done.
+**Tier 3: NOT STARTED** -- Requires user authentication.
 
-## Findings
+## Architecture
 
-### 1. Endpoints -- Rate Limiting Status
+**File:** `packages/backend/src/middleware/rateLimiter.ts`
 
-- **POST /api/v1/verify** (submit verification):
-  Verified. `packages/backend/src/routes/verify.ts` line 56 applies `verificationRateLimiter` as the first middleware on the `POST /` route. The limiter is configured at 10 requests/hour per IP, matching the prompt specification.
+The rate limiter auto-selects between two backends:
 
-- **POST /api/v1/verify/:id/vote** (upvote/downvote):
-  Verified. `packages/backend/src/routes/verify.ts` line 90 applies `voteRateLimiter` on the `POST /:verificationId/vote` route. Configured at 10 requests/hour per IP, matching the prompt.
+| Mode | When | State Scope | Algorithm |
+|------|------|-------------|-----------|
+| **Redis** | `REDIS_URL` env var set | Distributed across instances | Sorted set sliding window |
+| **In-Memory** | No Redis configured | Process-local only | Array-based sliding window |
 
-- **GET /api/v1/providers/search** (provider search):
-  Verified. `packages/backend/src/routes/providers.ts` line 153 applies `searchRateLimiter` on the `GET /search` route. Configured at 100 requests/hour per IP, matching the prompt.
+### Sliding Window Implementation
 
-- **GET /api/v1/providers/:npi** (provider detail):
-  Verified. `packages/backend/src/routes/providers.ts` line 251 applies `defaultRateLimiter` on the `GET /:npi` route. Configured at 200 requests/hour per IP, matching the prompt.
+Both modes use a sliding window algorithm (not fixed windows). For each request:
+1. Filter out timestamps older than `now - windowMs`
+2. Count remaining timestamps in the window
+3. If count < maxRequests, add current timestamp and allow
+4. If count >= maxRequests, reject with 429
 
-- **GET /api/v1/verify/stats** and **GET /api/v1/verify/recent**:
-  Verified. Both also apply `defaultRateLimiter` (200/hour), providing protection on read-only verification endpoints.
+This prevents the burst-at-window-boundary attack that fixed windows allow.
 
-- **GET /api/v1/providers/cities**:
-  Verified. Also uses `defaultRateLimiter` (200/hour).
+### Fail-Open Behavior
 
-### 2. Dual-Mode Architecture
+When Redis becomes unavailable mid-operation (lines 207-213, 241-247, 273-278):
+- Requests are ALLOWED (fail-open)
+- `X-RateLimit-Status: degraded` header is set
+- Warning logged for monitoring
+- In-memory limiter is NOT used as fallback to avoid inconsistent state
 
-- **Redis Mode (distributed):**
-  Verified. `createRedisRateLimiter()` in `rateLimiter.ts` (lines 189-280) implements a Redis-based sliding window using sorted sets. The key format is `ratelimit:{name}:{clientIP}`, matching the prompt. Request IDs use `{timestamp}-{random7chars}` for uniqueness within the sorted set. Key expiration is set via `EXPIRE` after each transaction.
+## Endpoint Rate Limits
 
-- **In-Memory Mode (process-local):**
-  Verified. `createInMemoryRateLimiter()` in `rateLimiter.ts` (lines 117-179) implements the same sliding window algorithm using a `Map<string, number[]>`. Used automatically when `REDIS_URL` is not set.
+### Checklist: Endpoint Coverage
 
-- **Auto-selection factory:**
-  Verified. `createRateLimiter()` (lines 299-319) checks `getRedisClient()` and selects the appropriate implementation. Mode is logged once per limiter name.
+- [x] `POST /api/v1/verify` -- `verificationRateLimiter` (10/hour) + `honeypotCheck` + `verifyCaptcha` (verify.ts line 60)
+- [x] `POST /api/v1/verify/:id/vote` -- `voteRateLimiter` (10/hour) + `honeypotCheck` + `verifyCaptcha` (verify.ts line 95)
+- [x] `GET /api/v1/providers/search` -- `searchRateLimiter` (100/hour) (providers.ts line 206)
+- [x] `GET /api/v1/providers/cities` -- `defaultRateLimiter` (200/hour) (providers.ts line 285)
+- [x] `GET /api/v1/providers/:npi` -- `defaultRateLimiter` (200/hour) (providers.ts line 304)
+- [x] `GET /api/v1/plans/search` -- `searchRateLimiter` (100/hour) (plans.ts line 32)
+- [x] `GET /api/v1/plans/grouped` -- `defaultRateLimiter` (200/hour) (plans.ts line 62)
+- [x] `GET /api/v1/plans/meta/*` -- `defaultRateLimiter` (200/hour) (plans.ts lines 84, 102)
+- [x] `GET /api/v1/plans/:planId/providers` -- `searchRateLimiter` (100/hour) (plans.ts line 123)
+- [x] `GET /api/v1/plans/:planId` -- `defaultRateLimiter` (200/hour) (plans.ts line 176)
+- [x] `GET /api/v1/locations/search` -- `searchRateLimiter` (100/hour) (locations.ts line 50)
+- [x] `GET /api/v1/locations/*` -- `defaultRateLimiter` (200/hour) (locations.ts lines 79, 93, 106, 125)
+- [x] `GET /api/v1/verify/stats` -- `defaultRateLimiter` (200/hour) (verify.ts line 126)
+- [x] `GET /api/v1/verify/recent` -- `defaultRateLimiter` (200/hour) (verify.ts line 139)
+- [x] `GET /api/v1/verify/:npi/:planId` -- `defaultRateLimiter` (200/hour) (verify.ts line 159)
+- [x] Global default -- `defaultRateLimiter` applied to all routes via `app.use(defaultRateLimiter)` (index.ts line 138)
+- [x] `/health` -- Placed BEFORE rate limiter (index.ts line 92) so monitoring is not blocked
+- [x] Insurance card extraction -- 10/hour per IP (frontend route.ts line 28, separate in-memory limiter)
 
-### 3. Sliding Window Algorithm
+### Pre-Configured Limiters (rateLimiter.ts lines 329-367)
 
-- **In-Memory implementation:**
-  Verified. Lines 141-175: Filters timestamps older than `now - windowMs`, counts remaining timestamps, rejects if count >= maxRequests, otherwise adds current timestamp. This correctly prevents the fixed-window boundary attack described in the prompt.
+| Limiter | Window | Max Requests | Applied To |
+|---------|--------|-------------|-----------|
+| `defaultRateLimiter` | 1 hour | 200 | Global + individual read endpoints |
+| `verificationRateLimiter` | 1 hour | 10 | POST /verify |
+| `voteRateLimiter` | 1 hour | 10 | POST /verify/:id/vote |
+| `searchRateLimiter` | 1 hour | 100 | Search endpoints |
 
-- **Redis implementation:**
-  Verified. Lines 220-278: Uses a Redis `MULTI` transaction with `ZREMRANGEBYSCORE` (remove old entries), `ZADD` (add current request), `ZCARD` (count requests), and `EXPIRE` (auto-cleanup). The sorted set score is the timestamp.
+## Response Headers
 
-- **Boundary condition difference:**
-  The in-memory limiter checks `requestCount >= maxRequests` (line 163), while the Redis limiter checks `requestCount > maxRequests` (line 262). This is because the Redis implementation adds the current request to the sorted set BEFORE checking the count (via the atomic MULTI transaction), so the count already includes the current request. The in-memory implementation checks BEFORE adding. Both correctly allow exactly `maxRequests` requests per window.
+All rate-limited responses include standard headers (in-memory: lines 159-161; Redis: lines 257-260):
 
-### 4. Rate Limit Headers
+| Header | Description |
+|--------|-------------|
+| `X-RateLimit-Limit` | Max requests per window |
+| `X-RateLimit-Remaining` | Requests remaining in window |
+| `X-RateLimit-Reset` | Unix timestamp when window resets |
+| `Retry-After` | Seconds until retry (on 429 only) |
 
-- **X-RateLimit-Limit:**
-  Verified in both modes. Set to `maxRequests`.
+## Additional Security Layers
 
-- **X-RateLimit-Remaining:**
-  Verified in both modes. Calculated as `max(0, maxRequests - requestCount)`.
+### CAPTCHA (`packages/backend/src/middleware/captcha.ts`)
 
-- **X-RateLimit-Reset:**
-  Verified in both modes. In-memory uses the oldest timestamp + windowMs; Redis uses `now + windowMs`.
+- **Type:** Google reCAPTCHA v3
+- **Applied to:** POST /verify, POST /verify/:id/vote
+- **Score threshold:** 0.5 (configurable via `CAPTCHA_MIN_SCORE`)
+- **Timeout:** 5 seconds (configurable via `CAPTCHA_API_TIMEOUT_MS`)
+- **Fail mode:** Configurable open/closed via `CAPTCHA_FAIL_MODE`
+- **Fallback rate limit:** 3/hour per IP when CAPTCHA API unavailable (vs normal 10/hour)
+- **Skipped in:** development, test, and when `RECAPTCHA_SECRET_KEY` is not set
 
-- **Retry-After on 429:**
-  Verified in both modes. Set to `Math.ceil(windowMs / 1000)` seconds.
+### Honeypot (`packages/backend/src/middleware/honeypot.ts`)
 
-- **429 Response Body:**
-  Verified. Returns JSON with `error`, `message`, and `retryAfter` fields.
+- Hidden `website` field that real users never fill in
+- Bots that auto-populate it get a fake 200 OK success response (line 21)
+- Applied to: POST /verify, POST /verify/:id/vote
+- Logged with IP for analysis
 
-### 5. Fail-Open Behavior
+### Sybil Prevention (`packages/backend/src/services/verificationService.ts` lines 72-115)
 
-- **Redis unavailable at request time:**
-  Verified. Lines 207-213: If `!redis || !isRedisConnected()`, the request is allowed with `X-RateLimit-Status: degraded` header and a warning logged.
+- Same IP cannot submit duplicate verifications for the same provider-plan pair within 30 days
+- Same email cannot submit duplicate verifications for the same provider-plan pair within 30 days
+- Returns 409 Conflict on duplicate detection
 
-- **Redis transaction failure:**
-  Verified. Lines 241-247: If `multi.exec()` returns null, the request is allowed with degraded header.
+## Attack Scenario Analysis
 
-- **Redis error during operation:**
-  Verified. Lines 273-278: Catch block allows the request, sets degraded header, and logs the error.
+### Checklist: Attack Coverage
 
-- **In-memory NOT used as fallback mid-request:**
-  Verified. The documentation states this explicitly and the code confirms it -- once Redis mode is selected, a Redis failure results in fail-open, not a switch to in-memory.
+- [x] **Competitor sabotage** (flood fake "doesn't accept" verifications): Mitigated by 10/hour IP rate limit + CAPTCHA + Sybil detection (30-day window per IP per provider-plan)
+- [x] **Provider manipulation** (false in-network claims): Same mitigations as above + consensus requires 3+ verifications with 2:1 majority and score >= 60 (`verificationService.ts` lines 163-185)
+- [x] **Bot spam**: Mitigated by CAPTCHA (score threshold 0.5) + honeypot + rate limiting
+- [x] **Vote manipulation**: 10/hour vote rate limit + CAPTCHA + one-vote-per-IP per verification (`VoteLog` unique constraint on `verificationId_sourceIp`)
+- [ ] **VPN rotation attacks**: Not mitigated -- IP-based only, no fingerprinting
 
-### 6. Cleanup of Old Entries
+### Impact on Confidence Scores
 
-- **In-memory cleanup:**
-  Verified. Lines 88-108: `setInterval` runs every 60 seconds (matching `RATE_LIMIT_CLEANUP_INTERVAL_MS`), iterating all stores and removing timestamps older than 1 hour. Empty client entries are deleted entirely.
+- 10 fake verifications from different IPs could still influence scores, but consensus requires 3+ with 2:1 ratio and confidence >= 60
+- With current 10/hour limit, a single IP can only contribute 1 verification per 30 days per provider-plan (Sybil check)
+- CAPTCHA score threshold of 0.5 blocks most automated tools
 
-- **Redis cleanup:**
-  Verified. Each request transaction includes `ZREMRANGEBYSCORE` to prune old entries, plus `EXPIRE` with `windowMs/1000 + 1` seconds to auto-delete idle keys.
+## Questions Answered
 
-### 7. CAPTCHA Integration (Tier 2)
+### 1. What's the absolute deadline for fixing this?
+Rate limiting is already deployed (Tier 1 complete as of January 2026).
 
-- **Applied to verification and vote endpoints:**
-  Verified. `packages/backend/src/routes/verify.ts` applies `verifyCaptcha` middleware AFTER the rate limiter on both `POST /` (line 57) and `POST /:verificationId/vote` (line 91). This ordering is correct: rate limiting runs first to block floods before incurring CAPTCHA API calls.
+### 2. Do we have Redis available?
+Optional. The system auto-selects Redis when `REDIS_URL` is set, falling back to in-memory. For single Cloud Run instance, in-memory is sufficient. For horizontal scaling, Redis (Memorystore) is needed.
 
-- **reCAPTCHA v3 implementation:**
-  Verified. `packages/backend/src/middleware/captcha.ts` sends POST to `https://www.google.com/recaptcha/api/siteverify` with secret key, token, and client IP. Uses `AbortController` with 5-second timeout.
+### 3. What are the initial limits?
+Already set: Verifications 10/hour, Votes 10/hour, Search 100/hour, Default 200/hour.
 
-- **Score threshold:**
-  Verified. `CAPTCHA_MIN_SCORE` is 0.5 (from `constants.ts` line 52), matching the prompt specification.
+### 4. Should we add CAPTCHA?
+Already implemented as Tier 2. Google reCAPTCHA v3 on verification and vote endpoints.
 
-- **Fail-open mode:**
-  Verified. Default `CAPTCHA_FAIL_MODE=open` allows requests when Google API fails but applies stricter fallback rate limiting of 3 requests/hour per IP (`CAPTCHA_FALLBACK_MAX_REQUESTS` from `constants.ts` line 62).
+### 5. Are there known good IPs to allowlist?
+Not implemented. The `skip` function in rate limiter options supports this but no allowlist is configured.
 
-- **Fail-closed mode:**
-  Verified. `CAPTCHA_FAIL_MODE=closed` blocks all requests with 503 when Google API is unavailable.
+### 6. What happens when rate limit is hit?
+429 JSON response with error message and `retryAfter` field. Frontend API client (`packages/frontend/src/lib/api.ts`) detects 429 and shows toast notification with retry time.
 
-- **Development/test skip:**
-  Verified. Lines 121-123: Skips in `development` and `test` environments. Also skips with a warning if `RECAPTCHA_SECRET_KEY` is not set.
+### 7. Should we log blocked verifications?
+Rate limit hits are logged via the logger. CAPTCHA failures are logged with IP and score. Honeypot triggers are logged with IP.
 
-- **Fallback rate limit headers:**
-  Verified. When in fail-open mode, the response includes `X-Security-Degraded`, `X-Fallback-RateLimit-Limit`, `X-Fallback-RateLimit-Remaining`, and `X-Fallback-RateLimit-Reset`.
+### 8. How do we test without breaking production?
+The `skip` function parameter on each rate limiter allows bypassing for test environments. CAPTCHA is skipped when `NODE_ENV=test` or `NODE_ENV=development`.
 
-### 8. Rate Limit Values
+## Remaining Gaps
 
-| Endpoint | Prompt Spec | Actual | Match |
-|----------|------------|--------|-------|
-| POST /api/v1/verify | 10/hour | 10/hour | Yes |
-| POST /api/v1/verify/:id/vote | 10/hour | 10/hour | Yes |
-| GET /api/v1/providers/search | 100/hour | 100/hour | Yes |
-| GET /api/v1/providers/:npi | 200/hour | 200/hour | Yes |
-| CAPTCHA fallback | 3/hour | 3/hour | Yes |
-
-### 9. Skip Function Support
-
-- Verified. The `RateLimiterOptions` interface includes `skip?: (req: Request) => boolean` and both implementations check it at the start of each request.
-
-### 10. Attack Scenarios
-
-- **Competitor sabotage / Provider manipulation / Bot spam:**
-  Warning. IP-based rate limiting at 10/hour limits but does not fully prevent distributed attacks (multiple IPs). CAPTCHA provides additional defense. Tier 3 (user accounts, anomaly detection) would provide stronger protection.
-
-- **Vote manipulation:**
-  Warning. Votes are limited to 10/hour per IP, and CAPTCHA adds bot detection, but no per-verification vote deduplication beyond the existing Sybil prevention in the verification service.
-
-### 11. Monitoring and Alerts
-
-- **Rate limit hits logged:**
-  Partially verified. The Redis rate limiter logs warnings on fail-open scenarios and errors. However, successful 429 rejections are NOT explicitly logged with structured data -- they return the 429 response but do not emit a specific log entry for monitoring dashboards.
-
-- **Dashboard / alerting:**
-  Not implemented. The prompt lists this as unchecked items under section 8.
-
-### 12. Testing Strategy
-
-- Not implemented. The prompt lists all testing items (local testing, production testing, load testing, bypass for automated tests) as unchecked.
-
-### 13. Tier 3 Implementation
-
-- Not implemented. User account-based limits, anomaly detection, and evidence requirements are documented as future work requiring authentication (prompt 03).
-
----
-
-## Summary
-
-The rate limiting implementation is robust and well-architected. All Tier 1 objectives are met: four distinct rate limiters cover all API endpoints with appropriate limits, a dual-mode architecture supports both single-instance and distributed deployments, and the sliding window algorithm prevents boundary-burst attacks. Tier 2 CAPTCHA integration is properly wired into the verification and vote submission routes with configurable fail-open/fail-closed modes and stricter fallback rate limiting. The code quality is high with extensive documentation, proper TypeScript typing, and comprehensive error handling.
-
-Key strengths:
-- Atomic Redis transactions prevent race conditions in the distributed limiter
-- Fail-open behavior ensures availability even during Redis outages
-- CAPTCHA fallback rate limiting (3/hour vs 10/hour) mitigates the risk of CAPTCHA bypass
-- Middleware ordering (rate limit -> CAPTCHA -> handler) is correct and efficient
-
----
-
-## Recommendations
-
-1. **Add structured logging for 429 rejections.** When a request is rate-limited (429 response), emit a structured log entry with the limiter name, client IP, and endpoint. This is critical for attack detection and the monitoring dashboard planned in section 8.
-
-2. **Implement at least basic testing.** The prompt's testing checklist (section 9) is entirely unchecked. A simple integration test that hits an endpoint `maxRequests + 1` times and asserts a 429 on the last call would verify the rate limiter works end-to-end.
-
-3. **Consider logging rate-limited CAPTCHA fallback entries to Redis/database.** Currently the CAPTCHA fallback rate limiter is in-memory only, even when Redis is available. This means each Cloud Run instance has independent fallback counters.
-
-4. **Document rate limits in API responses or documentation.** The prompt notes (section 5, Tier 2) that API docs should document rate limits. This is still unchecked.
-
-5. **Plan for Tier 3 anomaly detection.** With only IP-based limiting, a determined attacker using a botnet or VPN rotation could bypass the 10/hour verification limit. Fingerprinting and user-account-based limits (Tier 3) would significantly strengthen defenses.
-
-6. **Minor: Hardcoded 1-hour cleanup window in in-memory store.** The cleanup interval in lines 93-94 uses a hardcoded `maxWindowMs = 60 * 60 * 1000` rather than reading from the actual limiter configuration. This works because all current limiters use 1-hour windows, but would become incorrect if a limiter with a longer window were added.
+1. **No fingerprinting** -- VPN rotation can bypass IP-based limits
+2. **No rate limit hit monitoring dashboard** -- Hits are logged but not aggregated
+3. **No anomaly detection** -- No detection for patterns like "100 different IPs all verifying the same provider"
+4. **No allowlist/blocklist management** -- No admin UI for managing trusted/blocked IPs
+5. **In-memory mode not safe for multi-instance** -- If Cloud Run scales to multiple instances without Redis, each has independent counters
+6. **TLS not configured for Redis** -- Needed for production Memorystore

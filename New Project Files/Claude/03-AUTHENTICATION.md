@@ -1,133 +1,183 @@
-# Authentication Review -- Analysis
+# VerifyMyProvider Authentication
 
-**Generated:** 2026-02-05
-**Source Prompt:** prompts/03-authentication.md
-**Status:** Partially implemented -- Admin auth is solid; public endpoints remain unauthenticated by design (Phase 1)
-
----
-
-## Findings
-
-### 1. Current State (No Authentication)
-
-- **All endpoints are public:**
-  Verified. All routes under `/api/v1/providers`, `/api/v1/plans`, and `/api/v1/verify` have no authentication middleware. The only authenticated routes are under `/api/v1/admin/*`.
-
-- **No JWT, no sessions, no cookies:**
-  Verified. Grep across the entire backend `src/` directory confirms zero usage of cookies, sessions, JWTs, or any token-based auth for public endpoints. The `cors()` config sets `credentials: true` (which enables cookies in CORS preflight), but no cookies are actually set or read anywhere.
-
-- **Verifications are anonymous:**
-  Verified. `POST /api/v1/verify` accepts an optional `submittedBy` (email) field, but it is not required. Verifications and votes are tracked by IP address, not by authenticated user identity.
-
-- **No user accounts exist:**
-  Verified. The Prisma schema has no User model, no password fields, no auth tokens table.
-
-**Why Started This Way:**
-
-- **Reduce friction for verifications:**
-  Confirmed. The verify endpoint allows immediate anonymous submissions with no signup.
-
-- **Solve cold start problem:**
-  Confirmed. Anonymous contributions allow data to flow before a user base is established.
-
-- **Prioritize speed over security initially:**
-  Confirmed. Rate limiting and CAPTCHA are the only protection layers.
-
-**Risks:**
-
-- **Spam verifications (CRITICAL):**
-  Partially mitigated. Rate limiting is in place: `verificationRateLimiter` (10/hour), `voteRateLimiter` (10/hour), plus CAPTCHA middleware (`verifyCaptcha`) on both `POST /verify` and `POST /verify/:id/vote`. Sybil detection checks for duplicate IP + email within 30 days. However, without auth, a determined attacker can use rotating IPs/proxies to bypass these protections.
-
-- **Vote manipulation:**
-  Partially mitigated. Votes are deduplicated by `(verificationId, sourceIp)` unique constraint in the `VoteLog` model. IP-based deduplication is not foolproof against VPN/proxy rotation.
-
-- **No user reputation system:**
-  Confirmed. No mechanism to weight contributions by user trust level.
-
-- **Can't offer premium features:**
-  Confirmed. No user accounts means no personalization, saved providers, or payment integration.
-
-### 2. Admin Authentication (Implemented)
-
-- **`adminAuthMiddleware` in `routes/admin.ts`:**
-  Well implemented. Uses `crypto.timingSafeEqual` for constant-time comparison of the `X-Admin-Secret` header against the `ADMIN_SECRET` environment variable. This prevents timing attacks.
-
-- **Graceful degradation:**
-  Verified. If `ADMIN_SECRET` is not configured, admin endpoints return 503 with `ADMIN_NOT_CONFIGURED` code rather than failing open. This is the correct behavior.
-
-- **Protected endpoints (7 total):**
-  - `POST /api/v1/admin/cleanup-expired` -- Verified, uses `adminAuthMiddleware`
-  - `GET /api/v1/admin/expiration-stats` -- Verified, uses `adminAuthMiddleware`
-  - `GET /api/v1/admin/health` -- Verified, uses `adminAuthMiddleware`
-  - `POST /api/v1/admin/cache/clear` -- Verified, uses `adminAuthMiddleware`
-  - `GET /api/v1/admin/cache/stats` -- Verified, uses `adminAuthMiddleware`
-  - `POST /api/v1/admin/cleanup/sync-logs` -- Verified, uses `adminAuthMiddleware`
-  - `GET /api/v1/admin/retention/stats` -- Verified, uses `adminAuthMiddleware`
-
-- **Admin auth quality:**
-  - Timing-safe comparison: Yes
-  - Length check before `timingSafeEqual`: Yes (required since `timingSafeEqual` throws on unequal lengths)
-  - Secret via environment variable: Yes
-  - No secret in logs: Correct -- the logger only warns when the secret is not configured, never logs the secret value
-  - Uses `AppError.unauthorized` for invalid secrets: Yes, returns 401
-
-- **Minor observation:** The `X-Admin-Secret` header is included in the CORS `allowedHeaders` list in `index.ts`, which means browsers can send it cross-origin. This is acceptable since admin operations are likely done via CLI/scheduler, not the browser frontend.
-
-### 3. Planned Authentication Strategy
-
-- **Phase 1 (Before Beta Launch) -- Current state:**
-  - No auth: Verified
-  - Rate limiting (IP-based): Verified -- default (200/hr), search (100/hr), verification (10/hr), vote (10/hr)
-  - Honeypot fields: NOT IMPLEMENTED -- No honeypot fields found in any route handler or frontend code
-  - Anonymous contributions: Verified
-
-- **Phase 2 and Phase 3:** Not implemented yet. These are planning items.
-
-### 4. Auth Library Selection
-
-No decision has been made yet. No auth libraries (Passport.js, Auth0, Clerk, etc.) are in `package.json`.
-
-### 5. Integration with OwnMyHealth
-
-No decision documented in code. No shared auth infrastructure exists.
-
-### 6. Session Management
-
-Current: N/A (no sessions). Verified -- no session middleware, no `express-session`, no Redis session store.
-
-### 7. Password Security (Phase 3)
-
-Not applicable yet. No bcrypt or argon2 dependencies found.
-
-### 8. CAPTCHA Implementation (Additional Finding)
-
-The CAPTCHA middleware (`packages/backend/src/middleware/captcha.ts`) is well-designed:
-- Uses Google reCAPTCHA v3 with score-based detection (threshold configurable via `CAPTCHA_MIN_SCORE`)
-- Configurable fail-open vs fail-closed behavior via `CAPTCHA_FAIL_MODE` env var
-- Fallback rate limiting (3 requests/hour) when CAPTCHA API is unavailable in fail-open mode
-- Skips in development/test environments
-- Applied to both verification and vote endpoints
+**Last Updated:** 2026-02-06
+**Current State:** No user authentication (all public endpoints); admin endpoints protected by shared secret
+**Security Risk:** Medium (spam vulnerability mitigated by rate limiting + CAPTCHA + honeypot + Sybil prevention)
 
 ---
 
-## Summary
+## Current State
 
-The codebase is correctly in **Phase 1** of the authentication roadmap. Admin endpoints have strong header-based authentication with timing-safe secret comparison. All public-facing endpoints are unauthenticated by design, relying instead on IP-based rate limiting (sliding window algorithm, dual-mode Redis/in-memory), CAPTCHA verification, and Sybil attack detection as anti-abuse measures.
+### No User Authentication
 
-The implementation quality of what exists is high: timing-safe comparisons, proper error handling, graceful degradation when services are unconfigured. The main gaps are the planned but unimplemented items: honeypot fields, email verification, and user accounts.
+- [x] **All public endpoints are unauthenticated** -- Verified in `routes/index.ts` (lines 10-14): providers, plans, verify, locations, and admin routes are registered without any auth middleware on the router level. Individual admin routes use `adminAuthMiddleware`.
+- [x] **No JWT, no sessions, no cookies** -- No session middleware, no passport.js, no JWT libraries found. `index.ts` has no session/cookie middleware. The `credentials: true` CORS setting (line 84) is present but unused since no cookies are sent.
+- [x] **Verifications are anonymous** -- `verify.ts` line 63-69: submissions include only `req.ip` and `req.get('User-Agent')` for tracking, no user identity. The `submittedBy` email field is optional.
+- [x] **No user accounts exist** -- No `User` model in `schema.prisma`. No registration, login, or profile endpoints.
+
+### Why No Auth Initially
+
+- [x] **Reduce friction for verifications** -- The verification endpoint (`POST /api/v1/verify`) requires only NPI, planId, and acceptsInsurance boolean. No signup needed.
+- [x] **Cold start problem** -- Need data flowing quickly. Anonymous contributions lower the barrier.
+- [x] **Speed prioritized** -- The entire API is public-read, anonymous-write with anti-abuse measures.
+
+### Risks
+
+- [x] **Spam verifications** -- Mitigated by: rate limiting (10 verifications/hour per IP in `rateLimiter.ts` line 340-345), CAPTCHA (reCAPTCHA v3 on POST endpoints in `captcha.ts`), honeypot fields (`honeypot.ts` -- catches bots that fill hidden fields), and Sybil prevention (30-day duplicate check per IP/email per provider-plan pair in `verificationService.ts` lines 72-115).
+- [x] **Vote manipulation** -- Mitigated by: unique constraint `[verificationId, sourceIp]` on VoteLog (`schema.prisma` line 253), vote rate limiter (10/hour in `rateLimiter.ts` line 351-356), and CAPTCHA on vote endpoint.
+- [ ] **No user reputation system** -- Not implemented. No way to weight verifications by contributor quality.
+- [ ] **Can't offer premium features** -- No user accounts means no saved providers, alerts, or payment integration.
 
 ---
 
-## Recommendations
+## Admin Authentication (Implemented)
 
-1. **Implement honeypot fields (Phase 1 gap):** The prompt checklist lists honeypot fields as a Phase 1 item, but they are not implemented. Add hidden form fields to the verification and vote submission forms that bots will fill in but real users won't.
+### X-Admin-Secret Header Authentication
 
-2. **Document admin secret rotation procedure:** The admin auth works well, but there is no documented process for rotating the `ADMIN_SECRET`. Consider adding a runbook or admin guide.
+**File:** `packages/backend/src/routes/admin.ts` lines 21-55
 
-3. **Consider admin auth rate limiting:** The admin routes use `adminAuthMiddleware` but do not have their own rate limiter. A brute-force attack against the admin secret header is theoretically possible. Add a strict rate limiter (e.g., 5 requests per minute) to the `/api/v1/admin/*` path.
+**Implementation details:**
+- Uses `X-Admin-Secret` HTTP header for authentication
+- Secret stored in `ADMIN_SECRET` environment variable
+- **Timing-safe comparison** using `crypto.timingSafeEqual` (line 48) to prevent timing attacks
+- Returns 503 if `ADMIN_SECRET` not configured (graceful disable, line 27)
+- Returns 401 if secret is invalid (line 51)
+- Length check before `timingSafeEqual` (line 46-47) since the function requires equal-length buffers
 
-4. **Evaluate `credentials: true` in CORS:** The CORS configuration enables `credentials: true`, which allows cookies to be sent cross-origin. Since no cookies are currently used, this setting has no security impact now but should be reviewed when auth is added.
+**Protected endpoints (9 total):**
 
-5. **Plan Phase 2 timeline:** Rate limiting + CAPTCHA provide reasonable protection for a low-traffic beta, but spam risk will grow with traffic. Prioritize lightweight email verification before public launch.
+| Method | Path | Purpose |
+|--------|------|---------|
+| POST | `/admin/cleanup-expired` | Delete expired verification records |
+| GET | `/admin/expiration-stats` | Verification expiration statistics |
+| GET | `/admin/health` | Admin health check with retention metrics |
+| POST | `/admin/cache/clear` | Clear all cached data |
+| GET | `/admin/cache/stats` | Cache statistics |
+| GET | `/admin/enrichment/stats` | Location enrichment statistics |
+| POST | `/admin/cleanup/sync-logs` | Clean up old sync_logs |
+| GET | `/admin/retention/stats` | Comprehensive retention stats |
+| POST | `/admin/recalculate-confidence` | Recalculate confidence scores with decay |
 
-6. **Track auth library decision:** The prompt lists several options (Passport.js, Auth0, Clerk, Firebase Auth, roll-your-own). Make this decision before Phase 2 implementation begins to avoid rework.
+**Security assessment of admin auth:**
+- [x] Timing-safe comparison prevents timing attacks
+- [x] Graceful disable when not configured (503 vs exposing unprotected endpoints)
+- [ ] No IP allowlisting on admin endpoints
+- [ ] No rate limiting specific to admin endpoints (uses global default 200/hr)
+- [ ] Single shared secret (not per-user admin keys)
+- [ ] Secret transmitted in header (could be logged by proxies -- mitigated by HTTPS)
+
+---
+
+## Authentication Roadmap
+
+### Phase 1: No Auth (Current)
+**Features implemented:**
+- IP-based rate limiting (4 tiers: default 200/hr, search 100/hr, verify 10/hr, vote 10/hr)
+- reCAPTCHA v3 on POST verify and vote endpoints
+- Honeypot fields on verification and vote submissions
+- Sybil prevention (30-day window per IP/email per provider-plan)
+- Anonymous contributions allowed
+
+**Security stack verified in code:**
+1. `rateLimiter.ts` -- Dual-mode (Redis distributed / in-memory fallback), sliding window algorithm
+2. `captcha.ts` -- Google reCAPTCHA v3 with configurable fail-open/fail-closed mode
+3. `honeypot.ts` -- Hidden field detection, returns fake 200 to fool bots
+4. `verificationService.ts` `checkSybilAttack()` -- Database-backed duplicate detection
+
+### Phase 2: Lightweight Auth (Planned -- Not Implemented)
+**No code exists for this phase.** Planned features:
+- Email verification for identified submissions
+- Optional accounts (not required for basic use)
+- One verification per email per provider/plan
+- CAPTCHA on anonymous submissions
+- Progressive disclosure: anonymous -> email -> full account
+
+### Phase 3: Full Auth (Planned -- Not Implemented)
+**No code exists for this phase.** Planned features:
+- Full user accounts (email/password)
+- OAuth (Google, Facebook) optional
+- JWT access/refresh tokens
+- User reputation system
+- Premium features (saved providers, alerts)
+- API keys for B2B customers
+
+---
+
+## Technical Implementation
+
+### Auth Library Choice
+**Not yet selected.** No authentication library dependencies found in `package.json`.
+
+### Session Management
+**Current:** No sessions. All requests are stateless.
+
+### Password Security
+**Not applicable.** No passwords exist in the system.
+
+### CORS Configuration
+**File:** `packages/backend/src/index.ts` lines 22-85
+
+Allowed origins:
+- `https://verifymyprovider.com`
+- `https://www.verifymyprovider.com`
+- `https://verifymyprovider-frontend-741434145252.us-central1.run.app`
+- `process.env.FRONTEND_URL`
+- `localhost:3000`, `localhost:3001` (development only)
+
+Requests with no origin are allowed (line 69-71) for mobile apps, curl, Postman.
+X-Admin-Secret is in the `allowedHeaders` list (line 83).
+
+---
+
+## Integration with OwnMyHealth
+
+**Approach:** Not yet decided. No shared authentication code found.
+
+**Current state:** The API is structured as a standalone service. CORS whitelist can be extended to include OwnMyHealth domains. The admin secret could theoretically be shared for server-to-server calls, but no such integration exists.
+
+---
+
+## Anonymous vs Authenticated Verifications
+
+**Current strategy:** All verifications are anonymous with anti-abuse measures.
+
+**Current limits (code-verified):**
+
+| Protection Layer | Limit | File:Line |
+|---|---|---|
+| Rate limiting (verify) | 10/hour per IP | `rateLimiter.ts:340-345` |
+| Rate limiting (vote) | 10/hour per IP | `rateLimiter.ts:351-356` |
+| Sybil prevention | 1 per IP per provider-plan per 30 days | `verificationService.ts:72-96` |
+| Sybil prevention | 1 per email per provider-plan per 30 days | `verificationService.ts:99-114` |
+| CAPTCHA | reCAPTCHA v3, score >= 0.5 | `captcha.ts:173`, `constants.ts:52` |
+| CAPTCHA fallback | 3/hour when Google API down | `constants.ts:62` |
+| Honeypot | Silent rejection of bot submissions | `honeypot.ts:11-25` |
+| Consensus threshold | 3 verifications + score >= 60 + 2:1 ratio | `constants.ts:36-42` |
+
+---
+
+## Premium Features
+
+**Not implemented.** Requires user accounts (Phase 3).
+
+---
+
+## Next Steps
+
+1. **Immediate (before beta launch):**
+   - [ ] Current anti-abuse stack (rate limiting + CAPTCHA + honeypot + Sybil) should be sufficient
+   - [ ] Consider adding admin IP allowlisting
+   - [ ] Consider admin-specific rate limiting (separate from default)
+
+2. **Short-term (Phase 2):**
+   - [ ] Choose auth library (Passport.js, Clerk, or custom JWT)
+   - [ ] Implement optional email verification
+   - [ ] Add user table to schema
+   - [ ] Implement CSRF protection (see 04-csrf.md)
+
+3. **Long-term (Phase 3):**
+   - [ ] Full user accounts with OAuth
+   - [ ] JWT access/refresh tokens with HttpOnly cookies
+   - [ ] User reputation system
+   - [ ] Premium tier with payment integration
+   - [ ] API keys for B2B consumers

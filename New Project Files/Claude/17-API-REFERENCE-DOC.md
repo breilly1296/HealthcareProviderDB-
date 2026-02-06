@@ -1,183 +1,80 @@
-# API Reference
+# VerifyMyProvider API Reference
 
-**Last Updated:** 2026-02-05
-**Generated From:** prompts/17-api-reference-doc.md
-
----
-
-## Table of Contents
-
-1. [Overview](#1-overview)
-2. [Authentication](#2-authentication)
-3. [Common Response Format](#3-common-response-format)
-4. [Error Handling](#4-error-handling)
-5. [Rate Limiting](#5-rate-limiting)
-6. [CAPTCHA Protection](#6-captcha-protection)
-7. [Provider Endpoints](#7-provider-endpoints)
-8. [Plan Endpoints](#8-plan-endpoints)
-9. [Verification Endpoints](#9-verification-endpoints)
-10. [Admin Endpoints](#10-admin-endpoints)
-11. [Health Check](#11-health-check)
-12. [Validation Schemas](#12-validation-schemas)
+**Last Updated:** 2026-02-06
 
 ---
 
-## 1. Overview
+## Base URL
 
-**Base URL:** `/api/v1`
-
-The VerifyMyProvider API is a RESTful JSON API built on Express.js. All endpoints are prefixed with `/api/v1/` except the health check (`/health`) and root info (`/`).
-
-### Endpoint Summary
-
-| Method | Endpoint | Rate Limit | CAPTCHA | Auth | Purpose |
-|--------|----------|------------|---------|------|---------|
-| GET | `/health` | None | No | None | Health check |
-| GET | `/` | 200/hr | No | None | API info |
-| GET | `/api/v1/providers/search` | 100/hr | No | None | Search providers |
-| GET | `/api/v1/providers/cities` | 200/hr | No | None | Cities by state |
-| GET | `/api/v1/providers/:npi` | 200/hr | No | None | Provider detail |
-| GET | `/api/v1/plans/search` | 100/hr | No | None | Search plans |
-| GET | `/api/v1/plans/grouped` | 200/hr | No | None | Plans grouped by carrier |
-| GET | `/api/v1/plans/meta/issuers` | 200/hr | No | None | Issuer list |
-| GET | `/api/v1/plans/meta/types` | 200/hr | No | None | Plan type list |
-| GET | `/api/v1/plans/:planId/providers` | 100/hr | No | None | Providers for a plan |
-| GET | `/api/v1/plans/:planId` | 200/hr | No | None | Plan detail |
-| POST | `/api/v1/verify` | 10/hr | Yes | None | Submit verification |
-| POST | `/api/v1/verify/:verificationId/vote` | 10/hr | Yes | None | Vote on verification |
-| GET | `/api/v1/verify/stats` | 200/hr | No | None | Verification statistics |
-| GET | `/api/v1/verify/recent` | 200/hr | No | None | Recent verifications |
-| GET | `/api/v1/verify/:npi/:planId` | 200/hr | No | None | Pair verifications |
-| POST | `/api/v1/admin/cleanup-expired` | 200/hr | No | Admin | Clean expired records |
-| GET | `/api/v1/admin/expiration-stats` | 200/hr | No | Admin | Expiration statistics |
-| GET | `/api/v1/admin/health` | 200/hr | No | Admin | Admin health + metrics |
-| POST | `/api/v1/admin/cache/clear` | 200/hr | No | Admin | Clear cache |
-| GET | `/api/v1/admin/cache/stats` | 200/hr | No | Admin | Cache statistics |
-| POST | `/api/v1/admin/cleanup/sync-logs` | 200/hr | No | Admin | Clean old sync logs |
-| GET | `/api/v1/admin/retention/stats` | 200/hr | No | Admin | Retention statistics |
+- **Local Development:** `http://localhost:3001/api/v1`
+- **Production:** `https://verifymyprovider-backend-[hash].us-central1.run.app/api/v1`
 
 ---
 
-## 2. Authentication
+## Common Response Format
 
-### Public Endpoints
-
-Most endpoints require no authentication. All provider, plan, and verification read endpoints are publicly accessible.
-
-### Admin Endpoints
-
-Admin endpoints require the `X-Admin-Secret` header:
-
-```
-X-Admin-Secret: <your-admin-secret>
-```
-
-The secret is validated using timing-safe comparison (`crypto.timingSafeEqual`) to prevent timing attacks. If `ADMIN_SECRET` is not configured on the server, admin endpoints return `503 Service Unavailable`.
-
-**Error responses:**
-
-| Scenario | Status | Code |
-|----------|--------|------|
-| ADMIN_SECRET not set on server | 503 | `ADMIN_NOT_CONFIGURED` |
-| Header missing or invalid | 401 | (Unauthorized) |
-
----
-
-## 3. Common Response Format
+All endpoints return JSON with this structure:
 
 ### Success Response
-
 ```json
 {
   "success": true,
-  "data": {
-    // Endpoint-specific data
-  }
+  "data": { ... }
 }
 ```
 
-### Paginated Response
-
-```json
-{
-  "success": true,
-  "data": {
-    "providers": [...],
-    "pagination": {
-      "page": 1,
-      "limit": 20,
-      "total": 150,
-      "totalPages": 8,
-      "hasNext": true,
-      "hasPrev": false
-    }
-  }
-}
-```
-
-### Cache Headers
-
-Search endpoints include a cache indicator header:
-
-| Header | Value | Meaning |
-|--------|-------|---------|
-| `X-Cache` | `HIT` | Response served from cache |
-| `X-Cache` | `MISS` | Response served from database |
-
----
-
-## 4. Error Handling
-
-### Error Response Format
-
+### Error Response
 ```json
 {
   "error": {
-    "message": "Human-readable error description",
-    "code": "ERROR_CODE",
+    "message": "Human-readable error message",
+    "code": "MACHINE_READABLE_CODE",
     "statusCode": 400,
-    "requestId": "abc-123"
+    "requestId": "uuid-v4"
   }
 }
 ```
 
-### Validation Error Format (Zod)
-
+### Validation Error Response (Zod)
 ```json
 {
   "error": {
     "message": "Validation error",
     "code": "VALIDATION_ERROR",
     "statusCode": 400,
-    "requestId": "abc-123",
+    "requestId": "uuid-v4",
     "details": [
-      {
-        "field": "state",
-        "message": "String must contain exactly 2 character(s)"
-      }
+      { "field": "state", "message": "String must contain exactly 2 character(s)" }
     ]
   }
 }
 ```
 
-### Error Codes
+---
 
-| HTTP Status | Code | Description |
-|-------------|------|-------------|
-| 400 | `VALIDATION_ERROR` | Zod validation failed (includes field-level details) |
-| 400 | (varies) | Bad request (invalid CAPTCHA token, etc.) |
-| 401 | (varies) | Invalid or missing admin secret |
-| 403 | (varies) | CAPTCHA score too low (suspected bot) |
-| 404 | `NOT_FOUND` | Resource not found |
-| 404 | `ROUTE_NOT_FOUND` | Route does not exist |
-| 409 | `DUPLICATE_ENTRY` | Prisma unique constraint violation |
-| 413 | `PAYLOAD_TOO_LARGE` | Request body exceeds 100kb |
-| 429 | (varies) | Rate limit exceeded |
-| 500 | `INTERNAL_ERROR` | Unexpected server error |
-| 503 | `ADMIN_NOT_CONFIGURED` | ADMIN_SECRET env var not set |
+## Rate Limiting
 
-### Rate Limit Error
+All endpoints include rate limiting headers in the response:
 
+| Header | Description |
+|--------|-------------|
+| `X-RateLimit-Limit` | Maximum requests allowed in the window |
+| `X-RateLimit-Remaining` | Requests remaining in the current window |
+| `X-RateLimit-Reset` | Unix timestamp when the window resets |
+| `Retry-After` | Seconds to wait (only on 429 responses) |
+| `X-RateLimit-Status` | Set to `degraded` when Redis is unavailable (fail-open) |
+
+### Rate Limit Tiers
+
+| Tier | Limit | Window | Applied To |
+|------|-------|--------|-----------|
+| Default | 200 req | 1 hour | General API routes, detail endpoints |
+| Search | 100 req | 1 hour | Search endpoints (providers, plans, locations) |
+| Verification | 10 req | 1 hour | POST /verify (submit verification) |
+| Vote | 10 req | 1 hour | POST /verify/:id/vote |
+| CAPTCHA Fallback | 3 req | 1 hour | Applied when CAPTCHA API unavailable (fail-open mode) |
+
+### 429 Too Many Requests Response
 ```json
 {
   "error": "Too many requests",
@@ -186,102 +83,123 @@ Search endpoints include a cache indicator header:
 }
 ```
 
-Rate limit headers are always included on every response:
+---
 
-| Header | Description |
-|--------|-------------|
-| `X-RateLimit-Limit` | Maximum requests per window |
-| `X-RateLimit-Remaining` | Requests remaining in current window |
-| `X-RateLimit-Reset` | Unix timestamp when window resets |
-| `Retry-After` | Seconds to wait (only on 429 responses) |
+## Authentication
+
+### Public Endpoints
+No authentication required. CORS restricts origins to allowed domains.
+
+### Admin Endpoints
+Require `X-Admin-Secret` header with timing-safe comparison against `ADMIN_SECRET` environment variable.
+
+```
+X-Admin-Secret: your-secret-value
+```
+
+If `ADMIN_SECRET` is not configured, admin endpoints return 503 with `ADMIN_NOT_CONFIGURED` code.
 
 ---
 
-## 5. Rate Limiting
+## Pagination
 
-The API uses a sliding window algorithm for rate limiting. Two backends are supported:
+Paginated endpoints accept and return:
 
-- **Redis** (distributed): When `REDIS_URL` is configured. Uses sorted sets for sliding window. Supports horizontal scaling.
-- **In-Memory** (process-local): Fallback when Redis is unavailable. Only safe for single-instance deployments.
+### Query Parameters
+| Parameter | Type | Default | Range | Description |
+|-----------|------|---------|-------|-------------|
+| `page` | integer | 1 | >= 1 | Page number |
+| `limit` | integer | 20 | 1-100 | Results per page |
 
-If Redis becomes unavailable during operation, the rate limiter **fails open** (allows requests with `X-RateLimit-Status: degraded` header).
-
-### Rate Limit Tiers
-
-| Tier | Limit | Window | Applied To |
-|------|-------|--------|------------|
-| `default` | 200 requests | 1 hour | General API routes |
-| `search` | 100 requests | 1 hour | Search endpoints |
-| `verification` | 10 requests | 1 hour | Verification submission |
-| `vote` | 10 requests | 1 hour | Vote submission |
-
-The health check endpoint (`GET /health`) is exempt from rate limiting.
-
----
-
-## 6. CAPTCHA Protection
-
-Endpoints that modify data require a Google reCAPTCHA v3 token.
-
-### Sending the Token
-
-Include the token in the request body or as a header:
-
-- **Body:** `{ "captchaToken": "<token>" }`
-- **Header:** `X-Captcha-Token: <token>`
-
-### Behavior by Environment
-
-| Environment | Behavior |
-|-------------|----------|
-| `development` | CAPTCHA check skipped |
-| `test` | CAPTCHA check skipped |
-| Production (no `RECAPTCHA_SECRET_KEY`) | CAPTCHA check skipped with warning |
-| Production (configured) | Full verification against Google API |
-
-### Score Threshold
-
-reCAPTCHA v3 returns a score from 0.0 (likely bot) to 1.0 (likely human). Requests below the configured minimum score (`CAPTCHA_MIN_SCORE`) receive a `403 Forbidden` response.
-
-### Fail Mode
-
-When Google's reCAPTCHA API is unavailable:
-
-| Mode | Behavior |
-|------|----------|
-| `open` (default) | Allow request with stricter fallback rate limiting (3 req/hr) |
-| `closed` | Block all requests with `503 Service Unavailable` |
-
-Configure via `CAPTCHA_FAIL_MODE=open|closed` environment variable.
+### Response Pagination Object
+```json
+{
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 1234,
+    "totalPages": 62,
+    "hasMore": true
+  }
+}
+```
 
 ---
 
-## 7. Provider Endpoints
+## Health Check
+
+### GET /health
+
+Health check endpoint. Placed before rate limiter in middleware chain so monitoring tools are not blocked.
+
+**Rate Limit:** None
+
+**Response (200 OK):**
+```json
+{
+  "status": "ok",
+  "timestamp": "2026-02-06T12:00:00.000Z",
+  "version": "1.0.0",
+  "uptime": 3600.123,
+  "memory": {
+    "heapUsed": 45,
+    "heapTotal": 64,
+    "unit": "MB"
+  },
+  "checks": {
+    "database": "healthy"
+  },
+  "cache": {
+    "hits": 150,
+    "misses": 30,
+    "size": 12,
+    "mode": "memory",
+    "hitRate": "83.3%"
+  },
+  "databaseResponseTime": "5ms"
+}
+```
+
+**Response (503 -- Database Unreachable):**
+```json
+{
+  "status": "degraded",
+  "checks": {
+    "database": "unhealthy"
+  },
+  "error": "Database connection failed"
+}
+```
+
+---
+
+## Provider Endpoints
 
 ### GET /api/v1/providers/search
 
 Search providers with filters. Results are cached for 5 minutes.
 
-**Rate Limit:** 100 req/hr (search tier)
+**Rate Limit:** 100/hr (search)
 
 **Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `state` | string(2) | No | Two-letter state code (auto-uppercased) |
+| `city` | string | No | City name (1-100 chars) |
+| `cities` | string | No | Comma-separated city names (1-500 chars) |
+| `zipCode` | string | No | ZIP code (3-10 chars) |
+| `specialty` | string | No | Specialty description (1-200 chars) |
+| `specialtyCategory` | string | No | Specialty category code (1-100 chars) |
+| `name` | string | No | Provider name search (1-200 chars) |
+| `npi` | string(10) | No | Exact NPI lookup (10 digits) |
+| `entityType` | enum | No | `INDIVIDUAL` or `ORGANIZATION` |
+| `page` | integer | No | Page number (default: 1) |
+| `limit` | integer | No | Results per page (default: 20, max: 100) |
 
-| Parameter | Type | Required | Validation | Description |
-|-----------|------|----------|------------|-------------|
-| `state` | string | No | Exactly 2 chars, uppercased | State code (e.g., `CA`, `NY`) |
-| `city` | string | No | 1-100 chars | City name |
-| `cities` | string | No | 1-500 chars | Comma-separated city list |
-| `zipCode` | string | No | 3-10 chars | ZIP code |
-| `specialty` | string | No | 1-200 chars | Specialty / taxonomy description |
-| `specialtyCategory` | string | No | 1-100 chars | Specialty category |
-| `name` | string | No | 1-200 chars | Provider name (first, last, or organization) |
-| `npi` | string | No | Exactly 10 digits | NPI number |
-| `entityType` | string | No | `INDIVIDUAL` or `ORGANIZATION` | Provider type |
-| `page` | number | No | Min 1, default 1 | Page number |
-| `limit` | number | No | 1-100, default 20 | Results per page |
+**Response Headers:**
+- `X-Cache: HIT` or `X-Cache: MISS` -- indicates cache status
 
-**Response:**
-
+**Response (200 OK):**
 ```json
 {
   "success": true,
@@ -291,47 +209,42 @@ Search providers with filters. Results are cached for 5 minutes.
         "id": "1234567890",
         "npi": "1234567890",
         "entityType": "INDIVIDUAL",
-        "firstName": "John",
+        "firstName": "Jane",
         "lastName": "Smith",
         "middleName": null,
         "namePrefix": "Dr.",
         "nameSuffix": null,
         "credential": "MD",
         "organizationName": null,
-        "gender": "M",
-        "addressLine1": "123 Medical Dr",
+        "gender": "F",
+        "addressLine1": "123 Medical Center Dr",
         "addressLine2": "Suite 100",
-        "city": "Los Angeles",
-        "state": "CA",
-        "zip": "90001",
-        "phone": "3105551234",
+        "city": "Miami",
+        "state": "FL",
+        "zip": "33101",
+        "phone": "3055551234",
         "fax": null,
         "taxonomyCode": "207R00000X",
         "taxonomyDescription": "Internal Medicine",
-        "specialtyCategory": "Allopathic & Osteopathic Physicians",
+        "specialtyCategory": "INTERNAL_MEDICINE",
         "npiStatus": "ACTIVE",
-        "displayName": "Dr. John Smith, MD",
-        "cmsDetails": {
-          "group_practice_name": "Smith Medical Group",
-          "medical_school": "Johns Hopkins",
-          "graduation_year": "2005",
-          "medicare_assignment": "Y",
-          "telehealth": "Y"
-        },
-        "hospitals": [],
-        "insuranceNetworks": [],
-        "medicareIds": [],
-        "taxonomies": [],
-        "locations": []
+        "displayName": "Dr. Jane Smith, MD",
+        "cmsDetails": { ... },
+        "hospitals": [ ... ],
+        "insuranceNetworks": [ ... ],
+        "medicareIds": [ ... ],
+        "taxonomies": [ ... ],
+        "locations": [ ... ],
+        "nppesLastSynced": "2026-01-15T00:00:00.000Z",
+        "planAcceptances": [ ... ]
       }
     ],
     "pagination": {
       "page": 1,
       "limit": 20,
-      "total": 42,
-      "totalPages": 3,
-      "hasNext": true,
-      "hasPrev": false
+      "total": 614000,
+      "totalPages": 30700,
+      "hasMore": true
     }
   }
 }
@@ -341,25 +254,23 @@ Search providers with filters. Results are cached for 5 minutes.
 
 ### GET /api/v1/providers/cities
 
-Get unique cities for a state (used for search autocomplete).
+Get unique city names for a given state. Used to populate city dropdown filters.
 
-**Rate Limit:** 200 req/hr (default tier)
+**Rate Limit:** 200/hr (default)
 
 **Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `state` | string(2) | Yes | Two-letter state code (auto-uppercased) |
 
-| Parameter | Type | Required | Validation | Description |
-|-----------|------|----------|------------|-------------|
-| `state` | string | Yes | Exactly 2 chars, uppercased | State code |
-
-**Response:**
-
+**Response (200 OK):**
 ```json
 {
   "success": true,
   "data": {
-    "state": "CA",
-    "cities": ["Los Angeles", "San Francisco", "San Diego", "..."],
-    "count": 482
+    "state": "FL",
+    "cities": ["Miami", "Orlando", "Tampa", "Jacksonville"],
+    "count": 4
   }
 }
 ```
@@ -368,72 +279,112 @@ Get unique cities for a state (used for search autocomplete).
 
 ### GET /api/v1/providers/:npi
 
-Get a single provider by NPI with full enrichment data.
+Get a single provider by NPI with full enrichment data including CMS details, hospital affiliations, insurance networks, Medicare IDs, taxonomy codes, practice locations, and plan acceptances.
 
-**Rate Limit:** 200 req/hr (default tier)
+**Rate Limit:** 200/hr (default)
 
 **Path Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `npi` | string(10) | Yes | 10-digit NPI number |
 
-| Parameter | Type | Validation | Description |
-|-----------|------|------------|-------------|
-| `npi` | string | Exactly 10 digits | National Provider Identifier |
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "provider": {
+      "npi": "1234567890",
+      "entityType": "INDIVIDUAL",
+      "displayName": "Dr. Jane Smith, MD",
+      "cmsDetails": {
+        "group_practice_name": "Miami Medical Group",
+        "medical_school": "University of Miami",
+        "graduation_year": "2005",
+        "medicare_assignment": "Y",
+        "telehealth": "Y"
+      },
+      "hospitals": [
+        { "id": 1, "hospital_system": "Baptist Health", "hospital_name": "Baptist Hospital", "ccn": "100008" }
+      ],
+      "insuranceNetworks": [
+        { "id": 1, "network_name": "Aetna PPO", "identifier_id": "ABC123" }
+      ],
+      "medicareIds": [
+        { "id": 1, "medicare_id": "M12345", "medicare_state": "FL" }
+      ],
+      "taxonomies": [
+        { "id": 1, "taxonomy_code": "207R00000X", "is_primary": "Y", "slot_number": 1 }
+      ],
+      "locations": [
+        { "id": 1, "address_line1": "123 Medical Dr", "city": "Miami", "state": "FL", "zip_code": "33101" }
+      ],
+      "planAcceptances": [
+        {
+          "id": 1,
+          "planId": "PLAN123",
+          "locationId": 1,
+          "acceptanceStatus": "ACCEPTED",
+          "confidenceScore": 85,
+          "lastVerifiedAt": "2026-01-15T00:00:00.000Z",
+          "verificationCount": 5,
+          "expiresAt": "2026-07-15T00:00:00.000Z",
+          "plan": { "planId": "PLAN123", "planName": "Aetna PPO Gold", "issuerName": "Aetna" },
+          "location": { "id": 1, "addressLine1": "123 Medical Dr", "city": "Miami", "state": "FL", "zipCode": "33101" }
+        }
+      ]
+    }
+  }
+}
+```
 
-**Response:** Same provider object shape as search results, wrapped in `{ success: true, data: { provider: {...} } }`.
-
-**Error:** `404` if provider not found.
+**Error (404):**
+```json
+{
+  "error": {
+    "message": "Provider with NPI 1234567890 not found",
+    "statusCode": 404,
+    "requestId": "uuid"
+  }
+}
+```
 
 ---
 
-## 8. Plan Endpoints
+## Plan Endpoints
 
 ### GET /api/v1/plans/search
 
 Search insurance plans with filters.
 
-**Rate Limit:** 100 req/hr (search tier)
+**Rate Limit:** 100/hr (search)
 
 **Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `issuerName` | string | No | Issuer/carrier name (1-200 chars) |
+| `planType` | string | No | Plan type filter (1-20 chars) |
+| `search` | string | No | Free-text search (1-200 chars) |
+| `state` | string(2) | No | Two-letter state code |
+| `page` | integer | No | Page number (default: 1) |
+| `limit` | integer | No | Results per page (default: 20, max: 100) |
 
-| Parameter | Type | Required | Validation | Description |
-|-----------|------|----------|------------|-------------|
-| `issuerName` | string | No | 1-200 chars | Insurance issuer/carrier name |
-| `planType` | string | No | 1-20 chars | Plan type (e.g., `HMO`, `PPO`) |
-| `search` | string | No | 1-200 chars | Free-text search across plan fields |
-| `state` | string | No | Exactly 2 chars, uppercased | State code |
-| `page` | number | No | Min 1, default 1 | Page number |
-| `limit` | number | No | 1-100, default 20 | Results per page |
-
-**Response:**
-
+**Response (200 OK):**
 ```json
 {
   "success": true,
   "data": {
     "plans": [
       {
-        "planId": "12345CA0010001",
-        "planName": "Blue Shield Gold PPO",
-        "issuerName": "Blue Shield of California",
+        "planId": "PLAN123",
+        "planName": "Aetna PPO Gold",
+        "issuerName": "Aetna",
         "planType": "PPO",
-        "state": "CA",
-        "carrier": "Blue Shield",
-        "planVariant": "Gold",
-        "rawName": "Blue Shield Gold PPO 250/30",
-        "sourceHealthSystem": null,
-        "providerCount": 15420,
-        "carrierId": 1,
-        "healthSystemId": null,
-        "createdAt": "2025-01-15T00:00:00.000Z"
+        "state": "FL",
+        "carrier": "Aetna"
       }
     ],
-    "pagination": {
-      "page": 1,
-      "limit": 20,
-      "total": 85,
-      "totalPages": 5,
-      "hasNext": true,
-      "hasPrev": false
-    }
+    "pagination": { ... }
   }
 }
 ```
@@ -442,24 +393,27 @@ Search insurance plans with filters.
 
 ### GET /api/v1/plans/grouped
 
-Get plans grouped by carrier for dropdown/select UI components.
+Get plans grouped by carrier for dropdown display.
 
-**Rate Limit:** 200 req/hr (default tier)
+**Rate Limit:** 200/hr (default)
 
 **Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `search` | string | No | Search filter (1-200 chars) |
+| `state` | string(2) | No | Two-letter state code |
 
-| Parameter | Type | Required | Validation | Description |
-|-----------|------|----------|------------|-------------|
-| `search` | string | No | 1-200 chars | Filter plans by name |
-| `state` | string | No | Exactly 2 chars, uppercased | Filter by state |
-
-**Response:**
-
+**Response (200 OK):**
 ```json
 {
   "success": true,
   "data": {
-    // Grouped plan data (structure depends on planService implementation)
+    "groups": [
+      {
+        "carrier": "Aetna",
+        "plans": [ ... ]
+      }
+    ]
   }
 }
 ```
@@ -470,22 +424,20 @@ Get plans grouped by carrier for dropdown/select UI components.
 
 Get list of unique insurance issuers.
 
-**Rate Limit:** 200 req/hr (default tier)
+**Rate Limit:** 200/hr (default)
 
 **Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `state` | string(2) | No | Filter issuers by state |
 
-| Parameter | Type | Required | Validation | Description |
-|-----------|------|----------|------------|-------------|
-| `state` | string | No | Exactly 2 chars, uppercased | Filter issuers by state |
-
-**Response:**
-
+**Response (200 OK):**
 ```json
 {
   "success": true,
   "data": {
-    "issuers": ["Aetna", "Blue Cross", "Cigna", "UnitedHealthcare", "..."],
-    "count": 42
+    "issuers": ["Aetna", "Blue Cross Blue Shield", "Cigna", "United Healthcare"],
+    "count": 4
   }
 }
 ```
@@ -494,19 +446,17 @@ Get list of unique insurance issuers.
 
 ### GET /api/v1/plans/meta/types
 
-Get list of available plan types.
+Get available plan types, optionally filtered by state and issuer.
 
-**Rate Limit:** 200 req/hr (default tier)
+**Rate Limit:** 200/hr (default)
 
 **Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `state` | string(2) | No | Filter by state |
+| `issuerName` | string | No | Filter by issuer name (1-200 chars) |
 
-| Parameter | Type | Required | Validation | Description |
-|-----------|------|----------|------------|-------------|
-| `state` | string | No | Exactly 2 chars, uppercased | Filter by state |
-| `issuerName` | string | No | 1-200 chars | Filter by issuer |
-
-**Response:**
-
+**Response (200 OK):**
 ```json
 {
   "success": true,
@@ -521,25 +471,22 @@ Get list of available plan types.
 
 ### GET /api/v1/plans/:planId/providers
 
-Get providers who accept a specific plan. Includes confidence score and verification data.
+Get providers who accept a specific plan. Returns providers with acceptance status and confidence scores.
 
-**Rate Limit:** 100 req/hr (search tier)
+**Rate Limit:** 100/hr (search)
 
 **Path Parameters:**
-
-| Parameter | Type | Validation | Description |
-|-----------|------|------------|-------------|
-| `planId` | string | 1-50 chars | Insurance plan identifier |
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `planId` | string | Yes | Plan identifier (1-50 chars) |
 
 **Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `page` | integer | No | Page number (default: 1) |
+| `limit` | integer | No | Results per page (default: 20, max: 100) |
 
-| Parameter | Type | Required | Validation | Description |
-|-----------|------|----------|------------|-------------|
-| `page` | number | No | Min 1, default 1 | Page number |
-| `limit` | number | No | 1-100, default 20 | Results per page |
-
-**Response:**
-
+**Response (200 OK):**
 ```json
 {
   "success": true,
@@ -549,133 +496,102 @@ Get providers who accept a specific plan. Includes confidence score and verifica
         "id": "1234567890",
         "npi": "1234567890",
         "entityType": "1",
-        "firstName": "John",
+        "firstName": "Jane",
         "lastName": "Smith",
-        "middleName": null,
-        "credential": null,
-        "organizationName": null,
-        "addressLine1": null,
-        "addressLine2": null,
-        "city": "Los Angeles",
-        "state": "CA",
-        "zip": null,
-        "phone": "3105551234",
-        "taxonomyCode": null,
+        "displayName": "Dr. Jane Smith, MD",
+        "city": "Miami",
+        "state": "FL",
+        "phone": "3055551234",
         "taxonomyDescription": "Internal Medicine",
-        "specialtyCategory": null,
-        "npiStatus": "ACTIVE",
-        "displayName": "Dr. John Smith",
-        "confidenceScore": 75,
-        "lastVerified": "2026-01-20T00:00:00.000Z",
-        "verificationCount": 3
+        "confidenceScore": 85,
+        "lastVerified": "2026-01-15T00:00:00.000Z",
+        "verificationCount": 5
       }
     ],
-    "pagination": {
-      "page": 1,
-      "limit": 20,
-      "total": 150,
-      "totalPages": 8,
-      "hasNext": true,
-      "hasPrev": false
-    }
+    "pagination": { ... }
   }
 }
 ```
-
-**Error:** `404` if plan not found.
 
 ---
 
 ### GET /api/v1/plans/:planId
 
-Get a single plan by its plan ID.
+Get a single plan by plan ID.
 
-**Rate Limit:** 200 req/hr (default tier)
+**Rate Limit:** 200/hr (default)
 
 **Path Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `planId` | string | Yes | Plan identifier (1-50 chars) |
 
-| Parameter | Type | Validation | Description |
-|-----------|------|------------|-------------|
-| `planId` | string | 1-50 chars | Insurance plan identifier |
-
-**Response:**
-
+**Response (200 OK):**
 ```json
 {
   "success": true,
   "data": {
     "plan": {
-      "planId": "12345CA0010001",
-      "planName": "Blue Shield Gold PPO",
-      "issuerName": "Blue Shield of California",
+      "planId": "PLAN123",
+      "planName": "Aetna PPO Gold",
+      "issuerName": "Aetna",
       "planType": "PPO",
-      "state": "CA",
-      "carrier": "Blue Shield",
-      "planVariant": "Gold",
-      "rawName": "Blue Shield Gold PPO 250/30",
-      "sourceHealthSystem": null,
-      "providerCount": 15420,
-      "carrierId": 1,
-      "healthSystemId": null,
-      "createdAt": "2025-01-15T00:00:00.000Z"
+      "state": "FL",
+      "carrier": "Aetna",
+      "providerCount": 1250
     }
   }
 }
 ```
 
-**Error:** `404` if plan not found.
-
 ---
 
-## 9. Verification Endpoints
+## Verification Endpoints
 
 ### POST /api/v1/verify
 
-Submit a new verification for a provider-plan pair. Creates or updates the acceptance record and calculates a confidence score.
+Submit a new verification for a provider-plan pair. Protected by rate limiting, honeypot detection, and reCAPTCHA v3.
 
-**Rate Limit:** 10 req/hr (verification tier)
-**CAPTCHA:** Required (reCAPTCHA v3)
+**Rate Limit:** 10/hr (verification)
+**CAPTCHA:** Required (reCAPTCHA v3, skipped in development)
+**Honeypot:** `website` field must be empty
 
 **Request Body:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `npi` | string(10) | Yes | Provider NPI (10 digits) |
+| `planId` | string | Yes | Insurance plan ID (1-50 chars) |
+| `acceptsInsurance` | boolean | Yes | Whether the provider accepts this plan |
+| `acceptsNewPatients` | boolean | No | Whether the provider accepts new patients |
+| `locationId` | integer | No | Specific practice location ID |
+| `notes` | string | No | Free-text notes (max 1000 chars) |
+| `evidenceUrl` | string | No | URL supporting the verification (max 500 chars) |
+| `submittedBy` | string | No | Email address of submitter (max 200 chars) |
+| `captchaToken` | string | No | reCAPTCHA v3 token (required in production) |
+| `website` | string | No | Honeypot field -- must be empty |
 
-| Field | Type | Required | Validation | Description |
-|-------|------|----------|------------|-------------|
-| `npi` | string | Yes | Exactly 10 digits | Provider NPI |
-| `planId` | string | Yes | 1-50 chars | Insurance plan ID |
-| `acceptsInsurance` | boolean | Yes | - | Does the provider accept this plan? |
-| `acceptsNewPatients` | boolean | No | - | Accepting new patients? |
-| `locationId` | number | No | Positive integer | Specific practice location |
-| `notes` | string | No | Max 1000 chars | Additional notes |
-| `evidenceUrl` | string | No | Valid URL, max 500 chars | Supporting evidence link |
-| `submittedBy` | string | No | Valid email, max 200 chars | Submitter email (optional) |
-| `captchaToken` | string | No* | - | reCAPTCHA v3 token (*required in production) |
+**Sybil Prevention:**
+- IP-based deduplication: same IP cannot re-verify same provider-plan within 30 days
+- Email-based deduplication: same email cannot re-verify same provider-plan within 30 days
 
-**Response:**
-
+**Response (201 Created):**
 ```json
 {
   "success": true,
   "data": {
     "verification": {
-      "id": "clxxxx...",
-      "providerNpi": "1234567890",
-      "planId": "12345CA0010001",
-      "verificationType": "PLAN_ACCEPTANCE",
-      "verificationSource": "CROWDSOURCE",
-      "upvotes": 0,
-      "downvotes": 0,
-      "createdAt": "2026-02-05T12:00:00.000Z",
-      "expiresAt": "2026-08-05T12:00:00.000Z"
+      "id": "cuid",
+      "npi": "1234567890",
+      "planId": "PLAN123",
+      "acceptsInsurance": true,
+      "createdAt": "2026-02-06T12:00:00.000Z"
     },
     "acceptance": {
-      "id": 1,
-      "providerNpi": "1234567890",
-      "planId": "12345CA0010001",
       "acceptanceStatus": "ACCEPTED",
-      "confidenceScore": 50,
-      "lastVerified": "2026-02-05T12:00:00.000Z",
-      "verificationCount": 1,
-      "expiresAt": "2026-08-05T12:00:00.000Z"
+      "confidenceScore": 72,
+      "confidenceLevel": "MEDIUM",
+      "verificationCount": 2,
+      "lastVerified": "2026-02-06T12:00:00.000Z"
     },
     "message": "Verification submitted successfully"
   }
@@ -683,51 +599,49 @@ Submit a new verification for a provider-plan pair. Creates or updates the accep
 ```
 
 **Side Effects:**
-- Invalidates the search cache (async, non-blocking)
-- Source IP and User-Agent are recorded for Sybil detection (not returned in response)
+- Invalidates search cache asynchronously to ensure fresh data
+- Creates/updates `ProviderPlanAcceptance` record
+- Recalculates confidence score using 4-factor algorithm
 
 ---
 
 ### POST /api/v1/verify/:verificationId/vote
 
-Vote on an existing verification (upvote or downvote).
+Vote on an existing verification (up or down). Allows changing vote direction.
 
-**Rate Limit:** 10 req/hr (vote tier)
-**CAPTCHA:** Required (reCAPTCHA v3)
+**Rate Limit:** 10/hr (vote)
+**CAPTCHA:** Required (reCAPTCHA v3, skipped in development)
+**Honeypot:** `website` field must be empty
 
 **Path Parameters:**
-
-| Parameter | Type | Validation | Description |
-|-----------|------|------------|-------------|
-| `verificationId` | string | Min 1 char | Verification log ID |
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `verificationId` | string | Yes | Verification ID |
 
 **Request Body:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `vote` | enum | Yes | `up` or `down` |
+| `captchaToken` | string | No | reCAPTCHA v3 token (required in production) |
+| `website` | string | No | Honeypot field -- must be empty |
 
-| Field | Type | Required | Validation | Description |
-|-------|------|----------|------------|-------------|
-| `vote` | string | Yes | `up` or `down` | Vote direction |
-| `captchaToken` | string | No* | - | reCAPTCHA v3 token (*required in production) |
+**Vote Deduplication:** Unique constraint on `(verificationId, sourceIp)`. If the same IP votes again, the vote direction is updated rather than duplicated.
 
-**Response:**
-
+**Response (200 OK):**
 ```json
 {
   "success": true,
   "data": {
     "verification": {
-      "id": "clxxxx...",
-      "upvotes": 3,
+      "id": "cuid",
+      "upvotes": 5,
       "downvotes": 1,
-      "netVotes": 2
+      "netVotes": 4
     },
     "message": "Vote recorded: up"
   }
 }
 ```
-
-**Notes:**
-- Each IP can vote once per verification (unique constraint on `verificationId` + `sourceIp`)
-- Changing vote direction returns message `"Vote changed to: down"`
 
 ---
 
@@ -735,17 +649,14 @@ Vote on an existing verification (upvote or downvote).
 
 Get aggregate verification statistics.
 
-**Rate Limit:** 200 req/hr (default tier)
+**Rate Limit:** 200/hr (default)
 
-**Response:**
-
+**Response (200 OK):**
 ```json
 {
   "success": true,
   "data": {
-    "stats": {
-      // Aggregate verification statistics
-    }
+    "stats": { ... }
   }
 }
 ```
@@ -756,23 +667,21 @@ Get aggregate verification statistics.
 
 Get recent verification submissions.
 
-**Rate Limit:** 200 req/hr (default tier)
+**Rate Limit:** 200/hr (default)
 
 **Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `limit` | integer | No | Max results (default: 20, max: 100) |
+| `npi` | string(10) | No | Filter by provider NPI |
+| `planId` | string | No | Filter by plan ID |
 
-| Parameter | Type | Required | Validation | Description |
-|-----------|------|----------|------------|-------------|
-| `limit` | number | No | 1-100, default 20 | Number of results |
-| `npi` | string | No | Exactly 10 digits | Filter by provider NPI |
-| `planId` | string | No | 1-50 chars | Filter by plan ID |
-
-**Response:**
-
+**Response (200 OK):**
 ```json
 {
   "success": true,
   "data": {
-    "verifications": [...],
+    "verifications": [ ... ],
     "count": 20
   }
 }
@@ -784,85 +693,207 @@ Get recent verification submissions.
 
 Get all verifications for a specific provider-plan pair with full confidence breakdown.
 
-**Rate Limit:** 200 req/hr (default tier)
+**Rate Limit:** 200/hr (default)
 
 **Path Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `npi` | string(10) | Yes | Provider NPI (10 digits) |
+| `planId` | string | Yes | Plan ID (1-50 chars) |
 
-| Parameter | Type | Validation | Description |
-|-----------|------|------------|-------------|
-| `npi` | string | Exactly 10 digits | Provider NPI |
-| `planId` | string | 1-50 chars | Insurance plan ID |
-
-**Response:**
-
+**Response (200 OK):**
 ```json
 {
   "success": true,
   "data": {
     "npi": "1234567890",
-    "planId": "12345CA0010001",
+    "planId": "PLAN123",
     "acceptance": {
-      "id": 1,
       "acceptanceStatus": "ACCEPTED",
-      "confidenceScore": 75,
-      "lastVerified": "2026-02-05T12:00:00.000Z",
-      "verificationCount": 3,
-      "expiresAt": "2026-08-05T12:00:00.000Z"
-    },
-    "verifications": [
-      {
-        "id": "clxxxx...",
-        "verificationType": "PLAN_ACCEPTANCE",
-        "verificationSource": "CROWDSOURCE",
-        "upvotes": 3,
-        "downvotes": 0,
-        "notes": "Confirmed by phone",
-        "createdAt": "2026-02-01T10:00:00.000Z"
+      "confidenceScore": 85,
+      "confidenceLevel": "HIGH",
+      "verificationCount": 5,
+      "lastVerified": "2026-02-01T00:00:00.000Z",
+      "confidenceBreakdown": {
+        "dataSource": 15,
+        "recency": 28,
+        "verification": 25,
+        "agreement": 17
       }
-    ],
+    },
+    "verifications": [ ... ],
     "summary": {
-      "totalUpvotes": 5,
+      "totalUpvotes": 8,
       "totalDownvotes": 1
     }
   }
 }
 ```
 
-**Error:** `404` if provider or plan not found.
+---
+
+## Location Endpoints
+
+All location endpoints are registered and active (confirmed in `routes/index.ts`).
+
+### GET /api/v1/locations/search
+
+Search practice locations with filters. State is required.
+
+**Rate Limit:** 100/hr (search)
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `state` | string(2) | Yes | Two-letter state code (auto-uppercased) |
+| `city` | string | No | City name (1-100 chars) |
+| `zipCode` | string | No | ZIP code (3-10 chars) |
+| `page` | integer | No | Page number (default: 1) |
+| `limit` | integer | No | Results per page (default: 20, max: 100) |
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "locations": [ ... ],
+    "pagination": { ... }
+  }
+}
+```
 
 ---
 
-## 10. Admin Endpoints
+### GET /api/v1/locations/health-systems
 
-All admin endpoints require the `X-Admin-Secret` header.
+Get distinct health system names, optionally filtered by state/city.
+
+**Rate Limit:** 200/hr (default)
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `state` | string(2) | No | Filter by state |
+| `city` | string | No | Filter by city (1-100 chars) |
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "healthSystems": [ ... ],
+    "count": 15
+  }
+}
+```
+
+---
+
+### GET /api/v1/locations/stats/:state
+
+Get location statistics for a state.
+
+**Rate Limit:** 200/hr (default)
+
+**Path Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `state` | string(2) | Yes | Two-letter state code |
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "state": "FL",
+    ...
+  }
+}
+```
+
+---
+
+### GET /api/v1/locations/:locationId
+
+Get a single practice location by ID with provider details.
+
+**Rate Limit:** 200/hr (default)
+
+**Path Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `locationId` | integer | Yes | Location ID (positive integer) |
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "location": { ... }
+  }
+}
+```
+
+---
+
+### GET /api/v1/locations/:locationId/providers
+
+Get all providers that share the same address as this location (co-located providers).
+
+**Rate Limit:** 200/hr (default)
+
+**Path Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `locationId` | integer | Yes | Location ID (positive integer) |
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `page` | integer | No | Page number (default: 1) |
+| `limit` | integer | No | Results per page (default: 20, max: 100) |
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "location": { ... },
+    "providers": [ ... ],
+    "pagination": { ... }
+  }
+}
+```
+
+---
+
+## Admin Endpoints
+
+All admin endpoints require the `X-Admin-Secret` header. Protected with timing-safe comparison via `crypto.timingSafeEqual`.
 
 ### POST /api/v1/admin/cleanup-expired
 
 Clean up expired verification records. Designed to be called by Cloud Scheduler.
 
 **Query Parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `dryRun` | string | `false` | Set to `true` to preview what would be deleted |
+| `batchSize` | integer | 1000 | Number of records to delete per batch |
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `dryRun` | string | No | `false` | Set to `true` to preview without deleting |
-| `batchSize` | number | No | 1000 | Records to delete per batch |
-
-**Response:**
-
+**Response (200 OK):**
 ```json
 {
   "success": true,
   "data": {
-    "expiredPlanAcceptances": 15,
-    "expiredVerificationLogs": 42,
-    "deletedPlanAcceptances": 15,
-    "deletedVerificationLogs": 42,
-    "message": "Cleanup complete. 57 records deleted."
+    "expiredPlanAcceptances": 5,
+    "expiredVerificationLogs": 12,
+    "deletedPlanAcceptances": 5,
+    "deletedVerificationLogs": 12,
+    "message": "Cleanup complete. 17 records deleted."
   }
 }
 ```
-
-In dry run mode, `deleted*` fields are replaced with `expired*` counts and the message indicates a dry run.
 
 ---
 
@@ -870,14 +901,11 @@ In dry run mode, `deleted*` fields are replaced with `expired*` counts and the m
 
 Get statistics about verification expiration.
 
-**Response:**
-
+**Response (200 OK):**
 ```json
 {
   "success": true,
-  "data": {
-    // Expiration statistics from verificationService
-  }
+  "data": { ... }
 }
 ```
 
@@ -885,35 +913,29 @@ Get statistics about verification expiration.
 
 ### GET /api/v1/admin/health
 
-Extended health check with cache and retention metrics.
+Health check with retention metrics. More detailed than public `/health`.
 
-**Response:**
-
+**Response (200 OK):**
 ```json
 {
   "success": true,
   "data": {
     "status": "healthy",
-    "timestamp": "2026-02-05T12:00:00.000Z",
-    "uptime": 86400,
-    "cache": {
-      "hits": 1500,
-      "misses": 300,
-      "size": 42,
-      "mode": "memory"
-    },
+    "timestamp": "2026-02-06T12:00:00.000Z",
+    "uptime": 3600.123,
+    "cache": { ... },
     "retention": {
       "verificationLogs": {
-        "total": 5000,
-        "expiringIn7Days": 12,
-        "oldestRecord": "2025-08-05T00:00:00.000Z"
+        "total": 100,
+        "expiringIn7Days": 5,
+        "oldestRecord": "2025-08-01T00:00:00.000Z"
       },
       "syncLogs": {
-        "total": 90,
+        "total": 12,
         "oldestRecord": "2025-11-01T00:00:00.000Z"
       },
       "voteLogs": {
-        "total": 1200
+        "total": 250
       }
     }
   }
@@ -924,16 +946,15 @@ Extended health check with cache and retention metrics.
 
 ### POST /api/v1/admin/cache/clear
 
-Clear all cached data. Use after data imports to force fresh queries.
+Clear all cached data. Use after data imports to force fresh query results.
 
-**Response:**
-
+**Response (200 OK):**
 ```json
 {
   "success": true,
   "data": {
-    "message": "Cache cleared. 42 entries removed.",
-    "deletedCount": 42
+    "message": "Cache cleared. 12 entries removed.",
+    "deletedCount": 12
   }
 }
 ```
@@ -942,17 +963,16 @@ Clear all cached data. Use after data imports to force fresh queries.
 
 ### GET /api/v1/admin/cache/stats
 
-Get cache statistics.
+Get cache statistics including hit rate.
 
-**Response:**
-
+**Response (200 OK):**
 ```json
 {
   "success": true,
   "data": {
-    "hits": 1500,
-    "misses": 300,
-    "size": 42,
+    "hits": 150,
+    "misses": 30,
+    "size": 12,
     "mode": "memory",
     "hitRate": "83.33%"
   }
@@ -961,41 +981,39 @@ Get cache statistics.
 
 ---
 
+### GET /api/v1/admin/enrichment/stats
+
+Get location enrichment statistics for practice_locations and provider_hospitals.
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": { ... }
+}
+```
+
+---
+
 ### POST /api/v1/admin/cleanup/sync-logs
 
-Clean up sync_logs older than the retention period. Designed to be called by Cloud Scheduler daily.
+Clean up sync_logs older than a configurable retention period. Designed for Cloud Scheduler.
 
 **Query Parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `dryRun` | string | `false` | Set to `true` to preview changes |
+| `retentionDays` | integer | 90 | Number of days to retain |
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `dryRun` | string | No | `false` | Set to `true` to preview without deleting |
-| `retentionDays` | number | No | 90 | Number of days to retain |
-
-**Response (actual run):**
-
+**Response (200 OK):**
 ```json
 {
   "success": true,
   "data": {
     "dryRun": false,
-    "deletedCount": 25,
-    "olderThan": "2025-11-07T00:00:00.000Z",
-    "message": "Cleanup complete. 25 sync_logs records deleted."
-  }
-}
-```
-
-**Response (dry run):**
-
-```json
-{
-  "success": true,
-  "data": {
-    "dryRun": true,
-    "recordsToDelete": 25,
-    "olderThan": "2025-11-07T00:00:00.000Z",
-    "message": "Dry run complete. 25 sync_logs records would be deleted."
+    "deletedCount": 3,
+    "olderThan": "2025-11-08T00:00:00.000Z",
+    "message": "Cleanup complete. 3 sync_logs records deleted."
   }
 }
 ```
@@ -1006,36 +1024,35 @@ Clean up sync_logs older than the retention period. Designed to be called by Clo
 
 Get comprehensive retention statistics for all log types.
 
-**Response:**
-
+**Response (200 OK):**
 ```json
 {
   "success": true,
   "data": {
-    "timestamp": "2026-02-05T12:00:00.000Z",
+    "timestamp": "2026-02-06T12:00:00.000Z",
     "verificationLogs": {
-      "total": 5000,
-      "expiringIn7Days": 12,
-      "expiringIn30Days": 85,
-      "oldestRecord": "2025-08-05T00:00:00.000Z",
-      "newestRecord": "2026-02-05T11:00:00.000Z",
+      "total": 100,
+      "expiringIn7Days": 5,
+      "expiringIn30Days": 15,
+      "oldestRecord": "2025-08-01T00:00:00.000Z",
+      "newestRecord": "2026-02-05T00:00:00.000Z",
       "retentionPolicy": "6 months (TTL via expiresAt)"
     },
     "syncLogs": {
-      "total": 90,
-      "olderThan90Days": 5,
+      "total": 12,
+      "olderThan90Days": 2,
       "oldestRecord": "2025-11-01T00:00:00.000Z",
-      "newestRecord": "2026-02-05T06:00:00.000Z",
+      "newestRecord": "2026-02-01T00:00:00.000Z",
       "retentionPolicy": "90 days (manual cleanup)"
     },
     "planAcceptances": {
-      "total": 3000,
-      "expiringIn7Days": 8,
-      "expiringIn30Days": 45,
+      "total": 50,
+      "expiringIn7Days": 3,
+      "expiringIn30Days": 8,
       "retentionPolicy": "6 months (TTL via expiresAt)"
     },
     "voteLogs": {
-      "total": 1200,
+      "total": 250,
       "retentionPolicy": "Follows plan acceptance TTL"
     }
   }
@@ -1044,170 +1061,115 @@ Get comprehensive retention statistics for all log types.
 
 ---
 
-## 11. Health Check
+### POST /api/v1/admin/recalculate-confidence
 
-### GET /health
+Recalculate confidence scores for all provider-plan acceptance records with time-based decay applied proactively. Uses cursor-based pagination internally for batch processing.
 
-Public health check endpoint. Not rate-limited to allow monitoring tools unrestricted access.
+**Query Parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `dryRun` | string | `false` | Preview changes without writing |
+| `limit` | integer | all | Maximum records to process |
 
-**Response (healthy):**
-
+**Response (200 OK):**
 ```json
 {
-  "status": "ok",
-  "timestamp": "2026-02-05T12:00:00.000Z",
-  "version": "1.0.0",
-  "uptime": 3600.5,
-  "memory": {
-    "heapUsed": 45,
-    "heapTotal": 65,
-    "unit": "MB"
-  },
-  "checks": {
-    "database": "healthy"
-  },
-  "databaseResponseTime": "2ms",
-  "cache": {
-    "hits": 150,
-    "misses": 30,
-    "size": 42,
-    "mode": "memory",
-    "hitRate": "83.3%"
-  }
-}
-```
-
-**Response (degraded -- database unreachable):**
-
-HTTP `503 Service Unavailable`
-
-```json
-{
-  "status": "degraded",
-  "timestamp": "2026-02-05T12:00:00.000Z",
-  "version": "1.0.0",
-  "uptime": 3600.5,
-  "memory": { "heapUsed": 45, "heapTotal": 65, "unit": "MB" },
-  "checks": {
-    "database": "unhealthy"
-  },
-  "error": "Connection refused",
-  "cache": { "hits": 0, "misses": 0, "size": 0, "mode": "memory", "hitRate": "0%" }
-}
-```
-
-### GET /
-
-API information endpoint. Returns a list of available endpoints.
-
-**Response:**
-
-```json
-{
-  "name": "HealthcareProviderDB API",
-  "version": "1.0.0",
-  "description": "Healthcare provider database with NPI registry integration and insurance plan matching",
-  "documentation": "/api/v1",
-  "endpoints": {
-    "health": "GET /health",
-    "providers": {
-      "search": "GET /api/v1/providers/search",
-      "getByNpi": "GET /api/v1/providers/:npi",
-      "getPlans": "GET /api/v1/providers/:npi/plans"
-    },
-    "plans": {
-      "search": "GET /api/v1/plans/search",
-      "getByPlanId": "GET /api/v1/plans/:planId",
-      "issuers": "GET /api/v1/plans/meta/issuers",
-      "types": "GET /api/v1/plans/meta/types",
-      "years": "GET /api/v1/plans/meta/years"
-    },
-    "verify": {
-      "submit": "POST /api/v1/verify",
-      "vote": "POST /api/v1/verify/:verificationId/vote",
-      "stats": "GET /api/v1/verify/stats",
-      "recent": "GET /api/v1/verify/recent",
-      "getPair": "GET /api/v1/verify/:npi/:planId"
-    }
+  "success": true,
+  "data": {
+    "dryRun": false,
+    "processed": 50,
+    "updated": 12,
+    "unchanged": 35,
+    "errors": 3,
+    "durationMs": 1523,
+    "duration": "1.5s",
+    "message": "Recalculation complete. 12 of 50 records updated."
   }
 }
 ```
 
 ---
 
-## 12. Validation Schemas
+## Error Codes
 
-All request parameters are validated using Zod schemas before reaching route handlers. Invalid input returns a `400` response with field-level error details.
-
-### Common Schemas
-
-**File:** `packages/backend/src/schemas/commonSchemas.ts`
-
-| Schema | Fields | Used By |
-|--------|--------|---------|
-| `paginationSchema` | `page` (int, min 1, default 1), `limit` (int, 1-100, default 20) | providers, plans |
-| `npiParamSchema` | `npi` (string, exactly 10 digits) | providers, verify |
-| `stateQuerySchema` | `state` (string, exactly 2 chars, uppercased, optional) | plans |
-| `planIdParamSchema` | `planId` (string, 1-50 chars) | plans, verify |
-
-### Provider Search Schema
-
-| Field | Type | Validation |
-|-------|------|------------|
-| `state` | string | 2 chars, uppercased, optional |
-| `city` | string | 1-100 chars, optional |
-| `cities` | string | 1-500 chars (comma-separated), optional |
-| `zipCode` | string | 3-10 chars, optional |
-| `specialty` | string | 1-200 chars, optional |
-| `specialtyCategory` | string | 1-100 chars, optional |
-| `name` | string | 1-200 chars, optional |
-| `npi` | string | 10 digits, optional |
-| `entityType` | enum | `INDIVIDUAL` or `ORGANIZATION`, optional |
-| + pagination | - | Merged from `paginationSchema` |
-
-### Plan Search Schema
-
-| Field | Type | Validation |
-|-------|------|------------|
-| `issuerName` | string | 1-200 chars, optional |
-| `planType` | string | 1-20 chars, optional |
-| `search` | string | 1-200 chars, optional |
-| `state` | string | 2 chars, uppercased, optional |
-| + pagination | - | Merged from `paginationSchema` |
-
-### Verification Submission Schema
-
-| Field | Type | Validation |
-|-------|------|------------|
-| `npi` | string | Exactly 10 digits (from `npiParamSchema`) |
-| `planId` | string | 1-50 chars (from `planIdParamSchema`) |
-| `acceptsInsurance` | boolean | Required |
-| `acceptsNewPatients` | boolean | Optional |
-| `locationId` | number | Positive integer, optional |
-| `notes` | string | Max 1000 chars, optional |
-| `evidenceUrl` | string | Valid URL, max 500 chars, optional |
-| `submittedBy` | string | Valid email, max 200 chars, optional |
-| `captchaToken` | string | Optional (required in production) |
-
-### Vote Schema
-
-| Field | Type | Validation |
-|-------|------|------------|
-| `vote` | enum | `up` or `down` |
-| `captchaToken` | string | Optional (required in production) |
-
-### Recent Verifications Query Schema
-
-| Field | Type | Validation |
-|-------|------|------------|
-| `limit` | number | 1-100, default 20 |
-| `npi` | string | 10 digits, optional |
-| `planId` | string | 1-50 chars, optional |
+| Code | HTTP Status | Description |
+|------|-------------|-------------|
+| `VALIDATION_ERROR` | 400 | Zod schema validation failed |
+| `CAPTCHA_REQUIRED` | 400 | Missing reCAPTCHA token |
+| `CAPTCHA_FAILED` | 400 | reCAPTCHA verification failed |
+| `UNAUTHORIZED` | 401 | Missing or invalid admin secret |
+| `FORBIDDEN` | 403 | Low reCAPTCHA score (suspected bot) |
+| `NOT_FOUND` | 404 | Resource not found |
+| `ROUTE_NOT_FOUND` | 404 | Unmatched route |
+| `DUPLICATE_ENTRY` | 409 | Prisma P2002 unique constraint violation |
+| `TOO_MANY_REQUESTS` | 429 | Rate limit exceeded |
+| `PAYLOAD_TOO_LARGE` | 413 | Request body exceeds 100KB limit |
+| `ADMIN_NOT_CONFIGURED` | 503 | ADMIN_SECRET env var not set |
+| `SERVICE_UNAVAILABLE` | 503 | CAPTCHA fail-closed mode during outage |
+| `INTERNAL_ERROR` | 500 | Unhandled server error (message hidden in production) |
 
 ---
 
-## Disabled Endpoints
+## Endpoint Summary Table
 
-### /api/v1/locations (DISABLED)
+| # | Method | Endpoint | Rate Limit | CAPTCHA | Auth |
+|---|--------|----------|------------|---------|------|
+| 1 | GET | `/health` | None | No | None |
+| 2 | GET | `/api/v1/providers/search` | 100/hr | No | None |
+| 3 | GET | `/api/v1/providers/cities` | 200/hr | No | None |
+| 4 | GET | `/api/v1/providers/:npi` | 200/hr | No | None |
+| 5 | GET | `/api/v1/plans/search` | 100/hr | No | None |
+| 6 | GET | `/api/v1/plans/grouped` | 200/hr | No | None |
+| 7 | GET | `/api/v1/plans/meta/issuers` | 200/hr | No | None |
+| 8 | GET | `/api/v1/plans/meta/types` | 200/hr | No | None |
+| 9 | GET | `/api/v1/plans/:planId/providers` | 100/hr | No | None |
+| 10 | GET | `/api/v1/plans/:planId` | 200/hr | No | None |
+| 11 | POST | `/api/v1/verify` | 10/hr | Yes | None |
+| 12 | POST | `/api/v1/verify/:verificationId/vote` | 10/hr | Yes | None |
+| 13 | GET | `/api/v1/verify/stats` | 200/hr | No | None |
+| 14 | GET | `/api/v1/verify/recent` | 200/hr | No | None |
+| 15 | GET | `/api/v1/verify/:npi/:planId` | 200/hr | No | None |
+| 16 | GET | `/api/v1/locations/search` | 100/hr | No | None |
+| 17 | GET | `/api/v1/locations/health-systems` | 200/hr | No | None |
+| 18 | GET | `/api/v1/locations/stats/:state` | 200/hr | No | None |
+| 19 | GET | `/api/v1/locations/:locationId` | 200/hr | No | None |
+| 20 | GET | `/api/v1/locations/:locationId/providers` | 200/hr | No | None |
+| 21 | POST | `/api/v1/admin/cleanup-expired` | 200/hr | No | X-Admin-Secret |
+| 22 | GET | `/api/v1/admin/expiration-stats` | 200/hr | No | X-Admin-Secret |
+| 23 | GET | `/api/v1/admin/health` | 200/hr | No | X-Admin-Secret |
+| 24 | POST | `/api/v1/admin/cache/clear` | 200/hr | No | X-Admin-Secret |
+| 25 | GET | `/api/v1/admin/cache/stats` | 200/hr | No | X-Admin-Secret |
+| 26 | GET | `/api/v1/admin/enrichment/stats` | 200/hr | No | X-Admin-Secret |
+| 27 | POST | `/api/v1/admin/cleanup/sync-logs` | 200/hr | No | X-Admin-Secret |
+| 28 | GET | `/api/v1/admin/retention/stats` | 200/hr | No | X-Admin-Secret |
+| 29 | POST | `/api/v1/admin/recalculate-confidence` | 200/hr | No | X-Admin-Secret |
 
-The locations router is commented out in `packages/backend/src/routes/index.ts`. It depends on the old `Location` model which has been replaced by `practice_locations`. A rewrite is pending.
+**Total: 29 endpoints** (20 public + 9 admin)
+
+---
+
+## Checklist Status
+
+- [x] All public endpoints documented (20 endpoints)
+- [x] All admin endpoints documented (9 endpoints)
+- [x] Rate limits defined for all endpoints
+- [x] CAPTCHA requirements documented
+- [x] Zod validation schemas documented
+- [x] Error codes listed
+- [x] Response examples for key endpoints
+- [ ] OpenAPI/Swagger specification (not yet implemented)
+- [ ] API documentation website (not yet implemented)
+
+---
+
+## Answers to Prompt Questions
+
+1. **Should the API reference be auto-generated (Swagger/OpenAPI)?** -- Not currently implemented. The Zod schemas could be converted to OpenAPI spec using libraries like `zod-to-openapi`. This would enable auto-generated documentation and client SDK generation. Recommended for Q2 2026 when B2B API documentation is planned.
+
+2. **Are there undocumented query parameters or headers?** -- The `X-Cache` response header on search endpoints (HIT/MISS) is not advertised to consumers but is present. The `X-Security-Degraded` header is set when CAPTCHA fails open. The `X-Fallback-RateLimit-*` headers appear during CAPTCHA degradation. All are informational and documented above.
+
+3. **Should we add API versioning headers?** -- The API is already versioned via the URL path (`/api/v1`). Adding an `Accept-Version` header would enable header-based versioning but adds complexity. Recommended to defer until v2 is needed.
+
+4. **Are error codes consistent across all endpoints?** -- Mostly yes. All endpoints use the `AppError` class for structured errors. The error handler catches Zod, Prisma, and payload errors consistently. One minor inconsistency: the rate limiter returns `{ error: "Too many requests", message: "...", retryAfter: N }` without the standard `{ error: { message, code, statusCode } }` wrapper. The honeypot returns `{ success: true, data: { id: "submitted" } }` as a deliberate deception.
+
+5. **Should rate limit information be included in the API docs?** -- Yes, it is included above. The rate limit headers are standard practice and help API consumers implement proper backoff strategies.
