@@ -193,6 +193,16 @@ jobs:
           secrets: |
             ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest
 
+      - name: Smoke test frontend
+        run: |
+          sleep 10
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ steps.deploy.outputs.url }}")
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "Frontend smoke test failed with status $HTTP_STATUS"
+            exit 1
+          fi
+          echo "Frontend smoke test passed (HTTP $HTTP_STATUS)"
+
       - name: Show Frontend URL
         run: echo "Frontend deployed to ${{ steps.deploy.outputs.url }}"
 
