@@ -112,7 +112,7 @@ jobs:
       - name: Smoke test backend
         run: |
           sleep 10
-          HEALTH=$(curl -s -o /dev/null -w "%{http_code}" "${{ steps.deploy.outputs.url }}/api/v1/health")
+          HEALTH=$(curl -s -o /dev/null -w "%{http_code}" "${{ steps.deploy.outputs.url }}/health")
           if [ "$HEALTH" != "200" ]; then
             echo "Health check failed with status $HEALTH"
             exit 1
