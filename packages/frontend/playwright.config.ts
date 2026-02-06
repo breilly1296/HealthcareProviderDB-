@@ -55,11 +55,23 @@ export default defineConfig({
     },
   ],
 
-  // Run your local dev server before starting the tests
-  webServer: {
-    command: process.env.CI ? 'npm run start' : 'npm run dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120000, // 2 minutes to start server
-  },
+  // Run servers before starting the tests
+  webServer: [
+    // Mock API server (port 3001) — provides canned responses so tests
+    // don't require the real backend.  Always started; in local dev you can
+    // stop it and point NEXT_PUBLIC_API_URL at a real backend instead.
+    {
+      command: 'node e2e/mock-api.mjs',
+      url: 'http://localhost:3001/health',
+      reuseExistingServer: !process.env.CI,
+      timeout: 10000,
+    },
+    // Frontend Next.js server (port 3000)
+    {
+      command: process.env.CI ? 'npm run start' : 'npm run dev',
+      url: 'http://localhost:3000',
+      reuseExistingServer: !process.env.CI,
+      timeout: 120000,
+    },
+  ],
 });

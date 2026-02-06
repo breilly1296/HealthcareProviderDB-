@@ -39,8 +39,7 @@ jobs:
         run: npm run build
         working-directory: packages/frontend
         env:
-          # Add any required env vars for build
-          NEXT_PUBLIC_API_URL: http://localhost:3001
+          NEXT_PUBLIC_API_URL: http://localhost:3001/api/v1
 
       - name: Run Playwright tests
         run: npm run test:e2e
