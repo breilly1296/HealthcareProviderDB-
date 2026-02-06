@@ -87,6 +87,7 @@ export function errorHandler(
   // Handle AppError
   if (err instanceof AppError) {
     res.status(err.statusCode).json({
+      success: false,
       error: {
         message: err.message,
         code: err.code,
@@ -101,6 +102,7 @@ export function errorHandler(
   if (err.name === 'ZodError') {
     const zodError = err as unknown as { errors: Array<{ path: string[]; message: string }> };
     res.status(400).json({
+      success: false,
       error: {
         message: 'Validation error',
         code: 'VALIDATION_ERROR',
@@ -134,6 +136,7 @@ export function errorHandler(
 
     if (prismaError.code === 'P2002') {
       res.status(409).json({
+        success: false,
         error: {
           message: 'A record with this value already exists',
           code: 'DUPLICATE_ENTRY',
@@ -146,6 +149,7 @@ export function errorHandler(
 
     if (prismaError.code === 'P2025') {
       res.status(404).json({
+        success: false,
         error: {
           message: 'Record not found',
           code: 'NOT_FOUND',
@@ -164,6 +168,7 @@ export function errorHandler(
     : err.message;
 
   res.status(statusCode).json({
+    success: false,
     error: {
       message,
       code: 'INTERNAL_ERROR',
@@ -178,6 +183,7 @@ export function errorHandler(
  */
 export function notFoundHandler(req: Request, res: Response): void {
   res.status(404).json({
+    success: false,
     error: {
       message: `Route ${req.method} ${req.path} not found`,
       code: 'ROUTE_NOT_FOUND',
