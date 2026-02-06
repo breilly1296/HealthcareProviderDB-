@@ -16,11 +16,19 @@ export default function Error({ error, reset }: ErrorProps) {
     // Log error to console
     console.error('Application error:', error);
 
-    // TODO: Add error tracking service integration here
-    // Examples:
-    // - Sentry.captureException(error)
-    // - posthog.capture('error', { error: error.message, digest: error.digest })
-    // - LogRocket.captureException(error)
+    // Track error in PostHog (no PII — only error metadata)
+    import('posthog-js').then(({ default: posthog }) => {
+      if (posthog.__loaded) {
+        posthog.capture('$exception', {
+          $exception_message: error.message,
+          $exception_type: 'unhandled_error',
+          $exception_source: 'error_boundary',
+          digest: error.digest,
+        });
+      }
+    }).catch(() => {
+      // PostHog not available — silently ignore
+    });
   }, [error]);
 
   return (

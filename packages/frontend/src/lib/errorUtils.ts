@@ -385,4 +385,21 @@ export function logError(context: string, error: unknown): void {
     // In production, log minimal info
     console.error(`[${context}] ${appError.message}`);
   }
+
+  // Track error in PostHog (no PII — only error metadata)
+  if (typeof window !== 'undefined') {
+    import('posthog-js').then(({ default: posthog }) => {
+      if (posthog.__loaded) {
+        posthog.capture('$exception', {
+          $exception_message: appError.message,
+          $exception_type: appError.code || 'unknown',
+          $exception_source: context,
+          status_code: appError.statusCode,
+          retryable: appError.retryable,
+        });
+      }
+    }).catch(() => {
+      // PostHog not available — silently ignore
+    });
+  }
 }
