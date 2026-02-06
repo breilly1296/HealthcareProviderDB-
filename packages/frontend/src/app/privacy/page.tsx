@@ -10,7 +10,7 @@ export default function PrivacyPolicyPage() {
             Privacy Policy
           </h1>
           <p className="text-lg text-gray-600">
-            Last updated: January 2025
+            Last updated: February 2026
           </p>
         </div>
       </section>
@@ -64,16 +64,20 @@ export default function PrivacyPolicyPage() {
               </h3>
               <ul className="list-disc pl-6 text-gray-600 space-y-2">
                 <li>
-                  <strong>IP address:</strong> Used for rate limiting, spam prevention, and security
+                  <strong>IP address:</strong> Used by our server for rate limiting, spam prevention,
+                  and security only. Not sent to analytics.
                 </li>
                 <li>
                   <strong>Browser/device information:</strong> Browser type, device type, operating system
+                  (collected by PostHog analytics if you consent)
                 </li>
                 <li>
-                  <strong>Usage data:</strong> Pages visited, search queries, time spent on site
+                  <strong>Usage patterns:</strong> Which pages you visit, whether you used search
+                  filters (but not what you searched for). See the Analytics section below for details.
                 </li>
                 <li>
-                  <strong>Cookies:</strong> For analytics and site functionality (see Cookies section below)
+                  <strong>Local storage:</strong> Your theme preference, recent searches, and analytics
+                  consent choice are stored in your browser only (see Cookies &amp; Local Storage below)
                 </li>
               </ul>
             </div>
@@ -120,9 +124,14 @@ export default function PrivacyPolicyPage() {
                 <li>Member IDs or insurance account numbers</li>
                 <li>Social Security numbers or government IDs</li>
                 <li>Payment or financial information</li>
-                <li>Account passwords (we don't have user accounts yet)</li>
+                <li>Account passwords (we don&apos;t have user accounts yet)</li>
                 <li>Precise location data beyond IP-based city/region</li>
               </ul>
+              <p className="text-gray-600 dark:text-gray-300 mt-4">
+                Our analytics also do <strong className="text-gray-900 dark:text-white">NOT</strong> collect:
+                provider names, NPI numbers, insurance plan details, your actual search
+                terms, or IP addresses. See the Analytics section below.
+              </p>
               <p className="text-gray-600 dark:text-gray-300 mt-4">
                 <strong>Note:</strong> VerifyMyProvider is not subject to HIPAA as we do not handle
                 protected health information.
@@ -147,32 +156,124 @@ export default function PrivacyPolicyPage() {
               </ul>
             </div>
 
-            {/* Cookies */}
-            <div className="card mb-8">
+            {/* Analytics */}
+            <div className="card mb-8 border-l-4 border-l-indigo-500">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                5. Cookies
+                5. Analytics
               </h2>
-              <p className="text-gray-600 mb-4">
-                We use cookies for:
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
+                We use <strong>PostHog</strong> for privacy-preserving analytics to understand how people
+                use the site and where we can improve. Analytics only run if you accept the consent
+                banner that appears on your first visit.
               </p>
-              <ul className="list-disc pl-6 text-gray-600 space-y-2 mb-4">
+
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mt-6 mb-3">
+                What we track:
+              </h3>
+              <ul className="list-disc pl-6 text-gray-600 dark:text-gray-300 space-y-2 mb-4">
                 <li>
-                  <strong>Analytics:</strong> To understand how visitors use our site (via PostHog)
+                  <strong>Page views</strong> — which pages are visited (sensitive URL parameters like
+                  NPI numbers are stripped before sending)
                 </li>
                 <li>
-                  <strong>Functionality:</strong> To remember your preferences (like search filters)
+                  <strong>Search events</strong> — only whether filters were used (e.g., &quot;had a state
+                  filter&quot;), never the actual filter values
+                </li>
+                <li>
+                  <strong>Verification submissions</strong> — only that a verification occurred, with no
+                  details about the provider, plan, or result
+                </li>
+                <li>
+                  <strong>Vote events</strong> — only the direction (up or down), not which verification
+                  was voted on
                 </li>
               </ul>
-              <p className="text-gray-600">
-                We do not use cookies for advertising or tracking across other websites. You can
-                disable cookies in your browser settings, though some site features may not work properly.
+
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mt-6 mb-3">
+                What we do NOT send to analytics:
+              </h3>
+              <ul className="list-disc pl-6 text-gray-600 dark:text-gray-300 space-y-2 mb-4">
+                <li>Provider names or NPI numbers</li>
+                <li>Insurance plan names or IDs</li>
+                <li>Your search terms (state, city, specialty, etc.)</li>
+                <li>IP addresses</li>
+                <li>Personal health information of any kind</li>
+              </ul>
+
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mt-6 mb-3">
+                Technical safeguards:
+              </h3>
+              <ul className="list-disc pl-6 text-gray-600 dark:text-gray-300 space-y-2">
+                <li>
+                  <strong>Autocapture is disabled</strong> — we only track the specific events listed
+                  above, not every click or form interaction
+                </li>
+                <li>
+                  <strong>Session recording is disabled</strong> — we never record your screen or
+                  keystrokes
+                </li>
+                <li>
+                  <strong>Opt-out by default</strong> — analytics are off until you explicitly accept
+                  the consent banner
+                </li>
+                <li>
+                  <strong>No advertising</strong> — analytics data is never shared with third parties
+                  for advertising purposes
+                </li>
+              </ul>
+            </div>
+
+            {/* Cookies & Local Storage */}
+            <div className="card mb-8">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                6. Cookies &amp; Local Storage
+              </h2>
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
+                We primarily use your browser&apos;s local storage (not traditional cookies) to remember
+                your preferences. Here&apos;s exactly what we store:
               </p>
+
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mt-6 mb-3">
+                Local storage (stays in your browser):
+              </h3>
+              <ul className="list-disc pl-6 text-gray-600 dark:text-gray-300 space-y-2 mb-4">
+                <li><strong>Theme preference</strong> — your light/dark mode choice</li>
+                <li><strong>Recent searches</strong> — your last few search filters for quick access</li>
+                <li><strong>Analytics consent</strong> — whether you accepted or declined analytics</li>
+                <li><strong>Disclaimer dismissal</strong> — that you&apos;ve seen the site disclaimer</li>
+              </ul>
+
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mt-6 mb-3">
+                Session storage (cleared when you close the tab):
+              </h3>
+              <ul className="list-disc pl-6 text-gray-600 dark:text-gray-300 space-y-2 mb-4">
+                <li><strong>Comparison selections</strong> — providers you&apos;ve selected to compare</li>
+              </ul>
+
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mt-6 mb-3">
+                PostHog cookie:
+              </h3>
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
+                If you accept analytics, PostHog stores a small identifier in local storage to
+                recognize you as the same anonymous visitor across page loads. This is not used for
+                advertising or cross-site tracking. If you decline analytics, this identifier is
+                never created.
+              </p>
+
+              <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <p className="text-gray-600 dark:text-gray-300 text-sm">
+                  <strong>To withdraw analytics consent:</strong> Click the consent banner if it
+                  appears, or clear your browser&apos;s local storage for this site. You can also
+                  clear site data in your browser&apos;s settings under &quot;Privacy&quot; or
+                  &quot;Site Settings.&quot;
+                </p>
+              </div>
             </div>
 
             {/* Third Parties */}
             <div className="card mb-8">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                6. Third-Party Services
+                7. Third-Party Services
               </h2>
               <p className="text-gray-600 dark:text-gray-300 mb-4">
                 We use the following third-party services:
@@ -229,7 +330,7 @@ export default function PrivacyPolicyPage() {
             {/* Data Retention */}
             <div className="card mb-8">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                7. Data Retention
+                8. Data Retention
               </h2>
               <p className="text-gray-600 mb-4">
                 Verification data is retained indefinitely to maintain the accuracy and history of
@@ -259,26 +360,42 @@ export default function PrivacyPolicyPage() {
             {/* Your Rights */}
             <div className="card mb-8">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                8. Your Rights
+                9. Your Rights
               </h2>
-              <p className="text-gray-600 mb-4">
-                Depending on your location, you may have the right to:
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
+                You are in control of your data. Here&apos;s what you can do:
               </p>
-              <ul className="list-disc pl-6 text-gray-600 space-y-2 mb-4">
-                <li>Request access to your personal data</li>
-                <li>Request correction of inaccurate data</li>
-                <li>Request deletion of your data</li>
-                <li>Opt out of analytics tracking</li>
+              <ul className="list-disc pl-6 text-gray-600 dark:text-gray-300 space-y-2 mb-4">
+                <li>
+                  <strong>Opt out of analytics at any time</strong> — decline the consent banner, or
+                  clear your browser&apos;s local storage for this site to reset your choice
+                </li>
+                <li>
+                  <strong>No account required</strong> — you can use the entire service without
+                  creating an account or providing any personal information
+                </li>
+                <li>
+                  <strong>Request access or deletion</strong> — if you&apos;ve submitted verifications
+                  and want to review or remove them, contact us
+                </li>
+                <li>
+                  <strong>We do not sell personal data</strong> — your information is never sold to
+                  third parties, period
+                </li>
               </ul>
-              <p className="text-gray-600">
-                To exercise these rights, please contact us at the email below.
+              <p className="text-gray-600 dark:text-gray-300">
+                For any data requests, contact us at{' '}
+                <a href="mailto:breilly@ownmyhealth.io"
+                   className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300">
+                  breilly@ownmyhealth.io
+                </a>.
               </p>
             </div>
 
             {/* Security */}
             <div className="card mb-8">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                9. Security
+                10. Security
               </h2>
               <p className="text-gray-600">
                 We implement reasonable security measures to protect your information, including
@@ -290,7 +407,7 @@ export default function PrivacyPolicyPage() {
             {/* Children */}
             <div className="card mb-8">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                10. Children's Privacy
+                11. Children&apos;s Privacy
               </h2>
               <p className="text-gray-600">
                 Our service is not directed to children under 13. We do not knowingly collect
@@ -302,7 +419,7 @@ export default function PrivacyPolicyPage() {
             {/* Changes */}
             <div className="card mb-8">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                11. Changes to This Policy
+                12. Changes to This Policy
               </h2>
               <p className="text-gray-600">
                 We may update this Privacy Policy from time to time. We'll post the updated policy
@@ -314,13 +431,17 @@ export default function PrivacyPolicyPage() {
             {/* Contact */}
             <div className="card mb-8 bg-gray-50 dark:bg-gray-800">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                12. Contact Us
+                13. Contact Us
               </h2>
               <p className="text-gray-600 mb-4">
                 For privacy-related questions or to exercise your rights, contact us:
               </p>
-              <p className="text-gray-600">
-                Email: <a href="mailto:privacy@verifymyprovider.com" className="text-primary-600 hover:text-primary-700">privacy@verifymyprovider.com</a>
+              <p className="text-gray-600 dark:text-gray-300">
+                Email:{' '}
+                <a href="mailto:breilly@ownmyhealth.io"
+                   className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300">
+                  breilly@ownmyhealth.io
+                </a>
               </p>
             </div>
 

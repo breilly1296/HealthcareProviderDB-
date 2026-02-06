@@ -367,6 +367,7 @@ export interface VerificationSubmission {
   acceptsNewPatients?: boolean;
   notes?: string;
   submittedBy?: string;
+  website?: string; // honeypot field — must be empty for real users
 }
 
 export interface VerificationStats {
@@ -544,7 +545,7 @@ const verify = {
       body: JSON.stringify(data),
     }),
 
-  vote: (verificationId: string, vote: 'up' | 'down') =>
+  vote: (verificationId: string, vote: 'up' | 'down', website?: string) =>
     apiFetch<{
       verification: {
         id: string;
@@ -555,7 +556,7 @@ const verify = {
       message: string;
     }>(`/verify/${verificationId}/vote`, {
       method: 'POST',
-      body: JSON.stringify({ vote }),
+      body: JSON.stringify({ vote, website }),
     }),
 
   getStats: () =>

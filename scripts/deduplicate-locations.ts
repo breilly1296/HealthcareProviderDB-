@@ -64,7 +64,6 @@ async function main() {
 
     if (applyMode) {
       let processed = 0;
-      let offset = 0;
       const toProcess = limit ? Math.min(limit, totalLocations - alreadyHashed) : totalLocations - alreadyHashed;
 
       while (true) {
@@ -72,13 +71,15 @@ async function main() {
         const batchLimit = Math.min(BATCH_SIZE, remaining);
         if (batchLimit <= 0) break;
 
+        // No OFFSET needed: processed rows have address_hash set, so they
+        // drop out of the WHERE address_hash IS NULL filter automatically.
         const batch = await pool.query(
           `SELECT id, address_line1, city, state, zip_code
            FROM practice_locations
            WHERE address_hash IS NULL
            ORDER BY id
-           LIMIT $1 OFFSET $2`,
-          [batchLimit, offset]
+           LIMIT $1`,
+          [batchLimit]
         );
 
         if (batch.rows.length === 0) break;
@@ -108,7 +109,6 @@ async function main() {
         }
 
         processed += batch.rows.length;
-        offset += BATCH_SIZE;
 
         const pct = Math.round((processed / toProcess) * 100);
         process.stdout.write(`\r  Hashed: ${processed}/${toProcess} (${pct}%)`);

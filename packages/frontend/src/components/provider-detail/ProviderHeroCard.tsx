@@ -21,11 +21,32 @@ interface Provider {
   entityType?: string | null;
 }
 
+interface ConfidenceBreakdown {
+  score: number;
+  level: 'VERY_HIGH' | 'HIGH' | 'MEDIUM' | 'LOW' | 'VERY_LOW';
+  factors: {
+    dataSourceScore: number;
+    recencyScore: number;
+    verificationScore: number;
+    agreementScore: number;
+  };
+  metadata?: {
+    researchNote?: string;
+    isStale?: boolean;
+    daysSinceVerification?: number | null;
+    daysUntilStale?: number;
+    freshnessThreshold?: number;
+    recommendReVerification?: boolean;
+    explanation?: string;
+  };
+}
+
 interface ProviderHeroCardProps {
   provider: Provider;
   confidenceScore: number;
   verificationCount?: number;
   nppesLastSynced?: string | null;
+  confidenceBreakdown?: ConfidenceBreakdown;
 }
 
 function getInitials(name: string): string {
@@ -57,7 +78,7 @@ function getGoogleMapsUrl(provider: Provider): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(parts)}`;
 }
 
-export function ProviderHeroCard({ provider, confidenceScore, verificationCount = 0, nppesLastSynced }: ProviderHeroCardProps) {
+export function ProviderHeroCard({ provider, confidenceScore, verificationCount = 0, nppesLastSynced, confidenceBreakdown }: ProviderHeroCardProps) {
   const initials = getInitials(provider.displayName);
   const specialty = provider.specialty || provider.specialtyCategory || provider.taxonomyDescription || 'Healthcare Provider';
   const isVerified = confidenceScore >= 70;
@@ -170,6 +191,7 @@ export function ProviderHeroCard({ provider, confidenceScore, verificationCount 
             score={confidenceScore}
             size={140}
             verificationCount={verificationCount}
+            confidenceBreakdown={confidenceBreakdown}
           />
         </div>
       </div>

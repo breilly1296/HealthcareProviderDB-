@@ -35,6 +35,7 @@ export function VerificationButton({
   const [acceptsNewPatients, setAcceptsNewPatients] = useState<boolean | null>(null);
   const [notes, setNotes] = useState('');
   const [email, setEmail] = useState('');
+  const [honeypot, setHoneypot] = useState('');
 
   // Refs for focus trap
   const modalRef = useRef<HTMLDivElement>(null);
@@ -82,6 +83,7 @@ export function VerificationButton({
         acceptsNewPatients: acceptsNewPatients ?? undefined,
         notes: notes.trim() || undefined,
         submittedBy: email.trim() || undefined,
+        website: honeypot || undefined,
       });
 
       clearTimeout(timeoutId);
@@ -122,6 +124,7 @@ export function VerificationButton({
       setAcceptsNewPatients(null);
       setNotes('');
       setEmail('');
+      setHoneypot('');
     }, 200);
   }, [initialPlanId, initialPlanName]);
 
@@ -373,6 +376,20 @@ export function VerificationButton({
                         placeholder="For follow-up if needed"
                         className="input"
                         pattern="[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*"
+                      />
+                    </div>
+
+                    {/* Honeypot field — hidden from real users, filled by bots */}
+                    <div style={{ position: 'absolute', left: '-9999px', opacity: 0, height: 0, overflow: 'hidden' }} aria-hidden="true" tabIndex={-1}>
+                      <label htmlFor="vb-website">Website</label>
+                      <input
+                        type="text"
+                        id="vb-website"
+                        name="website"
+                        value={honeypot}
+                        onChange={(e) => setHoneypot(e.target.value)}
+                        autoComplete="off"
+                        tabIndex={-1}
                       />
                     </div>
 

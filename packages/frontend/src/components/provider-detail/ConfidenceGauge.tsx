@@ -1,10 +1,28 @@
 'use client';
 
+import { useState, useEffect, useCallback } from 'react';
+import { X } from 'lucide-react';
+import FocusTrap from 'focus-trap-react';
+import {
+  ConfidenceScoreBreakdown,
+  type ConfidenceLevelType,
+  type ConfidenceFactors,
+  type ConfidenceMetadata,
+} from '@/components/ConfidenceScoreBreakdown';
+
+interface ConfidenceBreakdown {
+  score: number;
+  level: ConfidenceLevelType;
+  factors: ConfidenceFactors;
+  metadata?: ConfidenceMetadata;
+}
+
 interface ConfidenceGaugeProps {
   score: number;
   size?: number;
   showLink?: boolean;
   verificationCount?: number;
+  confidenceBreakdown?: ConfidenceBreakdown;
 }
 
 function getConfidenceLevel(score: number): { label: string; color: string } {
@@ -33,8 +51,11 @@ export function ConfidenceGauge({
   score,
   size = 140,
   showLink = true,
-  verificationCount = 0
+  verificationCount = 0,
+  confidenceBreakdown
 }: ConfidenceGaugeProps) {
+  const [modalOpen, setModalOpen] = useState(false);
+
   const strokeWidth = 5;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -44,60 +65,139 @@ export function ConfidenceGauge({
   const { label, color } = getConfidenceLevel(score);
   const improvementHint = getImprovementHint(score, verificationCount);
 
-  return (
-    <div className="flex flex-col items-center">
-      <div className="relative" style={{ width: size, height: size }}>
-        <svg width={size} height={size} className="transform -rotate-90">
-          {/* Background track */}
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            fill="none"
-            className="stroke-stone-200 dark:stroke-gray-700"
-            strokeWidth={strokeWidth}
-          />
-          {/* Progress arc */}
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            fill="none"
-            stroke={color}
-            strokeWidth={strokeWidth}
-            strokeLinecap="round"
-            strokeDasharray={circumference}
-            strokeDashoffset={offset}
-            className="transition-all duration-700 ease-out"
-          />
-        </svg>
+  const handleClose = useCallback(() => setModalOpen(false), []);
 
-        {/* Center text */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-3xl font-bold text-stone-800 dark:text-white">{score}%</span>
+  // Close on Escape
+  useEffect(() => {
+    if (!modalOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') handleClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [modalOpen, handleClose]);
+
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (modalOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [modalOpen]);
+
+  const canShowBreakdown = showLink && confidenceBreakdown?.factors;
+
+  return (
+    <>
+      <div className="flex flex-col items-center">
+        <div className="relative" style={{ width: size, height: size }}>
+          <svg width={size} height={size} className="transform -rotate-90">
+            {/* Background track */}
+            <circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              fill="none"
+              className="stroke-stone-200 dark:stroke-gray-700"
+              strokeWidth={strokeWidth}
+            />
+            {/* Progress arc */}
+            <circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              fill="none"
+              stroke={color}
+              strokeWidth={strokeWidth}
+              strokeLinecap="round"
+              strokeDasharray={circumference}
+              strokeDashoffset={offset}
+              className="transition-all duration-700 ease-out"
+            />
+          </svg>
+
+          {/* Center text */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-3xl font-bold text-stone-800 dark:text-white">{score}%</span>
+          </div>
         </div>
+
+        {/* Confidence Level Label */}
+        <p
+          className="mt-2 text-sm font-semibold"
+          style={{ color }}
+        >
+          {label}
+        </p>
+
+        {/* Improvement hint */}
+        {improvementHint && (
+          <p className="mt-1 text-xs text-stone-500 dark:text-gray-400 text-center max-w-[160px]">
+            {improvementHint}
+          </p>
+        )}
+
+        {canShowBreakdown ? (
+          <button
+            className="mt-2 text-xs text-[#137fec] hover:underline"
+            onClick={() => setModalOpen(true)}
+          >
+            How is this calculated?
+          </button>
+        ) : showLink ? (
+          <span className="mt-2 text-xs text-stone-400 dark:text-gray-500">
+            How is this calculated?
+          </span>
+        ) : null}
       </div>
 
-      {/* Confidence Level Label */}
-      <p
-        className="mt-2 text-sm font-semibold"
-        style={{ color }}
-      >
-        {label}
-      </p>
+      {/* Score Breakdown Modal */}
+      {modalOpen && confidenceBreakdown?.factors && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Confidence score breakdown"
+        >
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={handleClose}
+          />
 
-      {/* Improvement hint */}
-      {improvementHint && (
-        <p className="mt-1 text-xs text-stone-500 dark:text-gray-400 text-center max-w-[160px]">
-          {improvementHint}
-        </p>
-      )}
+          {/* Modal Content */}
+          <FocusTrap>
+            <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-stone-200 dark:border-gray-700 w-full max-w-md max-h-[85vh] overflow-y-auto">
+              {/* Header */}
+              <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-stone-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between rounded-t-xl">
+                <h2 className="text-lg font-semibold text-stone-800 dark:text-white">
+                  Confidence Score Breakdown
+                </h2>
+                <button
+                  onClick={handleClose}
+                  className="p-1.5 rounded-lg hover:bg-stone-100 dark:hover:bg-gray-700 text-stone-500 dark:text-gray-400 transition-colors"
+                  aria-label="Close"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
 
-      {showLink && (
-        <button className="mt-2 text-xs text-[#137fec] hover:underline">
-          How is this calculated?
-        </button>
+              {/* Body */}
+              <div className="p-4">
+                <ConfidenceScoreBreakdown
+                  score={confidenceBreakdown.score}
+                  level={confidenceBreakdown.level}
+                  factors={confidenceBreakdown.factors}
+                  metadata={confidenceBreakdown.metadata}
+                  showExpanded={true}
+                />
+              </div>
+            </div>
+          </FocusTrap>
+        </div>
       )}
-    </div>
+    </>
   );
 }

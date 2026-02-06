@@ -83,11 +83,17 @@ export default function ProviderDetailClient({ npi, initialProvider }: ProviderD
     }
   }, [provider?.npi]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Calculate overall confidence score from plan acceptances
-  const confidenceScore = provider?.planAcceptances?.reduce(
-    (max, p) => Math.max(max, p.confidence?.score ?? p.confidenceScore ?? 0),
-    0
-  ) || 0;
+  // Find the plan acceptance with the highest confidence score
+  const bestAcceptance = provider?.planAcceptances?.reduce<PlanAcceptanceDisplay | null>(
+    (best, p) => {
+      const score = p.confidence?.score ?? p.confidenceScore ?? 0;
+      const bestScore = best ? (best.confidence?.score ?? best.confidenceScore ?? 0) : -1;
+      return score > bestScore ? p : best;
+    },
+    null
+  ) ?? null;
+
+  const confidenceScore = bestAcceptance?.confidence?.score ?? bestAcceptance?.confidenceScore ?? 0;
 
   // Count total verifications across all plans
   const verificationCount = provider?.planAcceptances?.reduce(
@@ -173,6 +179,7 @@ export default function ProviderDetailClient({ npi, initialProvider }: ProviderD
               confidenceScore={confidenceScore}
               verificationCount={verificationCount}
               nppesLastSynced={provider.nppesLastSynced}
+              confidenceBreakdown={bestAcceptance?.confidence}
             />
 
             {/* Data Accuracy Disclaimer */}

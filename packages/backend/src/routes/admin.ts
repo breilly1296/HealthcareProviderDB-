@@ -3,6 +3,7 @@ import { timingSafeEqual } from 'crypto';
 import { z } from 'zod';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { cleanupExpiredVerifications, getExpirationStats } from '../services/verificationService';
+import { recalculateAllConfidenceScores } from '../services/confidenceDecayService';
 import { getEnrichmentStats } from '../services/locationEnrichment';
 import { cacheClear, getCacheStats } from '../utils/cache';
 import prisma from '../lib/prisma';
@@ -442,6 +443,54 @@ router.get(
           total: voteTotal,
           retentionPolicy: 'Follows plan acceptance TTL',
         },
+      },
+    });
+  })
+);
+
+/**
+ * POST /api/v1/admin/recalculate-confidence
+ * Recalculate confidence scores for all provider-plan acceptance records
+ * with time-based decay applied proactively.
+ *
+ * Protected by X-Admin-Secret header
+ *
+ * Query parameters:
+ *   - dryRun: 'true' to preview changes without writing (default: false)
+ *   - limit: max records to process (default: all)
+ */
+router.post(
+  '/recalculate-confidence',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    const dryRun = req.query.dryRun === 'true';
+    const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : undefined;
+
+    if (limit !== undefined && (isNaN(limit) || limit < 1)) {
+      throw AppError.badRequest('limit must be a positive integer');
+    }
+
+    logger.info({ dryRun, limit }, 'Admin: starting confidence recalculation');
+
+    const stats = await recalculateAllConfidenceScores({
+      dryRun,
+      limit,
+      batchSize: 100,
+    });
+
+    res.json({
+      success: true,
+      data: {
+        dryRun,
+        processed: stats.processed,
+        updated: stats.updated,
+        unchanged: stats.unchanged,
+        errors: stats.errors,
+        durationMs: stats.durationMs,
+        duration: `${(stats.durationMs / 1000).toFixed(1)}s`,
+        message: dryRun
+          ? `Dry run complete. ${stats.updated} of ${stats.processed} records would be updated.`
+          : `Recalculation complete. ${stats.updated} of ${stats.processed} records updated.`,
       },
     });
   })

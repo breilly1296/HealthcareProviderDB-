@@ -173,6 +173,7 @@ function VerificationModal({ isOpen, onClose, plan, npi, providerName, onVerifie
   const [verificationDate, setVerificationDate] = useState<VerificationDate>(null);
   const [showNoteField, setShowNoteField] = useState(false);
   const [note, setNote] = useState('');
+  const [honeypot, setHoneypot] = useState('');
 
   if (!isOpen || !plan) return null;
 
@@ -199,6 +200,7 @@ function VerificationModal({ isOpen, onClose, plan, npi, providerName, onVerifie
         locationId: plan.locationId,
         acceptsInsurance,
         notes: fullNote || undefined,
+        website: honeypot || undefined,
       });
 
       // Close modal immediately and show success toast
@@ -221,6 +223,7 @@ function VerificationModal({ isOpen, onClose, plan, npi, providerName, onVerifie
     setVerificationDate(null);
     setShowNoteField(false);
     setNote('');
+    setHoneypot('');
     onClose();
   };
 
@@ -341,6 +344,20 @@ function VerificationModal({ isOpen, onClose, plan, npi, providerName, onVerifie
         <p className="text-xs text-stone-500 dark:text-gray-400 text-center mt-4">
           Your contribution helps others avoid surprise bills
         </p>
+
+        {/* Honeypot field — hidden from real users, filled by bots */}
+        <div style={{ position: 'absolute', left: '-9999px', opacity: 0, height: 0, overflow: 'hidden' }} aria-hidden="true" tabIndex={-1}>
+          <label htmlFor="website">Website</label>
+          <input
+            type="text"
+            id="website"
+            name="website"
+            value={honeypot}
+            onChange={(e) => setHoneypot(e.target.value)}
+            autoComplete="off"
+            tabIndex={-1}
+          />
+        </div>
       </div>
     </div>
   );

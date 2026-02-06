@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { verificationRateLimiter, voteRateLimiter, defaultRateLimiter } from '../middleware/rateLimiter';
 import { verifyCaptcha } from '../middleware/captcha';
+import { honeypotCheck } from '../middleware/honeypot';
 import {
   submitVerification,
   voteOnVerification,
@@ -27,11 +28,13 @@ const submitVerificationSchema = npiParamSchema.merge(planIdParamSchema).extend(
   evidenceUrl: z.string().url().max(500).optional(),
   submittedBy: z.string().email().max(200).optional(),
   captchaToken: z.string().optional(), // reCAPTCHA v3 token
+  website: z.string().optional(), // honeypot field — should always be empty
 });
 
 const voteSchema = z.object({
   vote: z.enum(['up', 'down']),
   captchaToken: z.string().optional(), // reCAPTCHA v3 token
+  website: z.string().optional(), // honeypot field — should always be empty
 });
 
 const verificationIdParamSchema = z.object({
@@ -55,6 +58,7 @@ const recentQuerySchema = z.object({
 router.post(
   '/',
   verificationRateLimiter,
+  honeypotCheck('website'),
   verifyCaptcha,
   asyncHandler(async (req, res) => {
     const body = submitVerificationSchema.parse(req.body);
@@ -89,6 +93,7 @@ router.post(
 router.post(
   '/:verificationId/vote',
   voteRateLimiter,
+  honeypotCheck('website'),
   verifyCaptcha,
   asyncHandler(async (req, res) => {
     const { verificationId } = verificationIdParamSchema.parse(req.params);
