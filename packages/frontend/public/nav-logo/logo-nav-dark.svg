@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 44" width="280" height="44">
+  <defs>
+    <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3B82F6"/>
+      <stop offset="100%" stop-color="#06B6D4"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(4, 8)">
+    <circle cx="14" cy="14" r="11" fill="none" stroke="url(#g1)" stroke-width="1.8" opacity="0.85"/>
+    <line x1="22" y1="22" x2="30" y2="30" stroke="url(#g1)" stroke-width="2" stroke-linecap="round" opacity="0.65"/>
+    <polyline points="8,14 13,19 21,10" fill="none" stroke="url(#g1)"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="40" y="29" font-family="sans-serif" font-size="20" letter-spacing="-0.3">
+    <tspan fill="#F1F5F9" font-weight="700">Verify</tspan><tspan fill="#64748B" font-weight="400">My</tspan><tspan fill="#F1F5F9" font-weight="700">Provider</tspan>
+  </text>
+</svg>
