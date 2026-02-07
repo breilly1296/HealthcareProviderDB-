@@ -34,6 +34,8 @@ function SearchResultsDisplay({
   const specialty = searchParams.get('specialty') || '';
   const healthSystem = searchParams.get('healthSystem') || '';
   const insurancePlanId = searchParams.get('insurancePlanId') || '';
+  const name = searchParams.get('name') || '';
+  const npi = searchParams.get('npi') || '';
 
   // Generate suggestions based on current search
   const getNoResultsSuggestions = useCallback((): SearchSuggestion[] => {
@@ -102,6 +104,11 @@ function SearchResultsDisplay({
   }
 
   const resultCount = pagination?.total || 0;
+  const pageSize = pagination?.limit || 20;
+
+  // Detect broad searches: many results with no narrowing filters
+  const isBroadSearch =
+    resultCount > 500 && !specialty && !cities && !name && !npi && !insurancePlanId;
 
   return (
     <div aria-live="polite">
@@ -115,11 +122,47 @@ function SearchResultsDisplay({
       {/* Results count */}
       <div className="mb-4">
         <p className="text-stone-600 dark:text-gray-300">
-          Found <strong className="text-stone-800 dark:text-white">{resultCount}</strong> providers
-          {state && ` in ${state}`}
-          {cities && ` in ${cities.split(',').join(', ')}`}
+          {isBroadSearch ? (
+            <>
+              Showing first {pageSize} of{' '}
+              <strong className="text-stone-800 dark:text-white">
+                {resultCount.toLocaleString()}
+              </strong>{' '}
+              providers{state && ` in ${state}`}
+            </>
+          ) : (
+            <>
+              Found{' '}
+              <strong className="text-stone-800 dark:text-white">{resultCount.toLocaleString()}</strong>{' '}
+              providers
+              {state && ` in ${state}`}
+              {cities && ` in ${cities.split(',').join(', ')}`}
+            </>
+          )}
         </p>
       </div>
+
+      {/* Refine search nudge for broad queries */}
+      {isBroadSearch && (
+        <div className="mb-5 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex-1">
+            <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+              That&apos;s a lot of providers! Narrow your search for better results.
+            </p>
+            <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+              Try adding a <strong>specialty</strong>, <strong>city</strong>, or{' '}
+              <strong>provider name</strong> to find what you&apos;re looking for faster.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="shrink-0 px-4 py-2 text-sm font-medium text-blue-700 dark:text-blue-200 bg-blue-100 dark:bg-blue-800/40 hover:bg-blue-200 dark:hover:bg-blue-800/60 rounded-lg transition-colors"
+          >
+            Refine search
+          </button>
+        </div>
+      )}
 
       {/* Disclaimer banner */}
       <div className="mb-6 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
