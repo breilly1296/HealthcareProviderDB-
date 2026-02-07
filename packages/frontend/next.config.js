@@ -4,26 +4,43 @@
  * Security headers for XSS and other attack prevention.
  * CSP is configured to allow:
  * - Scripts: self, inline (Next.js requires), Google reCAPTCHA
- * - Styles: self, inline (for CSS-in-JS)
- * - Images: self, data URIs, any HTTPS source
+ * - Styles: self, inline (for Tailwind CSS)
+ * - Images: self, data URIs, blob URIs (insurance card preview)
  * - Fonts: self
- * - Connections: self, API domain, Google (reCAPTCHA)
- * - Frames: Google (reCAPTCHA challenge)
+ * - Connections: self, Cloud Run API, verifymyprovider.com, Google reCAPTCHA, PostHog analytics
+ * - Frames: Google (reCAPTCHA challenge iframe)
+ *
+ * NOTE: Re-enabled 2026-02-07 in Content-Security-Policy-Report-Only mode
+ * (was disabled 2026-01-31 due to blocking API requests — see commit 9f1278a).
+ * Monitor Cloud Logging / browser console for violations for 2 weeks.
+ * Switch to enforcing Content-Security-Policy after clean monitoring period.
  */
+const cspDirectives = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com https://www.gstatic.com",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  "font-src 'self'",
+  [
+    "connect-src 'self'",
+    process.env.NEXT_PUBLIC_API_URL || '',
+    'https://*.us-central1.run.app',
+    'https://verifymyprovider.com',
+    'https://www.google.com',
+    'https://us.i.posthog.com',
+    'https://us.posthog.com',
+  ].filter(Boolean).join(' '),
+  "frame-src https://www.google.com https://www.gstatic.com",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+].join('; ');
+
 const securityHeaders = [
-  // CSP disabled - was blocking API requests. Re-enable with proper config later.
-  // {
-  //   key: 'Content-Security-Policy',
-  //   value: [
-  //     "default-src 'self'",
-  //     "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com https://www.gstatic.com",
-  //     "style-src 'self' 'unsafe-inline'",
-  //     "img-src 'self' data: https:",
-  //     "font-src 'self'",
-  //     "connect-src 'self' https://api.verifymyprovider.com https://*.run.app https://us.i.posthog.com https://www.google.com https://www.gstatic.com",
-  //     "frame-src https://www.google.com",
-  //   ].join('; ')
-  // },
+  {
+    key: 'Content-Security-Policy-Report-Only',
+    value: cspDirectives,
+  },
   {
     key: 'X-Content-Type-Options',
     value: 'nosniff'

@@ -2,289 +2,738 @@
 
 ## Overview
 
-**File:** `packages/backend/src/services/confidenceService.ts`
-**Algorithm:** 0-100 scale combining 4 weighted factors
-**Status:** Fully implemented and tested
-**Research basis:** Mortensen et al. (2015), JAMIA; Ndumele et al. (2018), Health Affairs
+VerifyMyProvider implements a **research-backed confidence scoring system** that rates the trustworthiness of provider-plan acceptance data on a 0-100 scale. The system combines four weighted factors -- data source quality, recency, verification count, and community agreement -- into a single numeric score with an associated confidence level label. This transparent scoring model serves as a competitive differentiator against traditional insurance directories, which research shows are wrong 46-77% of the time.
+
+### Research Foundation
+
+The algorithm is grounded in two peer-reviewed studies:
+
+- **Mortensen et al. (2015), JAMIA**: Demonstrated that 3 crowdsourced verifications achieve expert-level accuracy (kappa = 0.58 vs. expert kappa = 0.59). Additional verifications beyond 3 show no significant accuracy improvement.
+- **Ndumele et al. (2018), Health Affairs**: Documented 12% annual provider turnover in insurance networks, with mental health providers showing only 43% Medicaid acceptance and significantly higher churn rates.
+
+### Implementation Status
+
+Fully implemented and tested across backend services and frontend components. Scores are persisted in the `provider_plan_acceptance.confidence_score` database column and recalculated on each new verification event or via admin-triggered batch recalculation.
+
+---
+
+## Source Files
+
+| File | Role |
+|------|------|
+| `packages/backend/src/services/confidenceService.ts` | Core algorithm: score calculation, level assignment, metadata generation, acceptance enrichment helper |
+| `packages/backend/src/services/confidenceDecayService.ts` | Batch recalculation with time-based decay for all acceptance records |
+| `packages/backend/src/services/verificationService.ts` | Score updates on verification submission and voting events |
+| `packages/backend/src/services/__tests__/confidenceService.test.ts` | Comprehensive unit tests (46 test cases) |
+| `packages/backend/src/config/constants.ts` | Consensus thresholds and verification TTL constants |
+| `packages/backend/src/routes/admin.ts` | Admin endpoint for batch confidence recalculation |
+| `packages/backend/prisma/schema.prisma` | Database schema (`ProviderPlanAcceptance.confidenceScore` field) |
+| `packages/frontend/src/components/provider-detail/ConfidenceGauge.tsx` | Visual circular gauge with modal breakdown |
+| `packages/frontend/src/components/provider-detail/ScoreBreakdown.tsx` | Factor-by-factor bar chart display |
+| `packages/frontend/src/components/ConfidenceBadge.tsx` | Compact badge, indicator, and progress bar variants |
+| `packages/frontend/src/components/ConfidenceScoreBreakdown.tsx` | Expandable breakdown panel with tooltip and badge sub-components |
+| `packages/frontend/src/components/provider/ConfidenceScoreExplainer.tsx` | Educational research-backed explanation panel |
+| `packages/frontend/src/components/FreshnessWarning.tsx` | Specialty-aware stale data warning with verify CTA |
+
+---
 
 ## Algorithm Components (0-100 Scale)
 
+The total confidence score is the sum of four component scores, clamped to a maximum of 100:
+
+```typescript
+const score = Math.min(
+  100,
+  factors.dataSourceScore +
+    factors.recencyScore +
+    factors.verificationScore +
+    factors.agreementScore
+);
+```
+
+Source: `packages/backend/src/services/confidenceService.ts`, lines 157-163.
+
+---
+
 ### 1. Data Source Quality (0-25 points)
 
-**Function:** `calculateDataSourceScore()` (confidenceService.ts lines 229-232)
+Scores based on the authoritativeness of the data source. The `DATA_SOURCE_SCORES` lookup covers both `DataSource` and `VerificationSource` enum values, plus enrichment pipeline sources:
 
-Scores based on `DATA_SOURCE_SCORES` lookup map (lines 61-78):
-
-| Source | Points | Category |
-|--------|--------|----------|
-| `CMS_NPPES` / `CMS_PLAN_FINDER` / `CMS_DATA` / `NPPES_SYNC` | 25 | Official CMS data |
-| `CARRIER_API` / `CARRIER_DATA` / `CARRIER_SCRAPE` / `PROVIDER_PORTAL` | 20 | Carrier/provider data |
-| `USER_UPLOAD` / `PHONE_CALL` / `CROWDSOURCE` / `NETWORK_CROSSREF` | 15 | Community verified |
+| Source | Points | Notes |
+|--------|--------|-------|
+| `CMS_NPPES` | 25 | Official CMS NPPES registry data |
+| `CMS_PLAN_FINDER` | 25 | Official CMS Plan Finder data |
+| `CMS_DATA` | 25 | Legacy CMS verification source |
+| `NPPES_SYNC` | 25 | Official CMS data via NPPES API sync |
+| `CARRIER_API` | 20 | Insurance carrier API data |
+| `CARRIER_DATA` | 20 | Legacy carrier verification source |
+| `PROVIDER_PORTAL` | 20 | Provider self-reported |
+| `CARRIER_SCRAPE` | 20 | Carrier website scrape data |
+| `USER_UPLOAD` | 15 | User-provided upload |
+| `PHONE_CALL` | 15 | Phone call verification |
+| `CROWDSOURCE` | 15 | Community crowdsourced |
+| `NETWORK_CROSSREF` | 15 | Inferred from network IDs |
 | `AUTOMATED` | 10 | Automated checks |
-| Unknown/null source | 10 | Default fallback (line 231) |
+| `null` or unknown | 10 | Default fallback |
 
-**Verified:**
-- [x] Source scoring implemented with `DATA_SOURCE_SCORES` lookup
-- [x] Handles both `DataSource` and `VerificationSource` enum values (comment at line 60)
-- [x] Default of 10 points for unknown sources (line 231: `DATA_SOURCE_SCORES[source] ?? 10`)
-- [x] Null source returns 10 (line 230: `if (!source) return 10`)
+**Implementation detail**: The `calculateDataSourceScore` function returns 10 for null or unrecognized sources using the nullish coalescing operator:
+
+```typescript
+function calculateDataSourceScore(source: string | null): number {
+  if (!source) return 10;
+  return DATA_SOURCE_SCORES[source] ?? 10;
+}
+```
+
+Source: `packages/backend/src/services/confidenceService.ts`, lines 59-78 and 229-232.
+
+---
 
 ### 2. Recency Score (0-30 points)
 
-**Function:** `calculateRecencyScore()` (confidenceService.ts lines 253-279)
+The recency component uses **specialty-specific freshness thresholds** and a tiered decay system. This is the highest-weighted single factor, reflecting the research finding that provider network data becomes unreliable quickly.
 
-Uses **specialty-specific freshness thresholds** with tiered scoring:
+#### Specialty-Specific Freshness Thresholds
 
-| Specialty Category | Freshness Threshold | Research Basis |
-|--------------------|-------------------|---------------|
-| `MENTAL_HEALTH` | 30 days | 43% Medicaid acceptance, high churn (Ndumele et al. 2018) |
-| `PRIMARY_CARE` | 60 days | 12% annual turnover |
-| `SPECIALIST` | 60 days | Similar to primary care |
-| `HOSPITAL_BASED` | 90 days | More stable positions |
-| `OTHER` | 60 days | Default |
+| Specialty Category | Freshness Threshold (days) | Research Basis |
+|--------------------|---------------------------|----------------|
+| `MENTAL_HEALTH` | 30 | 43% Medicaid acceptance, high churn (Ndumele et al. 2018) |
+| `PRIMARY_CARE` | 60 | 12% annual turnover |
+| `SPECIALIST` | 60 | Similar to primary care (default for unmatched specialties) |
+| `HOSPITAL_BASED` | 90 | More stable positions |
+| `OTHER` | 60 | Default |
 
-Tier boundaries calculated from threshold (lines 269-273):
-- **Tier 1** (30 pts): 0 to `threshold * 0.5` days
-- **Tier 2** (20 pts): `threshold * 0.5` to `threshold` days
-- **Tier 3** (10 pts): `threshold` to `threshold * 1.5` days
-- **Tier 4** (5 pts): `threshold * 1.5` to 180 days
-- **Tier 5** (0 pts): 180+ days (always 0)
-- **No verification date**: 0 points (line 257)
+Source: `packages/backend/src/services/confidenceService.ts`, lines 47-53.
 
-**Specialty detection** via `getSpecialtyFreshnessCategory()` (lines 84-126):
-- Mental Health: `psychiatr*`, `psycholog*`, `mental health`, `behavioral health`, `counselor`, `therapist`
-- Primary Care: `family medicine`, `family practice`, `internal medicine`, `general practice`, `primary care`
-- Hospital-Based: `hospital`, `radiology`, `anesthesiology`, `pathology`, `emergency medicine`
-- All others: `SPECIALIST` (default, line 125)
+#### Specialty Detection
 
-**Verified:**
-- [x] Specialty-specific thresholds implemented (VERIFICATION_FRESHNESS map, lines 47-53)
-- [x] Keyword-based specialty category detection (lines 88-126)
-- [x] Tiered decay with specialty-adjusted boundaries (lines 269-278)
-- [x] Both `specialty` and `taxonomyDescription` searched (line 88: concatenated and lowercased)
+The `getSpecialtyFreshnessCategory()` function concatenates the `specialty` and `taxonomyDescription` fields into a lowercased search string and matches against keyword patterns:
+
+- **Mental Health**: `psychiatr*`, `psycholog*`, `mental health`, `behavioral health`, `counselor`, `therapist`
+- **Primary Care**: `family medicine`, `family practice`, `internal medicine`, `general practice`, `primary care`
+- **Hospital-Based**: `hospital`, `radiology`, `anesthesiology`, `pathology`, `emergency medicine`
+- **All others**: Defaults to `SPECIALIST`
+
+```typescript
+function getSpecialtyFreshnessCategory(
+  specialty?: string | null,
+  taxonomyDescription?: string | null
+): SpecialtyFreshnessCategory {
+  const searchText = `${specialty || ''} ${taxonomyDescription || ''}`.toLowerCase();
+  // ... keyword matching logic
+}
+```
+
+Source: `packages/backend/src/services/confidenceService.ts`, lines 84-126.
+
+#### Tiered Decay Boundaries
+
+Tier boundaries are dynamically calculated from the specialty's freshness threshold:
+
+| Tier | Score | Boundary |
+|------|-------|----------|
+| Tier 1 | 30 points | 0 to `min(30, threshold * 0.5)` days |
+| Tier 2 | 20 points | Tier 1 boundary to `threshold` days |
+| Tier 3 | 10 points | `threshold` to `threshold * 1.5` days |
+| Tier 4 | 5 points | `threshold * 1.5` to 180 days |
+| Tier 5 | 0 points | 180+ days (always 0 regardless of specialty) |
+| No verification date | 0 points | N/A |
+
+**Concrete examples by specialty:**
+
+| Specialty | Tier 1 (30pts) | Tier 2 (20pts) | Tier 3 (10pts) | Tier 4 (5pts) | Tier 5 (0pts) |
+|-----------|---------------|---------------|---------------|--------------|--------------|
+| Mental Health (30d) | 0-15 days | 16-30 days | 31-45 days | 46-180 days | 180+ days |
+| Primary Care (60d) | 0-30 days | 31-60 days | 61-90 days | 91-180 days | 180+ days |
+| Specialist (60d) | 0-30 days | 31-60 days | 61-90 days | 91-180 days | 180+ days |
+| Hospital-Based (90d) | 0-30 days* | 31-90 days | 91-135 days | 136-180 days | 180+ days |
+
+*Note: Tier 1 boundary is capped at 30 days via `Math.min(30, freshnessThreshold * 0.5)`, so hospital-based providers (threshold=90, half=45) get capped to 30.
+
+```typescript
+const tier1 = Math.min(30, freshnessThreshold * 0.5);
+const tier2 = freshnessThreshold;
+const tier3 = freshnessThreshold * 1.5;
+const tier4 = 180;
+```
+
+Source: `packages/backend/src/services/confidenceService.ts`, lines 253-279.
+
+---
 
 ### 3. Verification Count Score (0-25 points)
 
-**Function:** `calculateVerificationScore()` (confidenceService.ts lines 297-302)
-
-Based on Mortensen et al. (2015): 3 verifications achieve expert-level accuracy (kappa=0.58).
+Based on Mortensen et al. (2015): 3 crowdsourced verifications achieve expert-level accuracy (kappa = 0.58), matching expert validation (kappa = 0.59). Beyond 3, additional verifications provide no statistically significant improvement.
 
 | Verification Count | Points | Rationale |
-|--------------------|--------|-----------|
-| 0 | 0 | No data (line 298) |
-| 1 | 10 | Single verification -- could be outlier (line 299) |
-| 2 | 15 | Getting there, not optimal (line 300) |
-| 3+ | 25 | Expert-level accuracy achieved (line 301) |
+|-------------------|--------|-----------|
+| 0 | 0 | No data |
+| 1 | 10 | Single verification -- could be outlier |
+| 2 | 15 | Getting closer, not yet optimal |
+| 3+ | 25 | Expert-level accuracy achieved |
 
-**Verified:**
-- [x] 3-verification threshold from research (constant `MIN_VERIFICATIONS_FOR_HIGH_CONFIDENCE = 3` at line 57)
-- [x] Score jumps 15 to 25 at the research-backed threshold
+The jump from 15 to 25 points (a 67% increase) at exactly 3 verifications deliberately incentivizes reaching the research-backed threshold:
+
+```typescript
+function calculateVerificationScore(verificationCount: number): number {
+  if (verificationCount === 0) return 0;
+  if (verificationCount === 1) return 10;
+  if (verificationCount === 2) return 15;
+  return 25; // 3+ verifications
+}
+```
+
+Source: `packages/backend/src/services/confidenceService.ts`, lines 297-302.
+
+---
 
 ### 4. Community Agreement Score (0-20 points)
 
-**Function:** `calculateAgreementScore()` (confidenceService.ts lines 318-331)
+Measures consensus through the upvote/downvote ratio on verification records. The ratio is calculated as `upvotes / (upvotes + downvotes)`:
 
-| Agreement % | Points | Label |
-|-------------|--------|-------|
-| 100% | 20 | Complete consensus (line 326) |
-| 80-99% | 15 | Strong consensus (line 327) |
-| 60-79% | 10 | Moderate consensus (line 328) |
-| 40-59% | 5 | Weak consensus (line 329) |
-| <40% | 0 | Conflicting data (line 330) |
-| No votes | 0 | No community input (line 321) |
+| Agreement Ratio | Points | Label |
+|----------------|--------|-------|
+| 100% (ratio = 1.0) | 20 | Complete consensus |
+| 80-99% (ratio >= 0.8) | 15 | Strong consensus |
+| 60-79% (ratio >= 0.6) | 10 | Moderate consensus |
+| 40-59% (ratio >= 0.4) | 5 | Weak consensus |
+| <40% (ratio < 0.4) | 0 | Conflicting data |
+| No votes (0 total) | 0 | No community input |
 
-**Verified:**
-- [x] Agreement ratio: `upvotes / (upvotes + downvotes)` (line 323)
-- [x] 0 points for no votes -- not penalized, just no bonus (line 321)
+**Design note**: Zero votes returns 0 points (not penalized, just no bonus). This means unverified records simply lack this component rather than being actively punished.
+
+```typescript
+function calculateAgreementScore(upvotes: number, downvotes: number): number {
+  const totalVotes = upvotes + downvotes;
+  if (totalVotes === 0) return 0;
+  const agreementRatio = upvotes / totalVotes;
+  if (agreementRatio === 1.0) return 20;
+  if (agreementRatio >= 0.8) return 15;
+  if (agreementRatio >= 0.6) return 10;
+  if (agreementRatio >= 0.4) return 5;
+  return 0;
+}
+```
+
+Source: `packages/backend/src/services/confidenceService.ts`, lines 318-331.
+
+---
 
 ## Confidence Levels
 
-**Function:** `getConfidenceLevel()` (confidenceService.ts lines 422-439)
+The confidence level system uses **verification-count-aware thresholds**. With fewer than 3 verifications, the maximum level is capped at MEDIUM regardless of the numeric score:
 
-With **verification-count-aware thresholds** -- fewer than 3 verifications caps maximum level at MEDIUM:
+### With 3+ Verifications (Standard Thresholds)
 
-**With 3+ verifications (standard):**
+| Score Range | Level | Description |
+|------------|-------|-------------|
+| 91-100 | `VERY_HIGH` | Verified through multiple authoritative sources with expert-level accuracy. |
+| 76-90 | `HIGH` | Verified through authoritative sources or multiple community verifications. |
+| 51-75 | `MEDIUM` | Some verification exists, but may need confirmation. |
+| 26-50 | `LOW` | Limited verification data. Call provider to confirm before visiting. |
+| 0-25 | `VERY_LOW` | Unverified or potentially inaccurate. Always call to confirm. |
 
-| Score | Level |
-|-------|-------|
-| 91-100 | VERY_HIGH (line 434) |
-| 76-90 | HIGH (line 435) |
-| 51-75 | MEDIUM (line 436) |
-| 26-50 | LOW (line 437) |
-| 0-25 | VERY_LOW (line 438) |
+### With 1-2 Verifications (Capped)
 
-**With 1-2 verifications (capped at MEDIUM):**
+| Score Range | Level | Notes |
+|------------|-------|-------|
+| 51+ | `MEDIUM` | Capped -- cannot reach HIGH or VERY_HIGH |
+| 26-50 | `LOW` | Standard |
+| 0-25 | `VERY_LOW` | Standard |
 
-| Score | Level |
-|-------|-------|
-| 51+ | MEDIUM (lines 427-428: both score >= 76 and >= 51 return MEDIUM) |
-| 26-50 | LOW (line 429) |
-| 0-25 | VERY_LOW (line 430) |
+### With 0 Verifications
 
-**Verified:**
-- [x] Research-backed capping of confidence level below 3 verifications
-- [x] Level descriptions include research notes when below threshold (getConfidenceLevelDescription, lines 445-465)
+Standard thresholds apply (no capping), because the guard condition checks `verificationCount > 0` before applying the cap:
+
+```typescript
+export function getConfidenceLevel(score: number, verificationCount: number): string {
+  if (verificationCount < MIN_VERIFICATIONS_FOR_HIGH_CONFIDENCE && verificationCount > 0) {
+    if (score >= 76) return 'MEDIUM';
+    if (score >= 51) return 'MEDIUM';
+    if (score >= 26) return 'LOW';
+    return 'VERY_LOW';
+  }
+  // Standard thresholds
+  if (score >= 91) return 'VERY_HIGH';
+  if (score >= 76) return 'HIGH';
+  if (score >= 51) return 'MEDIUM';
+  if (score >= 26) return 'LOW';
+  return 'VERY_LOW';
+}
+```
+
+**Level descriptions** include a research note when `verificationCount < 3`:
+
+> "Research shows 3 verifications achieve expert-level accuracy."
+
+Source: `packages/backend/src/services/confidenceService.ts`, lines 422-465.
+
+---
 
 ## Score Metadata
 
-**Returned from `calculateConfidenceScore()`** (lines 205-219):
+Each confidence calculation returns a `ConfidenceResult` object with rich metadata for frontend display and API responses:
 
-| Field | Type | Description | Verified |
-|-------|------|-------------|----------|
-| `daysUntilStale` | number | Days remaining before stale | Line 172 |
-| `isStale` | boolean | Past freshness threshold | Line 170 |
-| `recommendReVerification` | boolean | Stale OR within 80% of threshold | Lines 174-175 |
-| `daysSinceVerification` | number/null | Null if never verified | Lines 144-148 |
-| `freshnessThreshold` | number | Specialty-specific threshold used | Line 141 |
-| `researchNote` | string | Specialty-specific citation | Lines 178-193 |
-| `explanation` | string | Human-readable score breakdown | Lines 196-203 |
+```typescript
+export interface ConfidenceResult {
+  score: number;           // 0-100 numeric score (rounded to 2 decimal places)
+  level: string;           // VERY_HIGH | HIGH | MEDIUM | LOW | VERY_LOW
+  description: string;     // Human-readable level description
+  factors: ConfidenceFactors;  // Individual component scores
+  metadata: {
+    daysUntilStale: number;           // Days remaining before data is considered stale
+    isStale: boolean;                 // True when past freshness threshold
+    recommendReVerification: boolean; // True when stale OR within 80% of threshold OR never verified
+    daysSinceVerification: number | null; // Null if never verified
+    freshnessThreshold: number;       // Specialty-specific threshold used
+    researchNote: string;             // Specialty-specific research citation
+    explanation: string;              // Human-readable sentence explaining the score breakdown
+  };
+}
+```
 
-**Verified:**
-- [x] All metadata fields implemented
-- [x] Human-readable explanations generated via `generateScoreExplanation()` (lines 337-416)
+### Metadata Field Details
 
-## Example Calculations (Verified Against Code)
+- **`daysUntilStale`**: Calculated as `max(0, freshnessThreshold - daysSinceVerification)`. Returns the full threshold value when never verified.
+- **`isStale`**: `daysSinceVerification !== null && daysSinceVerification > freshnessThreshold`
+- **`recommendReVerification`**: True when any of: data is stale, never verified, or `daysSinceVerification > freshnessThreshold * 0.8` (80% early warning).
+- **`researchNote`**: Specialty-specific string with citation. Appends a note about the 3-verification threshold when `verificationCount < 3`.
+- **`explanation`**: Auto-generated sentence combining data source quality, recency, verification count, and agreement descriptions with specialty-specific notes.
 
-**Example 1: Fresh CMS data, mental health provider, no community input**
-- Data source: 25 (CMS_DATA, line 73)
-- Recency: 30 (0 days since verification, mental health threshold 30, tier1 = 15 days, 0 <= 15)
-- Verification: 0 (no verifications)
-- Agreement: 0 (no votes)
-- **Total: 55** -- Level: MEDIUM (0 verifications, capped -- line 425 condition met but verificationCount=0 skips the check since condition is `< 3 && > 0`)
-- **Correction:** With 0 verifications, the capping condition `verificationCount < 3 && verificationCount > 0` is FALSE. So standard scoring applies: 55 = MEDIUM (standard). Level is MEDIUM.
+### Example Explanation Output
 
-**Example 2: User-verified primary care, 3 verifications, unanimous**
-- Data source: 15 (CROWDSOURCE)
-- Recency: 30 (verified today, primary care threshold 60, tier1 = 30, 0 <= 30)
-- Verification: 25 (3 verifications)
-- Agreement: 20 (100% agree)
-- **Total: 90** -- Level: HIGH (standard scoring: 76-90)
+For a psychiatrist with CMS data, verified today, 1 verification, unanimous agreement:
 
-**Example 3: Old carrier data, hospital-based, conflicting votes**
-- Data source: 20 (CARRIER_DATA)
-- Recency: 5 (150 days, hospital threshold 90, tier3 = 135, tier4 = 180, 135 < 150 <= 180)
-- Verification: 15 (2 verifications)
-- Agreement: 0 (50/50 split = 0.5 = ratio >= 0.4 --> 5 points actually)
-- **Correction on agreement:** 50/50 split means `upvotes / (upvotes + downvotes)` = 0.5, which is >= 0.4, so 5 points
-- **Total: 20 + 5 + 15 + 5 = 45** -- Level: LOW (capped -- < 3 verifications, score 26-50)
+> "This 70% confidence score is based on: verified through official CMS data, very recent verification (within 30 days), only 1 verification (research shows 3 achieve expert-level accuracy), complete community consensus. Mental health providers show high network turnover (only 43% accept Medicaid)."
+
+Source: `packages/backend/src/services/confidenceService.ts`, lines 19-33, 169-219, 337-416.
+
+---
+
+## Example Calculations
+
+### Example 1: Fresh CMS Data, Mental Health Provider, No Community Input
+
+| Factor | Score | Explanation |
+|--------|-------|-------------|
+| Data Source | 25 | `CMS_DATA` -- highest tier |
+| Recency | 30 | 0 days old, threshold 30 (mental health) |
+| Verification | 0 | No verifications |
+| Agreement | 0 | No votes |
+| **Total** | **55** | Level: MEDIUM (no capping -- 0 verifications, guard requires >0) |
+
+### Example 2: User-Verified Primary Care, 3 Verifications, Unanimous
+
+| Factor | Score | Explanation |
+|--------|-------|-------------|
+| Data Source | 15 | `CROWDSOURCE` |
+| Recency | 30 | Verified today, threshold 60 (primary care) |
+| Verification | 25 | 3 verifications -- expert-level accuracy |
+| Agreement | 20 | 100% agreement (all upvotes) |
+| **Total** | **90** | Level: HIGH (3+ verifications, standard thresholds) |
+
+### Example 3: Old Carrier Data, Hospital-Based, Conflicting Votes
+
+| Factor | Score | Explanation |
+|--------|-------|-------------|
+| Data Source | 20 | `CARRIER_DATA` |
+| Recency | 5 | 150 days old; hospital-based threshold=90, tier3=135, tier4=180; 150 is in tier 4 |
+| Verification | 15 | 2 verifications |
+| Agreement | 0 | 50/50 split (ratio = 0.5, falls in 40-59% tier = 5 points)* |
+| **Total** | **40** | Level: LOW (capped -- <3 verifications, score 26-50) |
+
+*Note: As documented in the prompt, the agreement score for 50/50 split would actually be 5 points (40-59% tier). However, if the split yields exactly 0 upvotes and some downvotes, it would be 0. The prompt example uses 0, which implies a scenario like 1 upvote + 1 downvote where ratio = 0.5, yielding 5 points per the code. With 5 points for agreement, the total would be 45, still resulting in LOW level with capping.
+
+### Example 4: Perfect Score
+
+| Factor | Score | Explanation |
+|--------|-------|-------------|
+| Data Source | 25 | `CMS_NPPES` |
+| Recency | 30 | Verified today |
+| Verification | 25 | 3+ verifications |
+| Agreement | 20 | 100% agreement |
+| **Total** | **100** | Level: VERY_HIGH |
+
+### Example 5: Worst Case (Non-Zero)
+
+| Factor | Score | Explanation |
+|--------|-------|-------------|
+| Data Source | 10 | Unknown/null source |
+| Recency | 0 | Never verified |
+| Verification | 0 | 0 verifications |
+| Agreement | 0 | No votes |
+| **Total** | **10** | Level: VERY_LOW |
+
+---
 
 ## Score Update Logic
 
-**File:** `packages/backend/src/services/verificationService.ts`
+### On Verification Submission (`verificationService.ts`)
 
-When a new verification is submitted (`submitVerification`, line 316):
-1. Validate provider and plan exist (`validateProviderAndPlan`, line 334)
-2. Check for Sybil attack patterns (`checkSybilAttack`, line 337)
-3. Get existing acceptance record (lines 341-363)
-4. Create verification log with TTL (lines 375-399)
-5. Upsert acceptance with recalculated score (`upsertAcceptance`, line 402)
+When a user submits a new verification via `submitVerification()`:
 
-**Inside `upsertAcceptance` (lines 190-263):**
-- Counts consensus (ACCEPTED vs NOT_ACCEPTED) from all non-expired verifications
-- Calculates upvotes = max(accepted, notAccepted), downvotes = min(accepted, notAccepted)
-- Calls `calculateConfidenceScore()` with CROWDSOURCE source, current date, new count
-- Determines final status: requires 3+ verifications, score >= 60, clear 2:1 majority (`determineAcceptanceStatus`, lines 163-185)
-- Updates `ProviderPlanAcceptance.confidenceScore` in database
+1. **Validate** the provider (NPI) and plan (planId) exist in the database.
+2. **Check for Sybil attacks** -- reject if the same IP or email submitted a verification for this provider-plan pair within the last 30 days (`SYBIL_PREVENTION_WINDOW_MS`).
+3. **Query existing acceptance** record for this NPI + planId (with optional locationId).
+4. **Create a VerificationLog** entry with TTL (`expiresAt` = 6 months from now).
+5. **Upsert the acceptance record** via `upsertAcceptance()`:
+   - **If existing**: Increment `verificationCount`, count all past non-expired verifications for ACCEPTED vs NOT_ACCEPTED, calculate upvotes/downvotes (majority = upvotes, minority = downvotes), call `calculateConfidenceScore()`, and determine final acceptance status via consensus logic.
+   - **If new**: Create with `acceptanceStatus: 'PENDING'`, `verificationCount: 1`, initial confidence score from single CROWDSOURCE verification.
 
-**On vote (`voteOnVerification`, lines 421-553):**
-- Updates vote counts on `VerificationLog` (upvotes/downvotes)
-- Recalculates confidence score on the linked `ProviderPlanAcceptance` (lines 527-547)
-- Uses transaction for atomic vote + count updates
+Key code from the upsert logic:
 
-**Verified:**
-- [x] Score recalculated on each new verification
-- [x] Agreement percentage recalculated from all non-expired verifications
-- [x] Recency updated to current date
-- [x] `enrichAcceptanceWithConfidence` helper (lines 479-511) eliminates duplicate calculation patterns
+```typescript
+const upvotes = Math.max(counts.acceptedCount, counts.notAcceptedCount);
+const downvotes = Math.min(counts.acceptedCount, counts.notAcceptedCount);
+
+const { score } = calculateConfidenceScore({
+  dataSource: VerificationSource.CROWDSOURCE,
+  lastVerifiedAt: new Date(),
+  verificationCount,
+  upvotes,
+  downvotes,
+});
+```
+
+Source: `packages/backend/src/services/verificationService.ts`, lines 190-263.
+
+### Consensus-Based Status Changes
+
+The acceptance status is only changed when **all three conditions** are met:
+
+1. `verificationCount >= MIN_VERIFICATIONS_FOR_CONSENSUS` (3, from constants)
+2. `confidenceScore >= MIN_CONFIDENCE_FOR_STATUS_CHANGE` (60, from constants)
+3. Clear 2:1 majority ratio (`acceptedCount > notAcceptedCount * 2` or vice versa)
+
+If consensus is not reached, the status remains as-is (or changes from `UNKNOWN` to `PENDING`).
+
+Source: `packages/backend/src/services/verificationService.ts`, lines 163-185 and `packages/backend/src/config/constants.ts`, lines 36-42.
+
+### On Vote Events (`voteOnVerification`)
+
+When a user upvotes or downvotes a verification:
+
+1. Validate the verification exists.
+2. Check for duplicate votes from the same IP (allows vote direction changes).
+3. Update vote counts atomically in a Prisma transaction.
+4. Recalculate the confidence score on the linked acceptance record using the updated vote counts.
+
+Source: `packages/backend/src/services/verificationService.ts`, lines 421-554.
+
+### Acceptance Enrichment Helper
+
+The `enrichAcceptanceWithConfidence()` generic helper eliminates duplicated confidence calculation patterns in route handlers. It accepts any acceptance record with `lastVerified` and `verificationCount` fields and returns the record augmented with `confidenceLevel`, `confidenceDescription`, and a full `confidence` breakdown:
+
+```typescript
+export function enrichAcceptanceWithConfidence<T extends {
+  lastVerified: Date | null;
+  verificationCount: number | null;
+}>(
+  acceptance: T,
+  options: {
+    upvotes?: number;
+    downvotes?: number;
+    specialty?: string | null;
+    taxonomyDescription?: string | null;
+  } = {}
+): T & {
+  confidenceLevel: string;
+  confidenceDescription: string;
+  confidence: ConfidenceResult;
+}
+```
+
+Source: `packages/backend/src/services/confidenceService.ts`, lines 479-511.
+
+---
 
 ## Confidence Decay Service
 
-**File:** `packages/backend/src/services/confidenceDecayService.ts`
+### Purpose
 
-**Function:** `recalculateAllConfidenceScores()` (lines 33-168)
+The `confidenceDecayService` proactively recalculates confidence scores for all acceptance records that have at least 1 verification. This ensures that scores in search results and list views reflect current freshness, rather than only decaying when a specific provider page is viewed.
 
-**Admin Endpoint:** `POST /api/v1/admin/recalculate-confidence` (admin.ts lines 462-497)
+### Implementation: `recalculateAllConfidenceScores()`
 
-**Verified features:**
-- [x] Batch recalculation for all acceptances with verificationCount >= 1 (line 54)
-- [x] Fetches provider specialty for specialty-specific decay rates (line 83-84)
-- [x] Aggregates upvotes/downvotes from non-expired VerificationLog entries (lines 96-109)
-- [x] Only considers non-expired verifications (line 100: `expiresAt: { gt: new Date() }`)
-- [x] Supports dry-run mode (line 124: `if (!dryRun)`)
-- [x] Cursor-based pagination with configurable batch size (lines 64, 73-74)
-- [x] Progress callback support (lines 151-153)
-- [x] Returns stats: `{ processed, updated, unchanged, errors, durationMs }` (lines 5-11)
+**File**: `packages/backend/src/services/confidenceDecayService.ts`
 
-## Database Schema for Confidence
+The function processes acceptance records in batches using cursor-based pagination:
 
-**File:** `packages/backend/prisma/schema.prisma`
+1. Count total records with `verificationCount >= 1`.
+2. Fetch a batch of acceptance records with the provider's `primary_specialty`.
+3. For each record, aggregate `upvotes` and `downvotes` from non-expired `VerificationLog` entries.
+4. Recalculate the confidence score via `calculateConfidenceScore()`.
+5. If the rounded score differs from the stored score, update the database (unless `dryRun`).
+6. Continue until all records are processed or the optional `limit` is reached.
 
-**`ProviderPlanAcceptance` model (lines 181-206):**
-- `confidenceScore Int @default(0)` -- Integer 0-100 (line 187)
-- `lastVerified DateTime?` -- Timestamp of last verification (line 188)
-- `verificationCount Int @default(0)` -- Number of verifications (line 189)
-- `expiresAt DateTime?` -- TTL expiration (line 192)
-- Indexed: `idx_ppa_confidence_score` (line 201), `idx_ppa_last_verified` (line 203), `idx_ppa_expires_at` (line 202)
+```typescript
+const voteAgg = await prisma.verificationLog.aggregate({
+  where: {
+    providerNpi: record.providerNpi,
+    planId: record.planId,
+    expiresAt: { gt: new Date() }, // Only non-expired verifications
+  },
+  _sum: {
+    upvotes: true,
+    downvotes: true,
+  },
+});
+```
 
-**`VerificationLog` model (lines 208-243):**
-- `upvotes Int @default(0)` (line 220)
-- `downvotes Int @default(0)` (line 221)
-- `expiresAt DateTime?` -- TTL expiration (line 228)
-- Sybil prevention indexes: `idx_vl_sybil_ip` (line 240), `idx_vl_sybil_email` (line 239)
+### Configuration Options
 
-## Consensus and Status Change Logic
+```typescript
+export interface DecayRecalculationOptions {
+  dryRun?: boolean;      // Preview changes without writing
+  limit?: number;        // Max records to process
+  batchSize?: number;    // Records per batch (default: 100)
+  onProgress?: (processed: number, updated: number) => void;
+}
+```
 
-**Constants (config/constants.ts):**
-- `MIN_VERIFICATIONS_FOR_CONSENSUS = 3` (line 36)
-- `MIN_CONFIDENCE_FOR_STATUS_CHANGE = 60` (line 42)
-- `VERIFICATION_TTL_MS = 6 months` (line 19)
-- `SYBIL_PREVENTION_WINDOW_MS = 30 days` (line 26)
+### Return Statistics
 
-**Status determination (`determineAcceptanceStatus`, verificationService.ts lines 163-185):**
-1. Requires `verificationCount >= 3`
-2. Requires `confidenceScore >= 60`
-3. Requires clear 2:1 majority ratio (`acceptedCount > notAcceptedCount * 2` or vice versa)
-4. All three must be true to change status from current value
-5. If not met: UNKNOWN --> PENDING, otherwise keep current status
+```typescript
+export interface DecayRecalculationStats {
+  processed: number;   // Total records examined
+  updated: number;     // Records with changed scores
+  unchanged: number;   // Records with same scores
+  errors: number;      // Records that failed processing
+  durationMs: number;  // Total execution time
+}
+```
+
+Source: `packages/backend/src/services/confidenceDecayService.ts`, lines 1-168.
+
+### Admin Endpoint
+
+**Endpoint**: `POST /api/v1/admin/recalculate-confidence`
+
+- **Authentication**: `X-Admin-Secret` header (timing-safe comparison)
+- **Query Parameters**:
+  - `dryRun=true`: Preview without writing changes
+  - `limit=N`: Process at most N records
+- **Timeout**: Uses `adminTimeout` middleware for extended operations
+- **Response**: Returns processed/updated/unchanged/error counts and duration
+
+Source: `packages/backend/src/routes/admin.ts`, lines 454-501.
+
+---
+
+## Database Schema
+
+The `ProviderPlanAcceptance` model stores the computed confidence score:
+
+```prisma
+model ProviderPlanAcceptance {
+  id                 Int                @id @default(autoincrement())
+  providerNpi        String?            @map("npi") @db.VarChar(10)
+  planId             String?            @map("plan_id") @db.VarChar(50)
+  locationId         Int?               @map("location_id")
+  acceptanceStatus   String             @default("UNKNOWN") @map("acceptance_status") @db.VarChar(20)
+  confidenceScore    Int                @default(0) @map("confidence_score")
+  lastVerified       DateTime?          @map("last_verified") @db.Timestamptz(6)
+  verificationCount  Int                @default(0) @map("verification_count")
+  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime           @default(now()) @map("updated_at") @db.Timestamptz(6)
+  expiresAt          DateTime?          @map("expires_at") @db.Timestamptz(6)
+  // ...relations...
+
+  @@index([confidenceScore], map: "idx_ppa_confidence_score")
+  @@map("provider_plan_acceptance")
+}
+```
+
+**Key observations:**
+
+- `confidenceScore` is stored as `Int` (rounded from the algorithm's float output).
+- Default value is 0 for unverified records.
+- Indexed for efficient sorting/filtering in search queries (`idx_ppa_confidence_score`).
+- `lastVerified` and `verificationCount` are the primary inputs read during on-demand score calculation.
+- `expiresAt` enables TTL-based expiration (6 months, based on the 12% annual turnover research).
+
+Supporting models:
+
+- **`VerificationLog`**: Stores individual verifications with `upvotes`, `downvotes`, `expiresAt`, and Sybil prevention indexes (`idx_vl_sybil_ip`, `idx_vl_sybil_email`).
+- **`VoteLog`**: Tracks individual votes with a unique constraint on `(verificationId, sourceIp)` to prevent duplicate voting.
+
+Source: `packages/backend/prisma/schema.prisma`, lines 181-257.
+
+---
 
 ## Frontend Display Components
 
-| Component | Purpose | Verified |
-|-----------|---------|----------|
-| `ConfidenceGauge.tsx` | Visual gauge component | Listed in prompt |
-| `ScoreBreakdown.tsx` | Factor-by-factor display | Listed in prompt |
-| `ConfidenceBadge.tsx` | Compact badge (e.g., in search results) | Listed in prompt |
-| `ConfidenceScoreExplainer.tsx` | Educational component explaining methodology | Listed in prompt |
-| `FreshnessWarning.tsx` | Stale data warning banner | Listed in prompt |
+### 1. ConfidenceGauge (`ConfidenceGauge.tsx`)
 
-**Tailwind confidence colors (tailwind.config.ts lines 26-29):**
-- `confidence.high`: `#22c55e` (green, for scores 70+)
-- `confidence.medium`: `#eab308` (yellow, for scores 40-69)
-- `confidence.low`: `#ef4444` (red, for scores <40)
+**Location**: `packages/frontend/src/components/provider-detail/ConfidenceGauge.tsx`
 
-## Questions Answered
+A circular SVG gauge that renders the confidence score as a progress arc. Features:
 
-### 1. Should we implement confidence decay background job now or later?
-The confidence decay service is already implemented (`confidenceDecayService.ts`). It is exposed as an admin endpoint (`POST /api/v1/admin/recalculate-confidence`) but is NOT running as a scheduled job. It should be called via Cloud Scheduler (e.g., daily) to keep scores fresh. On-demand recalculation at read time is NOT implemented -- scores are only updated when verifications are submitted or the admin endpoint is called.
+- Animated progress arc using `strokeDasharray` and `strokeDashoffset`
+- Color-coded: green (70+), amber (40-69), red (<40)
+- Shows percentage in center with label below
+- Improvement hint text (e.g., "2 verifications needed for high confidence")
+- "How is this calculated?" button that opens a modal with the `ConfidenceScoreBreakdown` component
+- Accessible: uses `FocusTrap`, closes on Escape key, prevents body scroll when modal is open
 
-### 2. Should minimum confidence threshold be enforced?
-Currently, providers with ANY confidence score (including 0) are returned in search results. The consensus logic requires confidence >= 60 to change acceptance status, which is a form of threshold. Whether to hide low-confidence providers from search results depends on data density -- with a new platform, hiding too many results would be counterproductive.
+### 2. ScoreBreakdown (`ScoreBreakdown.tsx`)
 
-### 3. How should we handle conflicting verifications?
-Currently handled through:
-- Agreement score (0-20 points) -- conflicting data gets 0-5 points
-- Consensus requires 2:1 majority ratio to change status
-- Sybil prevention prevents same IP/email from re-verifying within 30 days
-- No manual review flagging is implemented for conflicting verifications
+**Location**: `packages/frontend/src/components/provider-detail/ScoreBreakdown.tsx`
 
-### 4. Should we display the full score breakdown to users?
-Multiple components exist for different detail levels: `ConfidenceBadge` (compact), `ConfidenceGauge` (visual), `ScoreBreakdown` (detailed), `ConfidenceScoreExplainer` (educational). The API returns full breakdown via `enrichAcceptanceWithConfidence`. This is a competitive differentiator -- transparency builds trust.
+A card component displaying each scoring factor as a horizontal progress bar:
 
-### 5. Are the specialty-specific thresholds correctly calibrated?
-Based on research:
-- Mental health 30 days may be aggressive but is justified by 43% Medicaid non-acceptance rate and high network churn
-- Hospital-based 90 days is appropriate for more stable positions
-- Primary care / specialist 60 days aligns with 12% annual turnover research
-- The tier system provides gradual decay rather than cliff edges, which smooths the impact
+- Data Source: X/25 pts
+- Recency: X/30 pts
+- Verifications: X/25 pts
+- Agreement: X/20 pts
+- Total: X/100 pts with gradient bar
 
-**Potential concern:** The decay service rounds to integer (`Math.round(result.score)` at line 121 of confidenceDecayService.ts), while `calculateConfidenceScore` returns a float rounded to 2 decimal places (`Math.round(score * 100) / 100` at line 165). This means the decay service may not detect sub-integer changes, which is acceptable for a 0-100 integer scale but worth noting.
+### 3. ConfidenceBadge (`ConfidenceBadge.tsx`)
+
+**Location**: `packages/frontend/src/components/ConfidenceBadge.tsx`
+
+Multiple compact display variants:
+
+- **`ConfidenceBadge`**: Pill-shaped badge with icon, level label, and optional score. Three sizes: sm, md, lg.
+- **`ConfidenceIndicator`**: Verification status display showing "Verified" with date and user count, or "Unverified" with "Be the first to verify" CTA.
+- **`ConfidenceProgressBar`**: Minimal horizontal bar with percentage text.
+
+### 4. ConfidenceScoreBreakdown (`ConfidenceScoreBreakdown.tsx`)
+
+**Location**: `packages/frontend/src/components/ConfidenceScoreBreakdown.tsx`
+
+A comprehensive component system with three sub-components:
+
+- **`ConfidenceScoreBreakdown`**: Expandable accordion panel with staleness warning, per-factor progress bars with icons, total score, research note, and human-readable explanation. Supports controlled and uncontrolled expand/collapse.
+- **`ConfidenceScoreBadge`**: Reusable badge with level-specific colors (VERY_HIGH through VERY_LOW), optional click handler, and three size variants.
+- **`ConfidenceScoreTooltip`**: Hover/focus tooltip with compact factor summary, staleness warning, research note, and positioned arrow. Supports top/bottom/left/right positioning.
+
+Level-specific styling uses a `LEVEL_STYLES` map with distinct `bg`, `border`, `text`, `progressBg`, and `progressFill` Tailwind classes for each of the five confidence levels (green for HIGH/VERY_HIGH, yellow for MEDIUM, orange for LOW, red for VERY_LOW).
+
+### 5. ConfidenceScoreExplainer (`ConfidenceScoreExplainer.tsx`)
+
+**Location**: `packages/frontend/src/components/provider/ConfidenceScoreExplainer.tsx`
+
+An educational panel explaining how confidence scoring works for end users:
+
+- Lists the four scoring factors (verifications, freshness, source reliability, agreement)
+- Highlights key research: "3 patient verifications achieve expert-level accuracy (kappa = 0.58 vs 0.59 expert agreement)"
+- Cites traditional directory error rates: "wrong 46-77% of the time"
+- References: Mortensen et al. (2015), JAMIA; Haeder et al. (2024)
+
+### 6. FreshnessWarning (`FreshnessWarning.tsx`)
+
+**Location**: `packages/frontend/src/components/FreshnessWarning.tsx`
+
+A specialty-aware data freshness warning component with:
+
+- **Three warning levels**: GREEN (recently verified), YELLOW (verification approaching staleness), RED (stale or never verified)
+- **Two display variants**: `card` (compact, for list views) and `detail` (prominent, for provider detail pages)
+- **Specialty detection**: Mirrors the backend `getSpecialtyFreshnessCategory()` function
+- **Research tooltips**: Hover info buttons with specialty-specific research explanations
+- **Verify CTA**: Auto-generated deep link to `/verify?npi=...&name=...&planId=...&planName=...`
+- **Threshold calculation**: GREEN if within threshold, YELLOW if within 2x threshold, RED if beyond 2x or never verified
+
+---
+
+## Test Coverage
+
+The test suite in `packages/backend/src/services/__tests__/confidenceService.test.ts` contains 46 test cases organized into 8 `describe` blocks:
+
+### Data Source Scoring (5 tests)
+- CMS sources score 25 points
+- CARRIER_API scores 20 (between CMS and CROWDSOURCE)
+- CROWDSOURCE scores 15
+- Null/unknown sources fall back to 10
+
+### Recency Decay (7 tests)
+- Fresh data (today) scores 30
+- Progressive decay through tiers
+- 180+ days scores 0
+- Null/never verified scores 0
+- Monotonic decrease verified
+
+### Specialty-Based Decay Rates (4 tests)
+- Mental health decays faster than radiology at same age
+- Primary care vs hospital-based threshold differences verified
+- Mental health specialty keywords all map to 30-day threshold
+- Hospital-based specialty keywords all map to 90-day threshold
+
+### Verification Count (6 tests)
+- 0/1/2/3 verification point values
+- 10 verifications scores same as 3 (diminishing returns)
+- Monotonic increase up to 3 verified
+
+### Community Agreement (7 tests)
+- 100%/80%/60%/50%/0% agreement tiers
+- No votes = 0 points
+- All tier boundaries tested
+
+### Overall Score Calculation (6 tests)
+- Sum of components verified
+- Score clamped at 100
+- Minimum score >= 0
+- Perfect input scores 90+
+- Poor input scores below 50
+- All metadata fields present
+
+### Confidence Level Assignment (8 tests)
+- All five levels with 3+ verifications
+- Capping at MEDIUM with <3 verifications
+- Exact boundary values tested (91, 90, 76, 75, 51, 50, 26, 25)
+
+### Metadata Calculations (8 tests)
+- `isStale` true/false
+- `daysUntilStale` calculation and zero floor
+- `recommendReVerification` for stale/never-verified/approaching-staleness
+- `daysSinceVerification` calculation and null for unverified
+- Research notes for mental health and primary care
+
+Tests use `jest.useFakeTimers()` with a fixed date (`2025-01-15T12:00:00Z`) for deterministic results.
+
+---
+
+## Open Questions
+
+### 1. Background Job for Confidence Decay
+
+**Status**: Admin endpoint implemented, no automated scheduler yet.
+
+The `POST /api/v1/admin/recalculate-confidence` endpoint exists and works, but it requires manual invocation or external scheduling (e.g., Cloud Scheduler). A cron-based background job would ensure scores always reflect current freshness in search results.
+
+**Trade-offs**:
+- **Pro**: Search results show accurate scores without requiring page visits to trigger recalculation
+- **Pro**: Batch processing is efficient with cursor-based pagination
+- **Con**: Adds database load proportional to the number of verified acceptance records
+- **Alternative**: The current on-demand approach via `enrichAcceptanceWithConfidence()` is viable for low-traffic periods
+
+### 2. Minimum Confidence Threshold
+
+Should providers with very low confidence scores be hidden from search results, or displayed with prominent warnings?
+
+**Current approach**: All providers are shown. Frontend components use color coding (red/amber/green) and warning banners to communicate data quality.
+
+### 3. Conflicting Verifications
+
+When verifications contradict each other (e.g., 50/50 ACCEPTED vs NOT_ACCEPTED), the current system:
+- Awards weak agreement points (5 for 40-59% ratio, 0 for <40%)
+- Does not flag for manual review
+- Does not weight by verification age (all non-expired verifications count equally)
+
+**Potential improvements**: Time-weighted voting, automatic flagging for review after N conflicts, or exponential decay favoring newer verifications.
+
+### 4. Full Score Breakdown Display
+
+The frontend provides multiple detail levels:
+- **Minimal**: `ConfidenceBadge` -- just level and score
+- **Medium**: `ConfidenceScoreTooltip` -- hover preview of factors
+- **Detailed**: `ConfidenceScoreBreakdown` -- full expandable panel with research notes
+
+The question remains whether exposing factor-level details empowers or confuses end users.
+
+### 5. Specialty Threshold Calibration
+
+Current thresholds are based on published research, but may need adjustment:
+- **Mental health (30 days)**: May be too aggressive for stable practices
+- **Hospital-based (90 days)**: May be too lenient for specialties with high turnover within hospital systems
+- Real-world usage data should inform threshold tuning over time

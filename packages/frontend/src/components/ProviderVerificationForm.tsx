@@ -3,7 +3,9 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { progressWidth } from '@/lib/utils';
-import { logError } from '@/lib/errorUtils';
+import { verificationApi } from '@/lib/api';
+import { useCaptcha } from '@/hooks/useCaptcha';
+import toast from 'react-hot-toast';
 
 /**
  * Verification Form - Research-Backed Simplicity
@@ -66,6 +68,8 @@ export default function ProviderVerificationForm({
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showTooltip, setShowTooltip] = useState<string | null>(null);
+  const [honeypot, setHoneypot] = useState('');
+  const { getToken } = useCaptcha();
 
   const totalSteps = 4; // Main verification questions
   const stepNumbers: Record<string, number> = {
@@ -91,38 +95,34 @@ export default function ProviderVerificationForm({
     setCurrentStep(step);
   };
 
-  const handleSubmit = async (skipVerification = false) => {
+  const handleSubmit = async (acceptsSpecificPlan: 'YES' | 'NO' | 'NOT_ACCEPTING_NEW') => {
     setIsSubmitting(true);
 
     try {
-      if (skipVerification) {
-        // Don't submit verification, just show thank you
-        setCurrentStep(currentStep);
-        return;
+      const captchaToken = await getToken('submit_verification');
+
+      // Build notes from supplemental form data
+      const noteParts: string[] = [];
+      if (formData.contactedProvider !== null) {
+        noteParts.push(`Contacted provider: ${formData.contactedProvider ? 'Yes' : 'No'}`);
+      }
+      if (formData.phoneAccurate !== null) {
+        noteParts.push(`Phone accurate: ${formData.phoneAccurate ? 'Yes' : 'No'}`);
       }
 
-      const response = await fetch('/api/verifications', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          npi: providerNpi,
-          planId: planId,
-          phoneReached: formData.contactedProvider,
-          phoneCorrect: formData.phoneAccurate,
-          acceptsInsurance: formData.acceptsSpecificPlan === 'YES',
-          acceptsNewPatients: formData.acceptsSpecificPlan !== 'NOT_ACCEPTING_NEW',
-          scheduledAppointment: false,
-        }),
+      await verificationApi.submit({
+        npi: providerNpi,
+        planId,
+        acceptsInsurance: acceptsSpecificPlan === 'YES',
+        acceptsNewPatients: acceptsSpecificPlan !== 'NOT_ACCEPTING_NEW',
+        notes: noteParts.length > 0 ? noteParts.join('. ') : undefined,
+        captchaToken,
+        website: honeypot || undefined,
       });
 
-      if (!response.ok) {
-        throw new Error('Verification submission failed');
-      }
-
       setCurrentStep('success');
-    } catch (error) {
-      logError('ProviderVerificationForm.submit', error);
-      alert('Failed to submit verification. Please try again.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to submit verification. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -550,11 +550,25 @@ export default function ProviderVerificationForm({
           </Tooltip>
         </div>
 
+        {/* Honeypot field — hidden from real users, filled by bots */}
+        <div style={{ position: 'absolute', left: '-9999px', opacity: 0, height: 0, overflow: 'hidden' }} aria-hidden="true" tabIndex={-1}>
+          <label htmlFor="pvf-website">Website</label>
+          <input
+            type="text"
+            id="pvf-website"
+            name="website"
+            value={honeypot}
+            onChange={(e) => setHoneypot(e.target.value)}
+            autoComplete="off"
+            tabIndex={-1}
+          />
+        </div>
+
         <div className="space-y-3">
           <button
             onClick={() => {
               handleAnswer('acceptsSpecificPlan', 'YES');
-              handleSubmit();
+              handleSubmit('YES');
             }}
             disabled={isSubmitting}
             className="w-full btn-primary text-lg py-4"
@@ -564,7 +578,7 @@ export default function ProviderVerificationForm({
           <button
             onClick={() => {
               handleAnswer('acceptsSpecificPlan', 'NOT_ACCEPTING_NEW');
-              handleSubmit();
+              handleSubmit('NOT_ACCEPTING_NEW');
             }}
             disabled={isSubmitting}
             className="w-full btn-outline text-lg py-4"
@@ -574,7 +588,7 @@ export default function ProviderVerificationForm({
           <button
             onClick={() => {
               handleAnswer('acceptsSpecificPlan', 'NO');
-              handleSubmit();
+              handleSubmit('NO');
             }}
             disabled={isSubmitting}
             className="w-full btn-outline text-lg py-4"

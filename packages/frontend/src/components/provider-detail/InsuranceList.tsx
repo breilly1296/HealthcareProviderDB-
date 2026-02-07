@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { CheckCircle, XCircle, Clock, HelpCircle, Search, ChevronDown, ChevronRight, MessageSquarePlus, X, ThumbsUp, ThumbsDown, Users, Loader2, MessageSquare, MapPin } from 'lucide-react';
+import FocusTrap from 'focus-trap-react';
 import { verificationApi } from '@/lib/api';
+import { useCaptcha } from '@/hooks/useCaptcha';
 import toast from 'react-hot-toast';
 
 type PlanStatus = 'accepted' | 'not_accepted' | 'pending' | 'unknown';
@@ -134,15 +136,23 @@ function DataFreshnessBadge({ dateString }: { dateString: string | null | undefi
 // ============================================================================
 
 function StatusIcon({ status }: { status: PlanStatus }) {
+  const labelMap: Record<PlanStatus, string> = {
+    accepted: 'Accepted',
+    not_accepted: 'Not accepted',
+    pending: 'Pending verification',
+    unknown: 'Unknown status',
+  };
+  const label = labelMap[status] || 'Unknown status';
+
   switch (status) {
     case 'accepted':
-      return <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />;
+      return <><CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" aria-hidden="true" /><span className="sr-only">{label}</span></>;
     case 'not_accepted':
-      return <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />;
+      return <><XCircle className="w-4 h-4 text-red-500 flex-shrink-0" aria-hidden="true" /><span className="sr-only">{label}</span></>;
     case 'pending':
-      return <Clock className="w-4 h-4 text-yellow-500 flex-shrink-0" />;
+      return <><Clock className="w-4 h-4 text-yellow-500 flex-shrink-0" aria-hidden="true" /><span className="sr-only">{label}</span></>;
     default:
-      return <HelpCircle className="w-4 h-4 text-stone-400 dark:text-gray-500 flex-shrink-0" />;
+      return <><HelpCircle className="w-4 h-4 text-stone-400 dark:text-gray-500 flex-shrink-0" aria-hidden="true" /><span className="sr-only">{label}</span></>;
   }
 }
 
@@ -174,6 +184,36 @@ function VerificationModal({ isOpen, onClose, plan, npi, providerName, onVerifie
   const [showNoteField, setShowNoteField] = useState(false);
   const [note, setNote] = useState('');
   const [honeypot, setHoneypot] = useState('');
+  const { getToken } = useCaptcha();
+
+  const handleClose = useCallback(() => {
+    setIsSubmitting(null);
+    setVerificationDate(null);
+    setShowNoteField(false);
+    setNote('');
+    setHoneypot('');
+    onClose();
+  }, [onClose]);
+
+  // Close on Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') handleClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, handleClose]);
+
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [isOpen]);
 
   if (!isOpen || !plan) return null;
 
@@ -194,6 +234,8 @@ function VerificationModal({ isOpen, onClose, plan, npi, providerName, onVerifie
         fullNote = fullNote ? `${dateContext}. ${fullNote}` : dateContext;
       }
 
+      const captchaToken = await getToken('submit_verification');
+
       await verificationApi.submit({
         npi,
         planId: plan.planId,
@@ -201,6 +243,7 @@ function VerificationModal({ isOpen, onClose, plan, npi, providerName, onVerifie
         acceptsInsurance,
         notes: fullNote || undefined,
         website: honeypot || undefined,
+        captchaToken,
       });
 
       // Close modal immediately and show success toast
@@ -218,33 +261,33 @@ function VerificationModal({ isOpen, onClose, plan, npi, providerName, onVerifie
     }
   };
 
-  const resetAndClose = () => {
-    setIsSubmitting(null);
-    setVerificationDate(null);
-    setShowNoteField(false);
-    setNote('');
-    setHoneypot('');
-    onClose();
-  };
+  const resetAndClose = handleClose;
 
   const handleSkip = () => {
-    resetAndClose();
+    handleClose();
   };
 
   const isLoading = isSubmitting !== null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50" onClick={resetAndClose} />
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="verify-modal-title"
+    >
+      <div className="absolute inset-0 bg-black/50" onClick={resetAndClose} aria-hidden="true" />
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false }}>
       <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full p-6">
         <button
           onClick={resetAndClose}
           className="absolute top-4 right-4 text-stone-400 hover:text-stone-600 dark:hover:text-gray-300"
+          aria-label="Close"
         >
-          <X className="w-5 h-5" />
+          <X className="w-5 h-5" aria-hidden="true" />
         </button>
 
-        <h3 className="text-lg font-bold text-stone-800 dark:text-white mb-1">
+        <h3 id="verify-modal-title" className="text-lg font-bold text-stone-800 dark:text-white mb-1">
           Verify Insurance Acceptance
         </h3>
         <p className="text-sm text-stone-500 dark:text-gray-400 mb-5">
@@ -260,9 +303,9 @@ function VerificationModal({ isOpen, onClose, plan, npi, providerName, onVerifie
             className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting === 'yes' ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
+              <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
             ) : (
-              <ThumbsUp className="w-5 h-5" />
+              <ThumbsUp className="w-5 h-5" aria-hidden="true" />
             )}
             {isSubmitting === 'yes' ? 'Submitting...' : 'Yes, they accept this plan'}
           </button>
@@ -272,9 +315,9 @@ function VerificationModal({ isOpen, onClose, plan, npi, providerName, onVerifie
             className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting === 'no' ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
+              <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
             ) : (
-              <ThumbsDown className="w-5 h-5" />
+              <ThumbsDown className="w-5 h-5" aria-hidden="true" />
             )}
             {isSubmitting === 'no' ? 'Submitting...' : "No, they don't accept this plan"}
           </button>
@@ -359,6 +402,7 @@ function VerificationModal({ isOpen, onClose, plan, npi, providerName, onVerifie
           />
         </div>
       </div>
+      </FocusTrap>
     </div>
   );
 }
@@ -698,10 +742,11 @@ export function InsuranceList({
       {/* Search Input */}
       {plans.length > 5 && (
         <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 dark:text-gray-500" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 dark:text-gray-500" aria-hidden="true" />
           <input
             type="text"
             placeholder="Search your insurance plan..."
+            aria-label="Search insurance plans"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 bg-stone-50 dark:bg-gray-700/50 border border-stone-200 dark:border-gray-600 rounded-lg text-sm text-stone-800 dark:text-white placeholder-stone-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#137fec] focus:border-transparent"

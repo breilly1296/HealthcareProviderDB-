@@ -3,6 +3,7 @@
 import { useState, FormEvent, useEffect, useRef, useCallback } from 'react';
 import { verificationApi } from '@/lib/api';
 import { trackVerificationSubmit } from '@/lib/analytics';
+import { useCaptcha } from '@/hooks/useCaptcha';
 
 // Email validation regex (RFC 5322 simplified)
 const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
@@ -36,6 +37,8 @@ export function VerificationButton({
   const [notes, setNotes] = useState('');
   const [email, setEmail] = useState('');
   const [honeypot, setHoneypot] = useState('');
+
+  const { getToken } = useCaptcha();
 
   // Refs for focus trap
   const modalRef = useRef<HTMLDivElement>(null);
@@ -76,6 +79,8 @@ export function VerificationButton({
     }, SUBMISSION_TIMEOUT_MS);
 
     try {
+      const captchaToken = await getToken('submit_verification');
+
       await verificationApi.submit({
         npi,
         planId: planId.trim(),
@@ -84,6 +89,7 @@ export function VerificationButton({
         notes: notes.trim() || undefined,
         submittedBy: email.trim() || undefined,
         website: honeypot || undefined,
+        captchaToken,
       });
 
       clearTimeout(timeoutId);

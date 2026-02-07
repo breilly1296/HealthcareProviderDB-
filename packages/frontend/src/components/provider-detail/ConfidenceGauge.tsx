@@ -93,7 +93,7 @@ export function ConfidenceGauge({
     <>
       <div className="flex flex-col items-center">
         <div className="relative" style={{ width: size, height: size }}>
-          <svg width={size} height={size} className="transform -rotate-90">
+          <svg width={size} height={size} className="transform -rotate-90" role="img" aria-label={`Confidence score: ${score}%, ${label}`}>
             {/* Background track */}
             <circle
               cx={size / 2}
@@ -159,12 +159,13 @@ export function ConfidenceGauge({
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           role="dialog"
           aria-modal="true"
-          aria-label="Confidence score breakdown"
+          aria-labelledby="confidence-breakdown-title"
         >
           {/* Backdrop */}
           <div
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={handleClose}
+            aria-hidden="true"
           />
 
           {/* Modal Content */}
@@ -172,7 +173,7 @@ export function ConfidenceGauge({
             <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-stone-200 dark:border-gray-700 w-full max-w-md max-h-[85vh] overflow-y-auto">
               {/* Header */}
               <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-stone-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between rounded-t-xl">
-                <h2 className="text-lg font-semibold text-stone-800 dark:text-white">
+                <h2 id="confidence-breakdown-title" className="text-lg font-semibold text-stone-800 dark:text-white">
                   Confidence Score Breakdown
                 </h2>
                 <button

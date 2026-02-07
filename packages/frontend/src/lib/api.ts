@@ -368,6 +368,7 @@ export interface VerificationSubmission {
   notes?: string;
   submittedBy?: string;
   website?: string; // honeypot field — must be empty for real users
+  captchaToken?: string;
 }
 
 export interface VerificationStats {
@@ -545,7 +546,7 @@ const verify = {
       body: JSON.stringify(data),
     }),
 
-  vote: (verificationId: string, vote: 'up' | 'down', website?: string) =>
+  vote: (verificationId: string, vote: 'up' | 'down', website?: string, captchaToken?: string) =>
     apiFetch<{
       verification: {
         id: string;
@@ -556,7 +557,7 @@ const verify = {
       message: string;
     }>(`/verify/${verificationId}/vote`, {
       method: 'POST',
-      body: JSON.stringify({ vote, website }),
+      body: JSON.stringify({ vote, website, captchaToken }),
     }),
 
   getStats: () =>

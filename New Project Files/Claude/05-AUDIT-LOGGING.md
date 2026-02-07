@@ -1,217 +1,492 @@
 # VerifyMyProvider Audit Logging
 
-**Last Updated:** 2026-02-06
-**HIPAA Required:** NO
-**Purpose:** Debugging, spam detection, and operational monitoring
-**Implementation Status:** Fully implemented (structured logging + database audit trail)
+**Last Updated:** 2026-02-07
+**HIPAA Required:** NO (no PHI stored or processed)
+**Purpose:** Debugging, spam/abuse detection, operational monitoring
 
 ---
 
-## What Is Logged
+## What to Log
 
-### 1. Verification Submissions (NPI, plan, accepted, IP)
+### Currently Logged
 
-- [x] **Verified.** `verificationService.ts` lines 375-398: Every verification creates a `VerificationLog` record containing `providerNpi`, `planId`, `sourceIp`, `userAgent`, `submittedBy`, `verificationType`, `verificationSource`, `previousValue`, `newValue` (acceptance status), `notes`, `evidenceUrl`.
-- [x] IP address stored in `VerificationLog.sourceIp` (`schema.prisma` line 217) for Sybil prevention.
-- [x] User agent stored in `VerificationLog.userAgent` (`schema.prisma` line 218) for abuse analysis.
+| Event Category | What Is Logged | Where | Source File |
+|---|---|---|---|
+| **HTTP Requests** | Method, URL, status code, response time, request ID | stdout (Cloud Logging) | `requestLogger.ts`, `httpLogger.ts` |
+| **Rate Limit Hits** | Limit value, remaining count, 429 status | stdout via requestLogger | `requestLogger.ts` lines 50-69 |
+| **Verification Submissions** | NPI, plan ID, acceptance status, previous value, new value, timestamps | `verification_logs` table | `verificationService.ts` lines 375-399 |
+| **Vote Submissions** | Verification ID, vote direction, source IP | `vote_logs` table | `verificationService.ts` lines 496-514 |
+| **Anti-Abuse Data** | Source IP, user agent, submitter email (database only) | `verification_logs` table | `verificationService.ts` lines 393-395 |
+| **Sybil Attack Detection** | Duplicate verification attempts by IP or email | AppError.conflict thrown | `verificationService.ts` lines 72-115 |
+| **Honeypot Triggers** | IP, field name, request path | stdout (pino warn) | `honeypot.ts` lines 15-19 |
+| **CAPTCHA Events** | Failures, low scores, API errors, fail-open/closed decisions | stdout (pino warn/error) | `captcha.ts` lines 163-236 |
+| **Admin Actions** | Cleanup operations, cache clears, confidence recalculations | stdout (pino info) | `admin.ts` lines 77-84, 197-201, 477 |
+| **CORS Violations** | Blocked origin | stdout (pino warn) | `index.ts` line 79 |
+| **Sync Operations** | Sync type, state, records processed, status, errors | `sync_logs` table | Prisma schema `SyncLog` model |
+| **Data Quality Issues** | NPI, audit type, severity, field, current/expected values | `data_quality_audit` table | Prisma schema `DataQualityAudit` model |
+| **API Errors** | Request ID, error object, path, method | stdout (pino error) | `errorHandler.ts` lines 80-85 |
+| **Database Errors** | Prisma error codes (P2002, P2024, P2025, P2003, P2010) | stdout (pino error) | `errorHandler.ts` lines 134-214 |
+| **Server Lifecycle** | Startup, shutdown signals, database disconnection | stdout (pino info) | `index.ts` lines 190-226 |
+| **Request Timeouts** | Request ID, path, method, timeout duration | stdout (pino warn) | `requestTimeout.ts` lines 16-21 |
+| **Rate Limiter Mode** | Redis vs in-memory selection per limiter | stdout (pino info) | `rateLimiter.ts` lines 304-312 |
+| **Cache Activity** | Cache hits, misses, invalidation failures | stdout (pino debug/warn) | `providers.ts` lines 240-251 |
 
-### 2. Vote Submissions (verification ID, vote, IP)
+### Recommended Future Logging
 
-- [x] **Verified.** `verificationService.ts` lines 496-514: Every vote creates a `VoteLog` record with `verificationId`, `sourceIp`, `vote` (up/down), `createdAt`.
-- [x] IP stored in `VoteLog.sourceIp` for deduplication via unique constraint `[verificationId, sourceIp]`.
-
-### 3. Rate Limit Hits (IP, endpoint, timestamp)
-
-- [x] **Verified.** `requestLogger.ts` lines 50-68: The `RequestLogEntry` tracks `rateLimited: boolean` and `rateLimitInfo` (limit, remaining) on every request. Rate-limited requests (429 status) are clearly flagged.
-- [x] `rateLimiter.ts` lines 163-170 (in-memory) and 262-269 (Redis): Rate-limited requests return 429 with `Retry-After` header.
-
-### 4. API Errors (endpoint, error type)
-
-- [x] **Verified.** `errorHandler.ts` lines 80-85: Global error handler logs `requestId`, `err`, `path`, `method` via pino logger for every error.
-- [x] `httpLogger.ts` lines 17-19: Status codes >= 500 logged at `error` level, >= 400 at `warn` level.
-- [x] Production error responses hide internal details (`errorHandler.ts` line 162-163): `process.env.NODE_ENV === 'production'` returns generic "Internal server error" instead of stack traces.
-
-### 5. Authentication Events
-
-- [x] **Partially verified.** Admin auth failures are logged: `adminAuthMiddleware` logs `ADMIN_SECRET not configured` warning (`admin.ts` line 26). Auth failures throw `AppError.unauthorized` which is caught by the error handler and logged.
-- [ ] No user authentication events to log (no user auth exists).
-
----
-
-## What Is NOT Logged
-
-### 1. User Passwords
-
-- [x] **Verified.** No passwords exist in the system. No user accounts, no password fields in schema.
-
-### 2. Full Stack Traces in Production
-
-- [x] **Verified.** `errorHandler.ts` line 162-163: Production error messages are genericized. The `err` object is logged to pino (for Cloud Logging), but the API response to the client contains only "Internal server error" in production.
-
-### 3. Database Query Results
-
-- [x] **Verified.** Prisma client logging is configured in `prisma.ts` lines 10-12: development logs `['query', 'error', 'warn']`, production logs only `['error']`. Query results are not logged.
-
-### 4. CSRF Tokens
-
-- [x] **N/A.** No CSRF tokens exist in the system.
-
-### 5. Session IDs
-
-- [x] **N/A.** No sessions exist in the system.
+| Event | Priority | Reason |
+|---|---|---|
+| Authentication events | High | When user auth is added, track login/logout/failures |
+| Admin endpoint access attempts (failed auth) | High | Already partially covered by `AppError.unauthorized` in `adminAuthMiddleware` |
+| Expired record cleanup results | Medium | Already logged in admin routes, consider adding scheduled job logging |
+| Confidence score decay recalculations | Low | Admin-triggered, already logged |
 
 ---
 
-## Current Logging Implementation (Detailed)
+## What NOT to Log
 
-### Layer 1: Request ID Correlation
+### Explicitly Excluded from Application Logs
 
-**File:** `packages/backend/src/middleware/requestId.ts`
+| Data Type | Reason | Enforcement |
+|---|---|---|
+| **IP Addresses** | PII - excluded from request/application logs | `requestLogger.ts` interface `RequestLogEntry` has no IP field |
+| **User Agents** | PII - excluded from request logs | `requestLogger.ts` does not capture user agent |
+| **Full Stack Traces (production)** | Security - could expose internals | `errorHandler.ts` line 238: production returns generic "Internal server error" |
+| **Database Query Results** | Can be large, could contain sensitive data | Not included in any log statements |
+| **CSRF Tokens** | Security token, should never appear in logs | Not applicable (API uses CORS, not CSRF tokens) |
+| **Session IDs** | Not applicable (stateless API) | No session middleware in use |
+| **Passwords** | Never log credentials | No user auth system yet; admin secret checked via timing-safe comparison only |
+| **CAPTCHA Tokens** | Security tokens | Not logged; only verification result is logged |
+| **Admin Secret Values** | Critical credential | `admin.ts` uses `timingSafeEqual` comparison; secret value never logged |
 
-- Generates UUID per request via `crypto.randomUUID()` (line 22)
-- Uses existing `X-Request-ID` header if present (for cross-service tracing)
-- Attaches to `req.id` and sets `X-Request-ID` response header
-- Position in middleware chain: **first** (before all other middleware)
+### Important: Application Logs vs Database Storage Distinction
 
-### Layer 2: HTTP Request/Response Logging
+The project maintains a deliberate separation between what appears in application logs (stdout/Cloud Logging) and what is stored in database audit tables:
 
-**File:** `packages/backend/src/middleware/httpLogger.ts`
+```
+Application Logs (requestLogger.ts, httpLogger.ts):
+  - NO IP addresses
+  - NO user agents
+  - NO identifying information
+  - Only: method, path, status, response time, request ID, rate limit info
 
-- Uses `pino-http` for structured JSON logging
-- Correlates via `req.id` from requestId middleware (line 14)
-- Log levels: error (500+), warn (400+), info (success)
-- **Excludes `/health` endpoint** from logging (line 46) to reduce noise
-- **Serializers strip PII** (lines 33-42): Only logs `req.id`, `req.method`, `req.url` and `res.statusCode`. No IP, no user agent, no headers.
+Database Audit Tables (verification_logs, vote_logs):
+  - YES: sourceIp (for Sybil attack prevention, 30-day duplicate check)
+  - YES: userAgent (for abuse analysis)
+  - YES: submittedBy (email for duplicate detection)
+  - These are NEVER returned in API responses (stripped by stripVerificationPII())
+```
 
-### Layer 3: Application Request Logger
-
-**File:** `packages/backend/src/middleware/requestLogger.ts`
-
-- Tracks per-request metrics: requestId, timestamp, method, path, statusCode, responseTimeMs, rateLimited
-- **Explicitly excludes PII** (lines 7-19): `RequestLogEntry` interface has no IP, user agent, or identifying fields
-- In-memory buffer of last 1000 entries (line 27, `MAX_BUFFER_SIZE`)
-- `getRequestStats()` function (lines 101-135) provides aggregated stats: total requests, rate-limited count, average response time, status code distribution, endpoint counts, last 20 logs
-- Logs to stdout via pino (picked up by Cloud Logging in production)
-
-### Layer 4: Database Audit Trail
-
-**Files:** `schema.prisma` (VerificationLog, VoteLog, SyncLog, DataQualityAudit)
-
-| Table | Purpose | Retention | PII Fields |
-|-------|---------|-----------|------------|
-| `verification_logs` | Verification audit trail | 6 months (TTL via `expiresAt`) | `sourceIp`, `userAgent`, `submittedBy` |
-| `vote_logs` | Vote audit trail | Follows verification TTL (cascade delete) | `sourceIp` |
-| `sync_logs` | Data import tracking | 90 days (manual cleanup via admin endpoint) | None |
-| `data_quality_audit` | Data quality issues | No TTL (persistent) | None |
-
-### Layer 5: Error Logging
-
-**File:** `packages/backend/src/middleware/errorHandler.ts`
-
-- Global error handler (line 73-174) logs all errors with `requestId`, error details, path, method
-- Handles: AppError (custom), ZodError (validation), PayloadTooLargeError, PrismaClientKnownRequestError (P2002 duplicate, P2025 not found)
-- CAPTCHA failures logged with IP and score (`captcha.ts` lines 163-169, 174-181)
-- Honeypot triggers logged with IP (`honeypot.ts` lines 15-19)
-- Admin operations logged (`admin.ts` lines 75, 82, 196, 199, etc.)
+This is intentional: IPs are needed for anti-abuse logic but are not exposed in logs or API responses.
 
 ---
 
-## Privacy-Preserving Design (Verified)
+## Current Implementation
 
-**Critical distinction between application logs and database storage:**
+### 1. Structured Logging Infrastructure
 
-| Layer | Contains IP? | Contains User Agent? | Reason |
-|-------|---|---|---|
-| Application logs (`requestLogger.ts`) | **No** | **No** | Privacy by design |
-| HTTP logs (`httpLogger.ts`) | **No** | **No** | Custom serializers strip these |
-| Database (`VerificationLog`, `VoteLog`) | **Yes** | **Yes** (VerificationLog only) | Anti-abuse (Sybil prevention) |
-| API responses | **No** | **No** | `stripVerificationPII()` in `verificationService.ts` lines 307-310 |
+**Logger:** Pino (`packages/backend/src/utils/logger.ts`)
 
-**Exceptions where IP IS logged:**
-- CAPTCHA failures: `captcha.ts` lines 164, 176, 192, 202, 220, 231 -- IP logged in warn/error messages for security monitoring
-- Honeypot triggers: `honeypot.ts` line 16 -- IP logged to identify bot sources
-- CORS violations: `index.ts` line 78 -- origin logged (not IP) for monitoring
+```typescript
+// Production: structured JSON with ISO timestamps for Cloud Logging
+// Development: pino-pretty with colorized, human-readable output
+const logger = pino({
+  level: process.env.LOG_LEVEL || 'info',
+  // Production formatters output JSON to stdout
+  // Development uses pino-pretty transport
+});
+```
+
+**Log Level:** Configurable via `LOG_LEVEL` environment variable (default: `info`).
+
+**Environments:**
+- **Production:** JSON format to stdout, picked up by Google Cloud Logging
+- **Development:** Colorized console output via `pino-pretty`
+
+### 2. Request ID Correlation (`packages/backend/src/middleware/requestId.ts`)
+
+Every request gets a unique UUID for end-to-end log correlation:
+
+```typescript
+// Uses incoming X-Request-ID header if present (cross-service tracing)
+// Otherwise generates a new UUID via crypto.randomUUID()
+const requestId = (req.headers['x-request-id'] as string) || randomUUID();
+req.id = requestId;
+res.setHeader('X-Request-ID', requestId);
+```
+
+The request ID appears in:
+- All pino log entries (via `httpLogger.ts` using `genReqId: (req) => req.id`)
+- Error responses (returned as `requestId` field in error JSON)
+- The `requestLogger.ts` structured log entries
+
+### 3. Dual HTTP Logging Layer
+
+**Layer 1: pino-http (`httpLogger.ts`)** -- Automatic request/response logging:
+- Uses `req.id` for correlation
+- Custom log levels: 500+ = error, 400+ = warn, else info
+- Custom serializers exclude PII (only logs `id`, `method`, `url`, `statusCode`)
+- Skips `/health` endpoint to reduce noise
+
+**Layer 2: requestLogger (`requestLogger.ts`)** -- Application-level metrics:
+- Captures response time via `res.end` override
+- Extracts rate limit headers (`X-RateLimit-Limit`, `X-RateLimit-Remaining`)
+- Maintains in-memory buffer (max 1000 entries) for stats endpoint
+- Exposes `getRequestStats()` for aggregated monitoring data:
+  - Total requests, rate-limited count, average response time
+  - Status code distribution, endpoint frequency
+  - Last 20 log entries
+
+### 4. Database Audit Trail
+
+#### VerificationLog Model (`verification_logs` table)
+
+Primary audit record for all verification submissions. Schema from `packages/backend/prisma/schema.prisma`:
+
+```prisma
+model VerificationLog {
+  id                 String             @id @default(cuid())
+  providerNpi        String?            @map("provider_npi")
+  planId             String?            @map("plan_id")
+  acceptanceId       String?
+  verificationType   VerificationType   // PLAN_ACCEPTANCE, PROVIDER_INFO, etc.
+  verificationSource VerificationSource // CROWDSOURCE, CMS_DATA, etc.
+  previousValue      Json?              // Snapshot of state before change
+  newValue           Json?              // New verification data
+  sourceIp           String?            // Anti-abuse (NOT in logs or API responses)
+  userAgent          String?            // Abuse analysis (NOT in logs or API responses)
+  submittedBy        String?            // Email for dedup (NOT in API responses)
+  upvotes            Int                @default(0)
+  downvotes          Int                @default(0)
+  isApproved         Boolean?
+  reviewedAt         DateTime?
+  reviewedBy         String?
+  notes              String?
+  evidenceUrl        String?
+  createdAt          DateTime           @default(now())
+  expiresAt          DateTime?          // 6-month TTL
+}
+```
+
+**Key design decisions:**
+- `previousValue` / `newValue` as JSON fields capture the full state transition
+- `cuid()` primary keys prevent enumeration attacks
+- Sybil prevention indexes: `idx_vl_sybil_ip` (NPI + plan + IP + date), `idx_vl_sybil_email` (NPI + plan + email + date)
+- 6-month TTL based on 12% annual provider turnover research
+
+#### VoteLog Model (`vote_logs` table)
+
+Tracks individual votes on verifications:
+
+```prisma
+model VoteLog {
+  id               String           @id @default(cuid())
+  verificationId   String
+  sourceIp         String           // Required for vote deduplication
+  vote             String           // 'up' or 'down'
+  createdAt        DateTime         @default(now())
+
+  @@unique([verificationId, sourceIp]) // One vote per IP per verification
+}
+```
+
+**Anti-abuse:** The `@@unique([verificationId, sourceIp])` constraint at the database level prevents duplicate votes. Vote direction changes are allowed (up-to-down or vice versa) via transactional updates in `voteOnVerification()`.
+
+#### SyncLog Model (`sync_logs` table)
+
+Tracks data synchronization operations:
+
+```prisma
+model SyncLog {
+  id                Int       @id @default(autoincrement())
+  syncType          String?   // e.g., 'nppes', 'cms'
+  state             String?
+  recordsProcessed  Int?      @default(0)
+  status            String?
+  errorMessage      String?
+  startedAt         DateTime? @default(now())
+  completedAt       DateTime?
+}
+```
+
+#### DataQualityAudit Model (`data_quality_audit` table)
+
+Tracks data quality issues discovered during processing:
+
+```prisma
+model DataQualityAudit {
+  id             Int       @id @default(autoincrement())
+  npi            String
+  auditType      String    // Type of quality issue
+  severity       String    // Issue severity level
+  field          String?   // Which data field has the issue
+  currentValue   String?
+  expectedValue  String?
+  details        String?
+  resolved       Boolean   @default(false)
+  resolvedAt     DateTime?
+  createdAt      DateTime  @default(now())
+}
+```
+
+### 5. PII Stripping in API Responses
+
+The `stripVerificationPII()` function in `verificationService.ts` removes sensitive fields before returning data:
+
+```typescript
+function stripVerificationPII<T extends Record<string, unknown>>(
+  verification: T
+): Omit<T, 'sourceIp' | 'userAgent' | 'submittedBy'> {
+  const { sourceIp, userAgent, submittedBy, ...safe } = verification;
+  return safe;
+}
+```
+
+This is applied to:
+- `submitVerification()` return value (line 412)
+- `voteOnVerification()` return value (line 551)
+- `getRecentVerifications()` uses Prisma `select` to exclude these fields entirely (lines 632-648)
+- `getVerificationsForPair()` also uses Prisma `select` exclusion (lines 716-734)
+
+### 6. Error Logging Architecture
+
+The global error handler (`errorHandler.ts`) provides structured error logging:
+
+```typescript
+logger.error({
+  requestId: req.id,
+  err,
+  path: req.path,
+  method: req.method,
+}, 'Request error');
+```
+
+**Error categorization:**
+- `AppError` (operational): Logged and returned with appropriate status code + error code
+- `ZodError` (validation): Returned as 400 with field-level details
+- `PrismaClientKnownRequestError`: Mapped to appropriate HTTP status (409, 404, 400, 503, 500)
+- `PrismaClientInitializationError`: Logged as CRITICAL, returned as 503
+- `PayloadTooLargeError`: Returned as 413
+- Unknown errors: 500 in production (generic message), detailed in development
+
+**Production safety:** Full error messages are suppressed in production responses (line 238: `process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message`).
+
+### 7. Security Event Logging
+
+| Security Event | Log Level | Logger Location |
+|---|---|---|
+| Honeypot triggered (bot detection) | `warn` | `honeypot.ts` line 15 |
+| CAPTCHA verification failed | `warn` | `captcha.ts` line 163 |
+| CAPTCHA low score (possible bot) | `warn` | `captcha.ts` line 174 |
+| CAPTCHA Google API error | `error` | `captcha.ts` line 191 |
+| CAPTCHA fail-open with fallback limiting | `warn` | `captcha.ts` line 231 |
+| CAPTCHA fail-closed blocking | `warn` | `captcha.ts` line 201 |
+| CAPTCHA fallback rate limit exceeded | `warn` | `captcha.ts` line 222 |
+| CORS blocked origin | `warn` | `index.ts` line 79 |
+| Admin secret not configured | `warn` | `admin.ts` line 27 |
+| Admin unauthorized access | via AppError | `admin.ts` line 52 |
+| Rate limiter Redis unavailable | `warn` | `rateLimiter.ts` line 209 |
+| Rate limiter Redis error | `error` | `rateLimiter.ts` line 275 |
+| Request timeout | `warn` | `requestTimeout.ts` line 16 |
+| Database connection pool timeout | `error` | `errorHandler.ts` line 177 |
+| Database connection failure | `error` | `errorHandler.ts` line 219 |
+| Forced shutdown timeout | `error` | `index.ts` line 210 |
+
+### 8. Middleware Execution Order
+
+The middleware chain in `index.ts` establishes the logging pipeline:
+
+```
+1. requestIdMiddleware    -- Assigns UUID (or uses incoming X-Request-ID)
+2. httpLogger (pino-http) -- Logs HTTP request/response with request ID
+3. helmet                 -- Security headers (no logging)
+4. cors                   -- Logs CORS violations
+5. express.json           -- Body parsing
+6. defaultRateLimiter     -- Sets X-RateLimit-* headers
+7. requestLogger          -- Captures response metrics, rate limit info
+8. generalTimeout         -- Logs timeouts
+9. API routes             -- Route-specific logging
+10. notFoundHandler       -- Logs 404s
+11. errorHandler          -- Catches and logs all unhandled errors
+```
 
 ---
 
 ## Retention Policy
 
-| Data Type | Retention | Mechanism | Admin Endpoint |
-|-----------|-----------|-----------|----------------|
-| Verification logs | 6 months | `expiresAt` TTL field + cleanup job | `POST /admin/cleanup-expired` |
-| Vote logs | Follows verification | Cascade delete when verification deleted | (automatic) |
-| Plan acceptances | 6 months | `expiresAt` TTL field + cleanup job | `POST /admin/cleanup-expired` |
-| Sync logs | 90 days | Manual cleanup | `POST /admin/cleanup/sync-logs` |
-| Data quality audits | Permanent | No TTL | None |
-| Application logs (stdout) | Cloud Logging default | GCP retention settings | N/A |
+### Database Records
 
-**Cleanup implementation:**
-- `verificationService.ts` `cleanupExpiredVerifications()` (lines 767-854): Batch deletion with `dryRun` support
-- `admin.ts` sync-log cleanup (lines 273-335): Configurable `retentionDays` with `dryRun` support
-- Both designed for Cloud Scheduler (cron job) invocation
+| Table | Retention | Mechanism | Cleanup Endpoint |
+|---|---|---|---|
+| `verification_logs` | **6 months** | TTL via `expiresAt` column | `POST /api/v1/admin/cleanup-expired` |
+| `vote_logs` | **Follows parent** | Cascade delete from `verification_logs` | Automatic via `onDelete: Cascade` |
+| `provider_plan_acceptance` | **6 months** | TTL via `expiresAt` column | `POST /api/v1/admin/cleanup-expired` |
+| `sync_logs` | **90 days** | Manual cleanup | `POST /api/v1/admin/cleanup/sync-logs` |
+| `data_quality_audit` | **Indefinite** | No TTL or cleanup mechanism | None (manual) |
+
+**TTL Constants** (from `packages/backend/src/config/constants.ts`):
+- `VERIFICATION_TTL_MS = 6 * 30 * 24 * 60 * 60 * 1000` (approximately 180 days)
+- `SYBIL_PREVENTION_WINDOW_MS = 30 * 24 * 60 * 60 * 1000` (30 days)
+
+**Cleanup operations** are protected by admin authentication (`X-Admin-Secret` header with timing-safe comparison) and support dry-run mode. They are designed to be called by Google Cloud Scheduler.
+
+### Application Logs (stdout)
+
+| Destination | Retention | Notes |
+|---|---|---|
+| Cloud Logging (production) | Per GCP project settings | Configurable in Google Cloud Console |
+| In-memory buffer | Rolling 1000 entries | `requestLogger.ts` MAX_BUFFER_SIZE, not persistent |
+| Console (development) | Session only | Lost on restart |
+
+### Retention Monitoring
+
+The admin API provides comprehensive retention statistics:
+
+- `GET /api/v1/admin/retention/stats` -- Shows totals, expiring-soon counts, oldest/newest records for all log types
+- `GET /api/v1/admin/expiration-stats` -- Focused on verification expiration metrics
+- `GET /api/v1/admin/health` -- Includes retention metrics alongside cache and uptime data
 
 ---
 
-## Questions Answered
+## Architecture Diagram
+
+```
+                            Incoming Request
+                                  |
+                                  v
+                        +-------------------+
+                        | requestId (UUID)  |  <-- Assigns req.id
+                        +-------------------+
+                                  |
+                                  v
+                        +-------------------+
+                        | httpLogger        |  --> stdout (pino JSON)
+                        | (pino-http)       |      method, url, statusCode, req.id
+                        +-------------------+
+                                  |
+                                  v
+                        +-------------------+
+                        | rateLimiter       |  --> Sets X-RateLimit-* headers
+                        | (Redis/memory)    |      Logs Redis errors to stdout
+                        +-------------------+
+                                  |
+                                  v
+                        +-------------------+
+                        | requestLogger     |  --> stdout (pino JSON)
+                        |                   |      path, status, responseTime,
+                        |                   |      rateLimitInfo, requestId
+                        |                   |  --> In-memory buffer (stats)
+                        +-------------------+
+                                  |
+                                  v
+                        +-------------------+
+                        | Route Handlers    |
+                        | + honeypotCheck   |  --> stdout: bot detection events
+                        | + verifyCaptcha   |  --> stdout: CAPTCHA events
+                        | + route logic     |  --> PostgreSQL: verification_logs,
+                        |                   |      vote_logs, sync_logs,
+                        |                   |      data_quality_audit
+                        +-------------------+
+                                  |
+                                  v
+                        +-------------------+
+                        | errorHandler      |  --> stdout: structured error logs
+                        |                   |      (requestId, path, method, err)
+                        +-------------------+
+                                  |
+                                  v
+                              Response
+                         (X-Request-ID header)
+```
+
+---
+
+## Answers to Key Questions
 
 ### 1. Is any logging currently implemented?
 
-**Yes, comprehensively.** Five layers of logging are in place:
-1. Request ID correlation (`requestId.ts`)
-2. HTTP request/response logging via pino-http (`httpLogger.ts`)
-3. Application-level request tracking (`requestLogger.ts`)
-4. Database audit trail (VerificationLog, VoteLog, SyncLog, DataQualityAudit)
-5. Error logging with request context (`errorHandler.ts`)
+**Yes, extensively.** The project has a mature, multi-layered logging system:
+
+- **Application-level structured logging** via Pino with Cloud Run/Cloud Logging compatibility
+- **HTTP request/response logging** via pino-http with custom serializers
+- **Request metrics tracking** via custom `requestLogger` middleware with in-memory aggregation
+- **Database audit trail** via `verification_logs`, `vote_logs`, `sync_logs`, and `data_quality_audit` tables
+- **Security event logging** for honeypot triggers, CAPTCHA events, CORS violations, and rate limiter degradation
+- **Request ID correlation** across all log entries via UUID-based `X-Request-ID`
 
 ### 2. Should we implement audit logging now or later?
 
-**Already implemented.** The database audit trail (VerificationLog with full change tracking including `previousValue` and `newValue`) plus structured application logging is in place.
+**Already implemented.** The current system covers the primary use cases. The main gap is authentication event logging, which should be added when user authentication is implemented.
 
 ### 3. What events are most important to track?
 
-**Currently tracked (verified):**
-- Verification submissions (full audit trail in VerificationLog)
-- Vote submissions (VoteLog)
-- Rate limit violations (requestLogger + rateLimiter)
-- CAPTCHA failures (captcha.ts warning logs)
-- Bot detections (honeypot.ts warning logs)
-- API errors (errorHandler.ts)
-- Admin operations (admin.ts info logs)
-- Data sync operations (SyncLog)
+For this application (no PHI, crowdsourced data), the priority order is:
 
-**Not tracked but potentially useful:**
-- Admin endpoint access patterns (currently only logged on error)
-- Cache hit/miss rates over time (in-memory only via `getCacheStats()`)
-- Search query patterns (logged but not aggregated beyond in-memory buffer)
+1. **Verification submissions** (already tracked in DB) -- core business event
+2. **Vote submissions** (already tracked in DB) -- data quality signal
+3. **Rate limit / abuse events** (already tracked in logs) -- spam prevention
+4. **API errors** (already tracked in logs) -- debugging
+5. **Authentication events** (future) -- when auth is added
 
 ### 4. How long should logs be retained?
 
-**Current retention policy (verified in code):**
-- Verification/vote logs: 6 months (`VERIFICATION_TTL_MS = 6 * 30 * MS_PER_DAY` in `constants.ts` line 19)
-- Sync logs: 90 days (configurable via admin endpoint, `admin.ts` line 278)
-- Application logs: determined by Cloud Logging retention settings (not in application code)
-- Data quality audits: permanent (no TTL, no cleanup endpoint)
+**Not 7 years like HIPAA.** Current policy is appropriate:
+- Verifications: 6 months (based on 12% annual provider turnover research)
+- Sync logs: 90 days (operational data)
+- Application logs: Per Cloud Logging project settings (typically 30 days)
+- Data quality audits: Indefinite until resolved (consider adding TTL)
 
 ### 5. Should verifications be logged for spam detection?
 
-**Already implemented.** The Sybil prevention system uses VerificationLog records to detect:
-- Same IP submitting for same provider-plan within 30 days (`verificationService.ts` lines 81-96)
-- Same email submitting for same provider-plan within 30 days (`verificationService.ts` lines 99-114)
-- Dedicated indexes: `idx_vl_sybil_ip` and `idx_vl_sybil_email` for fast lookups
+**Yes, and they already are.** The system implements multiple anti-spam layers:
+- Sybil attack detection (30-day window per IP and email per provider-plan pair)
+- Honeypot fields on verification and vote forms
+- reCAPTCHA v3 with score-based filtering
+- Rate limiting (10 verifications/hour, 10 votes/hour per IP)
+- Vote deduplication via unique constraint on `(verificationId, sourceIp)`
+- Consensus requirements (3+ verifications, 60+ confidence, 2:1 majority ratio)
 
 ---
 
 ## Next Steps
 
-1. **Monitoring:**
-   - [ ] Set up Cloud Logging alerts for high volumes of CAPTCHA failures
-   - [ ] Set up alerts for high rates of 429 (rate limited) responses
-   - [ ] Set up alerts for honeypot trigger frequency
+### Short-Term (When Auth Is Added)
 
-2. **Aggregation:**
-   - [ ] Consider persisting request stats (currently in-memory buffer, lost on restart)
-   - [ ] Add daily/weekly aggregation of verification patterns
+- [ ] Log authentication events (login, logout, failed attempts) with request ID correlation
+- [ ] Log admin endpoint access (success and failure) beyond the current `AppError.unauthorized`
+- [ ] Add user ID to structured log context for authenticated requests
 
-3. **Security:**
-   - [ ] Add admin access audit trail (log which admin endpoints are called, when)
-   - [ ] Consider IP-based anomaly detection for verification submissions
+### Medium-Term (Operational Improvements)
+
+- [ ] Add TTL/cleanup for `data_quality_audit` table (currently indefinite retention)
+- [ ] Set up Cloud Logging alerts for high-volume security events (honeypot triggers, CAPTCHA failures, CORS violations)
+- [ ] Create a Cloud Scheduler job for automated daily cleanup of expired records (endpoints exist, scheduling not yet configured)
+- [ ] Consider log-based metrics for monitoring verification submission rates and vote patterns
+
+### Long-Term (If Scale Demands)
+
+- [ ] Evaluate moving from in-memory request stats buffer to Redis for multi-instance visibility
+- [ ] Consider structured audit log export (e.g., BigQuery) for longer-term trend analysis
+- [ ] Add request sampling for high-traffic endpoints to reduce log volume while maintaining visibility
+- [ ] Implement log-based anomaly detection for abuse pattern identification
+
+---
+
+## File Reference
+
+| File | Path | Purpose |
+|---|---|---|
+| Logger utility | `packages/backend/src/utils/logger.ts` | Pino logger instance (JSON/pretty) |
+| Request logger | `packages/backend/src/middleware/requestLogger.ts` | Structured request metrics, in-memory buffer |
+| HTTP logger | `packages/backend/src/middleware/httpLogger.ts` | pino-http automatic request/response logging |
+| Request ID | `packages/backend/src/middleware/requestId.ts` | UUID generation and X-Request-ID correlation |
+| Error handler | `packages/backend/src/middleware/errorHandler.ts` | Global error logging and response formatting |
+| Rate limiter | `packages/backend/src/middleware/rateLimiter.ts` | Dual-mode (Redis/memory) rate limiting with logging |
+| CAPTCHA | `packages/backend/src/middleware/captcha.ts` | reCAPTCHA v3 with fail-open/closed logging |
+| Honeypot | `packages/backend/src/middleware/honeypot.ts` | Bot detection with warning logs |
+| Request timeout | `packages/backend/src/middleware/requestTimeout.ts` | Timeout logging |
+| Verification service | `packages/backend/src/services/verificationService.ts` | Audit trail logic, PII stripping, Sybil detection |
+| Verify routes | `packages/backend/src/routes/verify.ts` | Verification/vote endpoints with cache invalidation logging |
+| Admin routes | `packages/backend/src/routes/admin.ts` | Cleanup, retention stats, admin action logging |
+| App entrypoint | `packages/backend/src/index.ts` | Middleware chain, CORS logging, lifecycle logging |
+| Prisma schema | `packages/backend/prisma/schema.prisma` | VerificationLog, VoteLog, SyncLog, DataQualityAudit models |
+| Constants | `packages/backend/src/config/constants.ts` | TTL values, Sybil window, consensus thresholds |

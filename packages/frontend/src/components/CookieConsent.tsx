@@ -40,6 +40,8 @@ export function CookieConsent() {
 
   return (
     <div
+      role="alert"
+      aria-live="polite"
       className="fixed bottom-20 md:bottom-4 left-4 right-4 z-50 mx-auto max-w-2xl
         animate-[slideUp_0.3s_ease-out]
         bg-white dark:bg-gray-800

@@ -82,6 +82,7 @@ export function CompareBar() {
           </button>
           <button
             onClick={clearAll}
+            aria-label="Clear all selected providers"
             className="
               px-3 py-2 text-sm text-gray-500 dark:text-gray-400
               hover:text-gray-700 dark:hover:text-gray-200
@@ -123,6 +124,7 @@ export function CompareBar() {
           <div className="flex items-center gap-2">
             <button
               onClick={clearAll}
+              aria-label="Clear all selected providers"
               className="
                 px-2 py-1.5 text-sm text-gray-500 dark:text-gray-400
                 hover:text-gray-700 dark:hover:text-gray-200

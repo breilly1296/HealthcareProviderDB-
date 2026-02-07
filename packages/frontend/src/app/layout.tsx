@@ -12,6 +12,7 @@ import { BottomNav } from '@/components/BottomNav';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { CompareProvider } from '@/context/CompareContext';
 import { ErrorProvider } from '@/context/ErrorContext';
+import { ReCaptchaProvider } from '@/components/ReCaptchaProvider';
 import { CompareBar } from '@/components/compare';
 import { GlobalErrorBanner } from '@/components/GlobalErrorBanner';
 import { Disclaimer } from '@/components/Disclaimer';
@@ -157,24 +158,29 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className={`${inter.className} flex flex-col min-h-screen bg-stone-100 dark:bg-gray-900 text-stone-800 dark:text-gray-100 transition-colors duration-200`}>
+        <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:top-2 focus:left-2 focus:px-4 focus:py-2 focus:bg-white focus:text-primary-600 focus:rounded-lg focus:shadow-lg focus:font-medium">
+          Skip to main content
+        </a>
         <Suspense fallback={null}>
           <PostHogProvider>
             <QueryProvider>
               <ThemeProvider>
                 <CompareProvider>
                   <ErrorProvider>
-                    <ToastProvider />
-                    <GlobalErrorBanner />
-                    <Header />
-                    <Disclaimer variant="banner" />
-                    <main className="flex-1 pb-20 md:pb-0">
-                      {children}
-                    </main>
-                    <Footer />
-                    <ScrollToTop />
-                    <CompareBar />
-                    <CookieConsent />
-                    <BottomNav />
+                    <ReCaptchaProvider>
+                      <ToastProvider />
+                      <GlobalErrorBanner />
+                      <Header />
+                      <Disclaimer variant="banner" />
+                      <main id="main-content" className="flex-1 pb-20 md:pb-0">
+                        {children}
+                      </main>
+                      <Footer />
+                      <ScrollToTop />
+                      <CompareBar />
+                      <CookieConsent />
+                      <BottomNav />
+                    </ReCaptchaProvider>
                   </ErrorProvider>
                 </CompareProvider>
               </ThemeProvider>

@@ -1,232 +1,711 @@
 # VerifyMyProvider CSRF Protection
 
-**Last Updated:** 2026-02-06
-**Current State:** No CSRF protection implemented (not needed -- no auth)
-**Future Need:** Required when authentication (Phase 2+) is added
+**Last Updated:** 2026-02-07
+**Current State:** Not needed (no authentication, no sessions, no cookies)
+**Future Need:** Required for Phase 2+ (email verification / magic links)
+**Reviewed By:** Claude Opus 4.6 (automated security audit)
 
 ---
 
 ## Current State
 
-### No CSRF Protection
+### No CSRF Protection Implemented
 
-- [x] **No authentication = no CSRF risk** -- Verified: No session cookies, no JWT cookies, no authentication tokens stored in cookies. CSRF attacks require session-based authentication to exploit, and VerifyMyProvider has none.
-- [x] **All endpoints are public** -- Verified in `routes/index.ts`: all route groups registered without auth middleware. Only admin routes have `adminAuthMiddleware` which uses a header-based secret (not cookie-based).
-- [x] **No cookies used for authentication** -- Verified in `index.ts`: no `express-session`, no `cookie-session`, no `cookie-parser` middleware. CORS has `credentials: true` (line 84) but no cookies are actually set.
-- [x] **No sessions to hijack** -- Verified: no session store, no session middleware, no session IDs.
+VerifyMyProvider currently has **zero CSRF protection** -- and this is correct for the current architecture. Here is the evidence from the codebase:
 
-### Why No CSRF Currently
+1. **No CSRF middleware exists.** The middleware directory (`packages/backend/src/middleware/`) contains eight middleware files -- none of which implement CSRF:
 
-- [x] **CSRF attacks target authenticated sessions** -- Without cookies carrying auth tokens, a cross-origin form submission cannot impersonate a user because there is no user identity to impersonate.
-- [x] **Without auth, there's nothing to hijack** -- The worst a CSRF attack could do is submit a verification or vote, which is already possible directly via the public API. Rate limiting, CAPTCHA, and Sybil prevention mitigate this.
-- [x] **Once auth is added, CSRF becomes critical** -- If JWT or session tokens are stored in cookies, CSRF protection must be in place before those features ship.
+   | File | Purpose |
+   |------|---------|
+   | `captcha.ts` | Google reCAPTCHA v3 verification |
+   | `errorHandler.ts` | Error handling and `AppError` class |
+   | `honeypot.ts` | Hidden field bot detection |
+   | `httpLogger.ts` | Pino HTTP request logging |
+   | `index.ts` | Re-exports errorHandler and rateLimiter |
+   | `rateLimiter.ts` | Dual-mode (Redis/in-memory) rate limiting |
+   | `requestId.ts` | UUID-based request correlation |
+   | `requestLogger.ts` | Usage analytics without PII |
+   | `requestTimeout.ts` | Per-route timeout enforcement |
 
-### Admin Endpoints and CSRF
+2. **No CSRF-related dependencies.** The backend `package.json` does not include `csurf`, `csrf-csrf`, `cookie-parser`, `express-session`, or any session/CSRF library.
 
-The admin endpoints (`/api/v1/admin/*`) use `X-Admin-Secret` header authentication (`admin.ts` lines 21-55). This is inherently CSRF-resistant because:
-1. The `X-Admin-Secret` header is a custom header
-2. Browsers do not attach custom headers to cross-origin form submissions
-3. The CORS `allowedHeaders` whitelist includes `X-Admin-Secret` (`index.ts` line 83), but cross-origin requests from non-whitelisted origins are blocked
-4. Even if CORS were misconfigured, the browser's preflight (OPTIONS) check would prevent the custom header from being sent cross-origin without explicit server approval
+3. **No cookies are set.** The backend sets no `Set-Cookie` headers. The CORS configuration in `packages/backend/src/index.ts` includes `credentials: true`, but this is forward-looking -- no cookies are actually exchanged:
 
-**Assessment:** Admin endpoints do NOT need CSRF protection with the current header-based auth scheme.
+   ```typescript
+   // packages/backend/src/index.ts (lines 68-86)
+   app.use(cors({
+     origin: (origin, callback) => {
+       if (!origin) {
+         return callback(null, true);
+       }
+       if (ALLOWED_ORIGINS.includes(origin)) {
+         callback(null, true);
+       } else {
+         logger.warn({ origin }, 'CORS blocked request from origin');
+         callback(new Error('Not allowed by CORS'));
+       }
+     },
+     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+     allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID', 'X-Admin-Secret'],
+     credentials: true,
+   }));
+   ```
+
+4. **No user sessions.** There is no session store, no `express-session`, no JWT token issuance, and no user login/logout flow.
+
+5. **Admin authentication is header-based, not cookie-based.** The admin routes in `packages/backend/src/routes/admin.ts` authenticate using `X-Admin-Secret` header with timing-safe comparison -- not cookies:
+
+   ```typescript
+   // packages/backend/src/routes/admin.ts (lines 22-56)
+   function adminAuthMiddleware(req: Request, res: Response, next: NextFunction) {
+     const adminSecret = process.env.ADMIN_SECRET;
+     if (!adminSecret) { /* ... return 503 ... */ }
+
+     const providedSecret = req.headers['x-admin-secret'];
+     const providedBuffer = Buffer.from(String(providedSecret || ''));
+     const secretBuffer = Buffer.from(adminSecret);
+
+     const isValid =
+       providedBuffer.length === secretBuffer.length &&
+       timingSafeEqual(providedBuffer, secretBuffer);
+
+     if (!isValid) {
+       throw AppError.unauthorized('Invalid or missing admin secret');
+     }
+     next();
+   }
+   ```
+
+   This is immune to CSRF because browsers cannot set custom headers (`X-Admin-Secret`) via cross-origin form submissions or image tags.
+
+### Why No CSRF Is Currently Safe
+
+CSRF (Cross-Site Request Forgery) attacks exploit **authenticated sessions** -- they trick a user's browser into sending a request that carries the user's session cookie, causing the server to execute actions with the user's identity and privileges.
+
+In the current VerifyMyProvider architecture, there is **nothing to forge**:
+
+| CSRF Prerequisite | VerifyMyProvider Status | Risk |
+|---|---|---|
+| Authentication cookies | None -- no auth system exists | None |
+| Session state | None -- stateless API | None |
+| User identity | Anonymous IP-based tracking only | None |
+| Privileged actions tied to identity | None -- all actions are anonymous | None |
+| Cookie-based admin auth | No -- uses `X-Admin-Secret` header | None |
+
+**Current protection layers against abuse (in lieu of CSRF):**
+
+- **Rate limiting** -- All mutating endpoints have strict per-IP rate limits (10 verifications/hour, 10 votes/hour) via sliding-window algorithm in `packages/backend/src/middleware/rateLimiter.ts`
+- **CAPTCHA** -- Google reCAPTCHA v3 protects verification and vote submissions in `packages/backend/src/middleware/captcha.ts`
+- **Honeypot** -- Hidden `website` field catches bots in `packages/backend/src/middleware/honeypot.ts`
+- **CORS** -- Strict origin allowlist prevents unauthorized cross-origin requests
+- **Helmet** -- Full CSP headers with `formAction: ["'none'"]` and `frameAncestors: ["'none'"]` prevent embedding and form hijacking
+- **Input validation** -- Zod schemas validate all request payloads
+
+### When CSRF Becomes Critical
+
+CSRF protection is **not needed now** but becomes **mandatory** when any of these triggers occur:
+
+| Trigger | Phase | Why CSRF Is Needed |
+|---------|-------|--------------------|
+| Email verification (magic links) | Phase 2 | Session cookies will authenticate users |
+| User accounts with trust tiers | Phase 2 | Actions are tied to identity/reputation |
+| Session cookies (JWT in httpOnly cookie) | Phase 2 | Browser will auto-send cookies on cross-origin requests |
+| Premium features with payment | Phase 3 | Financial actions must be protected from forgery |
+| OAuth (Google/Apple login) | Phase 3 | Session persistence via cookies |
+
+According to `docs/AUTH-IMPLEMENTATION-PLAN.md`, Phase 2 uses custom JWT + Oslo tokens + Resend for magic-link email verification. Once JWTs are stored in cookies (which is the plan per the auth design), CSRF protection becomes critical.
 
 ---
 
-## When CSRF Protection Is Needed
+## Current Mutating Endpoints Inventory
 
-### Triggers
+### Endpoints That Will Need CSRF Protection (Post-Auth)
 
-- [ ] **Adding email verification (Phase 2)** -- If verification codes are stored in cookies
-- [ ] **Adding user accounts (Phase 3)** -- If JWT refresh tokens use HttpOnly cookies
-- [ ] **Adding session cookies** -- Any cookie-based auth mechanism
-- [ ] **Adding premium features with payment** -- Critical for financial transactions
+All current POST/PUT/DELETE endpoints, plus future auth endpoints:
 
-### Timeline
+| Method | Route | Current Protection | CSRF Needed When Auth Added? |
+|--------|-------|-------------------|------------------------------|
+| POST | `/api/v1/verify` | Rate limit (10/hr) + CAPTCHA + Honeypot | Yes |
+| POST | `/api/v1/verify/:verificationId/vote` | Rate limit (10/hr) + CAPTCHA + Honeypot | Yes |
+| POST | `/api/v1/admin/cleanup-expired` | `X-Admin-Secret` header | No (header-based auth is CSRF-immune) |
+| POST | `/api/v1/admin/cache/clear` | `X-Admin-Secret` header | No |
+| POST | `/api/v1/admin/cleanup/sync-logs` | `X-Admin-Secret` header | No |
+| POST | `/api/v1/admin/recalculate-confidence` | `X-Admin-Secret` header | No |
 
-- [x] **Not needed now** -- No cookies, no sessions, no auth
-- [ ] **Required before Phase 2 beta** -- If Phase 2 uses cookie-based verification codes
-- [ ] **Critical before Phase 3** -- Full accounts with cookie-based JWT
+**Future endpoints that will need CSRF from day one:**
 
-**Important caveat:** If Phase 2/3 uses header-based JWT (Authorization: Bearer) instead of cookie-based JWT, CSRF protection is still not required. CSRF only matters when the browser automatically attaches credentials (cookies) to requests.
+| Method | Route | Notes |
+|--------|-------|-------|
+| POST | `/api/v1/auth/register` | Magic link registration |
+| POST | `/api/v1/auth/login` | Magic link login |
+| POST | `/api/v1/auth/logout` | Session destruction |
+| POST | `/api/v1/auth/refresh` | Token refresh |
+| PUT | `/api/v1/users/me/settings` | User preferences |
+| DELETE | `/api/v1/users/me/account` | Account deletion |
+
+### Endpoints That Remain CSRF-Free
+
+| Method | Route | Why |
+|--------|-------|-----|
+| GET | All GET routes | Safe by definition (idempotent, no side effects) |
+| POST | Admin routes with `X-Admin-Secret` | Custom header requirement makes CSRF impossible |
 
 ---
 
 ## CSRF Implementation Plan
 
-### Method: Double-Submit Cookie (Recommended)
+### Recommended Method: Double-Submit Cookie Pattern
 
-**Why this method:**
-- Works well with SPA (Next.js) + API (Express) architecture
-- No server-side session storage needed
-- Compatible with stateless JWT auth
+The double-submit cookie pattern is recommended because:
+- It is **stateless** -- no server-side token storage needed (fits the current stateless API design)
+- It works with the existing **Express + separate frontend** architecture
+- It is compatible with the planned **JWT-in-httpOnly-cookie** auth strategy from `AUTH-IMPLEMENTATION-PLAN.md`
 
-### Backend Implementation (When Needed)
+### How It Works
 
-**File to create:** `packages/backend/src/middleware/csrf.ts`
+1. Server generates a random CSRF token and sets it as a cookie (readable by JavaScript, NOT httpOnly)
+2. Frontend reads the cookie and includes the token value in a custom header (`X-CSRF-Token`) on every mutating request
+3. Server middleware compares the cookie value to the header value
+4. If they match, the request is legitimate (only same-origin JavaScript can read same-site cookies)
+5. If they differ or the header is missing, return 403
+
+### Backend Implementation
 
 ```typescript
-// Double-submit cookie pattern
-import csrf from 'csurf';
+// packages/backend/src/middleware/csrf.ts (TO BE CREATED in Phase 2)
+import { Request, Response, NextFunction } from 'express';
+import { randomBytes } from 'crypto';
+import { AppError } from './errorHandler';
+import logger from '../utils/logger';
 
-const csrfProtection = csrf({
-  cookie: {
-    httpOnly: false,    // JS needs to read the token
-    secure: true,       // HTTPS only
-    sameSite: 'strict', // Prevents cross-site cookie sending
+const CSRF_COOKIE_NAME = '_csrf';
+const CSRF_HEADER_NAME = 'x-csrf-token';
+const CSRF_TOKEN_LENGTH = 32; // 256-bit token
+
+/**
+ * Generate a new CSRF token and set it as a cookie.
+ * Called on initial page load or after login.
+ */
+export function csrfTokenGenerator(req: Request, res: Response, next: NextFunction): void {
+  // Only generate if no valid token exists
+  if (!req.cookies?.[CSRF_COOKIE_NAME]) {
+    const token = randomBytes(CSRF_TOKEN_LENGTH).toString('hex');
+
+    res.cookie(CSRF_COOKIE_NAME, token, {
+      httpOnly: false,    // JS must read this to include in headers
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict', // Prevents cookie from being sent cross-origin
+      path: '/',
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    });
   }
+  next();
+}
+
+/**
+ * Validate CSRF token on mutating requests.
+ * Compares cookie value to header value.
+ *
+ * Skip conditions:
+ * - Safe methods (GET, HEAD, OPTIONS)
+ * - Admin routes (authenticated via X-Admin-Secret header)
+ * - Development mode (optional, controlled by env var)
+ */
+export function csrfProtection(req: Request, res: Response, next: NextFunction): void {
+  // Safe methods don't need CSRF protection
+  const safeMethods = ['GET', 'HEAD', 'OPTIONS'];
+  if (safeMethods.includes(req.method)) {
+    return next();
+  }
+
+  // Admin routes use header-based auth, which is CSRF-immune
+  if (req.path.startsWith('/admin')) {
+    return next();
+  }
+
+  // Optional: skip in development
+  if (process.env.NODE_ENV === 'development' && process.env.CSRF_SKIP_DEV === 'true') {
+    return next();
+  }
+
+  const cookieToken = req.cookies?.[CSRF_COOKIE_NAME];
+  const headerToken = req.headers[CSRF_HEADER_NAME] as string | undefined;
+
+  if (!cookieToken || !headerToken) {
+    logger.warn({
+      ip: req.ip,
+      path: req.path,
+      method: req.method,
+      hasCookie: !!cookieToken,
+      hasHeader: !!headerToken,
+    }, 'CSRF validation failed: missing token');
+
+    throw AppError.forbidden('Invalid or missing CSRF token');
+  }
+
+  // Use timing-safe comparison to prevent timing attacks
+  const cookieBuffer = Buffer.from(cookieToken);
+  const headerBuffer = Buffer.from(headerToken);
+
+  if (
+    cookieBuffer.length !== headerBuffer.length ||
+    !require('crypto').timingSafeEqual(cookieBuffer, headerBuffer)
+  ) {
+    logger.warn({
+      ip: req.ip,
+      path: req.path,
+      method: req.method,
+    }, 'CSRF validation failed: token mismatch');
+
+    throw AppError.forbidden('Invalid CSRF token');
+  }
+
+  next();
+}
+```
+
+**Middleware registration in `packages/backend/src/index.ts`:**
+
+```typescript
+// After cookie-parser (new dependency required)
+import cookieParser from 'cookie-parser';
+import { csrfTokenGenerator, csrfProtection } from './middleware/csrf';
+
+app.use(cookieParser());
+app.use(csrfTokenGenerator);  // Generate tokens for all requests
+app.use(csrfProtection);       // Validate on mutating requests
+```
+
+**New dependency required:**
+```
+cookie-parser  -- Parse Cookie headers into req.cookies
+```
+
+### Frontend Implementation
+
+The frontend API client at `packages/frontend/src/lib/api.ts` would need to read the CSRF cookie and include it in headers. The existing `apiFetch` function is the single point of change:
+
+```typescript
+// packages/frontend/src/lib/api.ts -- modification to apiFetch()
+
+/**
+ * Read CSRF token from cookie
+ */
+function getCsrfToken(): string | null {
+  if (typeof document === 'undefined') return null; // SSR safety
+
+  const match = document.cookie
+    .split('; ')
+    .find(row => row.startsWith('_csrf='));
+
+  return match ? match.split('=')[1] : null;
+}
+
+export async function apiFetch<T>(
+  endpoint: string,
+  options: RequestInit = {},
+  retryOptions: RetryOptions = {}
+): Promise<T> {
+  const url = `${API_URL}${endpoint}`;
+  const csrfToken = getCsrfToken();
+
+  const response = await fetchWithRetry(
+    url,
+    {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+        ...options.headers,
+      },
+      credentials: 'include', // Ensure cookies are sent
+    },
+    retryOptions
+  );
+
+  // ... rest of existing error handling
+}
+```
+
+The `ProviderVerificationForm` component (`packages/frontend/src/components/ProviderVerificationForm.tsx`) makes a direct `fetch('/api/verifications', ...)` call at line 104. This would also need the CSRF header:
+
+```typescript
+// packages/frontend/src/components/ProviderVerificationForm.tsx (line 104)
+// Current:
+const response = await fetch('/api/verifications', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ /* ... */ }),
+});
+
+// Updated with CSRF:
+const csrfToken = document.cookie
+  .split('; ')
+  .find(row => row.startsWith('_csrf='))
+  ?.split('=')[1];
+
+const response = await fetch('/api/verifications', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+  },
+  credentials: 'include',
+  body: JSON.stringify({ /* ... */ }),
 });
 ```
 
-**Alternative:** Since `csurf` is deprecated (npm), consider using `csrf-csrf` package or implementing the double-submit pattern manually.
-
-### Frontend Implementation (When Needed)
-
-The Next.js frontend would need to:
-1. Read the CSRF token from the cookie on page load
-2. Include it in the `X-CSRF-Token` header for all mutating requests
-3. Handle 403 responses by refreshing the token
-
-### SameSite Cookie as Additional Protection
-
-Modern browsers support `SameSite=Strict` or `SameSite=Lax` cookies, which provide CSRF protection at the browser level. When auth is implemented:
-- Set all auth cookies with `SameSite: 'strict'`
-- This prevents cookies from being sent on cross-origin requests
-- Use double-submit cookie as defense-in-depth
+**Recommendation:** Refactor `ProviderVerificationForm` to use the centralized `api.verify.submit()` from `packages/frontend/src/lib/api.ts` instead of direct `fetch` calls, so CSRF headers are handled in one place.
 
 ---
 
-## Protected Routes (When Auth Is Added)
+## Token Lifecycle
 
-### Mutating Endpoints (Will Need CSRF)
-- [ ] `POST /auth/register`
-- [ ] `POST /auth/login`
-- [ ] `POST /auth/logout`
-- [ ] `POST /auth/refresh`
-- [ ] `POST /api/v1/verify` (if auth-gated)
-- [ ] `POST /api/v1/verify/:verificationId/vote` (if auth-gated)
-- [ ] `PUT /users/me/settings`
-- [ ] `DELETE /users/me/account`
+### Generation
 
-### Safe Endpoints (No CSRF Needed)
-- [x] All GET requests -- safe by HTTP specification
-- [x] Public search endpoints -- no side effects
-- [x] Admin endpoints -- use header-based auth (inherently CSRF-resistant)
+| Event | Action |
+|-------|--------|
+| First request to backend (any route) | `csrfTokenGenerator` middleware generates token if cookie not present |
+| After login (Phase 2) | Regenerate token to bind it to the new session |
+| After logout | Clear the CSRF cookie along with the session cookie |
 
----
+### Validation
 
-## Token Lifecycle (When Implemented)
+| Check | Result |
+|-------|--------|
+| Cookie present AND header present AND values match (timing-safe) | Request allowed |
+| Cookie missing | 403 Forbidden |
+| Header missing | 403 Forbidden |
+| Cookie and header mismatch | 403 Forbidden |
+| GET/HEAD/OPTIONS request | Skipped (safe methods) |
+| Admin route with `X-Admin-Secret` | Skipped (header auth is CSRF-immune) |
 
-**Generation:**
-- [ ] Token generated on first page load
-- [ ] Token sent as cookie (readable by JS, `httpOnly: false`)
-- [ ] Token regenerated on login/logout
+### Expiration
 
-**Validation:**
-- [ ] Token in cookie must match token in `X-CSRF-Token` header
-- [ ] Validated on every mutating request
-- [ ] Invalid/missing token returns 403 Forbidden
-
-**Expiration:**
-- [ ] Token expires with session/auth cookie
-- [ ] Token regenerated on authentication state changes
+| Condition | Behavior |
+|-----------|----------|
+| Cookie `maxAge` | 24 hours (configurable) |
+| Session expiration | CSRF token invalidated when session cookie expires |
+| Login | Token regenerated |
+| Logout | Token cleared |
 
 ---
 
-## Error Handling (When Implemented)
+## Error Handling
 
-**On CSRF Failure:**
+### Backend Response on CSRF Failure
+
+The error handling follows the existing `AppError` pattern from `packages/backend/src/middleware/errorHandler.ts`:
+
 ```typescript
-// Backend: Return 403 with clear error
+// Consistent with existing error format
 {
-  error: {
-    message: 'Invalid CSRF token',
-    code: 'CSRF_TOKEN_INVALID',
-    statusCode: 403,
-    requestId: req.id  // Already available via requestId middleware
+  "success": false,
+  "error": {
+    "message": "Invalid or missing CSRF token",
+    "code": "CSRF_VALIDATION_FAILED",
+    "statusCode": 403,
+    "requestId": "abc-123-def"
   }
 }
+```
 
-// Frontend: Refresh page or fetch new token
-if (response.status === 403 && response.data?.code === 'CSRF_TOKEN_INVALID') {
-  // Refresh CSRF token and retry request
+### Frontend Handling of CSRF Errors
+
+The existing `ApiError` class in `packages/frontend/src/lib/api.ts` already handles 403 responses via `isUnauthorized()`:
+
+```typescript
+// packages/frontend/src/lib/api.ts (lines 83-86)
+isUnauthorized(): boolean {
+  return this.statusCode === 401 || this.statusCode === 403;
 }
 ```
 
+For CSRF-specific 403 errors, the frontend should:
+
+1. Attempt to fetch a fresh CSRF token (reload page or call a token endpoint)
+2. Retry the original request once
+3. If still failing, show a user-friendly error: "Your session may have expired. Please refresh the page and try again."
+
 ---
 
-## Testing Strategy (When Implemented)
+## Existing Security Layers (Defense in Depth)
 
-**Manual tests:**
-```bash
-# Should succeed (with valid token)
-curl -X POST /api/v1/verify \
-  -H "X-CSRF-Token: <token>" \
-  -H "Cookie: csrf_token=<token>" \
-  -d '{"npi":"1234567890","planId":"test","acceptsInsurance":true}'
+Even without CSRF, the current architecture has multiple overlapping security controls:
 
-# Should fail 403 (no token)
-curl -X POST /api/v1/verify \
-  -d '{"npi":"1234567890","planId":"test","acceptsInsurance":true}'
+### 1. CORS Origin Allowlist
 
-# Should fail 403 (mismatched token)
-curl -X POST /api/v1/verify \
-  -H "X-CSRF-Token: wrong" \
-  -H "Cookie: csrf_token=<token>" \
-  -d '{"npi":"1234567890","planId":"test","acceptsInsurance":true}'
+```typescript
+// packages/backend/src/index.ts (lines 23-28)
+const ALLOWED_ORIGINS: string[] = [
+  'https://verifymyprovider.com',
+  'https://www.verifymyprovider.com',
+  'https://verifymyprovider-frontend-741434145252.us-central1.run.app',
+  process.env.FRONTEND_URL,
+].filter((origin): origin is string => Boolean(origin));
 ```
 
-**Automated tests:**
-- Integration tests verifying 403 on missing/invalid CSRF tokens
-- Tests verifying CSRF not required for GET requests
-- Tests verifying CSRF not required for admin endpoints (header auth)
+This prevents cross-origin requests from unauthorized domains. However, CORS alone does **not** prevent CSRF for simple POST requests with `Content-Type: application/x-www-form-urlencoded`, which browsers allow without preflight.
+
+### 2. Content-Type Requirement
+
+The backend requires `Content-Type: application/json` (enforced via `express.json()` at line 89). Simple CSRF attacks using HTML forms can only send `application/x-www-form-urlencoded` or `multipart/form-data`. A `Content-Type: application/json` header triggers a CORS preflight, which would be blocked.
+
+**However:** This is NOT a reliable CSRF defense on its own. Some browser extensions, Flash (legacy), and specific exploit scenarios can forge JSON content types. It is a useful defense-in-depth layer but should not be relied upon as the sole protection.
+
+### 3. Helmet CSP Headers
+
+```typescript
+// packages/backend/src/index.ts (lines 49-60)
+formAction: ["'none'"],       // No form submissions accepted
+frameAncestors: ["'none'"],   // Cannot be embedded in iframes
+```
+
+These headers prevent the API from being targeted by form-based CSRF or clickjacking. Since this is a JSON API (no HTML responses), forms submitted to it would fail regardless.
+
+### 4. Rate Limiting
+
+Even if a CSRF attack succeeded, the rate limiter at 10 requests/hour per IP for verifications and votes would limit the damage.
+
+### 5. reCAPTCHA v3
+
+CAPTCHA tokens are required for all verification and vote submissions. A CSRF attack would need to also obtain a valid reCAPTCHA token, which requires JavaScript execution on the attacker's page -- significantly raising the attack complexity.
 
 ---
 
-## Common Issues to Avoid
+## Testing Strategy
 
-1. **Token not readable by JavaScript**
-   - Problem: Setting `httpOnly: true` on the CSRF cookie prevents JS from reading it
-   - Solution: `httpOnly: false` for the CSRF cookie (it's not a secret -- the pattern relies on the Same-Origin Policy)
+### Manual Tests (Post-Implementation)
 
-2. **Missing header in API client**
-   - Problem: Frontend fetch calls without `X-CSRF-Token` header
-   - Solution: Configure API client (axios/fetch wrapper) to always include the header on POST/PUT/DELETE
+```bash
+# Should SUCCEED (valid CSRF token in both cookie and header)
+curl -X POST https://api.verifymyprovider.com/api/v1/verify \
+  -H "Content-Type: application/json" \
+  -H "X-CSRF-Token: abc123def456" \
+  -H "Cookie: _csrf=abc123def456" \
+  -d '{"npi":"1234567890","planId":"12345AA0010001","acceptsInsurance":true}'
 
-3. **Token not refreshed on login**
-   - Problem: Using pre-login CSRF token after authentication
-   - Solution: Regenerate token on any authentication state change
+# Should FAIL with 403 (no CSRF header)
+curl -X POST https://api.verifymyprovider.com/api/v1/verify \
+  -H "Content-Type: application/json" \
+  -H "Cookie: _csrf=abc123def456" \
+  -d '{"npi":"1234567890","planId":"12345AA0010001","acceptsInsurance":true}'
 
-4. **csurf deprecation**
-   - Problem: The `csurf` npm package is deprecated
-   - Solution: Use `csrf-csrf`, `lusca`, or implement double-submit pattern manually (straightforward with `crypto.randomBytes`)
+# Should FAIL with 403 (no CSRF cookie)
+curl -X POST https://api.verifymyprovider.com/api/v1/verify \
+  -H "Content-Type: application/json" \
+  -H "X-CSRF-Token: abc123def456" \
+  -d '{"npi":"1234567890","planId":"12345AA0010001","acceptsInsurance":true}'
+
+# Should FAIL with 403 (mismatched tokens)
+curl -X POST https://api.verifymyprovider.com/api/v1/verify \
+  -H "Content-Type: application/json" \
+  -H "X-CSRF-Token: wrong_token" \
+  -H "Cookie: _csrf=abc123def456" \
+  -d '{"npi":"1234567890","planId":"12345AA0010001","acceptsInsurance":true}'
+
+# Admin routes should BYPASS CSRF (uses X-Admin-Secret instead)
+curl -X POST https://api.verifymyprovider.com/api/v1/admin/cache/clear \
+  -H "Content-Type: application/json" \
+  -H "X-Admin-Secret: $ADMIN_SECRET"
+
+# GET requests should NOT require CSRF token
+curl https://api.verifymyprovider.com/api/v1/providers/search?state=CA
+```
+
+### Automated Tests
+
+```typescript
+// packages/backend/src/__tests__/csrf.test.ts (TO BE CREATED)
+describe('CSRF Protection', () => {
+  it('should allow GET requests without CSRF token', async () => {
+    const res = await request(app).get('/api/v1/providers/search?state=CA');
+    expect(res.status).not.toBe(403);
+  });
+
+  it('should reject POST without CSRF cookie', async () => {
+    const res = await request(app)
+      .post('/api/v1/verify')
+      .set('X-CSRF-Token', 'token')
+      .send({ npi: '1234567890', planId: '12345', acceptsInsurance: true });
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('CSRF_VALIDATION_FAILED');
+  });
+
+  it('should reject POST without CSRF header', async () => {
+    const res = await request(app)
+      .post('/api/v1/verify')
+      .set('Cookie', '_csrf=validtoken')
+      .send({ npi: '1234567890', planId: '12345', acceptsInsurance: true });
+    expect(res.status).toBe(403);
+  });
+
+  it('should reject POST with mismatched CSRF tokens', async () => {
+    const res = await request(app)
+      .post('/api/v1/verify')
+      .set('Cookie', '_csrf=token_a')
+      .set('X-CSRF-Token', 'token_b')
+      .send({ npi: '1234567890', planId: '12345', acceptsInsurance: true });
+    expect(res.status).toBe(403);
+  });
+
+  it('should allow POST with matching CSRF tokens', async () => {
+    const token = 'valid_csrf_token_here';
+    const res = await request(app)
+      .post('/api/v1/verify')
+      .set('Cookie', `_csrf=${token}`)
+      .set('X-CSRF-Token', token)
+      .send({ npi: '1234567890', planId: '12345', acceptsInsurance: true });
+    expect(res.status).not.toBe(403);
+  });
+
+  it('should skip CSRF for admin routes with X-Admin-Secret', async () => {
+    const res = await request(app)
+      .post('/api/v1/admin/cache/clear')
+      .set('X-Admin-Secret', process.env.ADMIN_SECRET!);
+    expect(res.status).not.toBe(403);
+  });
+});
+```
+
+---
+
+## Common Issues and Mitigations
+
+### 1. CSRF Cookie Must NOT Be httpOnly
+
+**Problem:** Setting `httpOnly: true` on the CSRF cookie prevents JavaScript from reading it, making the double-submit pattern impossible.
+
+**Solution:**
+```typescript
+// CORRECT
+res.cookie(CSRF_COOKIE_NAME, token, {
+  httpOnly: false,  // JS must read this
+  secure: true,
+  sameSite: 'strict',
+});
+
+// WRONG - breaks double-submit pattern
+res.cookie(CSRF_COOKIE_NAME, token, {
+  httpOnly: true,  // JS cannot read this
+});
+```
+
+### 2. SameSite Cookie Attribute
+
+**Problem:** Without `SameSite=Strict`, the CSRF cookie could be sent on cross-origin requests.
+
+**Solution:** Always set `sameSite: 'strict'` on the CSRF cookie. This is the strongest SameSite protection, preventing the cookie from being sent on any cross-site request.
+
+### 3. Frontend Must Send Credentials
+
+**Problem:** The `fetch` API does not send cookies by default for cross-origin requests.
+
+**Solution:** The `apiFetch` function in `packages/frontend/src/lib/api.ts` must include `credentials: 'include'`. The CORS config already has `credentials: true` (line 85 of index.ts), so the backend is ready.
+
+### 4. CORS AllowedHeaders Must Include CSRF Header
+
+**Problem:** The `X-CSRF-Token` custom header will trigger a CORS preflight. If not in the allowlist, it will be blocked.
+
+**Solution:** Add `'X-CSRF-Token'` to the `allowedHeaders` array in `packages/backend/src/index.ts`:
+
+```typescript
+// Current (line 84):
+allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID', 'X-Admin-Secret'],
+
+// Updated:
+allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID', 'X-Admin-Secret', 'X-CSRF-Token'],
+```
+
+### 5. Token Regeneration on Login
+
+**Problem:** If the CSRF token is not regenerated after login, a token obtained before authentication could be used to forge requests after login (session fixation variant).
+
+**Solution:** Regenerate the CSRF token on every authentication state change (login, logout, session refresh).
+
+### 6. csurf Library Is Deprecated
+
+**Problem:** The popular `csurf` npm package was deprecated in September 2022 due to design flaws.
+
+**Solution:** Implement the double-submit cookie pattern manually (as shown above) or use the maintained `csrf-csrf` package which addresses the flaws. The manual implementation is recommended for this project since it has minimal dependencies and the pattern is straightforward.
+
+---
+
+## Library Recommendation
+
+| Option | Status | Recommendation |
+|--------|--------|----------------|
+| `csurf` | **Deprecated** (Sep 2022) | Do NOT use |
+| `csrf-csrf` | Active, maintained | Good option for drop-in middleware |
+| Custom double-submit cookie | N/A | **Recommended** -- matches existing middleware pattern, zero new dependencies beyond `cookie-parser` |
+
+The custom approach is recommended because:
+- The existing codebase already follows a custom middleware pattern (see `captcha.ts`, `honeypot.ts`, `rateLimiter.ts`)
+- It requires only `cookie-parser` as a new dependency
+- It gives full control over token generation, validation, and error handling
+- It integrates naturally with the existing `AppError` error handling framework
 
 ---
 
 ## Implementation Timeline
 
-- [x] **Phase 1 (Now):** Not needed -- no auth, no cookies, no sessions
-- [ ] **Phase 2 (Beta):** Implement if cookie-based verification codes are used
-- [ ] **Phase 3 (Scale):** Critical -- must be in place before cookie-based JWT auth ships
+- [x] **Phase 1 (Now):** No CSRF needed -- no auth, no sessions, no cookies
+  - Current protections (rate limiting, CAPTCHA, honeypot, CORS, Helmet) are sufficient
+  - All endpoints are either anonymous or protected by `X-Admin-Secret` header
+
+- [ ] **Phase 2 (Email Verification / Magic Links):** CSRF required
+  - Install `cookie-parser`
+  - Create `packages/backend/src/middleware/csrf.ts`
+  - Register CSRF middleware in `packages/backend/src/index.ts`
+  - Add `X-CSRF-Token` to CORS `allowedHeaders`
+  - Update `packages/frontend/src/lib/api.ts` to include CSRF token
+  - Refactor `ProviderVerificationForm.tsx` to use centralized API client
+  - Write automated tests
+  - Token regeneration on login/logout
+
+- [ ] **Phase 3 (Full Accounts + OAuth):** CSRF critical
+  - Ensure CSRF token lifecycle is integrated with OAuth session management
+  - Add CSRF to all new authenticated endpoints (user settings, account deletion, payment)
+  - Penetration testing for CSRF bypass attempts
+  - Consider adding `SameSite=Lax` fallback for OAuth redirect flows (which break `Strict`)
 
 ---
 
-## Questions Answered
+## Next Steps
 
-### 1. When should we implement CSRF protection?
-**Answer:** Only when authentication that uses cookies is implemented. If Phase 2/3 uses header-based JWT (Authorization: Bearer), CSRF is not needed. If HttpOnly cookies are used for refresh tokens, CSRF must be implemented simultaneously.
+### Before Phase 2 Beta Launch
 
-### 2. What's the priority relative to other security items?
-**Answer:** Lower priority than rate limiting (already implemented), CAPTCHA (already implemented), and Sybil prevention (already implemented). CSRF is only relevant when auth introduces cookies.
+1. **Install dependency:**
+   ```bash
+   cd packages/backend && npm install cookie-parser && npm install -D @types/cookie-parser
+   ```
 
-### 3. Should we use csurf library or roll our own?
-**Answer:** `csurf` is deprecated. Options: `csrf-csrf` package (maintained), `lusca` (Kraken.js ecosystem), or manual double-submit cookie (simple: generate random token, set as cookie, validate header matches cookie).
+2. **Create CSRF middleware:** `packages/backend/src/middleware/csrf.ts`
 
-### 4. What should happen when CSRF validation fails?
-**Answer:** Return 403 with error code `CSRF_TOKEN_INVALID`. Frontend should catch this and attempt token refresh before retrying.
+3. **Register middleware in Express pipeline:**
+   - After `express.json()` and `cookieParser()`
+   - Before API routes
 
-### 5. How should we test CSRF protection?
-**Answer:** Automated integration tests with three scenarios: valid token (200), missing token (403), mismatched token (403). Plus manual curl tests during development.
+4. **Update CORS allowedHeaders:**
+   - Add `'X-CSRF-Token'` to the allowlist in `packages/backend/src/index.ts`
 
-### 6. Should we have a way to bypass CSRF in development?
-**Answer:** Follow the same pattern as CAPTCHA (`captcha.ts` line 121): skip in development/test environments via `process.env.NODE_ENV` check.
+5. **Update frontend API client:**
+   - Add CSRF token reading and header injection to `apiFetch()` in `packages/frontend/src/lib/api.ts`
+   - Refactor `ProviderVerificationForm.tsx` to use `api.verify.submit()` instead of direct `fetch`
+
+6. **Write tests:**
+   - Unit tests for CSRF middleware
+   - Integration tests for protected routes
+   - Edge cases: expired tokens, mismatched tokens, missing tokens
+
+7. **Update `packages/backend/src/middleware/index.ts`:**
+   - Export CSRF middleware for use in route-specific protection
+
+---
+
+## References
+
+- [OWASP CSRF Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html)
+- [Double-Submit Cookie Pattern](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#double-submit-cookie)
+- [csurf Deprecation Notice](https://github.com/expressjs/csurf#deprecated)
+- Project auth plan: `docs/AUTH-IMPLEMENTATION-PLAN.md`

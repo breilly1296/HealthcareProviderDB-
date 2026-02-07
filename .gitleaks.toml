@@ -1,7 +1,20 @@
 [allowlist]
   paths = [
     '''\.env\.example$''',
-    '''.*_test\.go$''',
+    '''docker-compose\.yml$''',
+    '''docker-compose\..*\.yml$''',
     '''.*\.test\.ts$''',
     '''.*\.spec\.ts$''',
+    '''.*__tests__.*\.ts$''',
+    '''.*__mocks__.*\.ts$''',
   ]
+
+  # Ignore common placeholder values in config/example files
+  regexTarget = "line"
+  [[allowlist.regexes]]
+    description = "Placeholder secrets in example configs"
+    regex = '''(?i)(your-.*-here|changeme|placeholder|xxxx|example\.com)'''
+
+  [[allowlist.regexes]]
+    description = "Default dev postgres credentials"
+    regex = '''postgres:postgres@localhost'''

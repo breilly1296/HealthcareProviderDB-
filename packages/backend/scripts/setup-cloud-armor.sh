@@ -54,8 +54,9 @@
 # - Adaptive Protection: Additional $0.10 per million requests
 #
 # Estimated Monthly Cost:
-# - Basic setup (1 policy, 5 rules): ~$10/month + request costs
-# - With 1M requests/month: ~$10 + $0.75 = ~$11/month
+# - Basic setup (1 policy, 10 rules): ~$15/month + request costs
+# - With load balancer + 1M req/month: ~$15 + $18 LB + $0.75 = ~$34/month
+# - See docs/CLOUD-ARMOR-SETUP.md for detailed cost breakdown
 #
 # =============================================================================
 
@@ -328,27 +329,72 @@ create_security_policy() {
         --quiet
     log_success "Session fixation rule added (priority 1007)"
 
+    # Known Bot / Malicious User-Agent Blocking (Priority 1008)
+    #
+    # The scannerdetection rule (1005) catches known vuln scanners like Nikto,
+    # sqlmap, Nessus, etc. This rule adds coverage for mass-scraping bots and
+    # HTTP libraries commonly used in automated attacks that the OWASP rules
+    # may not flag. Legitimate API consumers should set a proper User-Agent.
+    #
+    log_info "Adding known bot/malicious UA blocking rule..."
+    gcloud compute security-policies rules create 1008 \
+        --security-policy="$POLICY_NAME" \
+        --expression="has(request.headers['user-agent']) && request.headers['user-agent'].matches('(?i)(masscan|zgrab|gobuster|dirbuster|nuclei|httpx|subfinder|shodan|censys|internetmeasur|dataforseo|semrush.*bot|ahrefsbot|mj12bot|dotbot|blexbot|petalbot)')" \
+        --action=deny-403 \
+        --description="Block known malicious bots and aggressive crawlers" \
+        --quiet
+    log_success "Bot/scanner UA blocking rule added (priority 1008)"
+
     echo ""
-    log_step "Step 3: Add rate limiting rule"
+    log_step "Step 3: Add geographic restriction (optional)"
+
+    # Geographic Restriction (Priority 3000) — COMMENTED OUT
+    #
+    # For the NYC-first launch, all legitimate users are in the US.
+    # Uncomment to restrict traffic to US-only, which blocks a large volume
+    # of automated attacks originating overseas.
+    #
+    # To enable: remove the comment markers and re-run create-policy.
+    #
+    log_info "Geographic restriction rule: SKIPPED (commented out for launch)"
+    log_info "To enable US-only access, uncomment the geo rule in this script"
+    # gcloud compute security-policies rules create 3000 \
+    #     --security-policy="$POLICY_NAME" \
+    #     --expression="origin.region_code != 'US'" \
+    #     --action=deny-403 \
+    #     --description="Geographic restriction: US-only access" \
+    #     --quiet
+
+    echo ""
+    log_step "Step 4: Add rate limiting rule"
 
     # Edge Rate Limiting (Priority 2000)
-    log_info "Adding rate limiting rule (1000 req/min per IP)..."
+    #
+    # 100 req/min per IP at the edge layer. This is intentionally broader than
+    # the application-level rate limits (10-200 req/hr depending on endpoint)
+    # because Cloud Armor catches volumetric abuse before it reaches Cloud Run,
+    # while the Express rate limiter handles per-endpoint granularity.
+    #
+    # 100/min = 6,000/hr — any legitimate user is well under this.
+    # Bots doing bulk scraping or credential stuffing hit this quickly.
+    #
+    log_info "Adding rate limiting rule (100 req/min per IP)..."
     gcloud compute security-policies rules create 2000 \
         --security-policy="$POLICY_NAME" \
         --expression="true" \
         --action=rate-based-ban \
-        --rate-limit-threshold-count=1000 \
+        --rate-limit-threshold-count=100 \
         --rate-limit-threshold-interval-sec=60 \
         --ban-duration-sec=600 \
         --conform-action=allow \
         --exceed-action=deny-429 \
         --enforce-on-key=IP \
-        --description="Rate limit 1000 req/min per IP, ban for 10 min if exceeded" \
+        --description="Rate limit 100 req/min per IP, ban for 10 min if exceeded" \
         --quiet
     log_success "Rate limiting rule added (priority 2000)"
 
     echo ""
-    log_step "Step 4: Configure adaptive protection"
+    log_step "Step 5: Configure adaptive protection"
 
     log_info "Enabling adaptive protection..."
     gcloud compute security-policies update "$POLICY_NAME" \

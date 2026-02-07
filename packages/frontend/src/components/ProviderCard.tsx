@@ -222,7 +222,7 @@ function ProviderCardComponent({
             </div>
             {isVerified && (
               <div className="absolute -bottom-1 -right-1 bg-white dark:bg-gray-800 rounded-full p-0.5">
-                <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-500 fill-green-500" />
+                <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-500 fill-green-500" aria-hidden="true" />
               </div>
             )}
           </div>
@@ -236,7 +236,7 @@ function ProviderCardComponent({
                   {displayName}
                 </h3>
                 {isVerified && (
-                  <BadgeCheck className="w-5 h-5 text-[#137fec] flex-shrink-0 mt-0.5" />
+                  <BadgeCheck className="w-5 h-5 text-[#137fec] flex-shrink-0 mt-0.5" aria-hidden="true" />
                 )}
               </div>
 
@@ -262,7 +262,7 @@ function ProviderCardComponent({
             {/* Address and Phone */}
             <div className="space-y-1 text-sm text-stone-600 dark:text-gray-300">
               <div className="flex items-start gap-2">
-                <LocationIcon className="w-4 h-4 text-stone-400 dark:text-gray-500 mt-0.5 flex-shrink-0" />
+                <LocationIcon className="w-4 h-4 text-stone-400 dark:text-gray-500 mt-0.5 flex-shrink-0" aria-hidden={true} />
                 <span>
                   {formattedAddress.street}, {formattedAddress.cityStateZip}
                 </span>
@@ -270,7 +270,7 @@ function ProviderCardComponent({
 
               {formattedPhone && (
                 <div className="flex items-center gap-2">
-                  <PhoneIcon className="w-4 h-4 text-stone-400 dark:text-gray-500 flex-shrink-0" />
+                  <PhoneIcon className="w-4 h-4 text-stone-400 dark:text-gray-500 flex-shrink-0" aria-hidden={true} />
                   <span>{formattedPhone}</span>
                 </div>
               )}
@@ -298,7 +298,7 @@ function ProviderCardComponent({
                         title={fullName}
                         className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-medium rounded-full border border-green-200 dark:border-green-800 max-w-[200px] sm:max-w-[150px]"
                       >
-                        <CheckCircle className="w-3 h-3 flex-shrink-0" />
+                        <CheckCircle className="w-3 h-3 flex-shrink-0" aria-hidden="true" />
                         <span className="truncate">{fullName}</span>
                       </span>
                     );
@@ -324,7 +324,7 @@ function ProviderCardComponent({
             {/* View Details - full width tap target on mobile */}
             <span className="flex items-center justify-center sm:justify-end gap-1 text-[#137fec] font-medium text-sm py-2 sm:py-0 bg-blue-50 sm:bg-transparent rounded-lg sm:rounded-none hover:gap-2 transition-all">
               View Details
-              <ChevronRightIcon className="w-4 h-4" />
+              <ChevronRightIcon className="w-4 h-4" aria-hidden={true} />
             </span>
           </div>
         </div>

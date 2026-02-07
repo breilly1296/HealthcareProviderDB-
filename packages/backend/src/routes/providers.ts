@@ -12,6 +12,7 @@ import {
 } from '../services/providerService';
 import { getColocatedNpis } from '../services/locationService';
 import { getLocationHealthSystem } from '../services/locationEnrichment';
+import { enrichAcceptanceWithConfidence } from '../services/confidenceService';
 import prisma from '../lib/prisma';
 import { paginationSchema, npiParamSchema } from '../schemas/commonSchemas';
 import { buildPaginationMeta, sendSuccess } from '../utils/responseHelpers';
@@ -368,6 +369,95 @@ router.get(
       location,
       providers: colocatedProviders.map(transformProvider),
       pagination: buildPaginationMeta(colocatedResult.total, colocatedResult.page, colocatedResult.limit),
+    });
+  })
+);
+
+/**
+ * GET /api/v1/providers/:npi/plans
+ * Get insurance plan acceptances for a provider
+ */
+const plansQuerySchema = paginationSchema.extend({
+  status: z.string().min(1).max(20).optional(),
+  minConfidence: z.coerce.number().int().min(0).max(100).optional(),
+});
+
+router.get(
+  '/:npi/plans',
+  defaultRateLimiter,
+  asyncHandler(async (req, res) => {
+    const { npi } = npiParamSchema.parse(req.params);
+    const { page, limit, status, minConfidence } = plansQuerySchema.parse(req.query);
+
+    // Verify provider exists
+    const provider = await getProviderByNpi(npi);
+    if (!provider) {
+      throw AppError.notFound(`Provider with NPI ${npi} not found`);
+    }
+
+    // Build where clause
+    const where: Record<string, unknown> = { providerNpi: npi };
+    if (status) {
+      where.acceptanceStatus = status;
+    }
+    if (minConfidence !== undefined) {
+      where.confidenceScore = { gte: minConfidence };
+    }
+
+    const [acceptances, total] = await Promise.all([
+      prisma.providerPlanAcceptance.findMany({
+        where,
+        include: {
+          insurancePlan: true,
+          location: true,
+        },
+        orderBy: [
+          { confidenceScore: 'desc' },
+          { lastVerified: 'desc' },
+        ],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.providerPlanAcceptance.count({ where }),
+    ]);
+
+    const enrichedAcceptances = acceptances.map((pa) => {
+      const enriched = enrichAcceptanceWithConfidence(pa);
+      return {
+        id: String(enriched.id),
+        providerId: enriched.providerNpi,
+        planId: enriched.planId,
+        locationId: enriched.locationId,
+        acceptanceStatus: enriched.acceptanceStatus,
+        acceptsNewPatients: null,
+        confidenceScore: enriched.confidenceScore,
+        confidenceLevel: enriched.confidenceLevel,
+        confidenceDescription: enriched.confidenceDescription,
+        lastVerifiedAt: enriched.lastVerified?.toISOString() ?? null,
+        verificationCount: enriched.verificationCount,
+        plan: enriched.insurancePlan ? {
+          planId: enriched.insurancePlan.planId,
+          planName: enriched.insurancePlan.planName,
+          issuerName: enriched.insurancePlan.issuerName,
+          planType: enriched.insurancePlan.planType,
+          state: enriched.insurancePlan.state,
+          carrier: enriched.insurancePlan.carrier,
+        } : null,
+        location: enriched.location ? {
+          id: enriched.location.id,
+          addressLine1: enriched.location.address_line1,
+          city: enriched.location.city,
+          state: enriched.location.state,
+          zipCode: enriched.location.zip_code,
+        } : null,
+        confidence: enriched.confidence,
+      };
+    });
+
+    sendSuccess(res, {
+      npi,
+      acceptances: enrichedAcceptances,
+      pagination: buildPaginationMeta(total, page, limit),
     });
   })
 );
