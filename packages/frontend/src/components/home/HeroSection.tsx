@@ -31,11 +31,11 @@ export function HeroSection() {
             />
           </div>
 
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-stone-800 dark:text-white mb-4 px-4">
+          <h1 className="animate-fade-up text-3xl sm:text-4xl md:text-5xl font-bold text-stone-800 dark:text-white mb-4 px-4">
             Find Providers Who Actually
             <span className="text-primary-600 dark:text-primary-400"> Accept Your Insurance</span>
           </h1>
-          <p className="text-lg sm:text-xl text-stone-600 dark:text-gray-300 max-w-3xl mx-auto mb-8 px-4">
+          <p className="animate-fade-up-delay-1 text-lg sm:text-xl text-stone-600 dark:text-gray-300 max-w-3xl mx-auto mb-8 px-4">
             Verified by real patients. Backed by peer-reviewed research.
           </p>
 
@@ -43,7 +43,7 @@ export function HeroSection() {
           <div className="flex flex-col items-center gap-4 px-4">
             <Link
               href="/search"
-              className="inline-flex items-center justify-center gap-2 px-8 py-4 text-lg font-semibold text-white bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 rounded-xl shadow-lg shadow-blue-500/25 transition-all hover:scale-[1.02] hover:shadow-xl"
+              className="animate-fade-up-delay-2 inline-flex items-center justify-center gap-2 px-8 py-4 text-lg font-semibold text-white bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 rounded-xl shadow-lg shadow-blue-500/25 transition-all hover:scale-[1.02] hover:shadow-xl"
             >
               <Search className="w-5 h-5" />
               Find a Provider
@@ -52,7 +52,7 @@ export function HeroSection() {
             {/* Secondary link */}
             <Link
               href="/insurance"
-              className="inline-flex items-center gap-1.5 text-sm text-stone-500 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+              className="animate-scale-in inline-flex items-center gap-1.5 text-sm text-stone-500 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
             >
               <CreditCard className="w-4 h-4" />
               or scan your insurance card

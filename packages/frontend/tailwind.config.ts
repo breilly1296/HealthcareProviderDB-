@@ -42,6 +42,10 @@ const config: Config = {
         'slide-up': 'slideUp 0.3s ease-out',
         'modal-enter': 'modalEnter 0.2s ease-out',
         'fade-in': 'fadeIn 0.2s ease-out',
+        'fade-up': 'fadeUp 0.4s ease-out both',
+        'fade-up-delay-1': 'fadeUp 0.4s ease-out 0.15s both',
+        'fade-up-delay-2': 'fadeUp 0.4s ease-out 0.3s both',
+        'scale-in': 'scaleIn 0.35s ease-out 0.45s both',
       },
       keyframes: {
         shimmer: {
@@ -59,6 +63,14 @@ const config: Config = {
         fadeIn: {
           '0%': { opacity: '0' },
           '100%': { opacity: '1' },
+        },
+        fadeUp: {
+          '0%': { opacity: '0', transform: 'translateY(20px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        scaleIn: {
+          '0%': { opacity: '0', transform: 'scale(0.95)' },
+          '100%': { opacity: '1', transform: 'scale(1)' },
         },
       },
     },
