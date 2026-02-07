@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import { providerApi } from '@/lib/api';
+import { useQuery } from '@tanstack/react-query';
+import { providerKeys } from '@/hooks/useProviderSearch';
+import api from '@/lib/api';
 import { trackProviderView } from '@/lib/analytics';
 import type { ProviderDisplay, PlanAcceptanceDisplay } from '@/types';
 import LoadingSpinner from '@/components/LoadingSpinner';
@@ -48,43 +50,36 @@ const statusMap: Record<string, 'accepted' | 'not_accepted' | 'pending' | 'unkno
 };
 
 export default function ProviderDetailClient({ npi, initialProvider }: ProviderDetailClientProps) {
-  const [provider, setProvider] = useState<ProviderWithPlans | null>(initialProvider);
-  const [loading, setLoading] = useState(!initialProvider);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    data: typedProvider,
+    isLoading: loading,
+    isError,
+    refetch,
+  } = useQuery<ProviderWithPlans | null>({
+    queryKey: providerKeys.detail(npi),
+    queryFn: async () => {
+      const response = await api.providers.getByNpi(npi);
+      return response.provider as ProviderWithPlans;
+    },
+    initialData: initialProvider ?? undefined,
+    enabled: Boolean(npi),
+    staleTime: 10 * 60 * 1000, // 10 minutes
+  });
 
-  const fetchProvider = async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const result = await providerApi.getByNpi(npi);
-      setProvider(result.provider as ProviderWithPlans);
-    } catch {
-      setError('Unable to load provider information.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    // Only fetch client-side if we don't have initial data from SSR
-    if (!initialProvider && npi) {
-      fetchProvider();
-    }
-  }, [npi]); // eslint-disable-line react-hooks/exhaustive-deps
+  const error = isError ? 'Unable to load provider information.' : null;
 
   // Track provider view when data is available
   useEffect(() => {
-    if (provider) {
+    if (typedProvider) {
       trackProviderView({
         npi,
-        specialty: provider.taxonomyDescription || provider.specialtyCategory || undefined,
+        specialty: typedProvider.taxonomyDescription || typedProvider.specialtyCategory || undefined,
       });
     }
-  }, [provider?.npi]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [typedProvider?.npi]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Find the plan acceptance with the highest confidence score
-  const bestAcceptance = provider?.planAcceptances?.reduce<PlanAcceptanceDisplay | null>(
+  const bestAcceptance = typedProvider?.planAcceptances?.reduce<PlanAcceptanceDisplay | null>(
     (best, p) => {
       const score = p.confidence?.score ?? p.confidenceScore ?? 0;
       const bestScore = best ? (best.confidence?.score ?? best.confidenceScore ?? 0) : -1;
@@ -96,20 +91,20 @@ export default function ProviderDetailClient({ npi, initialProvider }: ProviderD
   const confidenceScore = bestAcceptance?.confidence?.score ?? bestAcceptance?.confidenceScore ?? 0;
 
   // Count total verifications across all plans
-  const verificationCount = provider?.planAcceptances?.reduce(
+  const verificationCount = typedProvider?.planAcceptances?.reduce(
     (total, p) => total + (p.verificationCount || 0),
     0
   ) || 0;
 
   // Get most recent verification date
-  const lastVerifiedAt = provider?.planAcceptances?.reduce((latest, p) => {
+  const lastVerifiedAt = typedProvider?.planAcceptances?.reduce((latest, p) => {
     if (!p.lastVerifiedAt) return latest;
     if (!latest) return p.lastVerifiedAt;
     return new Date(p.lastVerifiedAt) > new Date(latest) ? p.lastVerifiedAt : latest;
   }, null as string | null);
 
   // Transform plan acceptances for InsuranceList
-  const insurancePlans = provider?.planAcceptances?.map(p => ({
+  const insurancePlans = typedProvider?.planAcceptances?.map(p => ({
     id: p.id,
     planId: p.planId,
     name: p.plan?.planName || p.plan?.issuerName || 'Unknown Plan',
@@ -155,7 +150,7 @@ export default function ProviderDetailClient({ npi, initialProvider }: ProviderD
             <p className="text-stone-500 dark:text-gray-400 mb-6">{error}</p>
             <div className="flex justify-center gap-4">
               <button
-                onClick={fetchProvider}
+                onClick={() => refetch()}
                 className="bg-[#137fec] hover:bg-[#0d6edb] text-white px-6 py-2.5 rounded-lg font-medium transition-colors"
               >
                 Try Again
@@ -171,14 +166,14 @@ export default function ProviderDetailClient({ npi, initialProvider }: ProviderD
         )}
 
         {/* Provider Content */}
-        {!loading && !error && provider && (
+        {!loading && !error && typedProvider && (
           <div className="space-y-6">
             {/* Hero Card */}
             <ProviderHeroCard
-              provider={provider}
+              provider={typedProvider}
               confidenceScore={confidenceScore}
               verificationCount={verificationCount}
-              nppesLastSynced={provider.nppesLastSynced}
+              nppesLastSynced={typedProvider.nppesLastSynced}
               confidenceBreakdown={bestAcceptance?.confidence}
             />
 
@@ -187,20 +182,20 @@ export default function ProviderDetailClient({ npi, initialProvider }: ProviderD
 
             {/* About This Provider */}
             <AboutProvider
-              entityType={provider.entityType}
-              acceptsNewPatients={provider.acceptsNewPatients}
-              languages={provider.languages}
+              entityType={typedProvider.entityType}
+              acceptsNewPatients={typedProvider.acceptsNewPatients}
+              languages={typedProvider.languages}
             />
 
             {/* Insurance Plans */}
             <InsuranceList
               plans={insurancePlans.length > 0 ? insurancePlans : undefined}
               npi={npi}
-              providerName={provider.displayName}
+              providerName={typedProvider.displayName}
               lastVerifiedAt={lastVerifiedAt}
               verificationCount={verificationCount}
               mainConfidenceScore={confidenceScore}
-              locations={provider.locations}
+              locations={typedProvider.locations}
             />
 
             {/* Other Providers at This Location */}
