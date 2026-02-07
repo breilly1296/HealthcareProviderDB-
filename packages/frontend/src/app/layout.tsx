@@ -33,6 +33,7 @@ const themeScript = `
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://verifymyprovider.com'),
   title: 'VerifyMyProvider - Find Providers Who Accept Your Insurance',
   description: 'Search for healthcare providers and verify insurance acceptance with community-verified data.',
   icons: {
@@ -43,6 +44,15 @@ export const metadata: Metadata = {
       { url: '/favicon/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
     ],
     apple: '/favicon/apple-touch-icon.png',
+  },
+  openGraph: {
+    type: 'website',
+    locale: 'en_US',
+    siteName: 'VerifyMyProvider',
+    images: ['/full-logo/logo-full-light-1200w.png'],
+  },
+  twitter: {
+    card: 'summary_large_image',
   },
 };
 
