@@ -16,8 +16,9 @@ export function Header() {
             <Image
               src={resolvedTheme === 'dark' ? '/nav-logo/logo-nav-dark.svg' : '/nav-logo/logo-nav-light.svg'}
               alt="VerifyMyProvider"
-              width={240}
-              height={40}
+              width={260}
+              height={44}
+              className="h-8 w-auto"
               priority
             />
           </Link>
