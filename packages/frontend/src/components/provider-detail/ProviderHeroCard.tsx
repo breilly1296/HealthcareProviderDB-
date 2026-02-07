@@ -1,6 +1,7 @@
 'use client';
 
-import { MapPin, Phone, BadgeCheck, Navigation } from 'lucide-react';
+import { useState, useCallback, useMemo } from 'react';
+import { MapPin, Phone, BadgeCheck, Navigation, Share2, Printer, Check } from 'lucide-react';
 import { ConfidenceGauge } from './ConfidenceGauge';
 import { toDisplayCase, toAddressCase, toTitleCase } from '@/lib/formatName';
 
@@ -79,10 +80,74 @@ function getGoogleMapsUrl(provider: Provider): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(parts)}`;
 }
 
+interface ConfidenceHighlight {
+  label: string;
+  strength: 'strong' | 'moderate';
+  /** Normalized score 0–1 used for sorting */
+  rank: number;
+}
+
+const FACTOR_MAX = { dataSource: 25, recency: 30, verification: 25, agreement: 20 } as const;
+
+function getConfidenceHighlights(
+  factors: ConfidenceBreakdown['factors'],
+  verificationCount: number,
+  metadata?: ConfidenceBreakdown['metadata'],
+): ConfidenceHighlight[] {
+  const highlights: ConfidenceHighlight[] = [];
+
+  // Data source
+  const dsRatio = factors.dataSourceScore / FACTOR_MAX.dataSource;
+  if (factors.dataSourceScore > 0) {
+    highlights.push({
+      label: dsRatio >= 0.7 ? 'NPI active' : 'NPI on file',
+      strength: dsRatio >= 0.7 ? 'strong' : 'moderate',
+      rank: dsRatio,
+    });
+  }
+
+  // Recency
+  const recRatio = factors.recencyScore / FACTOR_MAX.recency;
+  if (factors.recencyScore > 0) {
+    const days = metadata?.daysSinceVerification;
+    let label: string;
+    if (days != null && days <= 365) {
+      label = days === 0 ? 'Updated today' : `Updated ${days}d ago`;
+    } else {
+      label = recRatio >= 0.7 ? 'Recently updated' : 'Has update history';
+    }
+    highlights.push({ label, strength: recRatio >= 0.6 ? 'strong' : 'moderate', rank: recRatio });
+  }
+
+  // Verifications
+  const verRatio = factors.verificationScore / FACTOR_MAX.verification;
+  if (factors.verificationScore > 0) {
+    highlights.push({
+      label: `${verificationCount} verification${verificationCount !== 1 ? 's' : ''}`,
+      strength: verRatio >= 0.6 ? 'strong' : 'moderate',
+      rank: verRatio,
+    });
+  }
+
+  // Agreement
+  const agrRatio = factors.agreementScore / FACTOR_MAX.agreement;
+  if (factors.agreementScore > 0) {
+    highlights.push({
+      label: agrRatio >= 0.7 ? 'Sources agree' : 'Partial agreement',
+      strength: agrRatio >= 0.7 ? 'strong' : 'moderate',
+      rank: agrRatio,
+    });
+  }
+
+  // Sort strongest first, take top 3
+  return highlights.sort((a, b) => b.rank - a.rank).slice(0, 3);
+}
+
 export function ProviderHeroCard({ provider, confidenceScore, verificationCount = 0, nppesLastSynced, confidenceBreakdown }: ProviderHeroCardProps) {
   const initials = getInitials(provider.displayName);
   const specialty = provider.specialty || provider.specialtyCategory || provider.taxonomyDescription || 'Healthcare Provider';
   const isVerified = confidenceScore >= 70;
+  const [copied, setCopied] = useState(false);
 
   // Build full address (title-cased from NPPES ALL-CAPS)
   const streetAddress = [toAddressCase(provider.addressLine1), toAddressCase(provider.addressLine2)].filter(Boolean).join(', ');
@@ -91,8 +156,63 @@ export function ProviderHeroCard({ provider, confidenceScore, verificationCount 
     provider.state ? `${provider.state}${provider.zip ? ` ${provider.zip}` : ''}` : null
   ].filter(Boolean).join(', ');
 
+  const highlights = useMemo(
+    () => confidenceBreakdown?.factors
+      ? getConfidenceHighlights(confidenceBreakdown.factors, verificationCount, confidenceBreakdown.metadata)
+      : [],
+    [confidenceBreakdown, verificationCount],
+  );
+
+  const handleShare = useCallback(async () => {
+    const url = window.location.href;
+    const title = `${toDisplayCase(provider.displayName)} - VerifyMyProvider`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title, url });
+      } catch {
+        // User cancelled or share failed — ignore
+      }
+    } else {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }, [provider.displayName]);
+
+  const handlePrint = useCallback(() => {
+    window.print();
+  }, []);
+
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-stone-200 dark:border-gray-700 p-4 sm:p-6 md:p-8">
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-stone-200 dark:border-gray-700 p-4 sm:p-6 md:p-8 relative">
+      {/* Share & Print buttons */}
+      <div className="absolute top-3 right-3 sm:top-4 sm:right-4 flex items-center gap-1.5 print:hidden">
+        <button
+          type="button"
+          onClick={handleShare}
+          aria-label={copied ? 'Link copied' : 'Share provider'}
+          className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-stone-500 dark:text-gray-400 hover:bg-stone-100 dark:hover:bg-gray-700 hover:text-stone-700 dark:hover:text-gray-200 transition-colors"
+        >
+          {copied ? <Check className="w-4 h-4 text-green-600 dark:text-green-400" /> : <Share2 className="w-4 h-4" />}
+        </button>
+        <button
+          type="button"
+          onClick={handlePrint}
+          aria-label="Print provider details"
+          className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-stone-500 dark:text-gray-400 hover:bg-stone-100 dark:hover:bg-gray-700 hover:text-stone-700 dark:hover:text-gray-200 transition-colors"
+        >
+          <Printer className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Toast notification for copy */}
+      {copied && (
+        <div className="absolute top-14 right-3 sm:right-4 bg-stone-800 dark:bg-gray-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg shadow-lg animate-fade-in print:hidden">
+          Link copied!
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row md:items-start gap-6 md:gap-8">
         {/* Left section: Avatar and Info */}
         <div className="flex items-start gap-3 sm:gap-4 flex-1">
@@ -186,14 +306,37 @@ export function ProviderHeroCard({ provider, confidenceScore, verificationCount 
           </div>
         </div>
 
-        {/* Right section: Confidence Gauge */}
-        <div className="flex justify-center md:justify-end">
+        {/* Right section: Confidence Gauge + factor highlights */}
+        <div className="flex flex-col items-center md:items-end gap-3">
           <ConfidenceGauge
             score={confidenceScore}
             size={140}
             verificationCount={verificationCount}
             confidenceBreakdown={confidenceBreakdown}
           />
+
+          {/* Inline factor summary pills */}
+          {highlights.length > 0 && (
+            <div className="flex flex-wrap justify-center md:justify-end gap-1.5">
+              {highlights.map((h) => (
+                <span
+                  key={h.label}
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full ${
+                    h.strength === 'strong'
+                      ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                      : 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                  }`}
+                >
+                  <span className={`w-1 h-1 rounded-full ${
+                    h.strength === 'strong'
+                      ? 'bg-green-500 dark:bg-green-400'
+                      : 'bg-amber-500 dark:bg-amber-400'
+                  }`} />
+                  {h.label}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

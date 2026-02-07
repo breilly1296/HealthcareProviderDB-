@@ -131,3 +131,25 @@
     padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
   }
 }
+
+/* Print styles - show only essential provider content */
+@media print {
+  header, footer, nav {
+    display: none !important;
+  }
+
+  .print\:hidden {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 12pt;
+  }
+
+  .card, [class*="rounded-xl"] {
+    box-shadow: none !important;
+    border: 1px solid #d1d5db !important;
+  }
+}
