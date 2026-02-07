@@ -125,11 +125,20 @@ export function WhyItMattersSection() {
     const el = sectionRef.current;
     if (!el) return;
 
+    // Use a low threshold so stacked mobile layouts still trigger
     const observer = new IntersectionObserver(handleIntersect, {
-      threshold: 0.5,
+      threshold: 0.15,
     });
     observer.observe(el);
-    return () => observer.disconnect();
+
+    // Safety fallback: if the observer never fires (e.g. element is
+    // already visible on mount but below threshold), show final values
+    const fallback = setTimeout(() => setTriggered(true), 3500);
+
+    return () => {
+      observer.disconnect();
+      clearTimeout(fallback);
+    };
   }, [handleIntersect]);
 
   return (
