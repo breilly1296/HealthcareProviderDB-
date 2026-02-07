@@ -206,9 +206,9 @@ test.describe('Provider Comparison', () => {
     await closeButton.click();
     await expect(modal).not.toBeVisible();
 
-    // Click Clear to remove all — use exact text match to target the
-    // CompareBar's Clear button specifically (not modal or other elements)
-    const clearButton = page.getByRole('button', { name: 'Clear', exact: true });
+    // Click Clear to remove all — target the CompareBar's Clear button
+    // by its aria-label (set for accessibility)
+    const clearButton = page.getByRole('button', { name: 'Clear all selected providers' });
     await clearButton.first().click();
 
     // After clearAll(), the CompareBar returns null (count === 0)

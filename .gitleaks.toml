@@ -9,12 +9,10 @@
     '''.*__mocks__.*\.ts$''',
   ]
 
-  # Ignore common placeholder values in config/example files
   regexTarget = "line"
-  [[allowlist.regexes]]
-    description = "Placeholder secrets in example configs"
-    regex = '''(?i)(your-.*-here|changeme|placeholder|xxxx|example\.com)'''
-
-  [[allowlist.regexes]]
-    description = "Default dev postgres credentials"
-    regex = '''postgres:postgres@localhost'''
+  regexes = [
+    # Placeholder secrets in example configs
+    '''(?i)(your-.*-here|changeme|placeholder|xxxx|example\.com)''',
+    # Default dev postgres credentials
+    '''postgres:postgres@localhost''',
+  ]
