@@ -47,8 +47,15 @@ function mapEntityType(dbValue: string | null | undefined): string {
 /**
  * Transform a provider record from DB shape to API response shape.
  * Pulls address from practice_locations, maps field names for frontend compatibility.
+ *
+ * When `options.preferredState` is provided the displayed address will prefer
+ * a practice_location matching that state (and optionally cities), so search
+ * results show the address relevant to the user's filter.
  */
-function transformProvider(p: Record<string, unknown>) {
+function transformProvider(
+  p: Record<string, unknown>,
+  options?: { preferredState?: string; preferredCities?: string[] },
+) {
   const provider = p as typeof p & {
     practice_locations?: Array<{
       id: number;
@@ -135,7 +142,7 @@ function transformProvider(p: Record<string, unknown>) {
     nppes_last_synced?: Date | null;
   };
 
-  const loc = getPrimaryLocation(provider.practice_locations);
+  const loc = getPrimaryLocation(provider.practice_locations, options);
 
   return {
     id: provider.npi,
@@ -265,9 +272,14 @@ router.get(
       limit: query.limit,
     });
 
-    // Transform result for response
+    // Transform result for response — pass search state/cities so the
+    // displayed address matches the location the user filtered by
+    const transformOpts = {
+      preferredState: query.state,
+      preferredCities: query.cities?.split(',').map(c => c.trim()).filter(Boolean),
+    };
     const responseData = {
-      providers: result.providers.map(transformProvider),
+      providers: result.providers.map(p => transformProvider(p, transformOpts)),
       pagination: buildPaginationMeta(result.total, result.page, result.limit),
     };
 
@@ -367,7 +379,7 @@ router.get(
 
     sendSuccess(res, {
       location,
-      providers: colocatedProviders.map(transformProvider),
+      providers: colocatedProviders.map(p => transformProvider(p)),
       pagination: buildPaginationMeta(colocatedResult.total, colocatedResult.page, colocatedResult.limit),
     });
   })

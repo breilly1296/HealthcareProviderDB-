@@ -361,19 +361,75 @@ export function getProviderDisplayName(provider: {
 }
 
 /**
- * Get primary practice location from a provider's locations array
- * Prefers 'practice' address type, falls back to first available
+ * Get primary practice location from a provider's locations array.
+ *
+ * When `preferredState` (and optionally `preferredCities`) are supplied the
+ * function tries to pick a location that matches the search context so the
+ * displayed address corresponds to the state/city the user filtered by.
+ *
+ * Priority order:
+ *   1. state + city + practice type
+ *   2. state + city (any type)
+ *   3. state + practice type
+ *   4. state (any type)
+ *   5. practice type (original behaviour)
+ *   6. first location
  */
-export function getPrimaryLocation(locations?: Array<{
-  address_type?: string | null;
-  address_line1?: string | null;
-  address_line2?: string | null;
-  city?: string | null;
-  state?: string | null;
-  zip_code?: string | null;
-  phone?: string | null;
-  fax?: string | null;
-}>) {
+export function getPrimaryLocation(
+  locations?: Array<{
+    address_type?: string | null;
+    address_line1?: string | null;
+    address_line2?: string | null;
+    city?: string | null;
+    state?: string | null;
+    zip_code?: string | null;
+    phone?: string | null;
+    fax?: string | null;
+  }>,
+  options?: {
+    preferredState?: string;
+    preferredCities?: string[];
+  },
+) {
   if (!locations || locations.length === 0) return null;
+
+  if (options?.preferredState) {
+    const stateUpper = options.preferredState.toUpperCase();
+
+    if (options.preferredCities && options.preferredCities.length > 0) {
+      const citiesLower = options.preferredCities.map(c => c.toLowerCase());
+
+      // 1. state + city + practice type
+      const exactMatch = locations.find(
+        l =>
+          l.state?.toUpperCase() === stateUpper &&
+          l.city != null &&
+          citiesLower.includes(l.city.toLowerCase()) &&
+          l.address_type === 'practice',
+      );
+      if (exactMatch) return exactMatch;
+
+      // 2. state + city (any type)
+      const cityMatch = locations.find(
+        l =>
+          l.state?.toUpperCase() === stateUpper &&
+          l.city != null &&
+          citiesLower.includes(l.city.toLowerCase()),
+      );
+      if (cityMatch) return cityMatch;
+    }
+
+    // 3. state + practice type
+    const statePractice = locations.find(
+      l => l.state?.toUpperCase() === stateUpper && l.address_type === 'practice',
+    );
+    if (statePractice) return statePractice;
+
+    // 4. state (any type)
+    const stateMatch = locations.find(l => l.state?.toUpperCase() === stateUpper);
+    if (stateMatch) return stateMatch;
+  }
+
+  // 5 & 6. Original fallback
   return locations.find(l => l.address_type === 'practice') || locations[0];
 }
