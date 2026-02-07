@@ -116,7 +116,7 @@ export function WhyItMattersSection() {
   const sectionRef = useRef<HTMLDivElement>(null);
 
   const handleIntersect = useCallback((entries: IntersectionObserverEntry[]) => {
-    if (entries[0].isIntersecting) {
+    if (entries[0]?.isIntersecting) {
       setTriggered(true);
     }
   }, []);
