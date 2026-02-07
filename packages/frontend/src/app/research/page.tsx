@@ -1,4 +1,10 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
+
+export const metadata: Metadata = {
+  title: 'Our Research | VerifyMyProvider',
+  description: "The peer-reviewed research behind VerifyMyProvider's insurance verification methodology and confidence scoring.",
+};
 
 export default function ResearchPage() {
   return (

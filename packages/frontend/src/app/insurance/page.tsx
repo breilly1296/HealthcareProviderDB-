@@ -2,7 +2,7 @@ import InsuranceCardUploader from '@/components/InsuranceCardUploader';
 import Link from 'next/link';
 
 export const metadata = {
-  title: 'Insurance Card Scanner | ProviderDB',
+  title: 'Insurance Card Scanner | VerifyMyProvider',
   description: 'Upload your insurance card to extract plan information and find in-network providers.',
 };
 

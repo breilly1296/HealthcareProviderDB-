@@ -1,4 +1,10 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
+
+export const metadata: Metadata = {
+  title: 'Terms of Service | VerifyMyProvider',
+  description: "Terms of service for using VerifyMyProvider's healthcare provider directory and insurance verification platform.",
+};
 
 export default function TermsOfServicePage() {
   return (
