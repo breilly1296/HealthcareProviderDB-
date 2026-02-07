@@ -101,12 +101,21 @@ function SearchResultsDisplay({
     return <EmptyState type="landing" />;
   }
 
+  const resultCount = pagination?.total || 0;
+
   return (
     <div aria-live="polite">
+      {/* Visually hidden announcement for screen readers */}
+      <p className="sr-only" role="status">
+        {resultCount} {resultCount === 1 ? 'result' : 'results'} found
+        {state ? ` in ${state}` : ''}
+        {cities ? ` in ${cities.split(',').join(', ')}` : ''}
+      </p>
+
       {/* Results count */}
       <div className="mb-4">
         <p className="text-stone-600 dark:text-gray-300">
-          Found <strong className="text-stone-800 dark:text-white">{pagination?.total || 0}</strong> providers
+          Found <strong className="text-stone-800 dark:text-white">{resultCount}</strong> providers
           {state && ` in ${state}`}
           {cities && ` in ${cities.split(',').join(', ')}`}
         </p>
@@ -128,7 +137,7 @@ function SearchResultsDisplay({
 
       {/* Pagination */}
       {pagination && pagination.totalPages > 1 && (
-        <div className="mt-8 flex justify-center gap-2">
+        <nav aria-label="Search results pagination" className="mt-8 flex justify-center gap-2">
           {Array.from({ length: pagination.totalPages }, (_, i) => i + 1)
             .filter((p) => p === 1 || p === pagination.totalPages || Math.abs(p - pagination.page) <= 2)
             .map((p, idx, arr) => {
@@ -161,7 +170,7 @@ function SearchResultsDisplay({
                 </div>
               );
             })}
-        </div>
+        </nav>
       )}
     </div>
   );

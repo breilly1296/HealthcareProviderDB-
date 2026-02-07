@@ -62,10 +62,10 @@ export function BottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 md:hidden z-50 safe-bottom transition-colors duration-200"
+      className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 shadow-[0_-2px_8px_-2px_rgba(0,0,0,0.08)] dark:shadow-[0_-2px_8px_-2px_rgba(0,0,0,0.3)] md:hidden z-50 safe-bottom transition-colors duration-200"
       aria-label="Main navigation"
     >
-      <div className="flex justify-around items-center h-16">
+      <div className="flex justify-around items-stretch h-16">
         {NAV_ITEMS.map((item) => {
           const active = isActive(item);
           const Icon = item.icon;
@@ -75,17 +75,29 @@ export function BottomNav() {
               key={item.href}
               href={item.href}
               className={`
-                flex flex-col items-center justify-center
-                flex-1 h-full
-                min-w-[64px]
-                transition-colors duration-150
+                relative flex flex-col items-center justify-center
+                flex-1 min-w-[64px] min-h-[44px]
+                transition-all duration-100
+                active:scale-95
                 focus:outline-none focus-visible:bg-gray-100 dark:focus-visible:bg-gray-800
-                ${active ? 'text-primary-600 dark:text-primary-400' : 'text-gray-500 dark:text-gray-400 active:text-gray-700 dark:active:text-gray-300'}
+                ${active
+                  ? 'text-[#137fec] dark:text-[#38bdf8]'
+                  : 'text-gray-500 dark:text-gray-400 active:text-gray-700 dark:active:text-gray-300'
+                }
               `}
               aria-current={active ? 'page' : undefined}
             >
+              {/* Active indicator bar */}
+              {active && (
+                <span
+                  aria-hidden="true"
+                  className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-[3px] rounded-full bg-gradient-to-r from-[#137fec] to-[#06b6d4]"
+                />
+              )}
               <Icon className="w-6 h-6" aria-hidden="true" />
-              <span className="text-[11px] mt-1 font-medium">{item.label}</span>
+              <span className={`text-[11px] mt-1 ${active ? 'font-semibold' : 'font-medium'}`}>
+                {item.label}
+              </span>
             </Link>
           );
         })}

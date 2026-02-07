@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { CheckCircle, XCircle, Clock, HelpCircle, Search, ChevronDown, ChevronRight, MessageSquarePlus, X, ThumbsUp, ThumbsDown, Users, Loader2, MessageSquare, MapPin } from 'lucide-react';
 import FocusTrap from 'focus-trap-react';
 import { verificationApi } from '@/lib/api';
@@ -185,6 +185,7 @@ function VerificationModal({ isOpen, onClose, plan, npi, providerName, onVerifie
   const [note, setNote] = useState('');
   const [honeypot, setHoneypot] = useState('');
   const { getToken } = useCaptcha();
+  const triggerRef = useRef<HTMLElement | null>(null);
 
   const handleClose = useCallback(() => {
     setIsSubmitting(null);
@@ -193,11 +194,15 @@ function VerificationModal({ isOpen, onClose, plan, npi, providerName, onVerifie
     setNote('');
     setHoneypot('');
     onClose();
+    // Restore focus to trigger element
+    setTimeout(() => triggerRef.current?.focus(), 0);
   }, [onClose]);
 
   // Close on Escape key
   useEffect(() => {
     if (!isOpen) return;
+    // Capture the element that triggered the modal
+    triggerRef.current = document.activeElement as HTMLElement;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') handleClose();
     };

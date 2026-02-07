@@ -329,7 +329,7 @@ export const SearchForm = forwardRef<SearchFormRef, SearchFormProps>(function Se
 
   // Inline variant: desktop layout with grid and search button
   return (
-    <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className={`space-y-4 ${className}`}>
+    <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} aria-label="Provider search form" className={`space-y-4 ${className}`}>
       {/* Primary Search Row */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <SearchableSelect

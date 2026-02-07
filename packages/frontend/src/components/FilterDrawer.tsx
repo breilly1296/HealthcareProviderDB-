@@ -23,6 +23,7 @@ export function FilterDrawer({
 }: FilterDrawerProps) {
   const drawerRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
 
   // Handle escape key
   const handleKeyDown = useCallback(
@@ -38,6 +39,9 @@ export function FilterDrawer({
   useEffect(() => {
     if (!isOpen) return;
 
+    // Capture the element that triggered the drawer
+    triggerRef.current = document.activeElement as HTMLElement;
+
     document.addEventListener('keydown', handleKeyDown);
     document.body.style.overflow = 'hidden';
     // Focus the close button when drawer opens
@@ -46,6 +50,8 @@ export function FilterDrawer({
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = '';
+      // Restore focus to trigger element
+      triggerRef.current?.focus();
     };
   }, [isOpen, handleKeyDown]);
 

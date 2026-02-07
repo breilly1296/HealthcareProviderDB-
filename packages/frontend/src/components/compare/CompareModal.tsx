@@ -178,6 +178,7 @@ export function CompareModal({ isOpen, onClose }: CompareModalProps) {
   const { selectedProviders, removeProvider } = useCompare();
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
 
   // Focus trap and escape key handler
   const handleKeyDown = useCallback(
@@ -192,6 +193,9 @@ export function CompareModal({ isOpen, onClose }: CompareModalProps) {
   useEffect(() => {
     if (!isOpen) return;
 
+    // Capture the element that triggered the modal
+    triggerRef.current = document.activeElement as HTMLElement;
+
     document.addEventListener('keydown', handleKeyDown);
     document.body.style.overflow = 'hidden';
     closeButtonRef.current?.focus();
@@ -199,6 +203,8 @@ export function CompareModal({ isOpen, onClose }: CompareModalProps) {
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = '';
+      // Restore focus to trigger element
+      triggerRef.current?.focus();
     };
   }, [isOpen, handleKeyDown]);
 

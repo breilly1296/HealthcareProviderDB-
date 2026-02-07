@@ -54,7 +54,7 @@ export function ThemeToggle() {
     <div
       className="flex items-center gap-0.5 p-0.5 bg-gray-100 dark:bg-gray-800 rounded-md"
       role="radiogroup"
-      aria-label="Select color theme"
+      aria-label="Theme settings"
     >
       {THEME_OPTIONS.map((option) => (
         <button
@@ -73,6 +73,7 @@ export function ThemeToggle() {
           `}
           role="radio"
           aria-checked={theme === option.value}
+          aria-pressed={theme === option.value}
           aria-label={`${option.label} theme`}
         >
           {option.icon}

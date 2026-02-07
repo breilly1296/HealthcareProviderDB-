@@ -1,6 +1,7 @@
 'use client';
 
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { ProviderDisplay } from '@/types';
 import { getSpecialtyDisplay } from '@/lib/provider-utils';
@@ -168,6 +169,15 @@ function ProviderCardComponent({
   showConfidence = true,
   index = 0,
 }: ProviderCardProps) {
+  const router = useRouter();
+
+  // Allow Space key to activate the card link (links only respond to Enter natively)
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === ' ') {
+      e.preventDefault();
+      router.push(`/provider/${provider.npi}`);
+    }
+  }, [router, provider.npi]);
   // Get confidence and plan data from provider object
   const confidenceScore = provider.confidenceScore ?? null;
   const planAcceptances = provider.planAcceptances ?? [];
@@ -220,7 +230,11 @@ function ProviderCardComponent({
   const remainingPlansCount = Math.max(0, totalAcceptedCount - 3);
 
   return (
-    <Link href={`/provider/${provider.npi}`}>
+    <Link
+      href={`/provider/${provider.npi}`}
+      onKeyDown={handleKeyDown}
+      className="block rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900"
+    >
       <article
         className="bg-white dark:bg-gray-800 rounded-xl border border-stone-200 dark:border-gray-700 p-4 sm:p-5 hover:-translate-y-0.5 hover:shadow-lg hover:border-stone-300 dark:hover:border-gray-600 transition-all duration-150 cursor-pointer animate-fade-up"
         style={{ animationDelay: `${index * 50}ms` }}
@@ -253,8 +267,12 @@ function ProviderCardComponent({
 
               {/* Confidence Score - compact on mobile */}
               {hasConfidence && confidenceColors && (
-                <div className={`flex-shrink-0 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg ${confidenceColors.bg} border ${confidenceColors.border} ${confidenceColors.ring}`}>
-                  <div className={`text-xs ${confidenceColors.text} text-center`}>
+                <div
+                  className={`flex-shrink-0 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg ${confidenceColors.bg} border ${confidenceColors.border} ${confidenceColors.ring}`}
+                  aria-label={`Confidence score: ${confidenceScore} out of 100, ${confidenceScore! >= 70 ? 'high' : confidenceScore! >= 50 ? 'medium' : 'low'} confidence`}
+                  role="img"
+                >
+                  <div className={`text-xs ${confidenceColors.text} text-center`} aria-hidden="true">
                     {confidenceScore}%
                   </div>
                   <div className="hidden sm:block w-20 h-1.5 bg-stone-200 dark:bg-gray-700 rounded-full mt-1 overflow-hidden">

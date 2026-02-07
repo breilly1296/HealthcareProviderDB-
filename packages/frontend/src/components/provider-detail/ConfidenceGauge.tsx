@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { X } from 'lucide-react';
 import FocusTrap from 'focus-trap-react';
 import {
@@ -55,6 +55,7 @@ export function ConfidenceGauge({
   confidenceBreakdown
 }: ConfidenceGaugeProps) {
   const [modalOpen, setModalOpen] = useState(false);
+  const triggerRef = useRef<HTMLElement | null>(null);
 
   const strokeWidth = 5;
   const radius = (size - strokeWidth) / 2;
@@ -65,7 +66,11 @@ export function ConfidenceGauge({
   const { label, color } = getConfidenceLevel(score);
   const improvementHint = getImprovementHint(score, verificationCount);
 
-  const handleClose = useCallback(() => setModalOpen(false), []);
+  const handleClose = useCallback(() => {
+    setModalOpen(false);
+    // Restore focus to the element that opened the modal
+    setTimeout(() => triggerRef.current?.focus(), 0);
+  }, []);
 
   // Close on Escape
   useEffect(() => {
@@ -142,7 +147,10 @@ export function ConfidenceGauge({
         {canShowBreakdown ? (
           <button
             className="mt-2 text-xs text-[#137fec] hover:underline"
-            onClick={() => setModalOpen(true)}
+            onClick={(e) => {
+              triggerRef.current = e.currentTarget;
+              setModalOpen(true);
+            }}
           >
             How is this calculated?
           </button>
@@ -169,7 +177,7 @@ export function ConfidenceGauge({
           />
 
           {/* Modal Content */}
-          <FocusTrap>
+          <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false }}>
             <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-stone-200 dark:border-gray-700 w-full max-w-md max-h-[85vh] overflow-y-auto">
               {/* Header */}
               <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-stone-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between rounded-t-xl">
