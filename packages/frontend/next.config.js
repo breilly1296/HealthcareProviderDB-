@@ -67,6 +67,10 @@ const nextConfig = {
   reactStrictMode: true,
   // Enable standalone output for Docker deployments
   output: 'standalone',
+  // Prefer modern image formats for smaller payloads
+  images: {
+    formats: ['image/avif', 'image/webp'],
+  },
   // Disable SWC for ARM64 compatibility
   swcMinify: false,
   experimental: {
