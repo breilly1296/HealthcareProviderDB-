@@ -282,6 +282,7 @@ export interface ProviderDisplay {
   // Optional fields for search results with plan data
   confidenceScore?: number | null;
   planAcceptances?: PlanAcceptancePreview[];
+  locationCount?: number;
 }
 
 /**

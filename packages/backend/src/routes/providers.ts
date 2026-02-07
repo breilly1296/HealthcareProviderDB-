@@ -178,6 +178,7 @@ function transformProvider(
     medicareIds: provider.provider_medicare || [],
     taxonomies: provider.provider_taxonomies || [],
     locations: provider.practice_locations || [],
+    locationCount: provider.practice_locations?.length ?? 0,
     nppesLastSynced: provider.nppes_last_synced || null,
     // Plan acceptances with location data
     planAcceptances: (provider.providerPlanAcceptances || []).map(pa => ({

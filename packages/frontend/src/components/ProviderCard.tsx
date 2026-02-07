@@ -292,9 +292,16 @@ function ProviderCardComponent({
             <div className="space-y-1 text-sm text-stone-600 dark:text-gray-300">
               <div className="flex items-start gap-2">
                 <LocationIcon className="w-4 h-4 text-stone-400 dark:text-gray-500 mt-0.5 flex-shrink-0" aria-hidden={true} />
-                <span>
-                  {formattedAddress.street}, {formattedAddress.cityStateZip}
-                </span>
+                <div className="min-w-0">
+                  <span>
+                    {formattedAddress.street}, {formattedAddress.cityStateZip}
+                  </span>
+                  {(provider.locationCount ?? 0) > 1 && (
+                    <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium text-stone-500 dark:text-gray-400 bg-stone-100 dark:bg-gray-700/60 rounded">
+                      1 of {provider.locationCount} locations
+                    </span>
+                  )}
+                </div>
               </div>
 
               {formattedPhone && (
