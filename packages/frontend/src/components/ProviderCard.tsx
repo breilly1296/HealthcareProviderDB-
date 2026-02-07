@@ -11,6 +11,7 @@ import { CheckCircle, BadgeCheck } from 'lucide-react';
 interface ProviderCardProps {
   provider: ProviderDisplay;
   showConfidence?: boolean;
+  index?: number;
 }
 
 // Standard credentials to keep (uppercase for matching)
@@ -131,25 +132,31 @@ function getInitials(provider: ProviderDisplay): string {
 }
 
 // Helper to get confidence color
-function getConfidenceColor(score: number): { bg: string; bar: string; text: string } {
+function getConfidenceColor(score: number): { bg: string; bar: string; text: string; border: string; ring: string } {
   if (score >= 70) {
     return {
-      bg: 'bg-green-50 dark:bg-green-900/20',
+      bg: 'bg-green-50 dark:bg-green-900/30',
       bar: 'bg-green-500',
-      text: 'text-green-700 dark:text-green-400',
+      text: 'text-green-700 dark:text-green-300 font-extrabold',
+      border: 'border-green-300 dark:border-green-700',
+      ring: 'ring-1 ring-green-200 dark:ring-green-800/50',
     };
   }
   if (score >= 50) {
     return {
-      bg: 'bg-yellow-50 dark:bg-yellow-900/20',
-      bar: 'bg-yellow-500',
-      text: 'text-yellow-700 dark:text-yellow-400',
+      bg: 'bg-amber-50 dark:bg-amber-900/20',
+      bar: 'bg-amber-500',
+      text: 'text-amber-700 dark:text-amber-400',
+      border: 'border-amber-200 dark:border-amber-800',
+      ring: '',
     };
   }
   return {
-    bg: 'bg-red-50 dark:bg-red-900/20',
-    bar: 'bg-red-500',
-    text: 'text-red-700 dark:text-red-400',
+    bg: 'bg-stone-50 dark:bg-gray-700/40',
+    bar: 'bg-stone-400 dark:bg-gray-500',
+    text: 'text-stone-500 dark:text-gray-400',
+    border: 'border-stone-200 dark:border-gray-600',
+    ring: '',
   };
 }
 
@@ -159,6 +166,7 @@ function getConfidenceColor(score: number): { bg: string; bar: string; text: str
 function ProviderCardComponent({
   provider,
   showConfidence = true,
+  index = 0,
 }: ProviderCardProps) {
   // Get confidence and plan data from provider object
   const confidenceScore = provider.confidenceScore ?? null;
@@ -213,7 +221,10 @@ function ProviderCardComponent({
 
   return (
     <Link href={`/provider/${provider.npi}`}>
-      <article className="bg-white dark:bg-gray-800 rounded-xl border border-stone-200 dark:border-gray-700 p-4 sm:p-5 hover:shadow-lg hover:border-stone-300 dark:hover:border-gray-600 transition-all duration-200 cursor-pointer">
+      <article
+        className="bg-white dark:bg-gray-800 rounded-xl border border-stone-200 dark:border-gray-700 p-4 sm:p-5 hover:-translate-y-0.5 hover:shadow-lg hover:border-stone-300 dark:hover:border-gray-600 transition-all duration-150 cursor-pointer animate-fade-up"
+        style={{ animationDelay: `${index * 50}ms` }}
+      >
         <div className="flex gap-3 sm:gap-4">
           {/* Avatar - smaller on mobile */}
           <div className="relative flex-shrink-0">
@@ -242,8 +253,8 @@ function ProviderCardComponent({
 
               {/* Confidence Score - compact on mobile */}
               {hasConfidence && confidenceColors && (
-                <div className={`flex-shrink-0 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg ${confidenceColors.bg} border ${confidenceColors.bg.includes('green') ? 'border-green-200 dark:border-green-800' : confidenceColors.bg.includes('yellow') ? 'border-yellow-200 dark:border-yellow-800' : 'border-red-200 dark:border-red-800'}`}>
-                  <div className={`text-xs font-bold ${confidenceColors.text} text-center`}>
+                <div className={`flex-shrink-0 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg ${confidenceColors.bg} border ${confidenceColors.border} ${confidenceColors.ring}`}>
+                  <div className={`text-xs ${confidenceColors.text} text-center`}>
                     {confidenceScore}%
                   </div>
                   <div className="hidden sm:block w-20 h-1.5 bg-stone-200 dark:bg-gray-700 rounded-full mt-1 overflow-hidden">
@@ -296,7 +307,7 @@ function ProviderCardComponent({
                       <span
                         key={idx}
                         title={fullName}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-medium rounded-full border border-green-200 dark:border-green-800 max-w-[200px] sm:max-w-[150px]"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-50 dark:bg-green-900/40 text-green-700 dark:text-green-300 text-xs font-medium rounded-full border border-green-200 dark:border-green-700 max-w-[200px] sm:max-w-[150px]"
                       >
                         <CheckCircle className="w-3 h-3 flex-shrink-0" aria-hidden="true" />
                         <span className="truncate">{fullName}</span>
@@ -304,7 +315,7 @@ function ProviderCardComponent({
                     );
                   })}
                   {remainingPlansCount > 0 && (
-                    <span className="px-2 py-0.5 bg-stone-100 dark:bg-gray-700 text-stone-600 dark:text-gray-300 text-xs font-medium rounded-full border border-stone-200 dark:border-gray-600 w-fit">
+                    <span className="px-2 py-0.5 bg-stone-100 dark:bg-gray-700/60 text-stone-600 dark:text-gray-200 text-xs font-medium rounded-full border border-stone-200 dark:border-gray-500 w-fit">
                       +{remainingPlansCount} more
                     </span>
                   )}

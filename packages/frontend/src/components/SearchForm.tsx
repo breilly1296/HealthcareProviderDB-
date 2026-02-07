@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useImperativeHandle, forwardRef } from 'react';
+import { useEffect, useMemo, useRef, useImperativeHandle, forwardRef, useCallback } from 'react';
 import { Search, X, Loader2, ChevronDown } from 'lucide-react';
 import { useSearchForm, useCities, useHealthSystems, useInsurancePlans, NYC_ALL_BOROUGHS_VALUE, NYC_BOROUGHS } from '@/hooks';
 import { SearchableSelect } from './ui/SearchableSelect';
@@ -25,6 +25,8 @@ interface SearchFormProps {
   variant?: 'inline' | 'drawer';
   /** Callback when active filter count changes (for mobile badge) */
   onFilterCountChange?: (count: number) => void;
+  /** Callback when loading state changes */
+  onLoadingChange?: (loading: boolean) => void;
 }
 
 // ============================================================================
@@ -38,6 +40,7 @@ export const SearchForm = forwardRef<SearchFormRef, SearchFormProps>(function Se
   defaultFilters,
   variant = 'inline',
   onFilterCountChange,
+  onLoadingChange,
 }, ref) {
   const {
     filters,
@@ -68,6 +71,11 @@ export const SearchForm = forwardRef<SearchFormRef, SearchFormProps>(function Se
   useEffect(() => {
     onFilterCountChange?.(activeFilterCount);
   }, [activeFilterCount, onFilterCountChange]);
+
+  // Notify parent of loading state changes
+  useEffect(() => {
+    onLoadingChange?.(isLoading);
+  }, [isLoading, onLoadingChange]);
 
   // Data fetching hooks
   const { cities, isLoading: citiesLoading } = useCities(filters.state);
@@ -112,6 +120,21 @@ export const SearchForm = forwardRef<SearchFormRef, SearchFormProps>(function Se
     e.preventDefault();
     searchImmediate();
   };
+
+  // Enter key triggers search from plain text inputs (e.g. ZIP, name, NPI)
+  // Native <input> Enter already submits the form via handleSubmit, but this
+  // ensures it also works if the browser doesn't fire submit (e.g. single-input forms).
+  // We skip SearchableSelect elements — they handle Enter internally.
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key !== 'Enter' || !canSearch || isLoading) return;
+    const target = e.target as HTMLElement;
+    // Only trigger for plain text inputs (ZIP, name, NPI) — not for
+    // SearchableSelect buttons/inputs which handle Enter on their own.
+    if (target.tagName === 'INPUT' && !(target as HTMLInputElement).readOnly) {
+      e.preventDefault();
+      searchImmediate();
+    }
+  }, [canSearch, isLoading, searchImmediate]);
 
   // Handle city selection with NYC All Boroughs logic
   const handleCityChange = (newValues: string[]) => {
@@ -306,7 +329,7 @@ export const SearchForm = forwardRef<SearchFormRef, SearchFormProps>(function Se
 
   // Inline variant: desktop layout with grid and search button
   return (
-    <form onSubmit={handleSubmit} className={`space-y-4 ${className}`}>
+    <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className={`space-y-4 ${className}`}>
       {/* Primary Search Row */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <SearchableSelect
@@ -387,11 +410,26 @@ export const SearchForm = forwardRef<SearchFormRef, SearchFormProps>(function Se
           <button
             type="submit"
             disabled={!canSearch || isLoading}
-            className="btn-primary flex items-center gap-2 px-6"
+            className={`btn-primary flex items-center gap-2 px-6 transition-shadow ${
+              canSearch && !isLoading
+                ? 'shadow-md shadow-primary-500/30 ring-1 ring-primary-400/50 dark:shadow-primary-400/20 dark:ring-primary-400/30'
+                : ''
+            }`}
           >
             {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-            Search
+            {isLoading ? 'Searching\u2026' : 'Search'}
           </button>
+
+          {activeFilterCount > 0 && !isLoading && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="text-sm text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors whitespace-nowrap"
+            >
+              <X className="w-3.5 h-3.5 inline -mt-0.5 mr-0.5" />
+              Clear all
+            </button>
+          )}
         </div>
       </div>
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, Suspense, useRef } from 'react';
+import { Loader2 } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { SearchForm, type SearchFormRef } from '@/components/SearchForm';
 import { ProviderCard } from '@/components/ProviderCard';
@@ -171,8 +172,7 @@ function SearchPageContent() {
   const [pagination, setPagination] = useState<PaginationState | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Loading state is managed by SearchForm, but kept here for potential direct use
-  const [isLoading, _setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Mobile filter drawer state
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
@@ -223,6 +223,7 @@ function SearchPageContent() {
             <SearchForm
               onResultsChange={handleResultsChange}
               onFilterCountChange={setActiveFilterCount}
+              onLoadingChange={setIsLoading}
             />
           </Suspense>
         </div>
@@ -246,12 +247,19 @@ function SearchPageContent() {
             variant="drawer"
             onResultsChange={handleResultsChange}
             onFilterCountChange={setActiveFilterCount}
+            onLoadingChange={setIsLoading}
           />
         </FilterDrawer>
 
         {/* Results */}
         {isLoading ? (
-          <SearchResultsSkeleton count={5} />
+          <>
+            <div className="flex items-center justify-center gap-2 py-4 text-primary-600 dark:text-primary-400" aria-live="polite">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="text-sm font-medium animate-pulse">Searching providers&hellip;</span>
+            </div>
+            <SearchResultsSkeleton count={5} />
+          </>
         ) : (
           <Suspense fallback={<SearchResultsSkeleton count={5} />}>
             <SearchResultsDisplay

@@ -37,6 +37,13 @@ const EMPTY_STATE_CONFIG: Record<EmptyStateType, {
   },
 };
 
+const SEARCH_TIPS = [
+  'Remove the city filter to search the entire state',
+  'Try a different or broader specialty',
+  'Check for typos in the provider name or NPI',
+  'Remove the insurance filter — not all plans are listed yet',
+];
+
 export function EmptyState({
   type,
   suggestions = [],
@@ -44,6 +51,7 @@ export function EmptyState({
 }: EmptyStateProps) {
   const config = EMPTY_STATE_CONFIG[type];
   const { title, description, Illustration } = config;
+  const showTips = type === 'no-results' || type === 'no-results-locations';
 
   return (
     <div className="text-center py-12 px-4">
@@ -59,6 +67,23 @@ export function EmptyState({
       <p className="text-gray-600 dark:text-gray-300 max-w-md mx-auto mb-6">
         {description}
       </p>
+
+      {/* Search tips */}
+      {showTips && (
+        <div className="max-w-sm mx-auto mb-6 text-left">
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Try broadening your search:
+          </p>
+          <ul className="space-y-1.5">
+            {SEARCH_TIPS.map((tip) => (
+              <li key={tip} className="flex items-start gap-2 text-sm text-gray-500 dark:text-gray-400">
+                <span className="mt-1 block w-1 h-1 rounded-full bg-gray-400 dark:bg-gray-500 flex-shrink-0" />
+                {tip}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Suggestion chips */}
       {suggestions.length > 0 && onSuggestionClick && (
