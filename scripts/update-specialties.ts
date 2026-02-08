@@ -55,6 +55,11 @@ async function main() {
       SELECT COUNT(*) as total FROM providers
       WHERE specialty_category IS NULL
          OR specialty_category = ''
+         OR specialty_category = 'Specialist'
+         OR specialty_category = 'Primary Care'
+         OR specialty_category = 'Advanced Practice'
+         OR specialty_category = 'Surgery'
+         OR specialty_category = 'Mental Health'
          OR primary_specialty IS NULL
          OR primary_specialty = ''
          OR primary_specialty = 'Specialist'
@@ -92,6 +97,11 @@ async function main() {
         LEFT JOIN provider_taxonomies pt ON p.npi = pt.npi AND pt.is_primary = 'Y'
         WHERE p.specialty_category IS NULL
            OR p.specialty_category = ''
+           OR p.specialty_category = 'Specialist'
+           OR p.specialty_category = 'Primary Care'
+           OR p.specialty_category = 'Advanced Practice'
+           OR p.specialty_category = 'Surgery'
+           OR p.specialty_category = 'Mental Health'
            OR p.primary_specialty IS NULL
            OR p.primary_specialty = ''
            OR p.primary_specialty = 'Specialist'
@@ -119,7 +129,13 @@ async function main() {
         const description = getTaxonomyDescription(taxonomyCode) || row.primary_specialty || 'Healthcare Provider';
 
         // Only update if we have something better than what's there
-        const needsCategoryUpdate = !row.specialty_category || row.specialty_category === '';
+        const needsCategoryUpdate = !row.specialty_category
+          || row.specialty_category === ''
+          || row.specialty_category === 'Specialist'
+          || row.specialty_category === 'Primary Care'
+          || row.specialty_category === 'Advanced Practice'
+          || row.specialty_category === 'Surgery'
+          || row.specialty_category === 'Mental Health';
         const needsDescriptionUpdate = !row.primary_specialty
           || row.primary_specialty === ''
           || row.primary_specialty === 'Specialist'
@@ -215,6 +231,11 @@ async function main() {
       SELECT COUNT(*) as total FROM providers
       WHERE specialty_category IS NULL
          OR specialty_category = ''
+         OR specialty_category = 'Specialist'
+         OR specialty_category = 'Primary Care'
+         OR specialty_category = 'Advanced Practice'
+         OR specialty_category = 'Surgery'
+         OR specialty_category = 'Mental Health'
          OR primary_specialty IS NULL
          OR primary_specialty = ''
          OR primary_specialty = 'Specialist'

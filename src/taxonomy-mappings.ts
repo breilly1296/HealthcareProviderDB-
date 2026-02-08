@@ -131,7 +131,7 @@ export const TAXONOMY_TO_SPECIALTY: Record<string, SpecialtyCategory> = {
   '207RG0300X': 'GERIATRICS', // Internal Medicine - Geriatric Medicine
 
   // ============================================================
-  // MENTAL HEALTH & COUNSELING (101*, 106*)
+  // MENTAL HEALTH & COUNSELING (101*, 106*, 221*, 225A*)
   // ============================================================
   '101Y00000X': 'MENTAL_HEALTH',  // Counselor
   '101YA0400X': 'MENTAL_HEALTH',  // Addiction (Substance Use Disorder) Counselor
@@ -142,10 +142,14 @@ export const TAXONOMY_TO_SPECIALTY: Record<string, SpecialtyCategory> = {
   '106E00000X': 'MENTAL_HEALTH',  // Assistant Behavior Analyst
   '106H00000X': 'MENTAL_HEALTH',  // Marriage & Family Therapist
   '106S00000X': 'MENTAL_HEALTH',  // Marriage & Family Therapist
+  '221700000X': 'MENTAL_HEALTH',  // Art Therapist
+  '225600000X': 'MENTAL_HEALTH',  // Dance Therapist
+  '225A00000X': 'MENTAL_HEALTH',  // Music Therapist
 
   // ============================================================
-  // PSYCHOLOGY (103*)
+  // PSYCHOLOGY (103*, 102L*)
   // ============================================================
+  '102L00000X': 'PSYCHOLOGY', // Psychoanalyst
   '103G00000X': 'PSYCHOLOGY', // Clinical Neuropsychologist
   '103GC0700X': 'PSYCHOLOGY', // Clinical Neuropsychologist
   '103K00000X': 'PSYCHOLOGY', // Behavioral Analyst
@@ -396,9 +400,11 @@ export const TAXONOMY_TO_SPECIALTY: Record<string, SpecialtyCategory> = {
   '224Z00000X': 'OCCUPATIONAL_THERAPY', // Occupational Therapy Assistant
 
   // ============================================================
-  // SPEECH THERAPY (225*, 235*)
+  // SPEECH THERAPY (225*, 235*, 231H*, 237*, 222Q*)
   // ============================================================
+  '222Q00000X': 'SPEECH_THERAPY', // Developmental Therapist
   '225700000X': 'SPEECH_THERAPY', // Respiratory/Speech/Rehab Technician (grouped here)
+  '231H00000X': 'SPEECH_THERAPY', // Audiologist
   '235500000X': 'SPEECH_THERAPY', // Speech/Language/Hearing Specialist
   '235Z00000X': 'SPEECH_THERAPY', // Speech-Language Pathologist
   '237600000X': 'SPEECH_THERAPY', // Audiologist
@@ -484,8 +490,9 @@ export const TAXONOMY_TO_SPECIALTY: Record<string, SpecialtyCategory> = {
   '207LP3000X': 'ANESTHESIOLOGY', // Anesthesiology - Pediatric Anesthesiology
 
   // ============================================================
-  // SURGERY (208*)
+  // SURGERY (207Y*, 208*)
   // ============================================================
+  '207Y00000X': 'SURGERY', // Otolaryngology (ENT)
   '208600000X': 'SURGERY', // Surgery
   '2086H0002X': 'SURGERY', // Surgery - Hospice and Palliative Medicine
   '2086S0102X': 'SURGERY', // Surgery - Surgical Critical Care
@@ -497,7 +504,7 @@ export const TAXONOMY_TO_SPECIALTY: Record<string, SpecialtyCategory> = {
   '2086X0206X': 'SURGERY', // Surgery - Surgical Oncology
   '208G00000X': 'SURGERY', // Thoracic Surgery
   '208G00001X': 'SURGERY', // Thoracic Surgery - Congenital Cardiac
-  '208M00000X': 'SURGERY', // Hospitalist
+  '208M00000X': 'INTERNAL_MEDICINE', // Hospitalist (changed from SURGERY)
   '208VP0000X': 'SURGERY', // Pain Medicine
   '208VP0014X': 'SURGERY', // Pain Medicine - Interventional Pain
 
@@ -691,14 +698,25 @@ export const TAXONOMY_TO_SPECIALTY: Record<string, SpecialtyCategory> = {
   '2083X0100X': 'PREVENTIVE_MEDICINE', // Occupational Medicine
 
   // ============================================================
-  // COMMUNITY HEALTH (172*, 173*, 174*, 175*, 176*, 251*)
+  // COMMUNITY HEALTH (170*, 171*, 172*, 173*, 174*, 175*, 176*, 251*, 252*)
   // ============================================================
+  '170300000X': 'COMMUNITY_HEALTH', // Genetic Counselor, MS
+  '171400000X': 'COMMUNITY_HEALTH', // Health & Wellness Coach
+  '171R00000X': 'COMMUNITY_HEALTH', // Interpreter
+  '171W00000X': 'COMMUNITY_HEALTH', // Contractor
+  '172A00000X': 'COMMUNITY_HEALTH', // Driver
   '172V00000X': 'COMMUNITY_HEALTH', // Community Health Worker
   '173000000X': 'COMMUNITY_HEALTH', // Legal Medicine
   '173C00000X': 'COMMUNITY_HEALTH', // Reflexologist
   '173F00000X': 'COMMUNITY_HEALTH', // Sleep Specialist, PhD
   '174200000X': 'COMMUNITY_HEALTH', // Meals
-  '174400000X': 'COMMUNITY_HEALTH', // Specialist
+  '174400000X': 'COMMUNITY_HEALTH', // Behavioral Analyst / Community Health
+  '1744G0900X': 'PSYCHOLOGY', // Behavioral Analyst - Gerontology
+  '1744P3200X': 'PSYCHOLOGY', // Behavioral Analyst - Pediatric
+  '1744R1102X': 'PSYCHOLOGY', // Behavioral Analyst - Rehabilitation
+  '1744R1103X': 'PSYCHOLOGY', // Behavioral Analyst - Rehabilitation, Pediatric
+  '174H00000X': 'COMMUNITY_HEALTH', // Health Educator
+  '174N00000X': 'NURSING', // Lactation Consultant, Non-RN
   '175F00000X': 'COMMUNITY_HEALTH', // Naturopath
   '175L00000X': 'COMMUNITY_HEALTH', // Homeopath
   '175M00000X': 'COMMUNITY_HEALTH', // Midwife, Lay
@@ -714,6 +732,7 @@ export const TAXONOMY_TO_SPECIALTY: Record<string, SpecialtyCategory> = {
   '251T00000X': 'COMMUNITY_HEALTH', // PACE Provider
   '251V00000X': 'COMMUNITY_HEALTH', // Voluntary Health Agency
   '251X00000X': 'COMMUNITY_HEALTH', // Supports Brokerage
+  '252Y00000X': 'COMMUNITY_HEALTH', // Early Intervention Provider Agency
 
   // ============================================================
   // HOME HEALTH (251E*)
@@ -873,8 +892,9 @@ export const TAXONOMY_TO_SPECIALTY: Record<string, SpecialtyCategory> = {
   '293D00000X': 'LAB_PATHOLOGY', // Physiological Laboratory
 
   // ============================================================
-  // Medical Technicians (24*, 246*, 247*)
+  // Medical Technicians (24*, 246*, 247*, 2255A*)
   // ============================================================
+  '2255A2300X': 'LAB_PATHOLOGY', // Specialist/Technologist, Athletic Training
   '246QB0000X': 'LAB_PATHOLOGY', // Specialist/Technologist, Pathology - Blood Banking
   '246QC1000X': 'LAB_PATHOLOGY', // Specialist/Technologist, Pathology - Chemistry
   '246QC2700X': 'LAB_PATHOLOGY', // Specialist/Technologist, Pathology - Cytotechnology
@@ -942,10 +962,14 @@ const PREFIX_MAPPINGS: [string, SpecialtyCategory][] = [
 
   // Mental Health & Behavioral
   ['101Y', 'MENTAL_HEALTH'],
+  ['102L', 'PSYCHOLOGY'], // Psychoanalyst
   ['103', 'PSYCHOLOGY'],
   ['104', 'SOCIAL_WORK'],
   ['106', 'MENTAL_HEALTH'],
   ['2084', 'PSYCHIATRY'],
+  ['2217', 'MENTAL_HEALTH'], // Art Therapist
+  ['225A', 'MENTAL_HEALTH'], // Music Therapist
+  ['2256', 'MENTAL_HEALTH'], // Dance Therapist
   ['373', 'MENTAL_HEALTH'],
 
   // Nursing & Mid-level Providers
@@ -974,6 +998,8 @@ const PREFIX_MAPPINGS: [string, SpecialtyCategory][] = [
   ['225X', 'OCCUPATIONAL_THERAPY'],
   ['224Z', 'OCCUPATIONAL_THERAPY'],
   ['2257', 'SPEECH_THERAPY'],
+  ['222Q', 'SPEECH_THERAPY'], // Developmental Therapist
+  ['231H', 'SPEECH_THERAPY'], // Audiologist
   ['235', 'SPEECH_THERAPY'],
   ['237', 'SPEECH_THERAPY'],
   ['367', 'RESPIRATORY_THERAPY'],
@@ -982,10 +1008,12 @@ const PREFIX_MAPPINGS: [string, SpecialtyCategory][] = [
 
   // Medical Specialties
   ['207P', 'EMERGENCY_MEDICINE'],
+  ['207Y', 'SURGERY'], // Otolaryngology (ENT)
   ['2080', 'PEDIATRICS'],
   ['207L', 'ANESTHESIOLOGY'],
   ['2086', 'SURGERY'],
   ['208G', 'SURGERY'],
+  ['208M', 'INTERNAL_MEDICINE'], // Hospitalist
   ['207V', 'OB_GYN'],
   ['2085', 'RADIOLOGY'],
   ['207N', 'DERMATOLOGY'],
@@ -1010,14 +1038,25 @@ const PREFIX_MAPPINGS: [string, SpecialtyCategory][] = [
   ['374', 'LAB_PATHOLOGY'],
   ['246', 'LAB_PATHOLOGY'],
   ['247', 'LAB_PATHOLOGY'],
+  ['2255A', 'LAB_PATHOLOGY'], // Specialist/Technologist, Athletic Training
   ['291', 'LAB_PATHOLOGY'],
   ['292', 'LAB_PATHOLOGY'],
   ['293', 'LAB_PATHOLOGY'],
   ['310', 'DME_PROSTHETICS'],
   ['332B', 'DME_PROSTHETICS'],
   ['335', 'DME_PROSTHETICS'],
+  ['1703', 'COMMUNITY_HEALTH'], // Genetic Counselor
+  ['1714', 'COMMUNITY_HEALTH'], // Health & Wellness Coach
+  ['171R', 'COMMUNITY_HEALTH'], // Interpreter
+  ['171W', 'COMMUNITY_HEALTH'], // Contractor
+  ['172A', 'COMMUNITY_HEALTH'], // Driver
   ['172V', 'COMMUNITY_HEALTH'],
+  ['173', 'COMMUNITY_HEALTH'], // Legal Medicine, etc.
+  ['174H', 'COMMUNITY_HEALTH'], // Health Educator
+  ['174N', 'NURSING'], // Lactation Consultant, Non-RN
+  ['175T', 'COMMUNITY_HEALTH'], // Peer Specialist
   ['251', 'COMMUNITY_HEALTH'],
+  ['252Y', 'COMMUNITY_HEALTH'], // Early Intervention Provider Agency
   ['171M', 'MIDWIFERY'],
   ['176B', 'MIDWIFERY'],
   ['315', 'HOSPICE_PALLIATIVE'],

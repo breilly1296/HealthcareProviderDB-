@@ -147,9 +147,9 @@ async function main() {
 
       const result = await pool.query(`
         UPDATE providers
-        SET "specialtyCategory" = $1, "updatedAt" = NOW()
-        WHERE "taxonomyCode" LIKE $2
-        AND ("specialtyCategory" IS NULL OR "specialtyCategory" != $1)
+        SET specialty_category = $1
+        WHERE primary_taxonomy_code LIKE $2
+        AND (specialty_category IS NULL OR specialty_category != $1)
       `, [category, `${prefix}%`]);
 
       if (result.rowCount > 0) {
@@ -161,8 +161,8 @@ async function main() {
     // Set remaining to OTHER
     const otherResult = await pool.query(`
       UPDATE providers
-      SET "specialtyCategory" = 'OTHER', "updatedAt" = NOW()
-      WHERE "specialtyCategory" IS NULL
+      SET specialty_category = 'OTHER'
+      WHERE specialty_category IS NULL
     `);
 
     if (otherResult.rowCount > 0) {
@@ -174,9 +174,9 @@ async function main() {
 
     // Show summary
     const summaryResult = await pool.query(`
-      SELECT "specialtyCategory", COUNT(*) as count
+      SELECT specialty_category, COUNT(*) as count
       FROM providers
-      GROUP BY "specialtyCategory"
+      GROUP BY specialty_category
       ORDER BY count DESC
     `);
 
@@ -184,7 +184,7 @@ async function main() {
     console.log('Specialty Category       | Count');
     console.log('-------------------------|----------');
     for (const row of summaryResult.rows) {
-      const cat = (row.specialtyCategory || 'NULL').padEnd(24);
+      const cat = (row.specialty_category || 'NULL').padEnd(24);
       console.log(`${cat} | ${parseInt(row.count).toLocaleString()}`);
     }
 
