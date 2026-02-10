@@ -236,7 +236,11 @@ function ProviderCardComponent({
       className="block rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900"
     >
       <article
-        className="bg-white dark:bg-gray-800 rounded-xl border border-stone-200 dark:border-gray-700 p-4 sm:p-5 hover:-translate-y-0.5 hover:shadow-lg hover:border-stone-300 dark:hover:border-gray-600 transition-all duration-150 cursor-pointer animate-fade-up"
+        className={`bg-white dark:bg-gray-800 rounded-xl border border-stone-200 dark:border-gray-700 p-4 sm:p-5 hover:-translate-y-0.5 hover:shadow-lg hover:border-stone-300 dark:hover:border-gray-600 transition-all duration-150 cursor-pointer animate-fade-up ${
+          isVerified
+            ? 'border-l-4 border-l-green-500/60 dark:border-l-green-400/40'
+            : ''
+        }`}
         style={{ animationDelay: `${index * 50}ms` }}
       >
         <div className="flex gap-3 sm:gap-4">
@@ -298,7 +302,7 @@ function ProviderCardComponent({
                   </span>
                   {(provider.locationCount ?? 0) > 1 && (
                     <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium text-stone-500 dark:text-gray-400 bg-stone-100 dark:bg-gray-700/60 rounded">
-                      1 of {provider.locationCount} locations
+                      {provider.locationCount} locations
                     </span>
                   )}
                 </div>
@@ -312,19 +316,15 @@ function ProviderCardComponent({
               )}
             </div>
 
-            {/* NPI - hidden on mobile */}
-            <p className="hidden sm:block text-xs text-stone-400 dark:text-gray-500 mt-2">
-              NPI: {provider.npi}
-            </p>
           </div>
         </div>
 
-        {/* Insurance Preview Section */}
+        {/* Insurance Preview & Footer */}
         <div className="mt-4 pt-4 border-t border-stone-100 dark:border-gray-700">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            {/* Insurance badges - vertical on mobile, horizontal on desktop */}
+            {/* Insurance badges - only shown when plans exist */}
             <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 sm:flex-wrap">
-              {acceptedPlans.length > 0 ? (
+              {acceptedPlans.length > 0 && (
                 <>
                   {acceptedPlans.map((plan, idx) => {
                     const fullName = plan.planName || plan.issuerName || 'Plan';
@@ -345,15 +345,6 @@ function ProviderCardComponent({
                     </span>
                   )}
                 </>
-              ) : (
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500 dark:text-gray-400">
-                    No verifications yet
-                  </span>
-                  <span className="text-blue-500 hover:text-blue-400 font-medium">
-                    Be the first to verify →
-                  </span>
-                </div>
               )}
             </div>
 
