@@ -109,12 +109,12 @@ export function Disclaimer({ variant = 'banner', showLearnMore = true, className
 
   // Banner variant
   return (
-    <div className={`bg-amber-50 dark:bg-amber-900/30 border-b border-amber-200 dark:border-amber-800 ${className}`}>
+    <div className={`bg-stone-50 dark:bg-gray-800/50 border-b border-stone-200 dark:border-gray-700 ${className}`}>
       <div className="container-wide py-2">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <svg
-              className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0"
+              className="w-4 h-4 text-blue-500 dark:text-blue-400 flex-shrink-0"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -123,16 +123,16 @@ export function Disclaimer({ variant = 'banner', showLearnMore = true, className
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
-                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
               />
             </svg>
-            <p className="text-xs sm:text-sm text-amber-800 dark:text-amber-200 truncate">
-              Crowdsourced data may be inaccurate. Always verify with your provider before scheduling.
+            <p className="text-xs sm:text-sm text-stone-600 dark:text-gray-300 truncate">
+              Data sourced from CMS NPPES and verified by real patients. Always confirm with your provider.
             </p>
             {showLearnMore && (
               <Link
                 href="/disclaimer"
-                className="text-xs sm:text-sm text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 underline whitespace-nowrap flex-shrink-0"
+                className="text-xs sm:text-sm text-stone-500 dark:text-gray-400 hover:text-stone-700 dark:hover:text-gray-200 underline whitespace-nowrap flex-shrink-0"
               >
                 Learn more
               </Link>
@@ -140,11 +140,11 @@ export function Disclaimer({ variant = 'banner', showLearnMore = true, className
           </div>
           <button
             onClick={handleDismiss}
-            className="p-1 rounded hover:bg-amber-200/50 dark:hover:bg-amber-800/50 transition-colors flex-shrink-0"
+            className="p-1 rounded hover:bg-stone-200/50 dark:hover:bg-gray-700/50 transition-colors flex-shrink-0"
             aria-label="Dismiss disclaimer"
           >
             <svg
-              className="w-4 h-4 text-amber-700 dark:text-amber-300"
+              className="w-4 h-4 text-stone-400 dark:text-gray-500"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
