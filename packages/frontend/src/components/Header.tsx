@@ -27,7 +27,7 @@ export function Header() {
               href="/search"
               className="hidden md:inline text-base font-medium text-stone-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
             >
-              Find Providers
+              Search
             </Link>
             <Link
               href="/insurance"
@@ -40,13 +40,6 @@ export function Header() {
               className="hidden md:inline text-base font-medium text-stone-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
             >
               About
-            </Link>
-            <Link
-              href="/search"
-              className="btn-primary text-sm sm:text-base px-3 py-2 sm:px-4 sm:py-2"
-            >
-              <span className="hidden sm:inline">Search Now</span>
-              <span className="sm:hidden">Search</span>
             </Link>
           </div>
         </nav>
