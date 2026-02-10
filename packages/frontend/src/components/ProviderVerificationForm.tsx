@@ -195,7 +195,7 @@ export default function ProviderVerificationForm({
             />
           </svg>
           <span className="text-sm font-semibold">
-            Verification {newVerificationTotal} of 3 needed for expert-level accuracy
+            Verification {newVerificationTotal} of 3 needed for high confidence
           </span>
         </div>
         {verificationsNeeded > 0 && (
@@ -246,12 +246,10 @@ export default function ProviderVerificationForm({
             </svg>
             <div>
               <h3 className="font-semibold text-primary-900 mb-1">
-                Research shows simple verification achieves expert-level accuracy
+                Your 2-minute verification helps prevent surprise bills
               </h3>
               <p className="text-sm text-primary-800">
-                <strong>3 verifications = κ=0.58 accuracy</strong> (matches professional validation)
-                <br />
-                <span className="text-xs">Based on peer-reviewed research from JAMIA</span>
+                When 3 patients verify the same info, we can confidently tell others what to expect.
               </p>
             </div>
           </div>
@@ -283,7 +281,7 @@ export default function ProviderVerificationForm({
               <p className="text-xs text-gray-500">
                 {verificationsNeeded > 0
                   ? `${verificationsNeeded} more needed for high confidence`
-                  : 'Expert-level accuracy achieved!'}
+                  : 'High confidence achieved!'}
               </p>
             </div>
           </div>
@@ -628,42 +626,35 @@ export default function ProviderVerificationForm({
 
         <p className="text-xl text-gray-600 mb-6">Your verification has been recorded.</p>
 
-        {/* Research Impact Box */}
-        <div className="bg-primary-50 border border-primary-200 rounded-lg p-6 mb-6">
-          <h3 className="font-semibold text-primary-900 mb-3">Research Impact</h3>
-          <p className="text-sm text-primary-800 mb-4">
-            <strong>
-              Research shows 3 verifications achieve expert-level accuracy (κ=0.58)
-            </strong>
-            <br />
-            <span className="text-xs">
-              Matches professional validation • Mortensen et al. (2015), JAMIA
-            </span>
+        {/* Impact Box */}
+        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-6 mb-6">
+          <h3 className="font-semibold text-green-900 dark:text-green-100 mb-2">
+            You&apos;re making a difference
+          </h3>
+          <p className="text-sm text-green-800 dark:text-green-200">
+            Your verification helps other patients avoid surprise bills.
+            When 3 patients verify the same information, we can be confident it&apos;s accurate.
           </p>
+        </div>
 
-          {/* Visual Progress */}
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <div className="flex gap-1">
-              {[...Array(Math.min(3, newVerificationTotal))].map((_, i) => (
-                <svg key={i} className="w-8 h-8 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                  <path
-                    fillRule="evenodd"
-                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              ))}
-              {[...Array(Math.max(0, 3 - newVerificationTotal))].map((_, i) => (
-                <svg key={i} className="w-8 h-8 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
-                  <circle cx="10" cy="10" r="8" />
-                </svg>
-              ))}
-            </div>
+        {/* Visual Progress */}
+        <div className="flex items-center justify-center gap-2 mb-4">
+          <div className="flex gap-1">
+            {[...Array(Math.min(3, newVerificationTotal))].map((_, i) => (
+              <svg key={i} className="w-8 h-8 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            ))}
+            {[...Array(Math.max(0, 3 - newVerificationTotal))].map((_, i) => (
+              <svg key={i} className="w-8 h-8 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
+                <circle cx="10" cy="10" r="8" />
+              </svg>
+            ))}
           </div>
-
-          <p className="text-base font-medium text-gray-900">
-            You're verification {newVerificationTotal} of 3 for this provider
-          </p>
         </div>
 
         {isExpertLevel ? (
@@ -672,17 +663,17 @@ export default function ProviderVerificationForm({
               <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
-              <p className="text-base font-bold text-green-900">Expert-level accuracy achieved!</p>
+              <p className="text-base font-bold text-green-900">High confidence achieved!</p>
             </div>
             <p className="text-sm text-green-800">
-              This provider now has high-confidence verification data
+              This provider now has enough verifications for high confidence
             </p>
           </div>
         ) : (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
             <p className="text-sm font-medium text-yellow-900">
               {verificationsNeeded} more {verificationsNeeded === 1 ? 'verification' : 'verifications'}{' '}
-              needed to reach expert-level accuracy
+              needed for high confidence
             </p>
           </div>
         )}
@@ -746,8 +737,7 @@ export default function ProviderVerificationForm({
         </div>
 
         <p className="text-sm text-gray-600 mb-6">
-          Research shows 46% of insurance directories contain errors. Calling ahead prevents surprise
-          bills.
+          Insurance directories are often wrong, so calling ahead is a good idea.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4">
