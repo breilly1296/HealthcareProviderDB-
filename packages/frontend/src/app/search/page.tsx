@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, Suspense, useRef } from 'react';
+import Link from 'next/link';
 import { Loader2 } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { SearchForm, type SearchFormRef } from '@/components/SearchForm';
@@ -164,13 +165,6 @@ function SearchResultsDisplay({
         </div>
       )}
 
-      {/* Disclaimer banner */}
-      <div className="mb-6 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-        <p className="text-sm text-yellow-800 dark:text-yellow-200">
-          <strong>Note:</strong> Provider information is crowdsourced and may not be current. Always verify insurance acceptance directly with the provider's office before scheduling.
-        </p>
-      </div>
-
       {/* Provider list */}
       <div className="space-y-5">
         {providers.map((provider) => (
@@ -215,6 +209,14 @@ function SearchResultsDisplay({
             })}
         </nav>
       )}
+
+      {/* Subtle data source note */}
+      <p className="text-center text-xs text-stone-400 dark:text-gray-500 mt-8 mb-4">
+        Data sourced from CMS NPPES and community verifications.
+        <Link href="/disclaimer" className="underline hover:text-stone-600 dark:hover:text-gray-300 ml-1">
+          Learn more
+        </Link>
+      </p>
     </div>
   );
 }
