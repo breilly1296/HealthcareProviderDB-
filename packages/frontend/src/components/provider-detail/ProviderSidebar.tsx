@@ -71,38 +71,33 @@ function VerifyCTACard({ provider }: { provider: ProviderDisplay }) {
 
 function ResearchExplainerCard() {
   return (
-    <div className="card bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+    <div className="card bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
       <div className="flex items-start gap-3 mb-3">
-        <div className="w-8 h-8 bg-gray-700 dark:bg-gray-600 rounded-full flex items-center justify-center flex-shrink-0">
+        <div className="w-8 h-8 bg-blue-600 dark:bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
           <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
           </svg>
         </div>
         <div className="flex-1">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
-            Why Verification Matters
+          <h3 className="text-sm font-semibold text-stone-900 dark:text-white mb-1">
+            Why We Verify
           </h3>
-          <div className="text-xs text-gray-700 dark:text-gray-300 space-y-2">
-            <p>
-              <strong className="text-gray-900 dark:text-white">46-77%</strong> of insurance directories are wrong, causing:
-            </p>
-            <ul className="list-disc list-inside ml-2 space-y-1">
-              <li><strong className="text-gray-900 dark:text-white">4x more surprise bills</strong></li>
-              <li>28% delay needed care</li>
-              <li>540 days to fix errors</li>
-            </ul>
-            <p className="pt-2">
-              Our crowdsourced verification achieves <strong className="text-gray-900 dark:text-white">expert-level accuracy</strong> (κ=0.58) with just 3 patients.
-            </p>
-          </div>
+          <p className="text-xs text-stone-700 dark:text-gray-300">
+            Insurance directories are often wrong — about half of listings contain errors.
+            That means surprise bills and wasted time. We use reports from real patients
+            to keep information accurate.
+          </p>
+          <p className="text-xs text-stone-600 dark:text-gray-400 mt-2">
+            Just 3 patient reports are enough to confirm a provider&apos;s insurance status
+            with high confidence.
+          </p>
         </div>
       </div>
-
       <Link
         href="/research"
-        className="text-xs font-medium text-primary-700 dark:text-primary-400 hover:text-primary-800 dark:hover:text-primary-300 flex items-center gap-1 mt-3"
+        className="text-xs font-medium text-blue-700 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center gap-1 mt-2"
       >
-        Read the research
+        See the research behind this
         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
@@ -118,10 +113,6 @@ function ProviderDetailsCard({ provider }: { provider: ProviderDisplay }) {
         Provider Details
       </h3>
       <dl className="space-y-3">
-        <div>
-          <dt className="text-sm text-gray-500 dark:text-gray-400">NPI Number</dt>
-          <dd className="font-mono text-gray-900 dark:text-white">{provider.npi}</dd>
-        </div>
         <div>
           <dt className="text-sm text-gray-500 dark:text-gray-400">Entity Type</dt>
           <dd className="text-gray-900 dark:text-white">
@@ -145,6 +136,10 @@ function ProviderDetailsCard({ provider }: { provider: ProviderDisplay }) {
               {provider.npiStatus}
             </span>
           </dd>
+        </div>
+        <div className="pt-2 mt-2 border-t border-stone-100 dark:border-gray-700">
+          <dt className="text-xs text-stone-400 dark:text-gray-500">NPI Number</dt>
+          <dd className="font-mono text-xs text-stone-500 dark:text-gray-400">{provider.npi}</dd>
         </div>
       </dl>
     </div>
