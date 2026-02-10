@@ -1,8 +1,11 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { Search } from 'lucide-react';
 import type { InsuranceCardDataWithConfidence, InsuranceCardExtractionResponse, ExtractionConfidence } from '@/types/insurance';
 import { useError } from '@/context/ErrorContext';
+import { useGeoLocation } from '@/hooks/useGeoLocation';
 
 /**
  * Confidence level indicator component
@@ -112,6 +115,15 @@ export default function InsuranceCardUploader() {
   const [validationError, setValidationError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { showErrorToast } = useError();
+  const router = useRouter();
+  const geo = useGeoLocation();
+
+  const handleFindProviders = useCallback(() => {
+    if (!extractedData) return;
+    const params = new URLSearchParams();
+    params.set('state', geo.state || 'NY');
+    router.push(`/search?${params.toString()}`);
+  }, [extractedData, geo.state, router]);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -343,6 +355,7 @@ export default function InsuranceCardUploader() {
 
       {/* Extracted Data */}
       {extractedData && (
+        <>
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
           <div className="bg-green-50 dark:bg-green-900/30 border-b border-green-100 dark:border-green-800 px-6 py-4">
             <div className="flex items-center justify-between flex-wrap gap-2">
@@ -527,6 +540,31 @@ export default function InsuranceCardUploader() {
             </p>
           </div>
         </div>
+
+        {/* Find Providers CTA */}
+        <div className="mt-6 p-5 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
+          <div className="flex flex-col sm:flex-row items-center gap-4">
+            <div className="flex-1 text-center sm:text-left">
+              <h3 className="text-lg font-semibold text-stone-800 dark:text-white">
+                Ready to find providers?
+              </h3>
+              <p className="text-sm text-stone-600 dark:text-gray-300 mt-1">
+                Search for providers who accept {extractedData.plan_name || extractedData.insurance_company || 'your plan'}
+              </p>
+            </div>
+            <button
+              onClick={handleFindProviders}
+              className="inline-flex items-center gap-2 px-6 py-3 text-base font-semibold text-white bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 rounded-xl shadow-lg shadow-blue-500/25 transition-all hover:scale-[1.02] whitespace-nowrap"
+            >
+              <Search className="w-5 h-5" />
+              Find Providers
+            </button>
+          </div>
+        </div>
+        <p className="text-xs text-stone-500 dark:text-gray-400 text-center mt-3">
+          Tip: Note your plan name ({extractedData.plan_name || 'shown above'}) to select it in the search filters
+        </p>
+        </>
       )}
     </div>
   );
