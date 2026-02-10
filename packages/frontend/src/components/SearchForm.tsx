@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useImperativeHandle, forwardRef, useCallback } from 'react';
-import { Search, X, Loader2, ChevronDown } from 'lucide-react';
+import { useState, useEffect, useMemo, useRef, useImperativeHandle, forwardRef, useCallback } from 'react';
+import { Search, X, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useSearchForm, useCities, useHealthSystems, useInsurancePlans, NYC_ALL_BOROUGHS_VALUE, NYC_BOROUGHS } from '@/hooks';
 import { SearchableSelect } from './ui/SearchableSelect';
 import { SPECIALTY_OPTIONS, STATE_OPTIONS } from '@/lib/provider-utils';
@@ -18,7 +18,6 @@ export interface SearchFormRef {
 
 interface SearchFormProps {
   onResultsChange?: (results: ProviderDisplay[], pagination: PaginationState | null) => void;
-  showAdvancedFilters?: boolean;
   className?: string;
   defaultFilters?: Partial<SearchFilters>;
   /** 'inline' shows full form with Search button, 'drawer' hides Search button for mobile drawer use */
@@ -35,7 +34,6 @@ interface SearchFormProps {
 
 export const SearchForm = forwardRef<SearchFormRef, SearchFormProps>(function SearchForm({
   onResultsChange,
-  showAdvancedFilters = true,
   className = '',
   defaultFilters,
   variant = 'inline',
@@ -327,11 +325,39 @@ export const SearchForm = forwardRef<SearchFormRef, SearchFormProps>(function Se
     );
   }
 
-  // Inline variant: desktop layout with grid and search button
+  // Inline variant: desktop layout with primary row + collapsible secondary filters
+  const [showMoreFilters, setShowMoreFilters] = useState(false);
+
+  // Count active secondary filters (everything except specialty, state, insurance)
+  const secondaryFilterCount = useMemo(() => {
+    let count = 0;
+    if (filters.cities.length > 0) count++;
+    if (filters.healthSystem) count++;
+    if (filters.zipCode) count++;
+    if (filters.name) count++;
+    if (filters.npi) count++;
+    return count;
+  }, [filters.cities, filters.healthSystem, filters.zipCode, filters.name, filters.npi]);
+
+  // Auto-expand "More Filters" if any secondary filter is active on mount
+  const hasAutoExpanded = useRef(false);
+  useEffect(() => {
+    if (hasAutoExpanded.current) return;
+    const hasSecondaryFilter = filters.cities.length > 0 ||
+      filters.healthSystem ||
+      filters.zipCode ||
+      filters.name ||
+      filters.npi;
+    if (hasSecondaryFilter) {
+      setShowMoreFilters(true);
+      hasAutoExpanded.current = true;
+    }
+  }, [filters.cities, filters.healthSystem, filters.zipCode, filters.name, filters.npi]);
+
   return (
     <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} aria-label="Provider search form" className={`space-y-4 ${className}`}>
-      {/* Primary Search Row */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Primary Search Row: Specialty | State | Insurance | Search */}
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr_auto] gap-4">
         <SearchableSelect
           label="Specialty"
           options={SPECIALTY_OPTIONS}
@@ -354,33 +380,6 @@ export const SearchForm = forwardRef<SearchFormRef, SearchFormProps>(function Se
         />
 
         <SearchableSelect
-          label="City"
-          options={cityOptions}
-          value={filters.cities}
-          onChange={(v) => handleCityChange((v as string[]) || [])}
-          placeholder={!filters.state ? 'Select state first' : 'Select cities'}
-          disabled={!filters.state}
-          isLoading={citiesLoading}
-          searchable
-          clearable
-          multiple
-        />
-
-        <SearchableSelect
-          label="Health System"
-          options={healthSystemOptions}
-          value={filters.healthSystem}
-          onChange={(v) => setFilter('healthSystem', (v as string) || '')}
-          placeholder="All Health Systems"
-          isLoading={healthSystemsLoading}
-          searchable
-          clearable
-        />
-      </div>
-
-      {/* Insurance Plan Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <SearchableSelect
           label="Insurance Plan"
           options={insuranceOptions as GroupedSelectOptions[]}
           value={filters.insurancePlanId}
@@ -392,7 +391,79 @@ export const SearchForm = forwardRef<SearchFormRef, SearchFormProps>(function Se
         />
 
         <div className="flex items-end gap-3">
-          <div className="flex-1">
+          <button
+            type="submit"
+            disabled={!canSearch || isLoading}
+            className={`btn-primary flex items-center gap-2 px-6 h-[42px] transition-shadow ${
+              canSearch && !isLoading
+                ? 'shadow-md shadow-primary-500/30'
+                : ''
+            }`}
+          >
+            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+            Search
+          </button>
+
+          {activeFilterCount > 0 && !isLoading && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="text-sm text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors whitespace-nowrap h-[42px]"
+            >
+              <X className="w-3.5 h-3.5 inline -mt-0.5 mr-0.5" />
+              Clear all
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* More Filters Toggle */}
+      <button
+        type="button"
+        onClick={() => setShowMoreFilters(!showMoreFilters)}
+        className="flex items-center gap-1.5 text-sm font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300"
+      >
+        {showMoreFilters ? (
+          <ChevronUp className="w-4 h-4" />
+        ) : (
+          <ChevronDown className="w-4 h-4" />
+        )}
+        More Filters
+        {secondaryFilterCount > 0 && (
+          <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-bold bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 rounded-full">
+            {secondaryFilterCount}
+          </span>
+        )}
+      </button>
+
+      {/* Secondary Filters (collapsible) */}
+      {showMoreFilters && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-3 border-t border-stone-200 dark:border-gray-700">
+          <SearchableSelect
+            label="City"
+            options={cityOptions}
+            value={filters.cities}
+            onChange={(v) => handleCityChange((v as string[]) || [])}
+            placeholder={!filters.state ? 'Select state first' : 'Select cities'}
+            disabled={!filters.state}
+            isLoading={citiesLoading}
+            searchable
+            clearable
+            multiple
+          />
+
+          <SearchableSelect
+            label="Health System"
+            options={healthSystemOptions}
+            value={filters.healthSystem}
+            onChange={(v) => setFilter('healthSystem', (v as string) || '')}
+            placeholder="All Health Systems"
+            isLoading={healthSystemsLoading}
+            searchable
+            clearable
+          />
+
+          <div>
             <label htmlFor="zipCode" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               ZIP Code
             </label>
@@ -407,76 +478,20 @@ export const SearchForm = forwardRef<SearchFormRef, SearchFormProps>(function Se
             />
           </div>
 
-          <button
-            type="submit"
-            disabled={!canSearch || isLoading}
-            className={`btn-primary flex items-center gap-2 px-6 transition-shadow ${
-              canSearch && !isLoading
-                ? 'shadow-md shadow-primary-500/30 ring-1 ring-primary-400/50 dark:shadow-primary-400/20 dark:ring-primary-400/30'
-                : ''
-            }`}
-          >
-            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-            {isLoading ? 'Searching\u2026' : 'Search'}
-          </button>
-
-          {activeFilterCount > 0 && !isLoading && (
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="text-sm text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors whitespace-nowrap"
-            >
-              <X className="w-3.5 h-3.5 inline -mt-0.5 mr-0.5" />
-              Clear all
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Advanced Filters Toggle */}
-      {showAdvancedFilters && (
-        <details className="group">
-          <summary className="flex items-center gap-2 cursor-pointer text-sm font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300">
-            <ChevronDown className="w-4 h-4 transition-transform group-open:rotate-180" />
-            Advanced Filters
-            {activeFilterCount > 0 && (
-              <span className="px-2 py-0.5 text-xs bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 rounded-full">
-                {activeFilterCount}
-              </span>
-            )}
-          </summary>
-
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Provider Name
-              </label>
-              <input
-                type="text"
-                id="name"
-                value={filters.name}
-                onChange={(e) => setFilter('name', e.target.value)}
-                placeholder="Search by name"
-                className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="npi" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                NPI Number
-              </label>
-              <input
-                type="text"
-                id="npi"
-                value={filters.npi}
-                onChange={(e) => setFilter('npi', e.target.value)}
-                placeholder="10-digit NPI"
-                className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
-                maxLength={10}
-              />
-            </div>
+          <div>
+            <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Provider Name
+            </label>
+            <input
+              type="text"
+              id="name"
+              value={filters.name}
+              onChange={(e) => setFilter('name', e.target.value)}
+              placeholder="Search by name"
+              className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
+            />
           </div>
-        </details>
+        </div>
       )}
 
       {/* Active Filter Chips */}
