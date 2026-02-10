@@ -5,21 +5,21 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 const steps = [
   {
     number: 1,
-    title: 'Search Providers',
+    title: 'Search',
     description:
-      'Enter your location, specialty needed, and optionally your insurance plan to find matching providers.',
+      'Enter your location and insurance to find matching providers near you.',
   },
   {
     number: 2,
-    title: 'Check Confidence Scores',
+    title: 'Compare',
     description:
-      'See our confidence rating for each provider-insurance match, based on official data and community verifications.',
+      'See which providers are verified by other patients like you.',
   },
   {
     number: 3,
-    title: 'Verify & Contribute',
+    title: 'Book with confidence',
     description:
-      'After your visit, help others by verifying whether the provider accepted your insurance as expected.',
+      'Found a provider? After your visit, help others by sharing your experience.',
   },
 ];
 
@@ -50,14 +50,8 @@ export function HowItWorksSection() {
         <h2 className="text-2xl md:text-3xl font-bold text-center text-stone-800 dark:text-white mb-3">
           How It Works
         </h2>
-        <p className="text-base text-stone-600 dark:text-gray-300 text-center max-w-2xl mx-auto mb-3">
-          Finding the right provider for your insurance is simple
-        </p>
-        <p className="text-sm text-stone-500 dark:text-gray-400 text-center max-w-2xl mx-auto mb-8">
-          Our approach achieves <strong className="text-stone-700 dark:text-gray-200">expert-level accuracy (κ=0.58 vs 0.59)</strong> with
-          <strong className="text-stone-700 dark:text-gray-200"> real-time updates vs 540-day industry lag</strong>
-          <br />
-          <span className="text-xs">Based on research from Health Affairs Scholar, JAMIA</span>
+        <p className="text-base text-stone-600 dark:text-gray-300 text-center max-w-2xl mx-auto mb-8">
+          Three simple steps to find the right provider.
         </p>
 
         <div ref={gridRef} className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-0 max-w-4xl mx-auto">
