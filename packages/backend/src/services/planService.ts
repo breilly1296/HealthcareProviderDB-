@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
+import { getProviderDisplayName } from './providerService';
 import { getPaginationValues } from './utils';
 
 // ============================================================================
@@ -356,9 +357,7 @@ export async function getProvidersForPlan(
         city: loc?.city || null,
         state: loc?.state || null,
         phone: loc?.phone || null,
-        displayName: prov.entityType === '2'
-          ? prov.organizationName || 'Unknown Organization'
-          : `${prov.firstName || ''} ${prov.lastName || ''}`.trim() || 'Unknown Provider',
+        displayName: getProviderDisplayName(prov),
         confidenceScore: a.confidenceScore,
         lastVerified: a.lastVerified,
         verificationCount: a.verificationCount,

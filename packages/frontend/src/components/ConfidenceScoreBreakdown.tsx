@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { progressWidth, absolutePosition } from '@/lib/utils';
+import { progressWidth } from '@/lib/utils';
 
 // ============================================================================
 // Types
@@ -522,7 +522,7 @@ export function ConfidenceScoreTooltip({
             ${style.bg} ${style.border}
             animate-in fade-in-0 zoom-in-95 duration-150
           `}
-          style={absolutePosition(tooltipPosition)}
+          style={tooltipPosition}
         >
           {/* Header */}
           <div className="flex items-center gap-2 mb-3">

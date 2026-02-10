@@ -14,6 +14,7 @@ import { getColocatedNpis } from '../services/locationService';
 import { getProvidersForMap } from '../services/mapService';
 import { getLocationHealthSystem } from '../services/locationEnrichment';
 import { enrichAcceptanceWithConfidence } from '../services/confidenceService';
+import { mapEntityTypeToApi } from '../services/utils';
 import prisma from '../lib/prisma';
 import { paginationSchema, npiParamSchema } from '../schemas/commonSchemas';
 import { buildPaginationMeta, sendSuccess } from '../utils/responseHelpers';
@@ -47,14 +48,7 @@ const mapQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(500).default(200),
 });
 
-/**
- * Map entity type from DB value ('1'/'2') to API value
- */
-function mapEntityType(dbValue: string | null | undefined): string {
-  if (dbValue === '1') return 'INDIVIDUAL';
-  if (dbValue === '2') return 'ORGANIZATION';
-  return dbValue || 'UNKNOWN';
-}
+// mapEntityTypeToApi imported from services/utils
 
 /**
  * Transform a provider record from DB shape to API response shape.
@@ -159,7 +153,7 @@ function transformProvider(
   return {
     id: provider.npi,
     npi: provider.npi,
-    entityType: mapEntityType(provider.entityType),
+    entityType: mapEntityTypeToApi(provider.entityType),
     firstName: provider.firstName,
     lastName: provider.lastName,
     middleName: provider.middle_name || null,

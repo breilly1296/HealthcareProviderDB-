@@ -33,23 +33,6 @@ export function progressWidth(percentage: number): React.CSSProperties {
 }
 
 /**
- * Creates a position style object for absolute positioning.
- * Useful for tooltips, popovers, and dropdowns.
- *
- * @example
- * <div style={absolutePosition({ top: 100, left: 50 })} />
- * // => { top: 100, left: 50 }
- */
-export function absolutePosition(position: {
-  top?: number;
-  left?: number;
-  right?: number;
-  bottom?: number;
-}): React.CSSProperties {
-  return position;
-}
-
-/**
  * Creates a max-height style object.
  * Useful for scrollable containers with dynamic heights.
  *

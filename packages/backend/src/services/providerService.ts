@@ -4,6 +4,8 @@ import {
   getPaginationValues,
   cleanWhereClause,
   addAndCondition,
+  buildCityFilter,
+  mapEntityTypeToDb,
 } from './utils';
 import logger from '../utils/logger';
 
@@ -215,7 +217,7 @@ export async function searchProviders(params: ProviderSearchParams): Promise<Pro
 
   // Map entity type: API uses INDIVIDUAL/ORGANIZATION, DB stores '1'/'2'
   if (entityType) {
-    where.entityType = entityType === 'INDIVIDUAL' ? '1' : entityType === 'ORGANIZATION' ? '2' : entityType;
+    where.entityType = mapEntityTypeToDb(entityType);
   }
 
   // Location-based filters go through practice_locations relation
@@ -225,19 +227,8 @@ export async function searchProviders(params: ProviderSearchParams): Promise<Pro
     if (state) locationFilters.push({ state: state.toUpperCase() });
     if (zipCode) locationFilters.push({ zip_code: { startsWith: zipCode } });
 
-    // City filter (single or multiple)
-    if (cities) {
-      const cityArray = cities.split(',').map(c => c.trim()).filter(Boolean);
-      if (cityArray.length > 0) {
-        locationFilters.push({
-          OR: cityArray.map(cityName => ({
-            city: { equals: cityName, mode: 'insensitive' as const }
-          }))
-        });
-      }
-    } else if (city) {
-      locationFilters.push({ city: { contains: city, mode: 'insensitive' } });
-    }
+    const cityFilter = buildCityFilter(cities, city);
+    if (cityFilter) locationFilters.push(cityFilter);
 
     addAndCondition(where, {
       practice_locations: {

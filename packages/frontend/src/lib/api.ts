@@ -523,14 +523,6 @@ const plans = {
     );
   },
 
-  // Legacy alias for backward compatibility
-  getGroupedPlans: (params?: { search?: string; state?: string }) => {
-    const query = buildQueryString(params || {});
-    return apiFetch<{ carriers: CarrierGroup[]; totalPlans: number }>(
-      `/plans/grouped${query ? `?${query}` : ''}`
-    );
-  },
-
   getIssuers: (state?: string) =>
     apiFetch<{ issuers: Issuer[]; count: number }>(
       `/plans/meta/issuers?${buildQueryString({ state })}`

@@ -1,5 +1,7 @@
 import { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
+import { getProviderDisplayName } from './providerService';
+import { mapEntityTypeToDb, mapEntityTypeToApi } from './utils';
 import logger from '../utils/logger';
 
 export interface MapQueryParams {
@@ -72,7 +74,7 @@ export async function getProvidersForMap(params: MapQueryParams): Promise<MapRes
   }
 
   if (entityType) {
-    providerWhere.entityType = entityType === 'INDIVIDUAL' ? '1' : entityType === 'ORGANIZATION' ? '2' : entityType;
+    providerWhere.entityType = mapEntityTypeToDb(entityType);
   }
 
   // If we have provider-level filters, nest them under the location query
@@ -147,17 +149,13 @@ export async function getProvidersForMap(params: MapQueryParams): Promise<MapRes
     )
     .map((loc) => {
       const provider = loc.providers;
-      const isOrg = provider.entityType === '2';
-      const displayName = isOrg
-        ? provider.organizationName || 'Unknown Organization'
-        : [provider.firstName, provider.lastName].filter(Boolean).join(' ') +
-          (provider.credential ? `, ${provider.credential}` : '') || 'Unknown Provider';
+      const displayName = getProviderDisplayName(provider);
 
       return {
         npi: loc.npi,
         displayName,
         specialty: provider.primary_specialty || provider.specialty_category || null,
-        entityType: provider.entityType === '1' ? 'INDIVIDUAL' : provider.entityType === '2' ? 'ORGANIZATION' : 'UNKNOWN',
+        entityType: mapEntityTypeToApi(provider.entityType),
         latitude: loc.latitude,
         longitude: loc.longitude,
         addressLine1: loc.address_line1,

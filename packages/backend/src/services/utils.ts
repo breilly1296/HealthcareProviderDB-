@@ -72,6 +72,24 @@ export function buildCityFilter(
   return null;
 }
 
+/**
+ * Map entity type from API value (INDIVIDUAL/ORGANIZATION) to DB value ('1'/'2')
+ */
+export function mapEntityTypeToDb(entityType: string): string {
+  if (entityType === 'INDIVIDUAL') return '1';
+  if (entityType === 'ORGANIZATION') return '2';
+  return entityType;
+}
+
+/**
+ * Map entity type from DB value ('1'/'2') to API value (INDIVIDUAL/ORGANIZATION)
+ */
+export function mapEntityTypeToApi(dbValue: string | null | undefined): string {
+  if (dbValue === '1') return 'INDIVIDUAL';
+  if (dbValue === '2') return 'ORGANIZATION';
+  return dbValue || 'UNKNOWN';
+}
+
 /** Type for Prisma where clauses with optional AND array */
 type WhereWithAnd = { AND?: unknown[] | unknown };
 

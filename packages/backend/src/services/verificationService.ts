@@ -13,6 +13,28 @@ import {
 export { VERIFICATION_TTL_MS };
 
 /**
+ * Standard select for public-facing verification queries.
+ * Excludes PII fields: sourceIp, userAgent, submittedBy
+ */
+const VERIFICATION_PUBLIC_SELECT = {
+  id: true,
+  providerNpi: true,
+  planId: true,
+  acceptanceId: true,
+  verificationType: true,
+  verificationSource: true,
+  previousValue: true,
+  newValue: true,
+  notes: true,
+  evidenceUrl: true,
+  isApproved: true,
+  createdAt: true,
+  expiresAt: true,
+  upvotes: true,
+  downvotes: true,
+} as const;
+
+/**
  * Calculate expiration date for new verifications
  */
 export function getExpirationDate(): Date {
@@ -630,22 +652,7 @@ export async function getRecentVerifications(options: {
     take: Math.min(limit, 100),
     orderBy: { createdAt: 'desc' },
     select: {
-      id: true,
-      providerNpi: true,
-      planId: true,
-      acceptanceId: true,
-      verificationType: true,
-      verificationSource: true,
-      previousValue: true,
-      newValue: true,
-      notes: true,
-      evidenceUrl: true,
-      isApproved: true,
-      createdAt: true,
-      expiresAt: true, // Include TTL for transparency
-      upvotes: true,
-      downvotes: true,
-      // Exclude: sourceIp, userAgent, submittedBy
+      ...VERIFICATION_PUBLIC_SELECT,
       provider: {
         select: {
           npi: true,
@@ -713,24 +720,7 @@ export async function getVerificationsForPair(
       where: verificationWhere,
       orderBy: { createdAt: 'desc' },
       take: 50,
-      select: {
-        id: true,
-        providerNpi: true,
-        planId: true,
-        acceptanceId: true,
-        verificationType: true,
-        verificationSource: true,
-        previousValue: true,
-        newValue: true,
-        notes: true,
-        evidenceUrl: true,
-        isApproved: true,
-        createdAt: true,
-        expiresAt: true, // Include TTL for transparency
-        upvotes: true,
-        downvotes: true,
-        // Exclude: sourceIp, userAgent, submittedBy
-      },
+      select: VERIFICATION_PUBLIC_SELECT,
     }),
   ]);
 

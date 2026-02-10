@@ -56,6 +56,32 @@ const VERIFICATION_FRESHNESS: Record<SpecialtyFreshnessCategory, number> = {
 // Mortensen et al. (2015), JAMIA
 const MIN_VERIFICATIONS_FOR_HIGH_CONFIDENCE = 3;
 
+// Research-based notes per specialty category
+const SPECIALTY_RESEARCH_NOTES: Record<SpecialtyFreshnessCategory, string> = {
+  [SpecialtyFreshnessCategory.MENTAL_HEALTH]:
+    'Mental health providers show high network turnover. Research shows only 43% accept Medicaid.',
+  [SpecialtyFreshnessCategory.PRIMARY_CARE]:
+    'Based on research showing 12% annual provider turnover in primary care.',
+  [SpecialtyFreshnessCategory.HOSPITAL_BASED]:
+    'Hospital-based providers typically have more stable network participation.',
+  [SpecialtyFreshnessCategory.SPECIALIST]:
+    'Specialist network participation changes regularly. Research shows 12% annual turnover.',
+  [SpecialtyFreshnessCategory.OTHER]:
+    'Specialist network participation changes regularly. Research shows 12% annual turnover.',
+};
+
+// Explanation-specific specialty notes (slightly different wording for explanation context)
+const SPECIALTY_EXPLANATION_NOTES: Record<SpecialtyFreshnessCategory, string> = {
+  [SpecialtyFreshnessCategory.MENTAL_HEALTH]:
+    ' Mental health providers show high network turnover (only 43% accept Medicaid).',
+  [SpecialtyFreshnessCategory.PRIMARY_CARE]:
+    ' Research shows primary care providers have 12% annual network turnover.',
+  [SpecialtyFreshnessCategory.HOSPITAL_BASED]:
+    ' Hospital-based providers typically maintain more stable network participation.',
+  [SpecialtyFreshnessCategory.SPECIALIST]: '',
+  [SpecialtyFreshnessCategory.OTHER]: '',
+};
+
 // Data source scores (max 25 points)
 // Covers both DataSource and VerificationSource enum values
 const DATA_SOURCE_SCORES: Record<string, number> = {
@@ -175,19 +201,7 @@ export function calculateConfidenceScore(input: ConfidenceInput): ConfidenceResu
     isStale || daysSinceVerification === null || daysSinceVerification > freshnessThreshold * 0.8;
 
   // Research note based on specialty
-  let researchNote: string;
-  if (specialtyCategory === SpecialtyFreshnessCategory.MENTAL_HEALTH) {
-    researchNote =
-      'Mental health providers show high network turnover. Research shows only 43% accept Medicaid.';
-  } else if (specialtyCategory === SpecialtyFreshnessCategory.PRIMARY_CARE) {
-    researchNote = 'Based on research showing 12% annual provider turnover in primary care.';
-  } else if (specialtyCategory === SpecialtyFreshnessCategory.HOSPITAL_BASED) {
-    researchNote = 'Hospital-based providers typically have more stable network participation.';
-  } else {
-    researchNote =
-      'Specialist network participation changes regularly. Research shows 12% annual turnover.';
-  }
-
+  let researchNote = SPECIALTY_RESEARCH_NOTES[specialtyCategory];
   if (input.verificationCount < MIN_VERIFICATIONS_FOR_HIGH_CONFIDENCE) {
     researchNote += ' Research shows 3 verifications achieve expert-level accuracy (κ=0.58).';
   }
@@ -400,17 +414,7 @@ function generateScoreExplanation(
 
   // Combine into readable sentence
   const baseExplanation = `This ${score}% confidence score is based on: ${parts.join(', ')}.`;
-
-  // Add specialty-specific note
-  let specialtyNote = '';
-  if (specialtyCategory === SpecialtyFreshnessCategory.MENTAL_HEALTH) {
-    specialtyNote =
-      ' Mental health providers show high network turnover (only 43% accept Medicaid).';
-  } else if (specialtyCategory === SpecialtyFreshnessCategory.PRIMARY_CARE) {
-    specialtyNote = ' Research shows primary care providers have 12% annual network turnover.';
-  } else if (specialtyCategory === SpecialtyFreshnessCategory.HOSPITAL_BASED) {
-    specialtyNote = ' Hospital-based providers typically maintain more stable network participation.';
-  }
+  const specialtyNote = SPECIALTY_EXPLANATION_NOTES[specialtyCategory] || '';
 
   return baseExplanation + specialtyNote;
 }
@@ -424,7 +428,6 @@ export function getConfidenceLevel(score: number, verificationCount: number): st
   // Force LOW confidence if below threshold, regardless of score
   if (verificationCount < MIN_VERIFICATIONS_FOR_HIGH_CONFIDENCE && verificationCount > 0) {
     // Only allow MEDIUM at best with < 3 verifications
-    if (score >= 76) return 'MEDIUM';
     if (score >= 51) return 'MEDIUM';
     if (score >= 26) return 'LOW';
     return 'VERY_LOW';

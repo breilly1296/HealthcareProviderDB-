@@ -132,6 +132,14 @@ function getInitials(provider: ProviderDisplay): string {
     .toUpperCase() || 'DR';
 }
 
+// Helper to compute display name for both card variants
+function getDisplayName(provider: ProviderDisplay): string {
+  if (provider.entityType === 'ORGANIZATION' && provider.organizationName) {
+    return toDisplayCase(cleanOrganizationName(provider.organizationName));
+  }
+  return toDisplayCase(cleanProviderName(provider.displayName));
+}
+
 // Helper to get confidence color
 function getConfidenceColor(score: number): { bg: string; bar: string; text: string; border: string; ring: string } {
   if (score >= 70) {
@@ -183,12 +191,7 @@ function ProviderCardComponent({
   const planAcceptances = provider.planAcceptances ?? [];
 
   // Clean and format the display name
-  const displayName = useMemo(() => {
-    if (provider.entityType === 'ORGANIZATION' && provider.organizationName) {
-      return toDisplayCase(cleanOrganizationName(provider.organizationName));
-    }
-    return toDisplayCase(cleanProviderName(provider.displayName));
-  }, [provider.entityType, provider.organizationName, provider.displayName]);
+  const displayName = useMemo(() => getDisplayName(provider), [provider.entityType, provider.organizationName, provider.displayName]);
 
   // Memoize computed specialty
   const specialty = useMemo(
@@ -223,11 +226,9 @@ function ProviderCardComponent({
   const confidenceColors = hasConfidence && confidenceScore !== null ? getConfidenceColor(confidenceScore) : null;
 
   // Get top accepted plans for preview (already filtered by backend, but double-check)
-  const acceptedPlans = planAcceptances
-    .filter(p => p.acceptanceStatus === 'ACCEPTED')
-    .slice(0, 3);
-  const totalAcceptedCount = planAcceptances.filter(p => p.acceptanceStatus === 'ACCEPTED').length;
-  const remainingPlansCount = Math.max(0, totalAcceptedCount - 3);
+  const allAcceptedPlans = planAcceptances.filter(p => p.acceptanceStatus === 'ACCEPTED');
+  const acceptedPlans = allAcceptedPlans.slice(0, 3);
+  const remainingPlansCount = Math.max(0, allAcceptedPlans.length - 3);
 
   return (
     <Link
@@ -385,12 +386,7 @@ function ProviderCardCompactComponent({
 }: {
   provider: ProviderDisplay;
 }) {
-  const displayName = useMemo(() => {
-    if (provider.entityType === 'ORGANIZATION' && provider.organizationName) {
-      return toDisplayCase(cleanOrganizationName(provider.organizationName));
-    }
-    return toDisplayCase(cleanProviderName(provider.displayName));
-  }, [provider.entityType, provider.organizationName, provider.displayName]);
+  const displayName = useMemo(() => getDisplayName(provider), [provider.entityType, provider.organizationName, provider.displayName]);
 
   return (
     <div className="flex items-center justify-between p-4 bg-stone-50 dark:bg-gray-800 rounded-lg">
