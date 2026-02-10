@@ -85,10 +85,10 @@ export function WhyItMattersSection() {
     <section className="py-8 md:py-12 bg-transparent dark:bg-gray-900 border-b border-stone-200 dark:border-gray-800">
       <div className="container-wide">
         <h2 className="text-2xl md:text-3xl font-bold text-center text-stone-800 dark:text-white mb-3">
-          Insurance Directories Are Broken
+          Why Directory Data Matters
         </h2>
         <p className="text-base text-stone-600 dark:text-gray-300 text-center max-w-2xl mx-auto mb-6">
-          Millions of patients get stuck with surprise bills because directory data is outdated.
+          Insurance directories are wrong up to half the time — and patients pay the price.
         </p>
 
         <div ref={sectionRef} className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 max-w-4xl mx-auto">
