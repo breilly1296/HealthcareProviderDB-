@@ -31,10 +31,10 @@ const NAV_ITEMS: NavItem[] = [
     matchPaths: ['/insurance'],
   },
   {
-    href: '/#how-it-works',
+    href: '/about',
     icon: InfoIcon,
-    label: 'How It Works',
-    matchPaths: [],
+    label: 'About',
+    matchPaths: ['/about', '/research'],
   },
 ];
 
