@@ -68,6 +68,19 @@ function flattenOptions(
   return options;
 }
 
+function matchesSearch(option: SelectOption, query: string): boolean {
+  if (option.label.toLowerCase().includes(query)) return true;
+  if (option.searchTerms?.some((term) => term.toLowerCase().includes(query))) return true;
+  return false;
+}
+
+function getMatchingTerm(option: SelectOption, query: string): string | null {
+  if (!query) return null;
+  if (option.label.toLowerCase().includes(query)) return null;
+  const match = option.searchTerms?.find((term) => term.toLowerCase().includes(query));
+  return match || null;
+}
+
 function filterOptions(
   options: SelectOption[] | GroupedSelectOptions[],
   searchQuery: string
@@ -79,14 +92,12 @@ function filterOptions(
     return options
       .map((group) => ({
         ...group,
-        options: group.options.filter((opt) =>
-          opt.label.toLowerCase().includes(query)
-        ),
+        options: group.options.filter((opt) => matchesSearch(opt, query)),
       }))
       .filter((group) => group.options.length > 0);
   }
 
-  return options.filter((opt) => opt.label.toLowerCase().includes(query));
+  return options.filter((opt) => matchesSearch(opt, query));
 }
 
 function getOptionId(baseId: string, optionValue: string): string {
@@ -336,6 +347,7 @@ export const SearchableSelect = forwardRef<
     const isHighlighted = flatIndex === highlightedIndex;
     const selected = isSelected(option.value);
     const optionId = getOptionId(componentId, option.value);
+    const matchingTerm = getMatchingTerm(option, searchQuery.toLowerCase().trim());
 
     return (
       <li
@@ -374,7 +386,14 @@ export const SearchableSelect = forwardRef<
             {selected && <Check className="w-3 h-3" />}
           </span>
         )}
-        <span className="flex-1 truncate">{option.label}</span>
+        <span className="flex-1 truncate">
+          {option.label}
+          {matchingTerm && (
+            <span className="text-xs text-stone-400 dark:text-gray-500 ml-2">
+              ({matchingTerm})
+            </span>
+          )}
+        </span>
         {!multiple && selected && (
           <Check className="w-4 h-4 text-primary-600 dark:text-primary-400 flex-shrink-0" />
         )}

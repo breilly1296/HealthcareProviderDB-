@@ -66,10 +66,44 @@ export const SPECIALTY_LABELS: Record<string, string> = {
   COLON_RECTAL_SURGERY: 'Colon & Rectal Surgery',
 };
 
+/** Patient-friendly search terms for each specialty */
+const SPECIALTY_SEARCH_TERMS: Partial<Record<string, string[]>> = {
+  ALLERGY_IMMUNOLOGY: ['allergies', 'allergist', 'asthma', 'hay fever', 'food allergy', 'hives'],
+  CARDIOLOGY: ['heart', 'cardiologist', 'chest pain', 'blood pressure', 'heart attack'],
+  DERMATOLOGY: ['skin', 'dermatologist', 'acne', 'rash', 'eczema', 'moles', 'psoriasis'],
+  ENDOCRINOLOGY: ['diabetes', 'thyroid', 'hormones', 'endocrinologist'],
+  FAMILY_MEDICINE: ['family doctor', 'general doctor', 'checkup', 'primary care', 'PCP', 'GP'],
+  GASTROENTEROLOGY: ['stomach', 'digestive', 'GI doctor', 'acid reflux', 'colonoscopy', 'IBS', 'bowel'],
+  GERIATRICS: ['elderly care', 'senior doctor', 'aging', 'geriatrician'],
+  INTERNAL_MEDICINE: ['internist', 'primary care', 'general medicine', 'adult medicine'],
+  MENTAL_HEALTH: ['therapy', 'therapist', 'counseling', 'counselor', 'anxiety', 'depression'],
+  NEPHROLOGY: ['kidney', 'kidney doctor', 'nephrologist', 'dialysis'],
+  NEUROLOGY: ['brain', 'neurologist', 'headache', 'migraine', 'seizure', 'nerve'],
+  OB_GYN: ['women\'s health', 'gynecologist', 'pregnancy', 'obstetrician', 'prenatal', 'OBGYN'],
+  ONCOLOGY: ['cancer', 'oncologist', 'tumor', 'chemotherapy'],
+  OPHTHALMOLOGY: ['eye doctor', 'ophthalmologist', 'vision', 'eye surgery', 'cataract', 'glaucoma'],
+  OPTOMETRY: ['eye exam', 'glasses', 'contacts', 'optometrist', 'vision test'],
+  ORTHOPEDICS: ['bones', 'joints', 'orthopedic', 'knee', 'hip', 'back pain', 'sports injury', 'fracture'],
+  PEDIATRICS: ['kids', 'children', 'pediatrician', 'baby', 'child doctor', 'infant'],
+  PHYSICAL_THERAPY: ['PT', 'rehab', 'rehabilitation', 'physical therapist', 'recovery'],
+  PSYCHIATRY: ['psychiatrist', 'mental health', 'medication', 'ADHD', 'bipolar', 'anxiety medication'],
+  PSYCHOLOGY: ['psychologist', 'therapy', 'counseling', 'talk therapy', 'CBT'],
+  PULMONOLOGY: ['lungs', 'breathing', 'pulmonologist', 'asthma specialist', 'COPD', 'sleep apnea'],
+  RHEUMATOLOGY: ['arthritis', 'rheumatologist', 'lupus', 'autoimmune', 'joint pain'],
+  SURGERY: ['surgeon', 'operation', 'surgical'],
+  UROLOGY: ['urologist', 'bladder', 'prostate', 'urinary', 'kidney stones'],
+  PODIATRY: ['foot doctor', 'podiatrist', 'feet', 'ankle', 'bunion'],
+  ENT: ['ear nose throat', 'ENT doctor', 'sinus', 'hearing', 'tonsils'],
+};
+
 /** Specialty options for dropdowns with value/label pairs */
 export const SPECIALTY_OPTIONS = [
-  { value: '', label: 'All Specialties' },
-  ...Object.entries(SPECIALTY_LABELS).map(([value, label]) => ({ value, label })),
+  { value: '', label: 'All Specialties', searchTerms: [] as string[] },
+  ...Object.entries(SPECIALTY_LABELS).map(([value, label]) => ({
+    value,
+    label,
+    searchTerms: SPECIALTY_SEARCH_TERMS[value] || [],
+  })),
 ];
 
 export function getSpecialtyDisplay(

@@ -48,8 +48,14 @@ export function HeroSearch() {
 
     if (state) params.set('state', state);
 
+    const q = searchText.toLowerCase();
     const matchedSpecialty = SPECIALTY_OPTIONS.find(
-      opt => opt.value && opt.label.toLowerCase().includes(searchText.toLowerCase())
+      opt => {
+        if (!opt.value) return false;
+        if (opt.label.toLowerCase().includes(q)) return true;
+        if (opt.searchTerms?.some(term => term.toLowerCase().includes(q))) return true;
+        return false;
+      }
     );
     if (matchedSpecialty) {
       params.set('specialty', matchedSpecialty.value);
