@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, useImperativeHandle, forwardRef, useCallback } from 'react';
 import { Search, X, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
-import { useSearchForm, useCities, useHealthSystems, useInsurancePlans, NYC_ALL_BOROUGHS_VALUE, NYC_BOROUGHS } from '@/hooks';
+import { useSearchForm, useCities, useHealthSystems, useInsurancePlans, useGeoLocation, NYC_ALL_BOROUGHS_VALUE, NYC_BOROUGHS } from '@/hooks';
 import { SearchableSelect } from './ui/SearchableSelect';
 import { SPECIALTY_OPTIONS, STATE_OPTIONS } from '@/lib/provider-utils';
 import type { SearchFilters, ProviderDisplay, PaginationState, SelectOption, GroupedSelectOptions } from '@/types';
@@ -82,6 +82,14 @@ export const SearchForm = forwardRef<SearchFormRef, SearchFormProps>(function Se
     cities: filters.cities,
   });
   const { selectOptions: insuranceOptions, isLoading: insuranceLoading, findPlan } = useInsurancePlans();
+
+  // Auto-fill state from geolocation if no state is set (e.g. no URL params)
+  const geo = useGeoLocation();
+  useEffect(() => {
+    if (geo.state && !filters.state) {
+      setFilter('state', geo.state);
+    }
+  }, [geo.state]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Track if initial search has been triggered
   const hasInitialSearched = useRef(false);

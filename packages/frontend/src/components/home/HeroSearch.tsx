@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Search } from 'lucide-react';
 import { SPECIALTY_OPTIONS, STATE_OPTIONS } from '@/lib/provider-utils';
 import { useInsurancePlans } from '@/hooks/useInsurancePlans';
+import { useGeoLocation } from '@/hooks/useGeoLocation';
 
 const QUICK_SEARCHES: { label: string; specialty: string }[] = [
   { label: 'Allergist', specialty: 'ALLERGY_IMMUNOLOGY' },
@@ -19,12 +20,20 @@ const QUICK_SEARCHES: { label: string; specialty: string }[] = [
 
 export function HeroSearch() {
   const router = useRouter();
+  const geo = useGeoLocation();
   const [searchText, setSearchText] = useState('');
-  const [state, setState] = useState('NY');
+  const [state, setState] = useState('');
   const [insurancePlanId, setInsurancePlanId] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { selectOptions, isLoading: insuranceLoading } = useInsurancePlans({ state });
+
+  // Pre-fill state from geolocation
+  useEffect(() => {
+    if (geo.state && !state) {
+      setState(geo.state);
+    }
+  }, [geo.state]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Autofocus on desktop only
   useEffect(() => {
@@ -89,6 +98,7 @@ export function HeroSearch() {
               className="w-full px-4 py-3 md:py-4 text-base bg-stone-50 dark:bg-gray-700 border border-stone-200 dark:border-gray-600 rounded-lg text-stone-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent appearance-none cursor-pointer"
               required
             >
+              <option value="">Select State</option>
               {STATE_OPTIONS.filter(opt => opt.value !== '').map(opt => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}

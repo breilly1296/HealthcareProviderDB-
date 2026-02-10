@@ -33,5 +33,8 @@ export type { CompareProvider } from './useCompare';
 export { useRecentSearches } from './useRecentSearches';
 export type { RecentSearch, RecentSearchParams } from './useRecentSearches';
 
+// Geolocation
+export { useGeoLocation } from './useGeoLocation';
+
 // Re-export types for convenience
 export type { CityData, HealthSystem, GroupedSelectOptions } from '../types';
