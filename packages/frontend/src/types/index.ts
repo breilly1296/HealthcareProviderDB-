@@ -332,3 +332,37 @@ export const defaultPaginationState: PaginationState = {
   totalPages: 0,
   hasMore: false,
 };
+
+// ============================================================================
+// Map Types
+// ============================================================================
+
+export interface MapPin {
+  npi: string;
+  displayName: string;
+  specialty: string | null;
+  entityType: string;
+  latitude: number;
+  longitude: number;
+  addressLine1: string | null;
+  city: string | null;
+  state: string | null;
+  zipCode: string | null;
+  phone: string | null;
+  addressHash: string | null;
+  providerCount: number;
+}
+
+export interface MapBounds {
+  north: number;
+  south: number;
+  east: number;
+  west: number;
+}
+
+export interface MapPinsResponse {
+  pins: MapPin[];
+  total: number;
+  clustered: boolean;
+  bounds: MapBounds;
+}

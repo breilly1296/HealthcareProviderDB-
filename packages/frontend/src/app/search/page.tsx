@@ -1,8 +1,19 @@
 'use client';
 
 import { useState, useCallback, Suspense, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Map, List, Columns2 } from 'lucide-react';
+import { useMapProviders } from '@/hooks/useMapProviders';
+
+const ProviderMap = dynamic(() => import('@/components/ProviderMap'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded-lg">
+      <span className="text-gray-500">Loading map...</span>
+    </div>
+  ),
+});
 import { useSearchParams, useRouter } from 'next/navigation';
 import { SearchForm, type SearchFormRef } from '@/components/SearchForm';
 import { ProviderCard } from '@/components/ProviderCard';
@@ -255,6 +266,9 @@ function SearchPageContent() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  // View mode
+  const [viewMode, setViewMode] = useState<'list' | 'map' | 'split'>('list');
+
   // Mobile filter drawer state
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
   const [activeFilterCount, setActiveFilterCount] = useState(0);
@@ -263,6 +277,20 @@ function SearchPageContent() {
   // Recent searches
   const { recentSearches, removeSearch, clearAll: clearAllSearches, isHydrated } = useRecentSearches();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Map data
+  const mapSpecialty = searchParams.get('specialty') || undefined;
+  const {
+    pins,
+    total: mapTotal,
+    clustered,
+    loading: mapLoading,
+    onBoundsChanged,
+  } = useMapProviders({
+    specialty: mapSpecialty,
+    enabled: viewMode === 'map' || viewMode === 'split',
+  });
 
   const handleRecentSearchSelect = useCallback((params: RecentSearchParams) => {
     const urlParams = new URLSearchParams();
@@ -324,11 +352,39 @@ function SearchPageContent() {
           </Suspense>
         </div>
 
-        {/* Mobile Filter Button */}
-        <FilterButton
-          activeFilterCount={activeFilterCount}
-          onClick={() => setIsFilterDrawerOpen(true)}
-        />
+        {/* Mobile Filter Button + View Toggle */}
+        <div className="flex items-center justify-between gap-3 mb-4 md:mb-0">
+          <FilterButton
+            activeFilterCount={activeFilterCount}
+            onClick={() => setIsFilterDrawerOpen(true)}
+          />
+          <div className="hidden md:flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1 gap-1">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`p-2 rounded-md transition-colors ${viewMode === 'list' ? 'bg-white dark:bg-gray-700 shadow-sm text-primary-600' : 'text-gray-500 hover:text-gray-700'}`}
+              aria-label="List view"
+              title="List view"
+            >
+              <List className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('split')}
+              className={`p-2 rounded-md transition-colors ${viewMode === 'split' ? 'bg-white dark:bg-gray-700 shadow-sm text-primary-600' : 'text-gray-500 hover:text-gray-700'}`}
+              aria-label="Split view"
+              title="Split view"
+            >
+              <Columns2 className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('map')}
+              className={`p-2 rounded-md transition-colors ${viewMode === 'map' ? 'bg-white dark:bg-gray-700 shadow-sm text-primary-600' : 'text-gray-500 hover:text-gray-700'}`}
+              aria-label="Map view"
+              title="Map view"
+            >
+              <Map className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
 
         {/* Mobile Filter Drawer */}
         <FilterDrawer
@@ -348,28 +404,83 @@ function SearchPageContent() {
         </FilterDrawer>
 
         {/* Results */}
-        {isLoading ? (
+        {viewMode === 'list' && (
           <>
-            <div className="flex items-center justify-center gap-2 py-4 text-primary-600 dark:text-primary-400" aria-live="polite">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span className="text-sm font-medium animate-pulse">Searching providers&hellip;</span>
-            </div>
-            <SearchResultsSkeleton count={5} />
+            {isLoading ? (
+              <>
+                <div className="flex items-center justify-center gap-2 py-4 text-primary-600 dark:text-primary-400" aria-live="polite">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span className="text-sm font-medium animate-pulse">Searching providers&hellip;</span>
+                </div>
+                <SearchResultsSkeleton count={5} />
+              </>
+            ) : (
+              <Suspense fallback={<SearchResultsSkeleton count={5} />}>
+                <SearchResultsDisplay
+                  providers={providers}
+                  pagination={pagination}
+                  hasSearched={hasSearched}
+                  error={error}
+                  recentSearches={recentSearches}
+                  isHydrated={isHydrated}
+                  onRecentSearchSelect={handleRecentSearchSelect}
+                  onRecentSearchRemove={removeSearch}
+                  onRecentSearchClearAll={clearAllSearches}
+                />
+              </Suspense>
+            )}
           </>
-        ) : (
-          <Suspense fallback={<SearchResultsSkeleton count={5} />}>
-            <SearchResultsDisplay
-              providers={providers}
-              pagination={pagination}
-              hasSearched={hasSearched}
-              error={error}
-              recentSearches={recentSearches}
-              isHydrated={isHydrated}
-              onRecentSearchSelect={handleRecentSearchSelect}
-              onRecentSearchRemove={removeSearch}
-              onRecentSearchClearAll={clearAllSearches}
+        )}
+
+        {viewMode === 'map' && (
+          <div className="h-[calc(100vh-200px)] min-h-[500px] rounded-lg overflow-hidden">
+            <ProviderMap
+              pins={pins}
+              loading={mapLoading}
+              onBoundsChanged={onBoundsChanged}
+              clustered={clustered}
+              total={mapTotal}
             />
-          </Suspense>
+          </div>
+        )}
+
+        {viewMode === 'split' && (
+          <div className="flex gap-6 h-[calc(100vh-200px)] min-h-[500px]">
+            <div className="w-1/2 overflow-y-auto pr-2">
+              {isLoading ? (
+                <>
+                  <div className="flex items-center justify-center gap-2 py-4 text-primary-600 dark:text-primary-400" aria-live="polite">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="text-sm font-medium animate-pulse">Searching providers&hellip;</span>
+                  </div>
+                  <SearchResultsSkeleton count={5} />
+                </>
+              ) : (
+                <Suspense fallback={<SearchResultsSkeleton count={5} />}>
+                  <SearchResultsDisplay
+                    providers={providers}
+                    pagination={pagination}
+                    hasSearched={hasSearched}
+                    error={error}
+                    recentSearches={recentSearches}
+                    isHydrated={isHydrated}
+                    onRecentSearchSelect={handleRecentSearchSelect}
+                    onRecentSearchRemove={removeSearch}
+                    onRecentSearchClearAll={clearAllSearches}
+                  />
+                </Suspense>
+              )}
+            </div>
+            <div className="w-1/2 rounded-lg overflow-hidden sticky top-0">
+              <ProviderMap
+                pins={pins}
+                loading={mapLoading}
+                onBoundsChanged={onBoundsChanged}
+                clustered={clustered}
+                total={mapTotal}
+              />
+            </div>
+          </div>
         )}
       </div>
     </div>

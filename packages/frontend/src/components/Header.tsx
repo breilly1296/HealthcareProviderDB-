@@ -30,6 +30,12 @@ export function Header() {
               Search
             </Link>
             <Link
+              href="/map"
+              className="hidden md:inline text-base font-medium text-stone-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+            >
+              Map
+            </Link>
+            <Link
               href="/insurance"
               className="hidden md:inline text-base font-medium text-stone-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
             >

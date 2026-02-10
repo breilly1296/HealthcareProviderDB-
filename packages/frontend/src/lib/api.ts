@@ -470,6 +470,36 @@ const providers = {
       providers: ProviderDisplay[];
       pagination: PaginationState;
     }>(`/providers/${npi}/colocated?${buildQueryString(params)}`),
+
+  getMapPins: (params: {
+    north: number;
+    south: number;
+    east: number;
+    west: number;
+    specialty?: string;
+    specialtyCategory?: string;
+    entityType?: string;
+    limit?: number;
+  }) => apiFetch<{
+    pins: Array<{
+      npi: string;
+      displayName: string;
+      specialty: string | null;
+      entityType: string;
+      latitude: number;
+      longitude: number;
+      addressLine1: string | null;
+      city: string | null;
+      state: string | null;
+      zipCode: string | null;
+      phone: string | null;
+      addressHash: string | null;
+      providerCount: number;
+    }>;
+    total: number;
+    clustered: boolean;
+    bounds: { north: number; south: number; east: number; west: number };
+  }>(`/providers/map?${buildQueryString(params)}`),
 };
 
 const plans = {

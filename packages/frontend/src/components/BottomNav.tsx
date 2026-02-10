@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { HomeIcon, SearchIcon, CreditCardIcon, InfoIcon } from './icons/Icons';
+import { HomeIcon, SearchIcon, MapIcon, CreditCardIcon, InfoIcon } from './icons/Icons';
 
 interface NavItem {
   href: string;
@@ -23,6 +23,12 @@ const NAV_ITEMS: NavItem[] = [
     icon: SearchIcon,
     label: 'Search',
     matchPaths: ['/search', '/provider'],
+  },
+  {
+    href: '/map',
+    icon: MapIcon,
+    label: 'Map',
+    matchPaths: ['/map'],
   },
   {
     href: '/insurance',
