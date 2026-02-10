@@ -64,110 +64,43 @@ export const metadata: Metadata = {
 function Footer() {
   return (
     <footer className="bg-stone-200 dark:bg-gray-800 border-t border-stone-300 dark:border-gray-700 mt-auto">
-      <div className="container-wide py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          {/* About */}
-          <div>
-            <h3 className="text-lg font-semibold text-stone-800 dark:text-white mb-4">
+      <div className="container-wide py-8">
+        {/* Main footer content - compact */}
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
+          {/* Left: Brand + description */}
+          <div className="max-w-sm">
+            <h3 className="text-lg font-semibold text-stone-800 dark:text-white mb-2">
               VerifyMyProvider
             </h3>
-            <p className="text-stone-600 dark:text-gray-300">
-              Community-verified provider and insurance information to help you find the right care.
+            <p className="text-sm text-stone-600 dark:text-gray-300">
+              Community-verified provider and insurance data. A product of{' '}
+              <a
+                href="https://ownmyhealth.io"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary-600 dark:text-primary-400 hover:underline"
+              >
+                OwnMyHealth
+              </a>.
             </p>
           </div>
 
-          {/* Quick Links */}
-          <div>
-            <h3 className="text-lg font-semibold text-stone-800 dark:text-white mb-4">
-              Quick Links
-            </h3>
-            <ul className="space-y-2">
-              <li>
-                <Link href="/search" className="text-stone-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
-                  Find Providers
-                </Link>
-              </li>
-              <li>
-                <Link href="/insurance" className="text-stone-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
-                  Scan Insurance Card
-                </Link>
-              </li>
-              <li>
-                <Link href="/#how-it-works" className="text-stone-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
-                  How It Works
-                </Link>
-              </li>
-              <li>
-                <Link href="/#confidence" className="text-stone-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
-                  Confidence Scores
-                </Link>
-              </li>
-              <li>
-                <Link href="/about" className="text-stone-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
-                  About Us
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Legal */}
-          <div>
-            <h3 className="text-lg font-semibold text-stone-800 dark:text-white mb-4">
-              Legal
-            </h3>
-            <ul className="space-y-2">
-              <li>
-                <Link href="/terms" className="text-stone-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
-                  Terms of Service
-                </Link>
-              </li>
-              <li>
-                <Link href="/privacy" className="text-stone-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
-                  Privacy Policy
-                </Link>
-              </li>
-              <li>
-                <Link href="/disclaimer" className="text-stone-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
-                  Data Disclaimer
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* OwnMyHealth */}
-          <div>
-            <h3 className="text-lg font-semibold text-stone-800 dark:text-white mb-4">
-              Part of OwnMyHealth
-            </h3>
-            <p className="text-stone-600 dark:text-gray-300 mb-4">
-              Empowering patients with the information they need to make informed healthcare decisions.
-            </p>
-            <a
-              href="https://ownmyhealth.io"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium"
-            >
-              Visit OwnMyHealth →
-            </a>
+          {/* Right: Links in a compact row */}
+          <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+            <Link href="/search" className="text-stone-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">Search</Link>
+            <Link href="/insurance" className="text-stone-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">Scan Card</Link>
+            <Link href="/about" className="text-stone-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">About</Link>
+            <Link href="/research" className="text-stone-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">Research</Link>
+            <Link href="/terms" className="text-stone-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">Terms</Link>
+            <Link href="/privacy" className="text-stone-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">Privacy</Link>
+            <Link href="/disclaimer" className="text-stone-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">Disclaimer</Link>
           </div>
         </div>
 
-        <div className="border-t border-stone-300 dark:border-gray-700 mt-8 pt-8 text-center text-stone-500 dark:text-gray-400">
-          <div className="flex items-center justify-center gap-4 mb-4">
-            <ThemeToggle />
-          </div>
+        {/* Bottom bar: copyright + theme toggle */}
+        <div className="border-t border-stone-300 dark:border-gray-700 mt-6 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-stone-500 dark:text-gray-400">
           <p>© {new Date().getFullYear()} VerifyMyProvider. All rights reserved.</p>
-          <p className="mt-2 text-sm font-medium text-amber-700 dark:text-amber-400">
-            Data is crowdsourced and may not be accurate. Verify with providers directly.
-          </p>
-          <p className="mt-2 text-sm">
-            <Link href="/terms" className="hover:text-primary-600 dark:hover:text-primary-400">Terms</Link>
-            {' · '}
-            <Link href="/privacy" className="hover:text-primary-600 dark:hover:text-primary-400">Privacy</Link>
-            {' · '}
-            <Link href="/disclaimer" className="hover:text-primary-600 dark:hover:text-primary-400">Disclaimer</Link>
-          </p>
+          <ThemeToggle />
         </div>
       </div>
     </footer>
