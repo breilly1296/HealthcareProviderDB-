@@ -31,13 +31,13 @@ export function VerificationCallToAction({ npi, providerName }: VerificationCall
       <div className="bg-white rounded-lg p-3 mb-4">
         <BenefitItem icon={<CheckCircleIcon />} text="5 simple yes/no questions" />
         <BenefitItem icon={<ClockIcon />} text="Under 2 minutes, no typing" />
-        <BenefitItem icon={<UsersIcon />} text="3 verifications = expert accuracy" />
+        <BenefitItem icon={<UsersIcon />} text="3 reports = high confidence" />
       </div>
 
       <VerificationButton npi={npi} providerName={providerName} />
 
       <p className="text-xs text-primary-700 mt-3 text-center">
-        Research shows patients face 4x more surprise bills when directories are wrong
+        Surprise bills happen when directories are wrong — your report helps prevent that
       </p>
     </div>
   );
