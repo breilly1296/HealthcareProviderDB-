@@ -4,3 +4,4 @@ export { WhyItMattersSection } from './WhyItMattersSection';
 export { HowItWorksSection } from './HowItWorksSection';
 export { ConfidenceSection } from './ConfidenceSection';
 export { CTASection } from './CTASection';
+export { TrustBar } from './TrustBar';

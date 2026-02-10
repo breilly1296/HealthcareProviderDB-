@@ -1,5 +1,6 @@
 import {
   HeroSection,
+  TrustBar,
   WhyItMattersSection,
   HowItWorksSection,
   ConfidenceSection,
@@ -10,6 +11,7 @@ export default function HomePage() {
   return (
     <div>
       <HeroSection />
+      <TrustBar />
       <WhyItMattersSection />
       <HowItWorksSection />
       <ConfidenceSection />
