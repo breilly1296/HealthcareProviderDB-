@@ -73,6 +73,9 @@ model practice_locations {
   phone                   String?                  @db.VarChar(20)
   fax                     String?                  @db.VarChar(20)
   address_hash            String?                  @map("address_hash") @db.VarChar(64)
+  latitude                Float?
+  longitude               Float?
+  geocoded_at             DateTime?                @map("geocoded_at") @db.Timestamptz(6)
   providers               Provider                 @relation(fields: [npi], references: [npi], onDelete: NoAction, onUpdate: NoAction)
   providerPlanAcceptances ProviderPlanAcceptance[]
 
@@ -81,6 +84,8 @@ model practice_locations {
   @@index([state], map: "idx_locations_state")
   @@index([zip_code], map: "idx_locations_zip")
   @@index([address_hash], map: "idx_locations_address_hash")
+  @@index([latitude, longitude], map: "idx_locations_lat_lng")
+  @@index([geocoded_at], map: "idx_locations_geocoded_at")
 }
 
 model provider_cms_details {
