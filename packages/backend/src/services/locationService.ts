@@ -33,6 +33,9 @@ const locationSelect = {
   zip_code: true,
   phone: true,
   fax: true,
+  latitude: true,
+  longitude: true,
+  geocoded_at: true,
 } as const;
 
 const providerBriefSelect = {

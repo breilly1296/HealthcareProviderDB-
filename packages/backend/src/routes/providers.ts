@@ -11,6 +11,7 @@ import {
   PROVIDER_INCLUDE,
 } from '../services/providerService';
 import { getColocatedNpis } from '../services/locationService';
+import { getProvidersForMap } from '../services/mapService';
 import { getLocationHealthSystem } from '../services/locationEnrichment';
 import { enrichAcceptanceWithConfidence } from '../services/confidenceService';
 import prisma from '../lib/prisma';
@@ -34,6 +35,17 @@ const searchQuerySchema = z.object({
   npi: z.string().length(10).regex(/^\d+$/).optional(),
   entityType: z.enum(['INDIVIDUAL', 'ORGANIZATION']).optional(),
 }).merge(paginationSchema);
+
+const mapQuerySchema = z.object({
+  north: z.coerce.number().min(-90).max(90),
+  south: z.coerce.number().min(-90).max(90),
+  east: z.coerce.number().min(-180).max(180),
+  west: z.coerce.number().min(-180).max(180),
+  specialty: z.string().min(1).max(200).optional(),
+  specialtyCategory: z.string().min(1).max(100).optional(),
+  entityType: z.enum(['INDIVIDUAL', 'ORGANIZATION']).optional(),
+  limit: z.coerce.number().int().min(1).max(500).default(200),
+});
 
 /**
  * Map entity type from DB value ('1'/'2') to API value
@@ -471,6 +483,50 @@ router.get(
       npi,
       acceptances: enrichedAcceptances,
       pagination: buildPaginationMeta(total, page, limit),
+    });
+  })
+);
+
+/**
+ * GET /api/v1/providers/map
+ * Get providers within a geographic bounding box for map display.
+ * Returns lightweight data optimized for map pins.
+ */
+router.get(
+  '/map',
+  searchRateLimiter,
+  asyncHandler(async (req, res) => {
+    const query = mapQuerySchema.parse(req.query);
+
+    // Check cache first
+    const cacheKey = `map:${JSON.stringify(query)}`;
+    const cached = await cacheGet(cacheKey);
+    if (cached) {
+      res.setHeader('X-Cache', 'HIT');
+      res.json({ success: true, data: cached });
+      return;
+    }
+
+    res.setHeader('X-Cache', 'MISS');
+
+    const result = await getProvidersForMap({
+      north: query.north,
+      south: query.south,
+      east: query.east,
+      west: query.west,
+      specialty: query.specialty,
+      specialtyCategory: query.specialtyCategory,
+      entityType: query.entityType,
+      limit: query.limit,
+    });
+
+    if (result.pins.length > 0) {
+      await cacheSet(cacheKey, result, 300); // 5 minute TTL
+    }
+
+    res.json({
+      success: true,
+      data: result,
     });
   })
 );
