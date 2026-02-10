@@ -13,6 +13,7 @@ interface EmptyStateProps {
   type: EmptyStateType;
   suggestions?: SearchSuggestion[];
   onSuggestionClick?: (action: string) => void;
+  compact?: boolean;
 }
 
 const EMPTY_STATE_CONFIG: Record<EmptyStateType, {
@@ -48,23 +49,24 @@ export function EmptyState({
   type,
   suggestions = [],
   onSuggestionClick,
+  compact = false,
 }: EmptyStateProps) {
   const config = EMPTY_STATE_CONFIG[type];
   const { title, description, Illustration } = config;
   const showTips = type === 'no-results' || type === 'no-results-locations';
 
   return (
-    <div className="text-center py-12 px-4">
+    <div className={`text-center ${compact ? 'py-6' : 'py-12'} px-4`}>
       {/* Illustration */}
-      <div className="flex justify-center mb-6">
-        <Illustration className="w-40 h-40 md:w-48 md:h-48" />
+      <div className="flex justify-center mb-4">
+        <Illustration className={compact ? 'w-20 h-20' : 'w-40 h-40 md:w-48 md:h-48'} />
       </div>
 
       {/* Text content */}
-      <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+      <h3 className={`${compact ? 'text-lg' : 'text-xl'} font-semibold text-gray-900 dark:text-white mb-2`}>
         {title}
       </h3>
-      <p className="text-gray-600 dark:text-gray-300 max-w-md mx-auto mb-6">
+      <p className={`text-gray-600 dark:text-gray-300 max-w-md mx-auto mb-6 ${compact ? 'text-sm' : ''}`}>
         {description}
       </p>
 

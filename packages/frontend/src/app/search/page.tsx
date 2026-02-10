@@ -9,9 +9,11 @@ import { ProviderCard } from '@/components/ProviderCard';
 import { SearchResultsSkeleton } from '@/components/ProviderCardSkeleton';
 import ErrorMessage from '@/components/ErrorMessage';
 import { EmptyState, type SearchSuggestion } from '@/components/EmptyState';
+import { RecentSearches } from '@/components/RecentSearches';
 import { SaveProfileButton } from '@/components/SaveProfileButton';
 import { FilterButton } from '@/components/FilterButton';
 import { FilterDrawer } from '@/components/FilterDrawer';
+import { useRecentSearches, type RecentSearch, type RecentSearchParams } from '@/hooks/useRecentSearches';
 import type { ProviderDisplay, PaginationState } from '@/types';
 
 function SearchResultsDisplay({
@@ -20,12 +22,22 @@ function SearchResultsDisplay({
   hasSearched,
   error,
   onRetry,
+  recentSearches,
+  isHydrated,
+  onRecentSearchSelect,
+  onRecentSearchRemove,
+  onRecentSearchClearAll,
 }: {
   providers: ProviderDisplay[];
   pagination: PaginationState | null;
   hasSearched: boolean;
   error: string | null;
   onRetry?: () => void;
+  recentSearches: RecentSearch[];
+  isHydrated: boolean;
+  onRecentSearchSelect: (params: RecentSearchParams) => void;
+  onRecentSearchRemove: (id: string) => void;
+  onRecentSearchClearAll: () => void;
 }) {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -101,7 +113,22 @@ function SearchResultsDisplay({
   }
 
   if (!hasSearched) {
-    return <EmptyState type="landing" />;
+    const hasRecent = isHydrated && recentSearches.length > 0;
+    return (
+      <div className="py-4">
+        {hasRecent && (
+          <div className="mb-6">
+            <RecentSearches
+              searches={recentSearches}
+              onSelect={onRecentSearchSelect}
+              onRemove={onRecentSearchRemove}
+              onClearAll={onRecentSearchClearAll}
+            />
+          </div>
+        )}
+        <EmptyState type="landing" compact={hasRecent} />
+      </div>
+    );
   }
 
   const resultCount = pagination?.total || 0;
@@ -233,6 +260,21 @@ function SearchPageContent() {
   const [activeFilterCount, setActiveFilterCount] = useState(0);
   const drawerFormRef = useRef<SearchFormRef>(null);
 
+  // Recent searches
+  const { recentSearches, removeSearch, clearAll: clearAllSearches, isHydrated } = useRecentSearches();
+  const router = useRouter();
+
+  const handleRecentSearchSelect = useCallback((params: RecentSearchParams) => {
+    const urlParams = new URLSearchParams();
+    if (params.state) urlParams.set('state', params.state);
+    if (params.specialty) urlParams.set('specialty', params.specialty);
+    if (params.cities) urlParams.set('cities', params.cities);
+    if (params.healthSystem) urlParams.set('healthSystem', params.healthSystem);
+    if (params.insurancePlanId) urlParams.set('insurancePlanId', params.insurancePlanId);
+    if (params.zipCode) urlParams.set('zipCode', params.zipCode);
+    router.push(`/search?${urlParams.toString()}`);
+  }, [router]);
+
   const handleResultsChange = useCallback((
     newProviders: ProviderDisplay[],
     newPagination: PaginationState | null
@@ -321,6 +363,11 @@ function SearchPageContent() {
               pagination={pagination}
               hasSearched={hasSearched}
               error={error}
+              recentSearches={recentSearches}
+              isHydrated={isHydrated}
+              onRecentSearchSelect={handleRecentSearchSelect}
+              onRecentSearchRemove={removeSearch}
+              onRecentSearchClearAll={clearAllSearches}
             />
           </Suspense>
         )}
