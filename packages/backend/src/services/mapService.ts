@@ -133,7 +133,12 @@ export async function getProvidersForMap(params: MapQueryParams): Promise<MapRes
       })
     : [];
 
-  const countMap = new Map(counts.map(c => [c.address_hash, c._count.npi]));
+  const countMap = new Map(
+    counts.map(c => {
+      const count = typeof c._count === 'object' && c._count ? c._count.npi ?? 0 : 0;
+      return [c.address_hash, count] as const;
+    })
+  );
 
   // Transform to map pins
   const pins: MapPin[] = locations
