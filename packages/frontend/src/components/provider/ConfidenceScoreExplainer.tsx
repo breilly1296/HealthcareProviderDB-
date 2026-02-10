@@ -42,10 +42,8 @@ export function ConfidenceScoreExplainer({
             </ul>
             <div className="bg-white border border-primary-200 rounded p-3 mt-3">
               <p className="text-xs text-primary-900">
-                <strong>Research shows:</strong> 3 patient verifications achieve expert-level accuracy
-                (κ=0.58 vs 0.59 expert agreement). Traditional insurance directories are wrong 46-77% of the time.
-                <br />
-                <span className="text-primary-700 italic">Source: Mortensen et al. (2015), JAMIA; Haeder et al. (2024)</span>
+                Just 3 patient reports are enough to confirm a provider&apos;s insurance status with high confidence.
+                Insurance directories are often wrong, so real patient data makes a big difference.
               </p>
             </div>
           </div>

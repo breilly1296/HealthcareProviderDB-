@@ -63,7 +63,7 @@ export function VerificationTimeline({
             {isExpertLevel ? (
               <p className="text-xs text-green-700 mt-2 flex items-center gap-1">
                 <CheckIcon className="w-4 h-4" />
-                Expert-level accuracy achieved (κ=0.58)
+                High confidence achieved
               </p>
             ) : (
               <p className="text-xs text-gray-600 mt-2">

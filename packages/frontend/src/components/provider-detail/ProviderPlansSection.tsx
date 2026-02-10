@@ -220,8 +220,8 @@ function PlanCard({ plan: pa, provider }: PlanCardProps) {
       ? Math.floor((new Date().getTime() - new Date(pa.lastVerifiedAt).getTime()) / (24 * 60 * 60 * 1000))
       : null,
     researchNote: pa.verificationCount < 3
-      ? 'Research shows 3 verifications achieve expert-level accuracy (κ=0.58).'
-      : 'This verification meets the expert-level accuracy threshold.',
+      ? 'Just 3 patient reports are needed for high confidence.'
+      : 'This provider has enough reports for high confidence.',
   };
 
   return (

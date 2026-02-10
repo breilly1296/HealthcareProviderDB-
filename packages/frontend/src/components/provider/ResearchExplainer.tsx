@@ -27,7 +27,7 @@ export function ResearchExplainer() {
               <li>540 days to fix errors</li>
             </ul>
             <p className="pt-2">
-              Our crowdsourced verification achieves <strong>expert-level accuracy</strong> (κ=0.58) with just 3 patients.
+              Patient reports help confirm provider information — just 3 reports are enough for <strong>high confidence</strong>.
             </p>
           </div>
         </div>
