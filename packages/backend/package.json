@@ -8,6 +8,7 @@
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
     "clean": "rimraf dist",
+    "pretest": "prisma generate",
     "test": "node ../../node_modules/jest/bin/jest.js",
     "test:watch": "node ../../node_modules/jest/bin/jest.js --watch",
     "test:coverage": "node ../../node_modules/jest/bin/jest.js --coverage",
