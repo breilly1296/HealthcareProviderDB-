@@ -17,13 +17,14 @@ import { CompareBar } from '@/components/compare';
 import { GlobalErrorBanner } from '@/components/GlobalErrorBanner';
 import { Disclaimer } from '@/components/Disclaimer';
 import { CookieConsent } from '@/components/CookieConsent';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 // Script to prevent flash of wrong theme on page load
 const themeScript = `
   (function() {
     const stored = localStorage.getItem('verifymyprovider-theme');
-    const theme = stored === 'light' || stored === 'dark' ? stored :
-      (stored === 'system' || !stored) && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    const theme = stored === 'dark' ? 'dark' :
+      stored === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
     }
@@ -153,6 +154,9 @@ function Footer() {
         </div>
 
         <div className="border-t border-stone-300 dark:border-gray-700 mt-8 pt-8 text-center text-stone-500 dark:text-gray-400">
+          <div className="flex items-center justify-center gap-4 mb-4">
+            <ThemeToggle />
+          </div>
           <p>© {new Date().getFullYear()} VerifyMyProvider. All rights reserved.</p>
           <p className="mt-2 text-sm font-medium text-amber-700 dark:text-amber-400">
             Data is crowdsourced and may not be accurate. Verify with providers directly.

@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useTheme } from '@/context/ThemeContext';
-import { ThemeToggle } from './ThemeToggle';
 
 export function Header() {
   const { resolvedTheme } = useTheme();
@@ -42,7 +41,6 @@ export function Header() {
             >
               About
             </Link>
-            <ThemeToggle />
             <Link
               href="/search"
               className="btn-primary text-sm sm:text-base px-3 py-2 sm:px-4 sm:py-2"
