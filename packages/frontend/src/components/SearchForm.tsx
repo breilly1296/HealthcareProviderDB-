@@ -396,6 +396,7 @@ export const SearchForm = forwardRef<SearchFormRef, SearchFormProps>(function Se
           isLoading={insuranceLoading}
           searchable
           clearable
+          className="min-w-[180px]"
         />
 
         <div className="flex items-end gap-3">
