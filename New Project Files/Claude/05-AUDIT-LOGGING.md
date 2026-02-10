@@ -1,492 +1,237 @@
-# VerifyMyProvider Audit Logging
+# Audit Logging - VerifyMyProvider
 
-**Last Updated:** 2026-02-07
-**HIPAA Required:** NO (no PHI stored or processed)
-**Purpose:** Debugging, spam/abuse detection, operational monitoring
+## Overview
+
+VerifyMyProvider implements structured logging for **debugging and spam detection** purposes. HIPAA-compliant audit logging is **not required** because the application stores only public provider data and anonymous user interactions. The logging system is designed for operational observability on Google Cloud Run, not regulatory compliance.
 
 ---
 
-## What to Log
+## Implementation Status
 
-### Currently Logged
+| Component | Status | Date |
+|---|---|---|
+| Structured JSON request logging | Implemented | January 2026 |
+| Cloud Run / Cloud Logging integration | Implemented | January 2026 |
+| Request ID correlation | Implemented | January 2026 |
+| Response time tracking | Implemented | January 2026 |
+| Rate limit info extraction | Implemented | January 2026 |
+| In-memory log buffer for stats | Implemented | January 2026 |
+| PII stripping from API responses | Implemented | January 2026 |
 
-| Event Category | What Is Logged | Where | Source File |
+---
+
+## Request Logger Middleware
+
+The primary logging mechanism is the `requestLogger.ts` middleware, which produces structured JSON logs on every request.
+
+### Log Structure
+
+```json
+{
+  "timestamp": "2026-01-15T14:30:00.000Z",
+  "requestId": "abc123-def456",
+  "method": "GET",
+  "path": "/api/v1/providers/search",
+  "statusCode": 200,
+  "responseTime": 45,
+  "query": { "name": "Smith", "state": "NY" },
+  "rateLimit": {
+    "limit": 100,
+    "remaining": 87,
+    "status": "ok"
+  }
+}
+```
+
+### What Is Logged
+
+| Field | Source | Purpose |
+|---|---|---|
+| `timestamp` | Server clock | Event ordering |
+| `requestId` | `X-Request-ID` header or generated UUID | Cross-service correlation |
+| `method` | HTTP method | Request classification |
+| `path` | Request URL path | Route identification |
+| `statusCode` | Express response | Success/failure tracking |
+| `responseTime` | Start-to-finish timer (ms) | Performance monitoring |
+| `query` | Parsed query string | Debug context (search params only) |
+| `rateLimit` | Rate limiter headers | Abuse detection |
+
+### What Is NOT Logged (Application Logs)
+
+The `requestLogger.ts` middleware explicitly does **not** log:
+
+| Field | Reason |
+|---|---|
+| IP addresses | Privacy -- not needed for application debugging |
+| User-Agent strings | Privacy -- not needed for application debugging |
+| Request bodies | May contain user input (notes, etc.) |
+| Response bodies | May contain provider data (too verbose) |
+| Cookie values | Not applicable (no cookies currently) |
+| Authorization headers | Security -- never log credentials |
+
+---
+
+## Privacy Distinction: Application Logs vs. Database Audit
+
+There is an important distinction between what is logged in application logs (Cloud Logging) and what is stored in database audit tables:
+
+### Application Logs (requestLogger.ts) -- NO PII
+
+- Written to stdout / Cloud Logging
+- Used for operational debugging and performance monitoring
+- Do NOT contain IP addresses or user agents
+- Retained per Cloud Logging retention policy (default 30 days)
+
+### Database Audit Tables -- Limited PII for Anti-Abuse
+
+Certain database tables store IP addresses and user agents specifically for anti-abuse purposes:
+
+| Table | Field | Purpose | Retention |
 |---|---|---|---|
-| **HTTP Requests** | Method, URL, status code, response time, request ID | stdout (Cloud Logging) | `requestLogger.ts`, `httpLogger.ts` |
-| **Rate Limit Hits** | Limit value, remaining count, 429 status | stdout via requestLogger | `requestLogger.ts` lines 50-69 |
-| **Verification Submissions** | NPI, plan ID, acceptance status, previous value, new value, timestamps | `verification_logs` table | `verificationService.ts` lines 375-399 |
-| **Vote Submissions** | Verification ID, vote direction, source IP | `vote_logs` table | `verificationService.ts` lines 496-514 |
-| **Anti-Abuse Data** | Source IP, user agent, submitter email (database only) | `verification_logs` table | `verificationService.ts` lines 393-395 |
-| **Sybil Attack Detection** | Duplicate verification attempts by IP or email | AppError.conflict thrown | `verificationService.ts` lines 72-115 |
-| **Honeypot Triggers** | IP, field name, request path | stdout (pino warn) | `honeypot.ts` lines 15-19 |
-| **CAPTCHA Events** | Failures, low scores, API errors, fail-open/closed decisions | stdout (pino warn/error) | `captcha.ts` lines 163-236 |
-| **Admin Actions** | Cleanup operations, cache clears, confidence recalculations | stdout (pino info) | `admin.ts` lines 77-84, 197-201, 477 |
-| **CORS Violations** | Blocked origin | stdout (pino warn) | `index.ts` line 79 |
-| **Sync Operations** | Sync type, state, records processed, status, errors | `sync_logs` table | Prisma schema `SyncLog` model |
-| **Data Quality Issues** | NPI, audit type, severity, field, current/expected values | `data_quality_audit` table | Prisma schema `DataQualityAudit` model |
-| **API Errors** | Request ID, error object, path, method | stdout (pino error) | `errorHandler.ts` lines 80-85 |
-| **Database Errors** | Prisma error codes (P2002, P2024, P2025, P2003, P2010) | stdout (pino error) | `errorHandler.ts` lines 134-214 |
-| **Server Lifecycle** | Startup, shutdown signals, database disconnection | stdout (pino info) | `index.ts` lines 190-226 |
-| **Request Timeouts** | Request ID, path, method, timeout duration | stdout (pino warn) | `requestTimeout.ts` lines 16-21 |
-| **Rate Limiter Mode** | Redis vs in-memory selection per limiter | stdout (pino info) | `rateLimiter.ts` lines 304-312 |
-| **Cache Activity** | Cache hits, misses, invalidation failures | stdout (pino debug/warn) | `providers.ts` lines 240-251 |
+| `verification_logs` | `sourceIp` | 30-day Sybil attack detection (same IP submitting many conflicting verifications) | Indefinite (but IP can be purged) |
+| `verification_logs` | `userAgent` | Bot detection (automated submission patterns) | Indefinite |
+| `vote_logs` | `sourceIp` | Vote deduplication (unique constraint on `verificationId` + `sourceIp`) | Indefinite |
 
-### Recommended Future Logging
+### Why Database Stores IPs
 
-| Event | Priority | Reason |
-|---|---|---|
-| Authentication events | High | When user auth is added, track login/logout/failures |
-| Admin endpoint access attempts (failed auth) | High | Already partially covered by `AppError.unauthorized` in `adminAuthMiddleware` |
-| Expired record cleanup results | Medium | Already logged in admin routes, consider adding scheduled job logging |
-| Confidence score decay recalculations | Low | Admin-triggered, already logged |
+1. **Sybil Detection**: If the same IP submits 50 verifications claiming different providers don't accept the same insurance plan, that pattern suggests coordinated manipulation. The `sourceIp` field in `verification_logs` enables a 30-day lookback window for this check.
+
+2. **Vote Deduplication**: The `vote_logs` table has a unique constraint on `(verificationId, sourceIp)` to prevent the same IP from voting multiple times on the same verification. This is a structural anti-abuse measure.
+
+3. **Rate Limiting Enforcement**: While the rate limiter itself uses in-memory or Redis counters (not the database), the stored IP enables post-hoc analysis of abuse patterns.
 
 ---
 
-## What NOT to Log
+## PII Stripping from API Responses
 
-### Explicitly Excluded from Application Logs
-
-| Data Type | Reason | Enforcement |
-|---|---|---|
-| **IP Addresses** | PII - excluded from request/application logs | `requestLogger.ts` interface `RequestLogEntry` has no IP field |
-| **User Agents** | PII - excluded from request logs | `requestLogger.ts` does not capture user agent |
-| **Full Stack Traces (production)** | Security - could expose internals | `errorHandler.ts` line 238: production returns generic "Internal server error" |
-| **Database Query Results** | Can be large, could contain sensitive data | Not included in any log statements |
-| **CSRF Tokens** | Security token, should never appear in logs | Not applicable (API uses CORS, not CSRF tokens) |
-| **Session IDs** | Not applicable (stateless API) | No session middleware in use |
-| **Passwords** | Never log credentials | No user auth system yet; admin secret checked via timing-safe comparison only |
-| **CAPTCHA Tokens** | Security tokens | Not logged; only verification result is logged |
-| **Admin Secret Values** | Critical credential | `admin.ts` uses `timingSafeEqual` comparison; secret value never logged |
-
-### Important: Application Logs vs Database Storage Distinction
-
-The project maintains a deliberate separation between what appears in application logs (stdout/Cloud Logging) and what is stored in database audit tables:
-
-```
-Application Logs (requestLogger.ts, httpLogger.ts):
-  - NO IP addresses
-  - NO user agents
-  - NO identifying information
-  - Only: method, path, status, response time, request ID, rate limit info
-
-Database Audit Tables (verification_logs, vote_logs):
-  - YES: sourceIp (for Sybil attack prevention, 30-day duplicate check)
-  - YES: userAgent (for abuse analysis)
-  - YES: submittedBy (email for duplicate detection)
-  - These are NEVER returned in API responses (stripped by stripVerificationPII())
-```
-
-This is intentional: IPs are needed for anti-abuse logic but are not exposed in logs or API responses.
-
----
-
-## Current Implementation
-
-### 1. Structured Logging Infrastructure
-
-**Logger:** Pino (`packages/backend/src/utils/logger.ts`)
+The `stripVerificationPII()` function in `verificationService.ts` removes sensitive fields before returning verification data to API consumers:
 
 ```typescript
-// Production: structured JSON with ISO timestamps for Cloud Logging
-// Development: pino-pretty with colorized, human-readable output
-const logger = pino({
-  level: process.env.LOG_LEVEL || 'info',
-  // Production formatters output JSON to stdout
-  // Development uses pino-pretty transport
-});
+function stripVerificationPII(verification: VerificationLog) {
+  const { sourceIp, userAgent, ...safeVerification } = verification;
+  return safeVerification;
+}
 ```
 
-**Log Level:** Configurable via `LOG_LEVEL` environment variable (default: `info`).
+This ensures that:
+- API consumers never see the IP addresses of verification submitters
+- User agent strings are never exposed in API responses
+- The PII remains in the database for anti-abuse purposes only
+- Admin endpoints may access full records (behind `X-Admin-Secret` auth)
 
-**Environments:**
-- **Production:** JSON format to stdout, picked up by Google Cloud Logging
-- **Development:** Colorized console output via `pino-pretty`
+---
 
-### 2. Request ID Correlation (`packages/backend/src/middleware/requestId.ts`)
+## Log Formats
 
-Every request gets a unique UUID for end-to-end log correlation:
+### Production (JSON)
+
+In production (Cloud Run), logs are emitted as single-line JSON objects for structured ingestion by Google Cloud Logging:
+
+```json
+{"timestamp":"2026-01-15T14:30:00.000Z","requestId":"abc123","method":"GET","path":"/api/v1/providers/search","statusCode":200,"responseTime":45}
+```
+
+Cloud Logging automatically parses JSON and enables:
+- Log-based metrics (request count, error rate, latency percentiles)
+- Log filtering by any JSON field
+- Alerting on error patterns
+- Log correlation with Cloud Trace
+
+### Development (Colored Console)
+
+In development, logs use a human-readable colored format:
+
+```
+[14:30:00] GET /api/v1/providers/search 200 45ms [abc123]
+```
+
+Color coding:
+- Green: 2xx responses
+- Yellow: 3xx/4xx responses
+- Red: 5xx responses
+
+---
+
+## Request ID Correlation
+
+Every request is assigned a unique ID for end-to-end tracing:
+
+1. **Incoming**: If the request includes an `X-Request-ID` header (from a load balancer, CDN, or upstream service), that ID is used
+2. **Generated**: If no `X-Request-ID` header is present, a UUID v4 is generated
+3. **Propagated**: The request ID is:
+   - Included in all log entries for this request
+   - Set as a response header (`X-Request-ID`) so the client can reference it
+   - Available in the request context for downstream service calls
+
+This enables tracing a single user action across logs, even in concurrent/high-traffic scenarios.
+
+---
+
+## In-Memory Log Buffer
+
+The application maintains an in-memory buffer of the last 20 request log entries for the admin stats endpoint:
 
 ```typescript
-// Uses incoming X-Request-ID header if present (cross-service tracing)
-// Otherwise generates a new UUID via crypto.randomUUID()
-const requestId = (req.headers['x-request-id'] as string) || randomUUID();
-req.id = requestId;
-res.setHeader('X-Request-ID', requestId);
-```
+const LOG_BUFFER_SIZE = 20;
+const recentLogs: RequestLogEntry[] = [];
 
-The request ID appears in:
-- All pino log entries (via `httpLogger.ts` using `genReqId: (req) => req.id`)
-- Error responses (returned as `requestId` field in error JSON)
-- The `requestLogger.ts` structured log entries
-
-### 3. Dual HTTP Logging Layer
-
-**Layer 1: pino-http (`httpLogger.ts`)** -- Automatic request/response logging:
-- Uses `req.id` for correlation
-- Custom log levels: 500+ = error, 400+ = warn, else info
-- Custom serializers exclude PII (only logs `id`, `method`, `url`, `statusCode`)
-- Skips `/health` endpoint to reduce noise
-
-**Layer 2: requestLogger (`requestLogger.ts`)** -- Application-level metrics:
-- Captures response time via `res.end` override
-- Extracts rate limit headers (`X-RateLimit-Limit`, `X-RateLimit-Remaining`)
-- Maintains in-memory buffer (max 1000 entries) for stats endpoint
-- Exposes `getRequestStats()` for aggregated monitoring data:
-  - Total requests, rate-limited count, average response time
-  - Status code distribution, endpoint frequency
-  - Last 20 log entries
-
-### 4. Database Audit Trail
-
-#### VerificationLog Model (`verification_logs` table)
-
-Primary audit record for all verification submissions. Schema from `packages/backend/prisma/schema.prisma`:
-
-```prisma
-model VerificationLog {
-  id                 String             @id @default(cuid())
-  providerNpi        String?            @map("provider_npi")
-  planId             String?            @map("plan_id")
-  acceptanceId       String?
-  verificationType   VerificationType   // PLAN_ACCEPTANCE, PROVIDER_INFO, etc.
-  verificationSource VerificationSource // CROWDSOURCE, CMS_DATA, etc.
-  previousValue      Json?              // Snapshot of state before change
-  newValue           Json?              // New verification data
-  sourceIp           String?            // Anti-abuse (NOT in logs or API responses)
-  userAgent          String?            // Abuse analysis (NOT in logs or API responses)
-  submittedBy        String?            // Email for dedup (NOT in API responses)
-  upvotes            Int                @default(0)
-  downvotes          Int                @default(0)
-  isApproved         Boolean?
-  reviewedAt         DateTime?
-  reviewedBy         String?
-  notes              String?
-  evidenceUrl        String?
-  createdAt          DateTime           @default(now())
-  expiresAt          DateTime?          // 6-month TTL
+function addToBuffer(entry: RequestLogEntry) {
+  recentLogs.push(entry);
+  if (recentLogs.length > LOG_BUFFER_SIZE) {
+    recentLogs.shift();
+  }
 }
 ```
 
-**Key design decisions:**
-- `previousValue` / `newValue` as JSON fields capture the full state transition
-- `cuid()` primary keys prevent enumeration attacks
-- Sybil prevention indexes: `idx_vl_sybil_ip` (NPI + plan + IP + date), `idx_vl_sybil_email` (NPI + plan + email + date)
-- 6-month TTL based on 12% annual provider turnover research
+This buffer is accessible via the admin health endpoint and provides a quick snapshot of recent request activity without querying Cloud Logging.
 
-#### VoteLog Model (`vote_logs` table)
+**Limitations**:
+- Only the last 20 entries are retained
+- Buffer is process-local (not shared across Cloud Run instances)
+- Buffer is lost on process restart
+- Not suitable for historical analysis (use Cloud Logging for that)
 
-Tracks individual votes on verifications:
+---
 
-```prisma
-model VoteLog {
-  id               String           @id @default(cuid())
-  verificationId   String
-  sourceIp         String           // Required for vote deduplication
-  vote             String           // 'up' or 'down'
-  createdAt        DateTime         @default(now())
+## Rate Limit Logging
 
-  @@unique([verificationId, sourceIp]) // One vote per IP per verification
-}
-```
-
-**Anti-abuse:** The `@@unique([verificationId, sourceIp])` constraint at the database level prevents duplicate votes. Vote direction changes are allowed (up-to-down or vice versa) via transactional updates in `voteOnVerification()`.
-
-#### SyncLog Model (`sync_logs` table)
-
-Tracks data synchronization operations:
-
-```prisma
-model SyncLog {
-  id                Int       @id @default(autoincrement())
-  syncType          String?   // e.g., 'nppes', 'cms'
-  state             String?
-  recordsProcessed  Int?      @default(0)
-  status            String?
-  errorMessage      String?
-  startedAt         DateTime? @default(now())
-  completedAt       DateTime?
-}
-```
-
-#### DataQualityAudit Model (`data_quality_audit` table)
-
-Tracks data quality issues discovered during processing:
-
-```prisma
-model DataQualityAudit {
-  id             Int       @id @default(autoincrement())
-  npi            String
-  auditType      String    // Type of quality issue
-  severity       String    // Issue severity level
-  field          String?   // Which data field has the issue
-  currentValue   String?
-  expectedValue  String?
-  details        String?
-  resolved       Boolean   @default(false)
-  resolvedAt     DateTime?
-  createdAt      DateTime  @default(now())
-}
-```
-
-### 5. PII Stripping in API Responses
-
-The `stripVerificationPII()` function in `verificationService.ts` removes sensitive fields before returning data:
+The request logger extracts rate limit information from response headers and includes it in log entries:
 
 ```typescript
-function stripVerificationPII<T extends Record<string, unknown>>(
-  verification: T
-): Omit<T, 'sourceIp' | 'userAgent' | 'submittedBy'> {
-  const { sourceIp, userAgent, submittedBy, ...safe } = verification;
-  return safe;
-}
+const rateLimitInfo = {
+  limit: res.getHeader('X-RateLimit-Limit'),
+  remaining: res.getHeader('X-RateLimit-Remaining'),
+  status: res.getHeader('X-RateLimit-Status'), // "ok", "degraded", or absent
+};
 ```
 
-This is applied to:
-- `submitVerification()` return value (line 412)
-- `voteOnVerification()` return value (line 551)
-- `getRecentVerifications()` uses Prisma `select` to exclude these fields entirely (lines 632-648)
-- `getVerificationsForPair()` also uses Prisma `select` exclusion (lines 716-734)
+This enables:
+- Monitoring how close users are to their rate limits
+- Detecting when the rate limiter falls back to degraded mode (Redis failure)
+- Identifying IPs that consistently hit limits (potential abuse)
 
-### 6. Error Logging Architecture
+---
 
-The global error handler (`errorHandler.ts`) provides structured error logging:
+## What Is NOT Implemented (And Why)
 
-```typescript
-logger.error({
-  requestId: req.id,
-  err,
-  path: req.path,
-  method: req.method,
-}, 'Request error');
-```
-
-**Error categorization:**
-- `AppError` (operational): Logged and returned with appropriate status code + error code
-- `ZodError` (validation): Returned as 400 with field-level details
-- `PrismaClientKnownRequestError`: Mapped to appropriate HTTP status (409, 404, 400, 503, 500)
-- `PrismaClientInitializationError`: Logged as CRITICAL, returned as 503
-- `PayloadTooLargeError`: Returned as 413
-- Unknown errors: 500 in production (generic message), detailed in development
-
-**Production safety:** Full error messages are suppressed in production responses (line 238: `process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message`).
-
-### 7. Security Event Logging
-
-| Security Event | Log Level | Logger Location |
+| Feature | Status | Reason |
 |---|---|---|
-| Honeypot triggered (bot detection) | `warn` | `honeypot.ts` line 15 |
-| CAPTCHA verification failed | `warn` | `captcha.ts` line 163 |
-| CAPTCHA low score (possible bot) | `warn` | `captcha.ts` line 174 |
-| CAPTCHA Google API error | `error` | `captcha.ts` line 191 |
-| CAPTCHA fail-open with fallback limiting | `warn` | `captcha.ts` line 231 |
-| CAPTCHA fail-closed blocking | `warn` | `captcha.ts` line 201 |
-| CAPTCHA fallback rate limit exceeded | `warn` | `captcha.ts` line 222 |
-| CORS blocked origin | `warn` | `index.ts` line 79 |
-| Admin secret not configured | `warn` | `admin.ts` line 27 |
-| Admin unauthorized access | via AppError | `admin.ts` line 52 |
-| Rate limiter Redis unavailable | `warn` | `rateLimiter.ts` line 209 |
-| Rate limiter Redis error | `error` | `rateLimiter.ts` line 275 |
-| Request timeout | `warn` | `requestTimeout.ts` line 16 |
-| Database connection pool timeout | `error` | `errorHandler.ts` line 177 |
-| Database connection failure | `error` | `errorHandler.ts` line 219 |
-| Forced shutdown timeout | `error` | `index.ts` line 210 |
-
-### 8. Middleware Execution Order
-
-The middleware chain in `index.ts` establishes the logging pipeline:
-
-```
-1. requestIdMiddleware    -- Assigns UUID (or uses incoming X-Request-ID)
-2. httpLogger (pino-http) -- Logs HTTP request/response with request ID
-3. helmet                 -- Security headers (no logging)
-4. cors                   -- Logs CORS violations
-5. express.json           -- Body parsing
-6. defaultRateLimiter     -- Sets X-RateLimit-* headers
-7. requestLogger          -- Captures response metrics, rate limit info
-8. generalTimeout         -- Logs timeouts
-9. API routes             -- Route-specific logging
-10. notFoundHandler       -- Logs 404s
-11. errorHandler          -- Catches and logs all unhandled errors
-```
+| HIPAA audit trail | Not implemented | Not required -- no PHI in the system |
+| User action audit log | Not implemented | No user accounts yet (Phase 1) |
+| Database change log (CDC) | Not implemented | Not needed at current scale |
+| Log encryption at rest | Not implemented | Cloud Logging handles encryption by default |
+| Tamper-proof log storage | Not implemented | No regulatory requirement |
+| Access logging for provider records | Not implemented | Provider data is public; no access controls needed |
+| Detailed request body logging | Not implemented | Privacy -- would capture user-submitted notes |
 
 ---
 
-## Retention Policy
+## Future Considerations
 
-### Database Records
+When user accounts are added (Phase 2/3), the logging system should be extended with:
 
-| Table | Retention | Mechanism | Cleanup Endpoint |
-|---|---|---|---|
-| `verification_logs` | **6 months** | TTL via `expiresAt` column | `POST /api/v1/admin/cleanup-expired` |
-| `vote_logs` | **Follows parent** | Cascade delete from `verification_logs` | Automatic via `onDelete: Cascade` |
-| `provider_plan_acceptance` | **6 months** | TTL via `expiresAt` column | `POST /api/v1/admin/cleanup-expired` |
-| `sync_logs` | **90 days** | Manual cleanup | `POST /api/v1/admin/cleanup/sync-logs` |
-| `data_quality_audit` | **Indefinite** | No TTL or cleanup mechanism | None (manual) |
-
-**TTL Constants** (from `packages/backend/src/config/constants.ts`):
-- `VERIFICATION_TTL_MS = 6 * 30 * 24 * 60 * 60 * 1000` (approximately 180 days)
-- `SYBIL_PREVENTION_WINDOW_MS = 30 * 24 * 60 * 60 * 1000` (30 days)
-
-**Cleanup operations** are protected by admin authentication (`X-Admin-Secret` header with timing-safe comparison) and support dry-run mode. They are designed to be called by Google Cloud Scheduler.
-
-### Application Logs (stdout)
-
-| Destination | Retention | Notes |
-|---|---|---|
-| Cloud Logging (production) | Per GCP project settings | Configurable in Google Cloud Console |
-| In-memory buffer | Rolling 1000 entries | `requestLogger.ts` MAX_BUFFER_SIZE, not persistent |
-| Console (development) | Session only | Lost on restart |
-
-### Retention Monitoring
-
-The admin API provides comprehensive retention statistics:
-
-- `GET /api/v1/admin/retention/stats` -- Shows totals, expiring-soon counts, oldest/newest records for all log types
-- `GET /api/v1/admin/expiration-stats` -- Focused on verification expiration metrics
-- `GET /api/v1/admin/health` -- Includes retention metrics alongside cache and uptime data
-
----
-
-## Architecture Diagram
-
-```
-                            Incoming Request
-                                  |
-                                  v
-                        +-------------------+
-                        | requestId (UUID)  |  <-- Assigns req.id
-                        +-------------------+
-                                  |
-                                  v
-                        +-------------------+
-                        | httpLogger        |  --> stdout (pino JSON)
-                        | (pino-http)       |      method, url, statusCode, req.id
-                        +-------------------+
-                                  |
-                                  v
-                        +-------------------+
-                        | rateLimiter       |  --> Sets X-RateLimit-* headers
-                        | (Redis/memory)    |      Logs Redis errors to stdout
-                        +-------------------+
-                                  |
-                                  v
-                        +-------------------+
-                        | requestLogger     |  --> stdout (pino JSON)
-                        |                   |      path, status, responseTime,
-                        |                   |      rateLimitInfo, requestId
-                        |                   |  --> In-memory buffer (stats)
-                        +-------------------+
-                                  |
-                                  v
-                        +-------------------+
-                        | Route Handlers    |
-                        | + honeypotCheck   |  --> stdout: bot detection events
-                        | + verifyCaptcha   |  --> stdout: CAPTCHA events
-                        | + route logic     |  --> PostgreSQL: verification_logs,
-                        |                   |      vote_logs, sync_logs,
-                        |                   |      data_quality_audit
-                        +-------------------+
-                                  |
-                                  v
-                        +-------------------+
-                        | errorHandler      |  --> stdout: structured error logs
-                        |                   |      (requestId, path, method, err)
-                        +-------------------+
-                                  |
-                                  v
-                              Response
-                         (X-Request-ID header)
-```
-
----
-
-## Answers to Key Questions
-
-### 1. Is any logging currently implemented?
-
-**Yes, extensively.** The project has a mature, multi-layered logging system:
-
-- **Application-level structured logging** via Pino with Cloud Run/Cloud Logging compatibility
-- **HTTP request/response logging** via pino-http with custom serializers
-- **Request metrics tracking** via custom `requestLogger` middleware with in-memory aggregation
-- **Database audit trail** via `verification_logs`, `vote_logs`, `sync_logs`, and `data_quality_audit` tables
-- **Security event logging** for honeypot triggers, CAPTCHA events, CORS violations, and rate limiter degradation
-- **Request ID correlation** across all log entries via UUID-based `X-Request-ID`
-
-### 2. Should we implement audit logging now or later?
-
-**Already implemented.** The current system covers the primary use cases. The main gap is authentication event logging, which should be added when user authentication is implemented.
-
-### 3. What events are most important to track?
-
-For this application (no PHI, crowdsourced data), the priority order is:
-
-1. **Verification submissions** (already tracked in DB) -- core business event
-2. **Vote submissions** (already tracked in DB) -- data quality signal
-3. **Rate limit / abuse events** (already tracked in logs) -- spam prevention
-4. **API errors** (already tracked in logs) -- debugging
-5. **Authentication events** (future) -- when auth is added
-
-### 4. How long should logs be retained?
-
-**Not 7 years like HIPAA.** Current policy is appropriate:
-- Verifications: 6 months (based on 12% annual provider turnover research)
-- Sync logs: 90 days (operational data)
-- Application logs: Per Cloud Logging project settings (typically 30 days)
-- Data quality audits: Indefinite until resolved (consider adding TTL)
-
-### 5. Should verifications be logged for spam detection?
-
-**Yes, and they already are.** The system implements multiple anti-spam layers:
-- Sybil attack detection (30-day window per IP and email per provider-plan pair)
-- Honeypot fields on verification and vote forms
-- reCAPTCHA v3 with score-based filtering
-- Rate limiting (10 verifications/hour, 10 votes/hour per IP)
-- Vote deduplication via unique constraint on `(verificationId, sourceIp)`
-- Consensus requirements (3+ verifications, 60+ confidence, 2:1 majority ratio)
-
----
-
-## Next Steps
-
-### Short-Term (When Auth Is Added)
-
-- [ ] Log authentication events (login, logout, failed attempts) with request ID correlation
-- [ ] Log admin endpoint access (success and failure) beyond the current `AppError.unauthorized`
-- [ ] Add user ID to structured log context for authenticated requests
-
-### Medium-Term (Operational Improvements)
-
-- [ ] Add TTL/cleanup for `data_quality_audit` table (currently indefinite retention)
-- [ ] Set up Cloud Logging alerts for high-volume security events (honeypot triggers, CAPTCHA failures, CORS violations)
-- [ ] Create a Cloud Scheduler job for automated daily cleanup of expired records (endpoints exist, scheduling not yet configured)
-- [ ] Consider log-based metrics for monitoring verification submission rates and vote patterns
-
-### Long-Term (If Scale Demands)
-
-- [ ] Evaluate moving from in-memory request stats buffer to Redis for multi-instance visibility
-- [ ] Consider structured audit log export (e.g., BigQuery) for longer-term trend analysis
-- [ ] Add request sampling for high-traffic endpoints to reduce log volume while maintaining visibility
-- [ ] Implement log-based anomaly detection for abuse pattern identification
-
----
-
-## File Reference
-
-| File | Path | Purpose |
-|---|---|---|
-| Logger utility | `packages/backend/src/utils/logger.ts` | Pino logger instance (JSON/pretty) |
-| Request logger | `packages/backend/src/middleware/requestLogger.ts` | Structured request metrics, in-memory buffer |
-| HTTP logger | `packages/backend/src/middleware/httpLogger.ts` | pino-http automatic request/response logging |
-| Request ID | `packages/backend/src/middleware/requestId.ts` | UUID generation and X-Request-ID correlation |
-| Error handler | `packages/backend/src/middleware/errorHandler.ts` | Global error logging and response formatting |
-| Rate limiter | `packages/backend/src/middleware/rateLimiter.ts` | Dual-mode (Redis/memory) rate limiting with logging |
-| CAPTCHA | `packages/backend/src/middleware/captcha.ts` | reCAPTCHA v3 with fail-open/closed logging |
-| Honeypot | `packages/backend/src/middleware/honeypot.ts` | Bot detection with warning logs |
-| Request timeout | `packages/backend/src/middleware/requestTimeout.ts` | Timeout logging |
-| Verification service | `packages/backend/src/services/verificationService.ts` | Audit trail logic, PII stripping, Sybil detection |
-| Verify routes | `packages/backend/src/routes/verify.ts` | Verification/vote endpoints with cache invalidation logging |
-| Admin routes | `packages/backend/src/routes/admin.ts` | Cleanup, retention stats, admin action logging |
-| App entrypoint | `packages/backend/src/index.ts` | Middleware chain, CORS logging, lifecycle logging |
-| Prisma schema | `packages/backend/prisma/schema.prisma` | VerificationLog, VoteLog, SyncLog, DataQualityAudit models |
-| Constants | `packages/backend/src/config/constants.ts` | TTL values, Sybil window, consensus thresholds |
+1. **User action audit log**: Record account creation, login, logout, profile changes, subscription changes
+2. **Verification attribution**: Link verifications to authenticated user IDs (in addition to IP)
+3. **Admin action log**: Record all admin operations with the authenticated admin identity
+4. **Log retention policy**: Define and enforce retention periods for different log categories
+5. **Log-based alerting**: Set up alerts for anomalous patterns (spike in 401s, unusual verification volume)
