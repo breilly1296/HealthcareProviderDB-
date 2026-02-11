@@ -1,263 +1,16 @@
 'use client';
 
-import { useState, useCallback, Suspense, useRef } from 'react';
-import dynamic from 'next/dynamic';
-import Link from 'next/link';
-import { Loader2, Map, List, Columns2, ClipboardList } from 'lucide-react';
-import { useMapProviders } from '@/hooks/useMapProviders';
-
-const ProviderMap = dynamic(() => import('@/components/ProviderMap'), {
-  ssr: false,
-  loading: () => (
-    <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded-lg">
-      <span className="text-gray-500">Loading map...</span>
-    </div>
-  ),
-});
+import { useState, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { SearchForm, type SearchFormRef } from '@/components/SearchForm';
-import { ProviderCard } from '@/components/ProviderCard';
 import { SearchResultsSkeleton } from '@/components/ProviderCardSkeleton';
-import ErrorMessage from '@/components/ErrorMessage';
-import { EmptyState, type SearchSuggestion } from '@/components/EmptyState';
-import { RecentSearches } from '@/components/RecentSearches';
-import { SaveProfileButton } from '@/components/SaveProfileButton';
-import { FilterButton } from '@/components/FilterButton';
-import { FilterDrawer } from '@/components/FilterDrawer';
-import { useRecentSearches, type RecentSearch, type RecentSearchParams } from '@/hooks/useRecentSearches';
+import {
+  SearchHeader, SearchControls, InsuranceCardBanner,
+  SearchResultsList, SearchMapView, SearchViewLayout,
+  type ViewMode,
+} from '@/components/search';
+import { useMapProviders } from '@/hooks/useMapProviders';
+import { useRecentSearches, type RecentSearchParams } from '@/hooks/useRecentSearches';
 import type { ProviderDisplay, PaginationState } from '@/types';
-
-function SearchResultsDisplay({
-  providers,
-  pagination,
-  hasSearched,
-  error,
-  onRetry,
-  recentSearches,
-  isHydrated,
-  onRecentSearchSelect,
-  onRecentSearchRemove,
-  onRecentSearchClearAll,
-}: {
-  providers: ProviderDisplay[];
-  pagination: PaginationState | null;
-  hasSearched: boolean;
-  error: string | null;
-  onRetry?: () => void;
-  recentSearches: RecentSearch[];
-  isHydrated: boolean;
-  onRecentSearchSelect: (params: RecentSearchParams) => void;
-  onRecentSearchRemove: (id: string) => void;
-  onRecentSearchClearAll: () => void;
-}) {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-
-  const state = searchParams.get('state') || '';
-  const cities = searchParams.get('cities') || '';
-  const specialty = searchParams.get('specialty') || '';
-  const healthSystem = searchParams.get('healthSystem') || '';
-  const insurancePlanId = searchParams.get('insurancePlanId') || '';
-  const name = searchParams.get('name') || '';
-  const npi = searchParams.get('npi') || '';
-
-  // Generate suggestions based on current search
-  const getNoResultsSuggestions = useCallback((): SearchSuggestion[] => {
-    const suggestions: SearchSuggestion[] = [];
-
-    if (specialty) {
-      suggestions.push({ label: 'Search all specialties', action: 'clear-specialty' });
-    }
-    if (cities) {
-      suggestions.push({ label: 'Search entire state', action: 'clear-cities' });
-    }
-    if (healthSystem) {
-      suggestions.push({ label: 'All health systems', action: 'clear-health-system' });
-    }
-    if (insurancePlanId) {
-      suggestions.push({ label: 'All insurance plans', action: 'clear-insurance' });
-    }
-
-    return suggestions.slice(0, 3);
-  }, [specialty, cities, healthSystem, insurancePlanId]);
-
-  // Handle suggestion clicks
-  const handleSuggestionClick = useCallback((action: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-
-    switch (action) {
-      case 'clear-specialty':
-        params.delete('specialty');
-        break;
-      case 'clear-cities':
-        params.delete('cities');
-        break;
-      case 'clear-health-system':
-        params.delete('healthSystem');
-        break;
-      case 'clear-insurance':
-        params.delete('insurancePlanId');
-        break;
-    }
-
-    router.push(`/search?${params.toString()}`);
-  }, [searchParams, router]);
-
-  if (error) {
-    return (
-      <ErrorMessage
-        variant="server"
-        message={error}
-        action={onRetry ? { label: 'Try Again', onClick: onRetry } : undefined}
-      />
-    );
-  }
-
-  if (hasSearched && providers.length === 0) {
-    return (
-      <EmptyState
-        type="no-results"
-        suggestions={getNoResultsSuggestions()}
-        onSuggestionClick={handleSuggestionClick}
-      />
-    );
-  }
-
-  if (!hasSearched) {
-    const hasRecent = isHydrated && recentSearches.length > 0;
-    return (
-      <div className="py-4">
-        {hasRecent && (
-          <div className="mb-6">
-            <RecentSearches
-              searches={recentSearches}
-              onSelect={onRecentSearchSelect}
-              onRemove={onRecentSearchRemove}
-              onClearAll={onRecentSearchClearAll}
-            />
-          </div>
-        )}
-        <EmptyState type="landing" compact={hasRecent} />
-      </div>
-    );
-  }
-
-  const resultCount = pagination?.total || 0;
-  const pageSize = pagination?.limit || 20;
-
-  // Detect broad searches: many results with no narrowing filters
-  const isBroadSearch =
-    resultCount > 500 && !specialty && !cities && !name && !npi && !insurancePlanId;
-
-  return (
-    <div aria-live="polite">
-      {/* Visually hidden announcement for screen readers */}
-      <p className="sr-only" role="status">
-        {resultCount} {resultCount === 1 ? 'result' : 'results'} found
-        {state ? ` in ${state}` : ''}
-        {cities ? ` in ${cities.split(',').join(', ')}` : ''}
-      </p>
-
-      {/* Results count */}
-      <div className="mb-4">
-        <p className="text-stone-600 dark:text-gray-300">
-          {isBroadSearch ? (
-            <>
-              Showing first {pageSize} of{' '}
-              <strong className="text-stone-800 dark:text-white">
-                {resultCount.toLocaleString()}
-              </strong>{' '}
-              providers{state && ` in ${state}`}
-            </>
-          ) : (
-            <>
-              Found{' '}
-              <strong className="text-stone-800 dark:text-white">{resultCount.toLocaleString()}</strong>{' '}
-              providers
-              {state && ` in ${state}`}
-              {cities && ` in ${cities.split(',').join(', ')}`}
-            </>
-          )}
-        </p>
-      </div>
-
-      {/* Refine search nudge for broad queries */}
-      {isBroadSearch && (
-        <div className="mb-5 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg flex flex-col sm:flex-row sm:items-center gap-3">
-          <div className="flex-1">
-            <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
-              That&apos;s a lot of providers! Narrow your search for better results.
-            </p>
-            <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
-              Try adding a <strong>specialty</strong>, <strong>city</strong>, or{' '}
-              <strong>provider name</strong> to find what you&apos;re looking for faster.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            className="shrink-0 px-4 py-2 text-sm font-medium text-blue-700 dark:text-blue-200 bg-blue-100 dark:bg-blue-800/40 hover:bg-blue-200 dark:hover:bg-blue-800/60 rounded-lg transition-colors"
-          >
-            Refine search
-          </button>
-        </div>
-      )}
-
-      {/* Provider list */}
-      <div className="space-y-5">
-        {providers.map((provider) => (
-          <ProviderCard key={provider.id} provider={provider} />
-        ))}
-      </div>
-
-      {/* Pagination */}
-      {pagination && pagination.totalPages > 1 && (
-        <nav aria-label="Search results pagination" className="mt-8 flex justify-center gap-2">
-          {Array.from({ length: pagination.totalPages }, (_, i) => i + 1)
-            .filter((p) => p === 1 || p === pagination.totalPages || Math.abs(p - pagination.page) <= 2)
-            .map((p, idx, arr) => {
-              const prevPage = arr[idx - 1];
-              const showEllipsisBefore = idx > 0 && prevPage !== undefined && p - prevPage > 1;
-
-              return (
-                <div key={p} className="flex items-center gap-2">
-                  {showEllipsisBefore && (
-                    <span className="px-2 text-gray-400 dark:text-gray-500">...</span>
-                  )}
-                  <a
-                    href={`/search?${new URLSearchParams({
-                      ...(specialty && { specialty }),
-                      ...(state && { state }),
-                      ...(cities && { cities }),
-                      ...(healthSystem && { healthSystem }),
-                      page: String(p),
-                    }).toString()}`}
-                    className={`min-w-[44px] min-h-[44px] px-4 py-3 rounded-lg font-medium flex items-center justify-center ${
-                      p === pagination.page
-                        ? 'bg-primary-600 text-white'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
-                    }`}
-                    aria-label={`Page ${p}${p === pagination.page ? ', current page' : ''}`}
-                    aria-current={p === pagination.page ? 'page' : undefined}
-                  >
-                    {p}
-                  </a>
-                </div>
-              );
-            })}
-        </nav>
-      )}
-
-      {/* Subtle data source note */}
-      <p className="text-center text-xs text-stone-400 dark:text-gray-500 mt-8 mb-4">
-        Data sourced from CMS NPPES and community verifications.
-        <Link href="/disclaimer" className="underline hover:text-stone-600 dark:hover:text-gray-300 ml-1">
-          Learn more
-        </Link>
-      </p>
-    </div>
-  );
-}
 
 function SearchPageContent() {
   const [providers, setProviders] = useState<ProviderDisplay[]>([]);
@@ -265,30 +18,14 @@ function SearchPageContent() {
   const [hasSearched, setHasSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
 
-  // View mode
-  const [viewMode, setViewMode] = useState<'list' | 'map' | 'split'>('list');
-
-  // Mobile filter drawer state
-  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
-  const [activeFilterCount, setActiveFilterCount] = useState(0);
-  const drawerFormRef = useRef<SearchFormRef>(null);
-
-  // Recent searches
   const { recentSearches, removeSearch, clearAll: clearAllSearches, isHydrated } = useRecentSearches();
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Map data
-  const mapSpecialty = searchParams.get('specialty') || undefined;
-  const {
-    pins,
-    total: mapTotal,
-    clustered,
-    loading: mapLoading,
-    onBoundsChanged,
-  } = useMapProviders({
-    specialty: mapSpecialty,
+  const { pins, total: mapTotal, clustered, loading: mapLoading, onBoundsChanged } = useMapProviders({
+    specialty: searchParams.get('specialty') || undefined,
     enabled: viewMode === 'map' || viewMode === 'split',
   });
 
@@ -303,198 +40,51 @@ function SearchPageContent() {
     router.push(`/search?${urlParams.toString()}`);
   }, [router]);
 
-  const handleResultsChange = useCallback((
-    newProviders: ProviderDisplay[],
-    newPagination: PaginationState | null
-  ) => {
+  const handleResultsChange = useCallback((newProviders: ProviderDisplay[], newPagination: PaginationState | null) => {
     setProviders(newProviders);
     setPagination(newPagination);
     setHasSearched(newProviders.length > 0 || newPagination !== null);
     setError(null);
   }, []);
 
-  const handleApplyFilters = useCallback(() => {
-    drawerFormRef.current?.search();
-  }, []);
-
-  const handleClearFilters = useCallback(() => {
-    drawerFormRef.current?.clear();
-  }, []);
-
   return (
     <div className="py-8 md:py-12">
       <div className="container-wide">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-start justify-between gap-4 mb-4">
-            <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-stone-800 dark:text-white mb-2">
-                Find Healthcare Providers
-              </h1>
-              <p className="text-xl text-stone-600 dark:text-gray-300">
-                Search for providers by specialty, location, and more.
-              </p>
-            </div>
-            <Suspense fallback={null}>
-              <SaveProfileButton />
-            </Suspense>
-          </div>
-        </div>
-
-        {/* Insurance card hint banner */}
-        {searchParams.get('issuerName') && (
-          <div className="mb-6 flex items-center gap-3 px-4 py-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-            <ClipboardList className="w-5 h-5 text-blue-500 dark:text-blue-400 flex-shrink-0" />
-            <p className="text-sm text-blue-800 dark:text-blue-200">
-              Searching based on your{' '}
-              <strong>{searchParams.get('issuerName')}</strong>
-              {searchParams.get('planType') ? ` ${searchParams.get('planType')}` : ''} card
-              {searchParams.get('planName') ? ` — ${searchParams.get('planName')}` : ''}
-            </p>
-          </div>
-        )}
-
-        {/* Desktop Search Form - hidden on mobile */}
-        <div className="hidden md:block card mb-8">
-          <Suspense fallback={<div className="animate-pulse h-40 bg-gray-100 dark:bg-gray-700 rounded" />}>
-            <SearchForm
-              onResultsChange={handleResultsChange}
-              onFilterCountChange={setActiveFilterCount}
-              onLoadingChange={setIsLoading}
+        <SearchHeader />
+        <InsuranceCardBanner />
+        <SearchControls
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          onResultsChange={handleResultsChange}
+          onFilterCountChange={() => {}}
+          onLoadingChange={setIsLoading}
+        />
+        <SearchViewLayout
+          viewMode={viewMode}
+          isLoading={isLoading}
+          listContent={
+            <SearchResultsList
+              providers={providers}
+              pagination={pagination}
+              hasSearched={hasSearched}
+              error={error}
+              recentSearches={recentSearches}
+              isHydrated={isHydrated}
+              onRecentSearchSelect={handleRecentSearchSelect}
+              onRecentSearchRemove={removeSearch}
+              onRecentSearchClearAll={clearAllSearches}
             />
-          </Suspense>
-        </div>
-
-        {/* Mobile Filter Button + View Toggle */}
-        <div className="flex items-center justify-between gap-3 mb-4 md:mb-0">
-          <FilterButton
-            activeFilterCount={activeFilterCount}
-            onClick={() => setIsFilterDrawerOpen(true)}
-          />
-          <div className="hidden md:flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1 gap-1">
-            <button
-              onClick={() => setViewMode('list')}
-              className={`p-2 rounded-md transition-colors ${viewMode === 'list' ? 'bg-white dark:bg-gray-700 shadow-sm text-primary-600' : 'text-gray-500 hover:text-gray-700'}`}
-              aria-label="List view"
-              title="List view"
-            >
-              <List className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setViewMode('split')}
-              className={`p-2 rounded-md transition-colors ${viewMode === 'split' ? 'bg-white dark:bg-gray-700 shadow-sm text-primary-600' : 'text-gray-500 hover:text-gray-700'}`}
-              aria-label="Split view"
-              title="Split view"
-            >
-              <Columns2 className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setViewMode('map')}
-              className={`p-2 rounded-md transition-colors ${viewMode === 'map' ? 'bg-white dark:bg-gray-700 shadow-sm text-primary-600' : 'text-gray-500 hover:text-gray-700'}`}
-              aria-label="Map view"
-              title="Map view"
-            >
-              <Map className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile Filter Drawer */}
-        <FilterDrawer
-          isOpen={isFilterDrawerOpen}
-          onClose={() => setIsFilterDrawerOpen(false)}
-          onApply={handleApplyFilters}
-          onClear={handleClearFilters}
-          activeFilterCount={activeFilterCount}
-        >
-          <SearchForm
-            ref={drawerFormRef}
-            variant="drawer"
-            onResultsChange={handleResultsChange}
-            onFilterCountChange={setActiveFilterCount}
-            onLoadingChange={setIsLoading}
-          />
-        </FilterDrawer>
-
-        {/* Results */}
-        {viewMode === 'list' && (
-          <>
-            {isLoading ? (
-              <>
-                <div className="flex items-center justify-center gap-2 py-4 text-primary-600 dark:text-primary-400" aria-live="polite">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span className="text-sm font-medium animate-pulse">Searching providers&hellip;</span>
-                </div>
-                <SearchResultsSkeleton count={5} />
-              </>
-            ) : (
-              <Suspense fallback={<SearchResultsSkeleton count={5} />}>
-                <SearchResultsDisplay
-                  providers={providers}
-                  pagination={pagination}
-                  hasSearched={hasSearched}
-                  error={error}
-                  recentSearches={recentSearches}
-                  isHydrated={isHydrated}
-                  onRecentSearchSelect={handleRecentSearchSelect}
-                  onRecentSearchRemove={removeSearch}
-                  onRecentSearchClearAll={clearAllSearches}
-                />
-              </Suspense>
-            )}
-          </>
-        )}
-
-        {viewMode === 'map' && (
-          <div className="h-[calc(100vh-200px)] min-h-[500px] rounded-lg overflow-hidden">
-            <ProviderMap
+          }
+          mapContent={
+            <SearchMapView
               pins={pins}
+              total={mapTotal}
+              clustered={clustered}
               loading={mapLoading}
               onBoundsChanged={onBoundsChanged}
-              clustered={clustered}
-              total={mapTotal}
             />
-          </div>
-        )}
-
-        {viewMode === 'split' && (
-          <div className="flex gap-6 h-[calc(100vh-200px)] min-h-[500px]">
-            <div className="w-1/2 overflow-y-auto pr-2">
-              {isLoading ? (
-                <>
-                  <div className="flex items-center justify-center gap-2 py-4 text-primary-600 dark:text-primary-400" aria-live="polite">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span className="text-sm font-medium animate-pulse">Searching providers&hellip;</span>
-                  </div>
-                  <SearchResultsSkeleton count={5} />
-                </>
-              ) : (
-                <Suspense fallback={<SearchResultsSkeleton count={5} />}>
-                  <SearchResultsDisplay
-                    providers={providers}
-                    pagination={pagination}
-                    hasSearched={hasSearched}
-                    error={error}
-                    recentSearches={recentSearches}
-                    isHydrated={isHydrated}
-                    onRecentSearchSelect={handleRecentSearchSelect}
-                    onRecentSearchRemove={removeSearch}
-                    onRecentSearchClearAll={clearAllSearches}
-                  />
-                </Suspense>
-              )}
-            </div>
-            <div className="w-1/2 rounded-lg overflow-hidden sticky top-0">
-              <ProviderMap
-                pins={pins}
-                loading={mapLoading}
-                onBoundsChanged={onBoundsChanged}
-                clustered={clustered}
-                total={mapTotal}
-              />
-            </div>
-          </div>
-        )}
+          }
+        />
       </div>
     </div>
   );
