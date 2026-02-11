@@ -63,14 +63,14 @@ export async function getProvidersForMap(params: MapQueryParams): Promise<MapRes
 
   if (specialty) {
     providerWhere.OR = [
-      { primary_specialty: { contains: specialty, mode: 'insensitive' } },
-      { primary_taxonomy_code: { contains: specialty, mode: 'insensitive' } },
-      { specialty_category: { contains: specialty, mode: 'insensitive' } },
+      { primarySpecialty: { contains: specialty, mode: 'insensitive' } },
+      { primaryTaxonomyCode: { contains: specialty, mode: 'insensitive' } },
+      { specialtyCategory: { contains: specialty, mode: 'insensitive' } },
     ];
   }
 
   if (specialtyCategory) {
-    providerWhere.specialty_category = { contains: specialtyCategory, mode: 'insensitive' };
+    providerWhere.specialtyCategory = { contains: specialtyCategory, mode: 'insensitive' };
   }
 
   if (entityType) {
@@ -112,8 +112,8 @@ export async function getProvidersForMap(params: MapQueryParams): Promise<MapRes
           organizationName: true,
           entityType: true,
           credential: true,
-          primary_specialty: true,
-          specialty_category: true,
+          primarySpecialty: true,
+          specialtyCategory: true,
         },
       },
     },
@@ -154,7 +154,7 @@ export async function getProvidersForMap(params: MapQueryParams): Promise<MapRes
       return {
         npi: loc.npi,
         displayName,
-        specialty: provider.primary_specialty || provider.specialty_category || null,
+        specialty: provider.primarySpecialty || provider.specialtyCategory || null,
         entityType: mapEntityTypeToApi(provider.entityType),
         latitude: loc.latitude,
         longitude: loc.longitude,

@@ -40,9 +40,9 @@ function makeMockProvider(overrides: Record<string, any> = {}) {
     lastName: 'Smith',
     credential: 'MD',
     organizationName: null,
-    primary_specialty: 'Internal Medicine',
-    primary_taxonomy_code: '207R00000X',
-    specialty_category: 'Allopathic & Osteopathic Physicians',
+    primarySpecialty: 'Internal Medicine',
+    primaryTaxonomyCode: '207R00000X',
+    specialtyCategory: 'Allopathic & Osteopathic Physicians',
     practice_locations: [],
     ...overrides,
   };
@@ -121,7 +121,7 @@ describe('providerService', () => {
       // Should create OR condition across specialty fields
       expect(whereStr).toContain('Cardiology');
       // Check it searches multiple specialty-related fields
-      expect(whereStr).toContain('primary_specialty');
+      expect(whereStr).toContain('primarySpecialty');
     });
 
     // Test 5: Handles name search parsing "John Smith" into firstName/lastName

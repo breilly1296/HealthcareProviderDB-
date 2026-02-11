@@ -44,7 +44,7 @@ const providerBriefSelect = {
   lastName: true,
   organizationName: true,
   entityType: true,
-  primary_specialty: true,
+  primarySpecialty: true,
 } as const;
 
 const providerDetailSelect = {

@@ -134,16 +134,16 @@ function transformProvider(
     entityType?: string | null;
     firstName?: string | null;
     lastName?: string | null;
-    middle_name?: string | null;
-    name_prefix?: string | null;
-    name_suffix?: string | null;
+    middleName?: string | null;
+    namePrefix?: string | null;
+    nameSuffix?: string | null;
     credential?: string | null;
     organizationName?: string | null;
     gender?: string | null;
-    primary_taxonomy_code?: string | null;
-    primary_specialty?: string | null;
-    specialty_category?: string | null;
-    deactivation_date?: string | null;
+    primaryTaxonomyCode?: string | null;
+    primarySpecialty?: string | null;
+    specialtyCategory?: string | null;
+    deactivationDate?: string | null;
     enumerationDate?: string | null;
     nppes_last_synced?: Date | null;
   };
@@ -156,9 +156,9 @@ function transformProvider(
     entityType: mapEntityTypeToApi(provider.entityType),
     firstName: provider.firstName,
     lastName: provider.lastName,
-    middleName: provider.middle_name || null,
-    namePrefix: provider.name_prefix || null,
-    nameSuffix: provider.name_suffix || null,
+    middleName: provider.middleName || null,
+    namePrefix: provider.namePrefix || null,
+    nameSuffix: provider.nameSuffix || null,
     credential: provider.credential,
     organizationName: provider.organizationName,
     gender: provider.gender || null,
@@ -171,11 +171,11 @@ function transformProvider(
     phone: loc?.phone || null,
     fax: loc?.fax || null,
     // Specialty
-    taxonomyCode: provider.primary_taxonomy_code,
-    taxonomyDescription: provider.primary_specialty,
-    specialtyCategory: provider.specialty_category || null,
+    taxonomyCode: provider.primaryTaxonomyCode,
+    taxonomyDescription: provider.primarySpecialty,
+    specialtyCategory: provider.specialtyCategory || null,
     // Status
-    npiStatus: provider.deactivation_date ? 'DEACTIVATED' : 'ACTIVE',
+    npiStatus: provider.deactivationDate ? 'DEACTIVATED' : 'ACTIVE',
     displayName: getProviderDisplayName(provider),
     // Enrichment data from new tables
     cmsDetails: provider.provider_cms_details || null,

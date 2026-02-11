@@ -136,7 +136,7 @@ export async function findColocatedProviders(
           lastName: true,
           organizationName: true,
           entityType: true,
-          primary_specialty: true,
+          primarySpecialty: true,
         },
       },
     },

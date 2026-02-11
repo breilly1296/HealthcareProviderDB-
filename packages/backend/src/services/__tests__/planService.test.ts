@@ -206,8 +206,8 @@ describe('planService', () => {
         lastName: 'Smith',
         organizationName: null,
         entityType: '1',
-        primary_specialty: 'Internal Medicine',
-        primary_taxonomy_code: '207R00000X',
+        primarySpecialty: 'Internal Medicine',
+        primaryTaxonomyCode: '207R00000X',
         practice_locations: [
           {
             id: 100,

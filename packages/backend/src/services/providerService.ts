@@ -203,7 +203,7 @@ export const PROVIDER_INCLUDE = {
  *
  * Updated for new schema:
  * - Address/location filtering goes through practice_locations relation
- * - Specialty uses primary_specialty, primary_taxonomy_code, specialty_category
+ * - Specialty uses primarySpecialty, primaryTaxonomyCode, specialtyCategory
  * - Entity type maps INDIVIDUAL/ORGANIZATION to DB values '1'/'2'
  */
 export async function searchProviders(params: ProviderSearchParams): Promise<ProviderSearchResult> {
@@ -237,13 +237,13 @@ export async function searchProviders(params: ProviderSearchParams): Promise<Pro
     });
   }
 
-  // Specialty filter - searches primary_specialty, primary_taxonomy_code, and specialty_category
+  // Specialty filter - searches primarySpecialty, primaryTaxonomyCode, and specialtyCategory
   if (specialty) {
     addAndCondition(where, {
       OR: [
-        { primary_specialty: { contains: specialty, mode: 'insensitive' } },
-        { primary_taxonomy_code: { contains: specialty, mode: 'insensitive' } },
-        { specialty_category: { contains: specialty, mode: 'insensitive' } },
+        { primarySpecialty: { contains: specialty, mode: 'insensitive' } },
+        { primaryTaxonomyCode: { contains: specialty, mode: 'insensitive' } },
+        { specialtyCategory: { contains: specialty, mode: 'insensitive' } },
       ]
     });
   }
@@ -251,7 +251,7 @@ export async function searchProviders(params: ProviderSearchParams): Promise<Pro
   // Specialty category filter (exact category match)
   if (specialtyCategory) {
     addAndCondition(where, {
-      specialty_category: { contains: specialtyCategory, mode: 'insensitive' },
+      specialtyCategory: { contains: specialtyCategory, mode: 'insensitive' },
     });
   }
 

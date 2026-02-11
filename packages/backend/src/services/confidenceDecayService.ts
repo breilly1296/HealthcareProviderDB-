@@ -81,7 +81,7 @@ export async function recalculateAllConfidenceScores(
         verificationCount: true,
         provider: {
           select: {
-            primary_specialty: true,
+            primarySpecialty: true,
           },
         },
       },
@@ -115,7 +115,7 @@ export async function recalculateAllConfidenceScores(
           verificationCount: record.verificationCount,
           upvotes,
           downvotes,
-          specialty: record.provider?.primary_specialty ?? null,
+          specialty: record.provider?.primarySpecialty ?? null,
         });
 
         const newScore = Math.round(result.score);
