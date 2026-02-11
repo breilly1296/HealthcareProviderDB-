@@ -45,6 +45,7 @@ model Provider {
   @@index([credential], map: "idx_providers_credential")
   @@index([gender], map: "idx_providers_gender")
   @@index([lastName], map: "idx_providers_last_name")
+  @@index([lastName, firstName], map: "idx_provider_name")
   @@index([primarySpecialty], map: "idx_providers_specialty")
   @@index([primaryTaxonomyCode], map: "idx_providers_taxonomy")
   @@map("providers")
@@ -83,7 +84,9 @@ model PracticeLocation {
 
   @@index([city], map: "idx_locations_city")
   @@index([npi], map: "idx_locations_npi")
+  @@index([npi, addressType], map: "idx_locations_npi_address_type")
   @@index([state], map: "idx_locations_state")
+  @@index([state, city], map: "idx_locations_state_city")
   @@index([zipCode], map: "idx_locations_zip")
   @@index([address_hash], map: "idx_locations_address_hash")
   @@index([latitude, longitude], map: "idx_locations_lat_lng")
@@ -191,6 +194,7 @@ model InsurancePlan {
   @@index([carrierId], map: "idx_insurance_plans_carrier_id")
   @@index([healthSystemId], map: "idx_insurance_plans_health_system_id")
   @@index([planVariant], map: "idx_insurance_plans_plan_variant")
+  @@index([state, carrier], map: "idx_insurance_plans_state_carrier")
   @@map("insurance_plans")
 }
 
@@ -218,6 +222,8 @@ model ProviderPlanAcceptance {
   @@index([expiresAt], map: "idx_ppa_expires_at")
   @@index([lastVerified], map: "idx_ppa_last_verified")
   @@index([locationId], map: "idx_ppa_location_id")
+  @@index([planId, acceptanceStatus], map: "idx_ppa_plan_status")
+  @@index([providerNpi, acceptanceStatus], map: "idx_ppa_npi_status")
   @@map("provider_plan_acceptance")
 }
 
