@@ -223,7 +223,7 @@ async function main() {
   // Build the WHERE clause for un-geocoded rows with valid address data
   const where = {
     latitude: null,
-    address_line1: { not: null },
+    addressLine1: { not: null },
     city: { not: null },
     state: { not: null },
     address_hash: { not: null },
@@ -231,19 +231,19 @@ async function main() {
   } as const;
 
   // Count total un-geocoded rows
-  const totalRows = await prisma.practice_locations.count({ where });
+  const totalRows = await prisma.practiceLocation.count({ where });
 
   // Get distinct address hashes
-  const distinctRows = await prisma.practice_locations.findMany({
+  const distinctRows = await prisma.practiceLocation.findMany({
     where,
     distinct: ['address_hash'],
     select: {
       address_hash: true,
-      address_line1: true,
-      address_line2: true,
+      addressLine1: true,
+      addressLine2: true,
       city: true,
       state: true,
-      zip_code: true,
+      zipCode: true,
     },
     ...(limit ? { take: limit } : {}),
   });
@@ -278,11 +278,11 @@ async function main() {
   for (let i = 0; i < distinctRows.length; i++) {
     const row = distinctRows[i];
     const address = buildAddress(
-      row.address_line1,
-      row.address_line2,
+      row.addressLine1,
+      row.addressLine2,
       row.city,
       row.state,
-      row.zip_code,
+      row.zipCode,
     );
 
     if (!address) {
@@ -294,7 +294,7 @@ async function main() {
 
     switch (outcome.status) {
       case 'ok': {
-        const updated = await prisma.practice_locations.updateMany({
+        const updated = await prisma.practiceLocation.updateMany({
           where: { address_hash: row.address_hash },
           data: {
             latitude: outcome.result.latitude,

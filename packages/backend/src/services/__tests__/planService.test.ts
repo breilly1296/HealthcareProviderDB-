@@ -2,7 +2,7 @@ jest.mock('../../lib/prisma', () => ({
   __esModule: true,
   default: {
     provider: { findMany: jest.fn(), findUnique: jest.fn(), count: jest.fn() },
-    practice_locations: { findMany: jest.fn() },
+    practiceLocation: { findMany: jest.fn() },
     insurancePlan: { findMany: jest.fn(), findUnique: jest.fn(), count: jest.fn() },
     providerPlanAcceptance: { findMany: jest.fn(), findFirst: jest.fn(), findUnique: jest.fn(), upsert: jest.fn(), count: jest.fn() },
     verificationLog: { create: jest.fn(), findMany: jest.fn(), findUnique: jest.fn(), count: jest.fn(), deleteMany: jest.fn() },
@@ -208,23 +208,23 @@ describe('planService', () => {
         entityType: '1',
         primarySpecialty: 'Internal Medicine',
         primaryTaxonomyCode: '207R00000X',
-        practice_locations: [
+        practiceLocations: [
           {
             id: 100,
-            address_type: 'practice',
+            addressType: 'practice',
             city: 'New York',
             state: 'NY',
-            zip_code: '10001',
+            zipCode: '10001',
             phone: '2125551234',
           },
         ],
       },
       location: {
         id: 100,
-        address_line1: '123 Main St',
+        addressLine1: '123 Main St',
         city: 'New York',
         state: 'NY',
-        zip_code: '10001',
+        zipCode: '10001',
         phone: '2125551234',
       },
     });

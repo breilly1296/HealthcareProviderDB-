@@ -31,13 +31,13 @@ model Provider {
   primarySpecialty          String?                    @map("primary_specialty") @db.VarChar(200)
   specialtyCategory        String?                    @map("specialty_category") @db.VarChar(100)
   nppesLastSynced          DateTime?                  @map("nppes_last_synced") @db.Timestamptz(6)
-  practice_locations       practice_locations[]
-  provider_cms_details     provider_cms_details?
-  provider_hospitals       provider_hospitals[]
-  provider_insurance       provider_insurance[]
-  provider_medicare        provider_medicare[]
+  practiceLocations        PracticeLocation[]
+  providerCmsDetails       ProviderCmsDetails?
+  providerHospitals        ProviderHospital[]
+  providerInsurance        ProviderInsurance[]
+  providerMedicare         ProviderMedicare[]
   providerPlanAcceptances  ProviderPlanAcceptance[]
-  provider_taxonomies      provider_taxonomies[]
+  providerTaxonomies       ProviderTaxonomy[]
   verificationLogs         VerificationLog[]
   dataQualityAudits        DataQualityAudit[]
 
@@ -50,26 +50,28 @@ model Provider {
   @@map("providers")
 }
 
-model hospitals {
+model Hospital {
   ccn             String  @id @db.VarChar(20)
-  hospital_name   String? @db.VarChar(200)
-  hospital_system String? @db.VarChar(100)
+  hospitalName    String? @map("hospital_name") @db.VarChar(200)
+  hospitalSystem  String? @map("hospital_system") @db.VarChar(100)
   address         String? @db.VarChar(200)
   city            String? @db.VarChar(100)
   state           String? @db.VarChar(2)
-  zip_code        String? @db.VarChar(10)
+  zipCode         String? @map("zip_code") @db.VarChar(10)
   phone           String? @db.VarChar(20)
+
+  @@map("hospitals")
 }
 
-model practice_locations {
+model PracticeLocation {
   id                      Int                      @id @default(autoincrement())
   npi                     String                   @db.VarChar(10)
-  address_type            String?                  @default("practice") @db.VarChar(10)
-  address_line1           String?                  @db.VarChar(200)
-  address_line2           String?                  @db.VarChar(200)
+  addressType             String?                  @default("practice") @map("address_type") @db.VarChar(10)
+  addressLine1            String?                  @map("address_line1") @db.VarChar(200)
+  addressLine2            String?                  @map("address_line2") @db.VarChar(200)
   city                    String?                  @db.VarChar(100)
   state                   String?                  @db.VarChar(2)
-  zip_code                String?                  @db.VarChar(10)
+  zipCode                 String?                  @map("zip_code") @db.VarChar(10)
   phone                   String?                  @db.VarChar(20)
   fax                     String?                  @db.VarChar(20)
   address_hash            String?                  @map("address_hash") @db.VarChar(64)
@@ -82,81 +84,90 @@ model practice_locations {
   @@index([city], map: "idx_locations_city")
   @@index([npi], map: "idx_locations_npi")
   @@index([state], map: "idx_locations_state")
-  @@index([zip_code], map: "idx_locations_zip")
+  @@index([zipCode], map: "idx_locations_zip")
   @@index([address_hash], map: "idx_locations_address_hash")
   @@index([latitude, longitude], map: "idx_locations_lat_lng")
   @@index([geocoded_at], map: "idx_locations_geocoded_at")
+  @@map("practice_locations")
 }
 
-model provider_cms_details {
+model ProviderCmsDetails {
   npi                 String   @id @db.VarChar(10)
-  group_practice_name String?  @db.VarChar(200)
-  medical_school      String?  @db.VarChar(200)
-  graduation_year     String?  @db.VarChar(4)
-  medicare_assignment String?  @db.VarChar(1)
+  groupPracticeName   String?  @map("group_practice_name") @db.VarChar(200)
+  medicalSchool       String?  @map("medical_school") @db.VarChar(200)
+  graduationYear      String?  @map("graduation_year") @db.VarChar(4)
+  medicareAssignment  String?  @map("medicare_assignment") @db.VarChar(1)
   telehealth          String?  @db.VarChar(1)
   source              String?  @default("cms_national") @db.VarChar(30)
   providers           Provider @relation(fields: [npi], references: [npi], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("provider_cms_details")
 }
 
-model provider_hospitals {
+model ProviderHospital {
   id              Int      @id @default(autoincrement())
   npi             String   @db.VarChar(10)
-  hospital_system String?  @db.VarChar(100)
-  hospital_name   String?  @db.VarChar(200)
+  hospitalSystem  String?  @map("hospital_system") @db.VarChar(100)
+  hospitalName    String?  @map("hospital_name") @db.VarChar(200)
   ccn             String?  @db.VarChar(20)
   source          String?  @db.VarChar(30)
   confidence      String?  @default("MEDIUM") @db.VarChar(10)
   providers       Provider @relation(fields: [npi], references: [npi], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([npi], map: "idx_hospitals_npi")
-  @@index([hospital_system], map: "idx_hospitals_system")
+  @@index([hospitalSystem], map: "idx_hospitals_system")
+  @@map("provider_hospitals")
 }
 
-model provider_insurance {
+model ProviderInsurance {
   id            Int      @id @default(autoincrement())
   npi           String   @db.VarChar(10)
-  network_name  String?  @db.VarChar(200)
-  identifier_id String?  @db.VarChar(100)
+  networkName   String?  @map("network_name") @db.VarChar(200)
+  identifierId  String?  @map("identifier_id") @db.VarChar(100)
   source        String?  @default("npi_other_id") @db.VarChar(30)
   confidence    String?  @default("MEDIUM") @db.VarChar(10)
   providers     Provider @relation(fields: [npi], references: [npi], onDelete: NoAction, onUpdate: NoAction)
 
-  @@index([network_name], map: "idx_insurance_network")
+  @@index([networkName], map: "idx_insurance_network")
   @@index([npi], map: "idx_insurance_npi")
+  @@map("provider_insurance")
 }
 
-model provider_medicare {
+model ProviderMedicare {
   id             Int      @id @default(autoincrement())
   npi            String   @db.VarChar(10)
-  medicare_id    String?  @db.VarChar(20)
-  medicare_state String?  @db.VarChar(2)
+  medicareId     String?  @map("medicare_id") @db.VarChar(20)
+  medicareState  String?  @map("medicare_state") @db.VarChar(2)
   source         String?  @default("npi_other_id") @db.VarChar(30)
   providers      Provider @relation(fields: [npi], references: [npi], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([npi], map: "idx_medicare_npi")
+  @@map("provider_medicare")
 }
 
-model provider_taxonomies {
+model ProviderTaxonomy {
   id            Int      @id @default(autoincrement())
   npi           String   @db.VarChar(10)
-  taxonomy_code String?  @db.VarChar(20)
-  is_primary    String?  @db.VarChar(1)
-  slot_number   Int?
+  taxonomyCode  String?  @map("taxonomy_code") @db.VarChar(20)
+  isPrimary     String?  @map("is_primary") @db.VarChar(1)
+  slotNumber    Int?     @map("slot_number")
   providers     Provider @relation(fields: [npi], references: [npi], onDelete: NoAction, onUpdate: NoAction)
 
-  @@index([taxonomy_code], map: "idx_taxonomies_code")
+  @@index([taxonomyCode], map: "idx_taxonomies_code")
   @@index([npi], map: "idx_taxonomies_npi")
+  @@map("provider_taxonomies")
 }
 
-model taxonomy_reference {
-  taxonomy_code     String  @id @db.VarChar(20)
-  display_name      String? @db.VarChar(200)
-  grouping_name     String? @db.VarChar(200)
-  classification    String? @db.VarChar(200)
-  specialization    String? @db.VarChar(200)
-  standardized_name String? @db.VarChar(200)
-  provider_count    Int?
+model TaxonomyReference {
+  taxonomyCode     String  @id @map("taxonomy_code") @db.VarChar(20)
+  displayName      String? @map("display_name") @db.VarChar(200)
+  groupingName     String? @map("grouping_name") @db.VarChar(200)
+  classification   String? @db.VarChar(200)
+  specialization   String? @db.VarChar(200)
+  standardizedName String? @map("standardized_name") @db.VarChar(200)
+  providerCount    Int?    @map("provider_count")
+
+  @@map("taxonomy_reference")
 }
 
 model InsurancePlan {
@@ -197,7 +208,7 @@ model ProviderPlanAcceptance {
   expiresAt          DateTime?          @map("expires_at") @db.Timestamptz(6)
   provider           Provider?          @relation(fields: [providerNpi], references: [npi], onUpdate: NoAction)
   insurancePlan      InsurancePlan?     @relation(fields: [planId], references: [planId], onUpdate: NoAction)
-  location           practice_locations? @relation(fields: [locationId], references: [id], onUpdate: NoAction)
+  location           PracticeLocation?  @relation(fields: [locationId], references: [id], onUpdate: NoAction)
 
   // Unique constraints managed via raw SQL partial indexes:
   // idx_ppa_npi_plan_location: UNIQUE(npi, plan_id, location_id) WHERE location_id IS NOT NULL

@@ -2,7 +2,7 @@ jest.mock('../../lib/prisma', () => ({
   __esModule: true,
   default: {
     provider: { findMany: jest.fn(), findUnique: jest.fn(), count: jest.fn() },
-    practice_locations: { findMany: jest.fn() },
+    practiceLocation: { findMany: jest.fn() },
     insurancePlan: { findMany: jest.fn(), findUnique: jest.fn(), count: jest.fn() },
     providerPlanAcceptance: {
       findMany: jest.fn(),

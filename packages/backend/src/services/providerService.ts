@@ -176,22 +176,22 @@ export interface ProviderSearchResult {
  * Standard include for enriched provider data
  */
 export const PROVIDER_INCLUDE = {
-  practice_locations: true,
-  provider_taxonomies: true,
-  provider_cms_details: true,
-  provider_hospitals: true,
-  provider_insurance: true,
-  provider_medicare: true,
+  practiceLocations: true,
+  providerTaxonomies: true,
+  providerCmsDetails: true,
+  providerHospitals: true,
+  providerInsurance: true,
+  providerMedicare: true,
   providerPlanAcceptances: {
     include: {
       insurancePlan: true,
       location: {
         select: {
           id: true,
-          address_line1: true,
+          addressLine1: true,
           city: true,
           state: true,
-          zip_code: true,
+          zipCode: true,
         },
       },
     },
@@ -202,7 +202,7 @@ export const PROVIDER_INCLUDE = {
  * Search providers with filters and pagination
  *
  * Updated for new schema:
- * - Address/location filtering goes through practice_locations relation
+ * - Address/location filtering goes through practiceLocations relation
  * - Specialty uses primarySpecialty, primaryTaxonomyCode, specialtyCategory
  * - Entity type maps INDIVIDUAL/ORGANIZATION to DB values '1'/'2'
  */
@@ -220,18 +220,18 @@ export async function searchProviders(params: ProviderSearchParams): Promise<Pro
     where.entityType = mapEntityTypeToDb(entityType);
   }
 
-  // Location-based filters go through practice_locations relation
+  // Location-based filters go through practiceLocations relation
   if (state || city || cities || zipCode) {
-    const locationFilters: Prisma.practice_locationsWhereInput[] = [];
+    const locationFilters: Prisma.PracticeLocationWhereInput[] = [];
 
     if (state) locationFilters.push({ state: state.toUpperCase() });
-    if (zipCode) locationFilters.push({ zip_code: { startsWith: zipCode } });
+    if (zipCode) locationFilters.push({ zipCode: { startsWith: zipCode } });
 
     const cityFilter = buildCityFilter(cities, city);
     if (cityFilter) locationFilters.push(cityFilter);
 
     addAndCondition(where, {
-      practice_locations: {
+      practiceLocations: {
         some: locationFilters.length === 1 ? locationFilters[0] : { AND: locationFilters },
       },
     });
@@ -296,10 +296,10 @@ export async function getProviderByNpi(npi: string) {
 
 /**
  * Get unique cities for a state (sorted alphabetically)
- * Now queries practice_locations table instead of providers
+ * Now queries practiceLocations table instead of providers
  */
 export async function getCitiesByState(state: string): Promise<string[]> {
-  const result = await prisma.practice_locations.findMany({
+  const result = await prisma.practiceLocation.findMany({
     where: {
       state: state.toUpperCase(),
     },
@@ -368,12 +368,12 @@ export function getProviderDisplayName(provider: {
  */
 export function getPrimaryLocation(
   locations?: Array<{
-    address_type?: string | null;
-    address_line1?: string | null;
-    address_line2?: string | null;
+    addressType?: string | null;
+    addressLine1?: string | null;
+    addressLine2?: string | null;
     city?: string | null;
     state?: string | null;
-    zip_code?: string | null;
+    zipCode?: string | null;
     phone?: string | null;
     fax?: string | null;
   }>,
@@ -396,7 +396,7 @@ export function getPrimaryLocation(
           l.state?.toUpperCase() === stateUpper &&
           l.city != null &&
           citiesLower.includes(l.city.toLowerCase()) &&
-          l.address_type === 'practice',
+          l.addressType === 'practice',
       );
       if (exactMatch) return exactMatch;
 
@@ -412,7 +412,7 @@ export function getPrimaryLocation(
 
     // 3. state + practice type
     const statePractice = locations.find(
-      l => l.state?.toUpperCase() === stateUpper && l.address_type === 'practice',
+      l => l.state?.toUpperCase() === stateUpper && l.addressType === 'practice',
     );
     if (statePractice) return statePractice;
 
@@ -422,5 +422,5 @@ export function getPrimaryLocation(
   }
 
   // 5 & 6. Original fallback
-  return locations.find(l => l.address_type === 'practice') || locations[0];
+  return locations.find(l => l.addressType === 'practice') || locations[0];
 }

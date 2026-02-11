@@ -42,7 +42,7 @@ interface MapResponse {
  * Get providers within a geographic bounding box for map display.
  *
  * Strategy:
- * 1. Query practice_locations within the bounding box that have lat/lng
+ * 1. Query practiceLocations within the bounding box that have lat/lng
  * 2. Join to providers for name/specialty data
  * 3. Deduplicate by address_hash so overlapping providers show as one pin
  *    (the frontend will handle showing multiple providers at one location)
@@ -51,11 +51,11 @@ interface MapResponse {
 export async function getProvidersForMap(params: MapQueryParams): Promise<MapResponse> {
   const { north, south, east, west, specialty, specialtyCategory, entityType, limit } = params;
 
-  // Build where clause for practice_locations
-  const locationWhere: Prisma.practice_locationsWhereInput = {
+  // Build where clause for practiceLocations
+  const locationWhere: Prisma.PracticeLocationWhereInput = {
     latitude: { gte: south, lte: north },
     longitude: { gte: west, lte: east },
-    address_type: 'practice',
+    addressType: 'practice',
   };
 
   // Build provider-level filters
@@ -83,13 +83,13 @@ export async function getProvidersForMap(params: MapQueryParams): Promise<MapRes
   }
 
   // Count total matching locations (for "clustered" flag)
-  const total = await prisma.practice_locations.count({ where: locationWhere });
+  const total = await prisma.practiceLocation.count({ where: locationWhere });
   const clustered = total > limit;
 
   // Fetch locations with provider data
   // Use distinct on address_hash to deduplicate co-located providers
   // Each pin represents a unique physical address
-  const locations = await prisma.practice_locations.findMany({
+  const locations = await prisma.practiceLocation.findMany({
     where: locationWhere,
     distinct: ['address_hash'],
     take: limit,
@@ -97,10 +97,10 @@ export async function getProvidersForMap(params: MapQueryParams): Promise<MapRes
     select: {
       latitude: true,
       longitude: true,
-      address_line1: true,
+      addressLine1: true,
       city: true,
       state: true,
-      zip_code: true,
+      zipCode: true,
       phone: true,
       address_hash: true,
       npi: true,
@@ -125,7 +125,7 @@ export async function getProvidersForMap(params: MapQueryParams): Promise<MapRes
     .filter((h): h is string => h !== null);
 
   const counts = addressHashes.length > 0
-    ? await prisma.practice_locations.groupBy({
+    ? await prisma.practiceLocation.groupBy({
         by: ['address_hash'],
         where: {
           address_hash: { in: addressHashes },
@@ -158,10 +158,10 @@ export async function getProvidersForMap(params: MapQueryParams): Promise<MapRes
         entityType: mapEntityTypeToApi(provider.entityType),
         latitude: loc.latitude,
         longitude: loc.longitude,
-        addressLine1: loc.address_line1,
+        addressLine1: loc.addressLine1,
         city: loc.city,
         state: loc.state,
-        zipCode: loc.zip_code,
+        zipCode: loc.zipCode,
         phone: loc.phone,
         addressHash: loc.address_hash,
         providerCount: countMap.get(loc.address_hash ?? '') ?? 1,

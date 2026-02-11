@@ -1,8 +1,8 @@
 /**
  * Location Enrichment Service
  *
- * Enriches practice_locations with hospital/health-system data from provider_hospitals.
- * No writes to practice_locations — enrichment data is returned for API responses.
+ * Enriches practiceLocations with hospital/health-system data from providerHospitals.
+ * No writes to practiceLocations — enrichment data is returned for API responses.
  */
 
 import prisma from '../lib/prisma';
@@ -14,12 +14,12 @@ import prisma from '../lib/prisma';
 const locationSelect = {
   id: true,
   npi: true,
-  address_type: true,
-  address_line1: true,
-  address_line2: true,
+  addressType: true,
+  addressLine1: true,
+  addressLine2: true,
   city: true,
   state: true,
-  zip_code: true,
+  zipCode: true,
   phone: true,
   fax: true,
 } as const;
@@ -31,11 +31,11 @@ const locationSelect = {
 /**
  * Enrich a single practice_location with hospital affiliation data.
  *
- * Looks up the provider's NPI from the location, then checks provider_hospitals
- * for hospital_system and hospital_name. Returns enrichment data (does not write).
+ * Looks up the provider's NPI from the location, then checks providerHospitals
+ * for hospitalSystem and hospitalName. Returns enrichment data (does not write).
  */
 export async function enrichLocationWithHospitalData(locationId: number) {
-  const location = await prisma.practice_locations.findUnique({
+  const location = await prisma.practiceLocation.findUnique({
     where: { id: locationId },
     select: { ...locationSelect, providers: { select: { npi: true } } },
   });
@@ -44,11 +44,11 @@ export async function enrichLocationWithHospitalData(locationId: number) {
     return null;
   }
 
-  const hospitals = await prisma.provider_hospitals.findMany({
+  const hospitals = await prisma.providerHospital.findMany({
     where: { npi: location.npi },
     select: {
-      hospital_name: true,
-      hospital_system: true,
+      hospitalName: true,
+      hospitalSystem: true,
       ccn: true,
       confidence: true,
     },
@@ -61,7 +61,7 @@ export async function enrichLocationWithHospitalData(locationId: number) {
 }
 
 /**
- * Get enrichment statistics across practice_locations and provider_hospitals.
+ * Get enrichment statistics across practiceLocations and providerHospitals.
  */
 export async function getEnrichmentStats() {
   const [
@@ -70,19 +70,19 @@ export async function getEnrichmentStats() {
     distinctHospitalSystems,
     locationsByState,
   ] = await Promise.all([
-    prisma.practice_locations.count(),
+    prisma.practiceLocation.count(),
 
-    prisma.provider_hospitals.groupBy({
+    prisma.providerHospital.groupBy({
       by: ['npi'],
       _count: true,
     }),
 
-    prisma.provider_hospitals.groupBy({
-      by: ['hospital_system'],
-      where: { hospital_system: { not: null } },
+    prisma.providerHospital.groupBy({
+      by: ['hospitalSystem'],
+      where: { hospitalSystem: { not: null } },
     }),
 
-    prisma.practice_locations.groupBy({
+    prisma.practiceLocation.groupBy({
       by: ['state'],
       _count: { id: true },
       orderBy: { _count: { id: 'desc' } },
@@ -92,7 +92,7 @@ export async function getEnrichmentStats() {
   // Count distinct NPIs that have locations but no hospital affiliations
   const npisWithHospitals = new Set(totalProvidersWithHospitals.map((r) => r.npi));
 
-  const allLocationNpis = await prisma.practice_locations.groupBy({
+  const allLocationNpis = await prisma.practiceLocation.groupBy({
     by: ['npi'],
   });
   const npisWithoutHospitals = allLocationNpis.filter(
@@ -120,12 +120,12 @@ export async function findColocatedProviders(
   state: string,
   zipCode: string
 ) {
-  const locations = await prisma.practice_locations.findMany({
+  const locations = await prisma.practiceLocation.findMany({
     where: {
-      address_line1: { equals: addressLine1, mode: 'insensitive' },
+      addressLine1: { equals: addressLine1, mode: 'insensitive' },
       city: { equals: city, mode: 'insensitive' },
       state: { equals: state, mode: 'insensitive' },
-      zip_code: zipCode,
+      zipCode: zipCode,
     },
     select: {
       ...locationSelect,
@@ -146,24 +146,24 @@ export async function findColocatedProviders(
     locationId: loc.id,
     npi: loc.npi,
     address: {
-      addressLine1: loc.address_line1,
+      addressLine1: loc.addressLine1,
       city: loc.city,
       state: loc.state,
-      zipCode: loc.zip_code,
+      zipCode: loc.zipCode,
     },
     provider: loc.providers,
   }));
 }
 
 /**
- * Get the health system name for a provider via provider_hospitals.
- * Returns the first hospital_system found, or null.
+ * Get the health system name for a provider via providerHospitals.
+ * Returns the first hospitalSystem found, or null.
  */
 export async function getLocationHealthSystem(npi: string): Promise<string | null> {
-  const hospital = await prisma.provider_hospitals.findFirst({
-    where: { npi, hospital_system: { not: null } },
-    select: { hospital_system: true },
+  const hospital = await prisma.providerHospital.findFirst({
+    where: { npi, hospitalSystem: { not: null } },
+    select: { hospitalSystem: true },
   });
 
-  return hospital?.hospital_system ?? null;
+  return hospital?.hospitalSystem ?? null;
 }

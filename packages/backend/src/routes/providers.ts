@@ -52,7 +52,7 @@ const mapQuerySchema = z.object({
 
 /**
  * Transform a provider record from DB shape to API response shape.
- * Pulls address from practice_locations, maps field names for frontend compatibility.
+ * Pulls address from practiceLocations, maps field names for frontend compatibility.
  *
  * When `options.preferredState` is provided the displayed address will prefer
  * a practice_location matching that state (and optionally cities), so search
@@ -63,47 +63,47 @@ function transformProvider(
   options?: { preferredState?: string; preferredCities?: string[] },
 ) {
   const provider = p as typeof p & {
-    practice_locations?: Array<{
+    practiceLocations?: Array<{
       id: number;
-      address_type?: string | null;
-      address_line1?: string | null;
-      address_line2?: string | null;
+      addressType?: string | null;
+      addressLine1?: string | null;
+      addressLine2?: string | null;
       city?: string | null;
       state?: string | null;
-      zip_code?: string | null;
+      zipCode?: string | null;
       phone?: string | null;
       fax?: string | null;
     }>;
-    provider_cms_details?: {
-      group_practice_name?: string | null;
-      medical_school?: string | null;
-      graduation_year?: string | null;
-      medicare_assignment?: string | null;
+    providerCmsDetails?: {
+      groupPracticeName?: string | null;
+      medicalSchool?: string | null;
+      graduationYear?: string | null;
+      medicareAssignment?: string | null;
       telehealth?: string | null;
     } | null;
-    provider_hospitals?: Array<{
+    providerHospitals?: Array<{
       id: number;
-      hospital_system?: string | null;
-      hospital_name?: string | null;
+      hospitalSystem?: string | null;
+      hospitalName?: string | null;
       ccn?: string | null;
       confidence?: string | null;
     }>;
-    provider_insurance?: Array<{
+    providerInsurance?: Array<{
       id: number;
-      network_name?: string | null;
-      identifier_id?: string | null;
+      networkName?: string | null;
+      identifierId?: string | null;
       confidence?: string | null;
     }>;
-    provider_medicare?: Array<{
+    providerMedicare?: Array<{
       id: number;
-      medicare_id?: string | null;
-      medicare_state?: string | null;
+      medicareId?: string | null;
+      medicareState?: string | null;
     }>;
-    provider_taxonomies?: Array<{
+    providerTaxonomies?: Array<{
       id: number;
-      taxonomy_code?: string | null;
-      is_primary?: string | null;
-      slot_number?: number | null;
+      taxonomyCode?: string | null;
+      isPrimary?: string | null;
+      slotNumber?: number | null;
     }>;
     providerPlanAcceptances?: Array<{
       id: number;
@@ -124,10 +124,10 @@ function transformProvider(
       } | null;
       location?: {
         id: number;
-        address_line1?: string | null;
+        addressLine1?: string | null;
         city?: string | null;
         state?: string | null;
-        zip_code?: string | null;
+        zipCode?: string | null;
       } | null;
     }>;
     npi: string;
@@ -148,7 +148,7 @@ function transformProvider(
     nppes_last_synced?: Date | null;
   };
 
-  const loc = getPrimaryLocation(provider.practice_locations, options);
+  const loc = getPrimaryLocation(provider.practiceLocations, options);
 
   return {
     id: provider.npi,
@@ -163,11 +163,11 @@ function transformProvider(
     organizationName: provider.organizationName,
     gender: provider.gender || null,
     // Address from primary practice location
-    addressLine1: loc?.address_line1 || null,
-    addressLine2: loc?.address_line2 || null,
+    addressLine1: loc?.addressLine1 || null,
+    addressLine2: loc?.addressLine2 || null,
     city: loc?.city || null,
     state: loc?.state || null,
-    zip: loc?.zip_code || null,
+    zip: loc?.zipCode || null,
     phone: loc?.phone || null,
     fax: loc?.fax || null,
     // Specialty
@@ -178,13 +178,13 @@ function transformProvider(
     npiStatus: provider.deactivationDate ? 'DEACTIVATED' : 'ACTIVE',
     displayName: getProviderDisplayName(provider),
     // Enrichment data from new tables
-    cmsDetails: provider.provider_cms_details || null,
-    hospitals: provider.provider_hospitals || [],
-    insuranceNetworks: provider.provider_insurance || [],
-    medicareIds: provider.provider_medicare || [],
-    taxonomies: provider.provider_taxonomies || [],
-    locations: provider.practice_locations || [],
-    locationCount: provider.practice_locations?.length ?? 0,
+    cmsDetails: provider.providerCmsDetails || null,
+    hospitals: provider.providerHospitals || [],
+    insuranceNetworks: provider.providerInsurance || [],
+    medicareIds: provider.providerMedicare || [],
+    taxonomies: provider.providerTaxonomies || [],
+    locations: provider.practiceLocations || [],
+    locationCount: provider.practiceLocations?.length ?? 0,
     nppesLastSynced: provider.nppes_last_synced || null,
     // Plan acceptances with location data
     planAcceptances: (provider.providerPlanAcceptances || []).map(pa => ({
@@ -206,10 +206,10 @@ function transformProvider(
       } : null,
       location: pa.location ? {
         id: pa.location.id,
-        addressLine1: pa.location.address_line1,
+        addressLine1: pa.location.addressLine1,
         city: pa.location.city,
         state: pa.location.state,
-        zipCode: pa.location.zip_code,
+        zipCode: pa.location.zipCode,
       } : null,
     })),
   };
@@ -337,24 +337,24 @@ router.get(
       throw AppError.notFound(`Provider with NPI ${npi} not found`);
     }
 
-    const primaryLoc = getPrimaryLocation(provider.practice_locations);
+    const primaryLoc = getPrimaryLocation(provider.practiceLocations);
     const emptyResponse = {
       location: null,
       providers: [],
       pagination: buildPaginationMeta(0, page, limit),
     };
 
-    if (!primaryLoc?.address_line1) {
+    if (!primaryLoc?.addressLine1) {
       sendSuccess(res, emptyResponse);
       return;
     }
 
     const [colocatedResult, healthSystem] = await Promise.all([
       getColocatedNpis(
-        primaryLoc.address_line1,
+        primaryLoc.addressLine1,
         primaryLoc.city ?? null,
         primaryLoc.state ?? null,
-        primaryLoc.zip_code ?? null,
+        primaryLoc.zipCode ?? null,
         npi,
         { page, limit }
       ),
@@ -371,11 +371,11 @@ router.get(
 
     const location = {
       id: 0,
-      addressLine1: primaryLoc.address_line1,
-      addressLine2: primaryLoc.address_line2 || null,
+      addressLine1: primaryLoc.addressLine1,
+      addressLine2: primaryLoc.addressLine2 || null,
       city: primaryLoc.city || '',
       state: primaryLoc.state || '',
-      zipCode: primaryLoc.zip_code || '',
+      zipCode: primaryLoc.zipCode || '',
       name: null,
       healthSystem,
       facilityType: null,
@@ -464,10 +464,10 @@ router.get(
         } : null,
         location: enriched.location ? {
           id: enriched.location.id,
-          addressLine1: enriched.location.address_line1,
+          addressLine1: enriched.location.addressLine1,
           city: enriched.location.city,
           state: enriched.location.state,
-          zipCode: enriched.location.zip_code,
+          zipCode: enriched.location.zipCode,
         } : null,
         confidence: enriched.confidence,
       };

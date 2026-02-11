@@ -6,7 +6,7 @@ jest.mock('../../lib/prisma', () => ({
   __esModule: true,
   default: {
     provider: { findMany: jest.fn(), findUnique: jest.fn(), count: jest.fn() },
-    practice_locations: { findMany: jest.fn() },
+    practiceLocation: { findMany: jest.fn() },
     providerPlanAcceptance: { findMany: jest.fn(), count: jest.fn() },
     $transaction: jest.fn((fn: any) => fn()),
   },
@@ -108,24 +108,24 @@ function makeMockProvider(overrides: Record<string, any> = {}) {
     deactivationDate: null,
     enumerationDate: '2005-01-01',
     nppes_last_synced: new Date(),
-    practice_locations: [
+    practiceLocations: [
       {
         id: 1,
-        address_type: 'practice',
-        address_line1: '100 Main St',
-        address_line2: null,
+        addressType: 'practice',
+        addressLine1: '100 Main St',
+        addressLine2: null,
         city: 'New York',
         state: 'NY',
-        zip_code: '10001',
+        zipCode: '10001',
         phone: '212-555-0100',
         fax: null,
       },
     ],
-    provider_cms_details: null,
-    provider_hospitals: [],
-    provider_insurance: [],
-    provider_medicare: [],
-    provider_taxonomies: [],
+    providerCmsDetails: null,
+    providerHospitals: [],
+    providerInsurance: [],
+    providerMedicare: [],
+    providerTaxonomies: [],
     providerPlanAcceptances: [],
     ...overrides,
   };
@@ -264,7 +264,7 @@ describe('Providers Routes', () => {
   // ==========================================================================
   describe('GET /api/v1/providers/cities', () => {
     it('returns cities for a given state', async () => {
-      (mockPrisma.practice_locations.findMany as jest.Mock).mockResolvedValue([
+      (mockPrisma.practiceLocation.findMany as jest.Mock).mockResolvedValue([
         { city: 'NEW YORK' },
         { city: 'BROOKLYN' },
         { city: 'ALBANY' },
@@ -362,7 +362,7 @@ describe('Providers Routes', () => {
     });
 
     it('returns empty results when provider has no location', async () => {
-      const provider = makeMockProvider({ practice_locations: [] });
+      const provider = makeMockProvider({ practiceLocations: [] });
       (mockPrisma.provider.findUnique as jest.Mock).mockResolvedValue(provider);
 
       const res = await request(app).get('/api/v1/providers/1234567890/colocated');

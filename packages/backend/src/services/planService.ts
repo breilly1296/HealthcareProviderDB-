@@ -321,8 +321,8 @@ export async function getProvidersForPlan(
             entityType: true,
             primarySpecialty: true,
             primaryTaxonomyCode: true,
-            practice_locations: {
-              where: { address_type: 'practice' },
+            practiceLocations: {
+              where: { addressType: 'practice' },
               take: 1,
             },
           },
@@ -330,10 +330,10 @@ export async function getProvidersForPlan(
         location: {
           select: {
             id: true,
-            address_line1: true,
+            addressLine1: true,
             city: true,
             state: true,
-            zip_code: true,
+            zipCode: true,
             phone: true,
           },
         },
@@ -346,7 +346,7 @@ export async function getProvidersForPlan(
     .filter(a => a.provider)
     .map(a => {
       const prov = a.provider!;
-      const loc = prov.practice_locations?.[0];
+      const loc = prov.practiceLocations?.[0];
       return {
         npi: prov.npi,
         firstName: prov.firstName,

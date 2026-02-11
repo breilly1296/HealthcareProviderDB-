@@ -2,7 +2,7 @@ jest.mock('../../lib/prisma', () => ({
   __esModule: true,
   default: {
     provider: { findMany: jest.fn(), findUnique: jest.fn(), count: jest.fn() },
-    practice_locations: { findMany: jest.fn() },
+    practiceLocation: { findMany: jest.fn() },
     insurancePlan: { findMany: jest.fn(), findUnique: jest.fn(), count: jest.fn() },
     providerPlanAcceptance: { findMany: jest.fn(), findFirst: jest.fn(), upsert: jest.fn(), count: jest.fn() },
     verificationLog: { create: jest.fn(), findMany: jest.fn(), findUnique: jest.fn(), count: jest.fn(), deleteMany: jest.fn() },
@@ -43,7 +43,7 @@ function makeMockProvider(overrides: Record<string, any> = {}) {
     primarySpecialty: 'Internal Medicine',
     primaryTaxonomyCode: '207R00000X',
     specialtyCategory: 'Allopathic & Osteopathic Physicians',
-    practice_locations: [],
+    practiceLocations: [],
     ...overrides,
   };
 }
@@ -76,8 +76,8 @@ describe('providerService', () => {
       );
     });
 
-    // Test 2: Filters by state through practice_locations relation
-    it('filters by state through practice_locations relation', async () => {
+    // Test 2: Filters by state through practiceLocations relation
+    it('filters by state through practiceLocations relation', async () => {
       (mockPrisma.provider.findMany as jest.Mock).mockResolvedValue([]);
       (mockPrisma.provider.count as jest.Mock).mockResolvedValue(0);
 
@@ -86,9 +86,9 @@ describe('providerService', () => {
       const callArgs = (mockPrisma.provider.findMany as jest.Mock).mock.calls[0][0];
       const where = callArgs.where;
 
-      // The where clause should include a practice_locations.some filter with state
+      // The where clause should include a practiceLocations.some filter with state
       const whereStr = JSON.stringify(where);
-      expect(whereStr).toContain('practice_locations');
+      expect(whereStr).toContain('practiceLocations');
       expect(whereStr).toContain('NY');
     });
 
@@ -102,7 +102,7 @@ describe('providerService', () => {
       const callArgs = (mockPrisma.provider.findMany as jest.Mock).mock.calls[0][0];
       const whereStr = JSON.stringify(callArgs.where);
 
-      expect(whereStr).toContain('practice_locations');
+      expect(whereStr).toContain('practiceLocations');
       expect(whereStr).toContain('Brooklyn');
       // Should be case-insensitive (insensitive mode)
       expect(whereStr.toLowerCase()).toContain('insensitive');
@@ -219,7 +219,7 @@ describe('providerService', () => {
     it('returns provider with all includes for valid NPI', async () => {
       const provider = makeMockProvider({
         npi: '1234567890',
-        practice_locations: [{ id: 1, state: 'NY', city: 'New York' }],
+        practiceLocations: [{ id: 1, state: 'NY', city: 'New York' }],
       });
       (mockPrisma.provider.findUnique as jest.Mock).mockResolvedValue(provider);
 
@@ -318,22 +318,22 @@ describe('providerService', () => {
     });
 
     // Test 19: Prefers practice address type
-    it('prefers location with address_type "practice"', () => {
+    it('prefers location with addressType "practice"', () => {
       const mailingLocation = {
         id: 1,
-        address_type: 'mailing',
-        address_1: '100 Main St',
+        addressType: 'mailing',
+        addressLine1: '100 Main St',
         city: 'Albany',
         state: 'NY',
-        zip: '12201',
+        zipCode: '12201',
       };
       const practiceLocation = {
         id: 2,
-        address_type: 'practice',
-        address_1: '200 Oak Ave',
+        addressType: 'practice',
+        addressLine1: '200 Oak Ave',
         city: 'New York',
         state: 'NY',
-        zip: '10001',
+        zipCode: '10001',
       };
 
       const result = getPrimaryLocation([mailingLocation, practiceLocation] as any);
@@ -345,19 +345,19 @@ describe('providerService', () => {
     it('falls back to first location when no practice address type exists', () => {
       const firstLocation = {
         id: 1,
-        address_type: 'mailing',
-        address_1: '100 Main St',
+        addressType: 'mailing',
+        addressLine1: '100 Main St',
         city: 'Albany',
         state: 'NY',
-        zip: '12201',
+        zipCode: '12201',
       };
       const secondLocation = {
         id: 2,
-        address_type: 'mailing',
-        address_1: '200 Oak Ave',
+        addressType: 'mailing',
+        addressLine1: '200 Oak Ave',
         city: 'Buffalo',
         state: 'NY',
-        zip: '14201',
+        zipCode: '14201',
       };
 
       const result = getPrimaryLocation([firstLocation, secondLocation] as any);
