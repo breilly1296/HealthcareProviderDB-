@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
+import { queryClient } from '../lib/queryClient';
 import type { CityData } from '../types';
 
 // ============================================================================
@@ -85,14 +86,11 @@ function reorderCitiesWithPinned(cities: CityData[], state: string): CityData[] 
   const pinnedList = PINNED_CITIES[stateKey] || [];
 
   if (pinnedList.length === 0) {
-    // No pinned cities for this state, return alphabetically sorted
     return [...cities].sort((a, b) => a.city.localeCompare(b.city));
   }
 
-  // Create a set of city names for quick lookup
   const citySet = new Set(cities.map(c => c.city));
 
-  // Get pinned cities that exist in the fetched list
   const pinnedCities: CityData[] = [];
   for (const cityName of pinnedList) {
     if (citySet.has(cityName)) {
@@ -100,7 +98,6 @@ function reorderCitiesWithPinned(cities: CityData[], state: string): CityData[] 
     }
   }
 
-  // Get remaining cities (not in pinned list), sorted alphabetically
   const pinnedSet = new Set(pinnedList);
   const remainingCities = cities
     .filter(c => !pinnedSet.has(c.city))
@@ -117,7 +114,6 @@ function injectNycAllBoroughsOption(cities: CityData[], state: string): CityData
     return cities;
   }
 
-  // Check if all 5 NYC boroughs exist in the city list
   const cityNames = new Set(cities.map(c => c.city));
   const hasAllBoroughs = NYC_BOROUGHS.every(borough => cityNames.has(borough));
 
@@ -125,24 +121,32 @@ function injectNycAllBoroughsOption(cities: CityData[], state: string): CityData
     return cities;
   }
 
-  // Inject the special option at position 0
   return [{ city: NYC_ALL_BOROUGHS_VALUE, state }, ...cities];
 }
 
 // ============================================================================
-// Cache Configuration
+// Query Key Factory
 // ============================================================================
 
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+export const cityKeys = {
+  all: ['cities'] as const,
+  list: (state?: string) => [...cityKeys.all, state?.toUpperCase() || ''] as const,
+};
 
-interface CacheEntry {
-  cities: CityData[];
-  timestamp: number;
+// ============================================================================
+// Query Function
+// ============================================================================
+
+async function fetchCities(state: string): Promise<CityData[]> {
+  const response = await api.providers.getCities(state);
+  const rawCities: CityData[] = response.cities.map((city) => ({
+    city,
+    state,
+  }));
+
+  const reorderedCities = reorderCitiesWithPinned(rawCities, state);
+  return injectNycAllBoroughsOption(reorderedCities, state);
 }
-
-// Module-level cache and pending requests tracker
-const citiesCache = new Map<string, CacheEntry>();
-const pendingRequests = new Map<string, Promise<CityData[]>>();
 
 // ============================================================================
 // Cache Utilities
@@ -152,7 +156,7 @@ const pendingRequests = new Map<string, Promise<CityData[]>>();
  * Clear all cached cities data
  */
 export function clearCitiesCache(): void {
-  citiesCache.clear();
+  queryClient.invalidateQueries({ queryKey: cityKeys.all });
 }
 
 /**
@@ -160,51 +164,10 @@ export function clearCitiesCache(): void {
  */
 export async function prefetchCities(state: string): Promise<CityData[]> {
   if (!state) return [];
-
-  const cacheKey = state.toUpperCase();
-
-  // Check cache first
-  const cached = citiesCache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-    return cached.cities;
-  }
-
-  // Check if request is already in flight
-  const pending = pendingRequests.get(cacheKey);
-  if (pending) {
-    return pending;
-  }
-
-  // Make the request
-  const requestPromise = (async () => {
-    try {
-      const response = await api.providers.getCities(state);
-      const rawCities: CityData[] = response.cities.map((city) => ({
-        city,
-        state,
-      }));
-
-      // Reorder with pinned cities first
-      const reorderedCities = reorderCitiesWithPinned(rawCities, state);
-
-      // Inject NYC All Boroughs option for NY state
-      const cities = injectNycAllBoroughsOption(reorderedCities, state);
-
-      // Cache the result
-      citiesCache.set(cacheKey, {
-        cities,
-        timestamp: Date.now(),
-      });
-
-      return cities;
-    } finally {
-      // Clean up pending request
-      pendingRequests.delete(cacheKey);
-    }
-  })();
-
-  pendingRequests.set(cacheKey, requestPromise);
-  return requestPromise;
+  return queryClient.fetchQuery({
+    queryKey: cityKeys.list(state),
+    queryFn: () => fetchCities(state),
+  });
 }
 
 // ============================================================================
@@ -219,120 +182,21 @@ interface UseCitiesResult {
 }
 
 export function useCities(state: string | undefined): UseCitiesResult {
-  const [cities, setCities] = useState<CityData[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+  const queryClient = useQueryClient();
 
-  // Track the current state to handle race conditions
-  const currentStateRef = useRef<string | undefined>(state);
-  currentStateRef.current = state;
-
-  const fetchCities = useCallback(async (forceRefresh = false) => {
-    const stateToFetch = currentStateRef.current;
-
-    if (!stateToFetch) {
-      setCities([]);
-      setError(null);
-      return;
-    }
-
-    const cacheKey = stateToFetch.toUpperCase();
-
-    // Check cache unless forcing refresh
-    if (!forceRefresh) {
-      const cached = citiesCache.get(cacheKey);
-      if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-        setCities(cached.cities);
-        setError(null);
-        return;
-      }
-    }
-
-    // Check if request is already in flight
-    const pending = pendingRequests.get(cacheKey);
-    if (pending) {
-      setIsLoading(true);
-      try {
-        const result = await pending;
-        // Only update if state hasn't changed
-        if (currentStateRef.current === stateToFetch) {
-          setCities(result);
-          setError(null);
-        }
-      } catch (err) {
-        if (currentStateRef.current === stateToFetch) {
-          setError(err instanceof Error ? err : new Error('Failed to fetch cities'));
-        }
-      } finally {
-        if (currentStateRef.current === stateToFetch) {
-          setIsLoading(false);
-        }
-      }
-      return;
-    }
-
-    // Make new request
-    setIsLoading(true);
-    setError(null);
-
-    const requestPromise = (async () => {
-      const response = await api.providers.getCities(stateToFetch);
-      const rawCities: CityData[] = response.cities.map((city) => ({
-        city,
-        state: stateToFetch,
-      }));
-
-      // Reorder with pinned cities first
-      const reorderedCities = reorderCitiesWithPinned(rawCities, stateToFetch);
-
-      // Inject NYC All Boroughs option for NY state
-      const cityData = injectNycAllBoroughsOption(reorderedCities, stateToFetch);
-
-      // Cache the result
-      citiesCache.set(cacheKey, {
-        cities: cityData,
-        timestamp: Date.now(),
-      });
-
-      return cityData;
-    })();
-
-    pendingRequests.set(cacheKey, requestPromise);
-
-    try {
-      const result = await requestPromise;
-      // Only update if state hasn't changed during request
-      if (currentStateRef.current === stateToFetch) {
-        setCities(result);
-        setError(null);
-      }
-    } catch (err) {
-      if (currentStateRef.current === stateToFetch) {
-        setError(err instanceof Error ? err : new Error('Failed to fetch cities'));
-        setCities([]);
-      }
-    } finally {
-      pendingRequests.delete(cacheKey);
-      if (currentStateRef.current === stateToFetch) {
-        setIsLoading(false);
-      }
-    }
-  }, []);
-
-  // Fetch when state changes
-  useEffect(() => {
-    fetchCities();
-  }, [state, fetchCities]);
-
-  const refetch = useCallback(async () => {
-    await fetchCities(true);
-  }, [fetchCities]);
+  const { data, isLoading, error } = useQuery<CityData[], Error>({
+    queryKey: cityKeys.list(state),
+    queryFn: () => fetchCities(state!),
+    enabled: !!state,
+  });
 
   return {
-    cities,
+    cities: data ?? [],
     isLoading,
-    error,
-    refetch,
+    error: error ?? null,
+    refetch: async () => {
+      await queryClient.invalidateQueries({ queryKey: cityKeys.list(state) });
+    },
   };
 }
 

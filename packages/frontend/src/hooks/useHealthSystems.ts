@@ -1,40 +1,39 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
+import { queryClient } from '../lib/queryClient';
 import type { HealthSystem } from '../types';
 
 // ============================================================================
-// Cache Configuration
+// Query Key Factory
 // ============================================================================
 
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+export const healthSystemKeys = {
+  all: ['healthSystems'] as const,
+  list: (state?: string, cities?: string[]) =>
+    [...healthSystemKeys.all, state?.toUpperCase() || '', cities?.slice().sort().join(',') || ''] as const,
+};
 
-interface CacheEntry {
-  healthSystems: HealthSystem[];
-  timestamp: number;
+// ============================================================================
+// Query Function
+// ============================================================================
+
+async function fetchHealthSystems(state: string, cities?: string[]): Promise<HealthSystem[]> {
+  const response = await api.locations.getHealthSystems(state, cities);
+  return response.healthSystems.map((name) => ({
+    name,
+    state,
+  }));
 }
-
-// Module-level cache and pending requests tracker
-const healthSystemsCache = new Map<string, CacheEntry>();
-const pendingRequests = new Map<string, Promise<HealthSystem[]>>();
 
 // ============================================================================
 // Cache Utilities
 // ============================================================================
 
 /**
- * Generate cache key from state and cities
- */
-function getCacheKey(state?: string, cities?: string[]): string {
-  const stateKey = state?.toUpperCase() || '';
-  const citiesKey = cities?.slice().sort().join(',') || '';
-  return `${stateKey}:${citiesKey}`;
-}
-
-/**
  * Clear all cached health systems data
  */
 export function clearHealthSystemsCache(): void {
-  healthSystemsCache.clear();
+  queryClient.invalidateQueries({ queryKey: healthSystemKeys.all });
 }
 
 /**
@@ -45,45 +44,10 @@ export async function prefetchHealthSystems(
   cities?: string[]
 ): Promise<HealthSystem[]> {
   if (!state) return [];
-
-  const cacheKey = getCacheKey(state, cities);
-
-  // Check cache first
-  const cached = healthSystemsCache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-    return cached.healthSystems;
-  }
-
-  // Check if request is already in flight
-  const pending = pendingRequests.get(cacheKey);
-  if (pending) {
-    return pending;
-  }
-
-  // Make the request
-  const requestPromise = (async () => {
-    try {
-      const response = await api.locations.getHealthSystems(state, cities);
-      const healthSystems: HealthSystem[] = response.healthSystems.map((name) => ({
-        name,
-        state,
-      }));
-
-      // Cache the result
-      healthSystemsCache.set(cacheKey, {
-        healthSystems,
-        timestamp: Date.now(),
-      });
-
-      return healthSystems;
-    } finally {
-      // Clean up pending request
-      pendingRequests.delete(cacheKey);
-    }
-  })();
-
-  pendingRequests.set(cacheKey, requestPromise);
-  return requestPromise;
+  return queryClient.fetchQuery({
+    queryKey: healthSystemKeys.list(state, cities),
+    queryFn: () => fetchHealthSystems(state, cities),
+  });
 }
 
 // ============================================================================
@@ -106,119 +70,21 @@ export function useHealthSystems(
   params: UseHealthSystemsParams
 ): UseHealthSystemsResult {
   const { state, cities } = params;
+  const queryClient = useQueryClient();
 
-  const [healthSystems, setHealthSystems] = useState<HealthSystem[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-
-  // Track current params to handle race conditions
-  const currentParamsRef = useRef<UseHealthSystemsParams>(params);
-  currentParamsRef.current = params;
-
-  // Stable cache key for dependency tracking
-  const cacheKey = getCacheKey(state, cities);
-
-  const fetchHealthSystems = useCallback(async (forceRefresh = false) => {
-    const currentState = currentParamsRef.current.state;
-    const currentCities = currentParamsRef.current.cities;
-
-    if (!currentState) {
-      setHealthSystems([]);
-      setError(null);
-      return;
-    }
-
-    const key = getCacheKey(currentState, currentCities);
-
-    // Check cache unless forcing refresh
-    if (!forceRefresh) {
-      const cached = healthSystemsCache.get(key);
-      if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-        setHealthSystems(cached.healthSystems);
-        setError(null);
-        return;
-      }
-    }
-
-    // Check if request is already in flight
-    const pending = pendingRequests.get(key);
-    if (pending) {
-      setIsLoading(true);
-      try {
-        const result = await pending;
-        // Only update if params haven't changed
-        if (getCacheKey(currentParamsRef.current.state, currentParamsRef.current.cities) === key) {
-          setHealthSystems(result);
-          setError(null);
-        }
-      } catch (err) {
-        if (getCacheKey(currentParamsRef.current.state, currentParamsRef.current.cities) === key) {
-          setError(err instanceof Error ? err : new Error('Failed to fetch health systems'));
-        }
-      } finally {
-        if (getCacheKey(currentParamsRef.current.state, currentParamsRef.current.cities) === key) {
-          setIsLoading(false);
-        }
-      }
-      return;
-    }
-
-    // Make new request
-    setIsLoading(true);
-    setError(null);
-
-    const requestPromise = (async () => {
-      const response = await api.locations.getHealthSystems(currentState, currentCities);
-      const systems: HealthSystem[] = response.healthSystems.map((name) => ({
-        name,
-        state: currentState,
-      }));
-
-      // Cache the result
-      healthSystemsCache.set(key, {
-        healthSystems: systems,
-        timestamp: Date.now(),
-      });
-
-      return systems;
-    })();
-
-    pendingRequests.set(key, requestPromise);
-
-    try {
-      const result = await requestPromise;
-      // Only update if params haven't changed during request
-      if (getCacheKey(currentParamsRef.current.state, currentParamsRef.current.cities) === key) {
-        setHealthSystems(result);
-        setError(null);
-      }
-    } catch (err) {
-      if (getCacheKey(currentParamsRef.current.state, currentParamsRef.current.cities) === key) {
-        setError(err instanceof Error ? err : new Error('Failed to fetch health systems'));
-        setHealthSystems([]);
-      }
-    } finally {
-      pendingRequests.delete(key);
-      if (getCacheKey(currentParamsRef.current.state, currentParamsRef.current.cities) === key) {
-        setIsLoading(false);
-      }
-    }
-  }, []);
-
-  // Fetch when params change
-  useEffect(() => {
-    fetchHealthSystems();
-  }, [cacheKey, fetchHealthSystems]);
-
-  const refetch = useCallback(async () => {
-    await fetchHealthSystems(true);
-  }, [fetchHealthSystems]);
+  const { data, isLoading, error } = useQuery<HealthSystem[], Error>({
+    queryKey: healthSystemKeys.list(state, cities),
+    queryFn: () => fetchHealthSystems(state!, cities),
+    enabled: !!state,
+  });
 
   return {
-    healthSystems,
+    healthSystems: data ?? [],
     isLoading,
-    error,
-    refetch,
+    error: error ?? null,
+    refetch: async () => {
+      await queryClient.invalidateQueries({ queryKey: healthSystemKeys.list(state, cities) });
+    },
   };
 }
 
