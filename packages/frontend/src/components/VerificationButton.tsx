@@ -4,6 +4,7 @@ import { useState, FormEvent, useEffect, useRef, useCallback } from 'react';
 import { verificationApi } from '@/lib/api';
 import { trackVerificationSubmit } from '@/lib/analytics';
 import { useCaptcha } from '@/hooks/useCaptcha';
+import { CheckCircle2, Check, X } from 'lucide-react';
 
 // Email validation regex (RFC 5322 simplified)
 const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
@@ -207,9 +208,7 @@ export function VerificationButton({
         onClick={handleOpen}
         className="btn-primary"
       >
-        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
+        <CheckCircle2 className="w-5 h-5 mr-2" />
         Verify Insurance
       </button>
 
@@ -240,9 +239,7 @@ export function VerificationButton({
                 className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
                 aria-label="Close modal"
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <X className="w-6 h-6" />
               </button>
 
               {step === 'form' && (
@@ -290,9 +287,7 @@ export function VerificationButton({
                               : 'border-gray-200 hover:border-gray-300'
                           }`}
                         >
-                          <svg className="w-5 h-5 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
+                          <Check className="w-5 h-5 mx-auto mb-1" />
                           Yes
                         </button>
                         <button
@@ -304,9 +299,7 @@ export function VerificationButton({
                               : 'border-gray-200 hover:border-gray-300'
                           }`}
                         >
-                          <svg className="w-5 h-5 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
+                          <X className="w-5 h-5 mx-auto mb-1" />
                           No
                         </button>
                       </div>
@@ -422,9 +415,7 @@ export function VerificationButton({
               {step === 'success' && (
                 <div className="text-center py-8">
                   <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
+                    <Check className="w-8 h-8 text-green-600" />
                   </div>
                   <h3 className="text-xl font-semibold text-gray-900 mb-2">
                     Thank You!
@@ -441,9 +432,7 @@ export function VerificationButton({
               {step === 'error' && (
                 <div className="text-center py-8">
                   <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
+                    <X className="w-8 h-8 text-red-600" />
                   </div>
                   <h3 className="text-xl font-semibold text-gray-900 mb-2">
                     Submission Failed

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { ArrowRight, ArrowDown } from 'lucide-react';
 
 const steps = [
   {
@@ -83,15 +84,11 @@ export function HowItWorksSection() {
                 <>
                   {/* Desktop: horizontal arrow */}
                   <div className="hidden md:flex items-center justify-center w-10 flex-shrink-0">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-stone-300 dark:text-gray-600" aria-hidden="true">
-                      <path d="M5 12h14m-4-4 4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
+                    <ArrowRight className="w-6 h-6 text-stone-300 dark:text-gray-600" aria-hidden="true" />
                   </div>
                   {/* Mobile: vertical arrow */}
                   <div className="flex md:hidden items-center justify-center h-8 flex-shrink-0">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-stone-300 dark:text-gray-600" aria-hidden="true">
-                      <path d="M12 5v14m-4-4 4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
+                    <ArrowDown className="w-6 h-6 text-stone-300 dark:text-gray-600" aria-hidden="true" />
                   </div>
                 </>
               )}

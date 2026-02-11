@@ -6,6 +6,7 @@ import { progressWidth } from '@/lib/utils';
 import { verificationApi } from '@/lib/api';
 import { useCaptcha } from '@/hooks/useCaptcha';
 import toast from 'react-hot-toast';
+import { CheckCircle2, Circle, FileText, Check, Info, Clock, AlertTriangle, CircleDollarSign, ChevronRight } from 'lucide-react';
 
 /**
  * Verification Form - Research-Backed Simplicity
@@ -139,14 +140,7 @@ export default function ProviderVerificationForm({
         className="ml-2 text-primary-600 hover:text-primary-700 focus:outline-none"
         aria-label="More information"
       >
-        <svg className="w-5 h-5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
+        <Info className="w-5 h-5 inline" />
       </button>
       {showTooltip === id && (
         <div className="absolute z-10 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-lg -top-2 left-8">
@@ -181,19 +175,7 @@ export default function ProviderVerificationForm({
       {/* Verification count progress */}
       <div className="mt-4 text-center">
         <div className="inline-flex items-center gap-2 bg-primary-50 text-primary-900 px-4 py-2 rounded-full border border-primary-200">
-          <svg
-            className="w-5 h-5 text-primary-600"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
+          <CheckCircle2 className="w-5 h-5 text-primary-600" />
           <span className="text-sm font-semibold">
             Verification {newVerificationTotal} of 3 needed for high confidence
           </span>
@@ -218,9 +200,7 @@ export default function ProviderVerificationForm({
       <div className="card max-w-2xl mx-auto">
         <div className="text-center mb-6">
           <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+            <CheckCircle2 className="w-8 h-8 text-primary-600" />
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Verify Provider Information</h2>
           <p className="text-gray-600 mb-4">
@@ -231,19 +211,7 @@ export default function ProviderVerificationForm({
         {/* Research Context Banner */}
         <div className="bg-primary-50 border border-primary-200 rounded-lg p-4 mb-6">
           <div className="flex items-start gap-3">
-            <svg
-              className="w-6 h-6 text-primary-600 flex-shrink-0 mt-0.5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
-            </svg>
+            <FileText className="w-6 h-6 text-primary-600 flex-shrink-0 mt-0.5" />
             <div>
               <h3 className="font-semibold text-primary-900 mb-1">
                 Your 2-minute verification helps prevent surprise bills
@@ -260,18 +228,10 @@ export default function ProviderVerificationForm({
           <div className="flex items-center gap-3 mb-3">
             <div className="flex gap-1">
               {[...Array(Math.min(3, newVerificationTotal))].map((_, i) => (
-                <svg key={i} className="w-8 h-8 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                  <path
-                    fillRule="evenodd"
-                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                    clipRule="evenodd"
-                  />
-                </svg>
+                <CheckCircle2 key={i} className="w-8 h-8 text-green-500" fill="currentColor" strokeWidth={0} />
               ))}
               {[...Array(Math.max(0, 3 - newVerificationTotal))].map((_, i) => (
-                <svg key={i} className="w-8 h-8 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
-                  <circle cx="10" cy="10" r="8" />
-                </svg>
+                <Circle key={i} className="w-8 h-8 text-gray-300" fill="currentColor" strokeWidth={0} />
               ))}
             </div>
             <div>
@@ -289,33 +249,14 @@ export default function ProviderVerificationForm({
 
         <div className="space-y-4 mb-6">
           <div className="flex items-start gap-3">
-            <svg
-              className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
+            <Check className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
             <div>
               <strong className="text-gray-900">4 simple yes/no questions</strong>
               <p className="text-sm text-gray-600">One question at a time, no typing required</p>
             </div>
           </div>
           <div className="flex items-start gap-3">
-            <svg
-              className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
+            <Clock className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
             <div>
               <strong className="text-gray-900">Under 2 minutes total</strong>
               <p className="text-sm text-gray-600">
@@ -324,19 +265,7 @@ export default function ProviderVerificationForm({
             </div>
           </div>
           <div className="flex items-start gap-3">
-            <svg
-              className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-              />
-            </svg>
+            <AlertTriangle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
             <div>
               <strong className="text-gray-900">Prevent surprise bills</strong>
               <p className="text-sm text-gray-600">
@@ -617,9 +546,7 @@ export default function ProviderVerificationForm({
     return (
       <div className="card max-w-2xl mx-auto text-center">
         <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-          <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
+          <Check className="w-10 h-10 text-green-600" />
         </div>
 
         <h2 className="text-3xl font-bold text-gray-900 mb-4">Thank You!</h2>
@@ -641,18 +568,10 @@ export default function ProviderVerificationForm({
         <div className="flex items-center justify-center gap-2 mb-4">
           <div className="flex gap-1">
             {[...Array(Math.min(3, newVerificationTotal))].map((_, i) => (
-              <svg key={i} className="w-8 h-8 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                <path
-                  fillRule="evenodd"
-                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                  clipRule="evenodd"
-                />
-              </svg>
+              <CheckCircle2 key={i} className="w-8 h-8 text-green-500" fill="currentColor" strokeWidth={0} />
             ))}
             {[...Array(Math.max(0, 3 - newVerificationTotal))].map((_, i) => (
-              <svg key={i} className="w-8 h-8 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
-                <circle cx="10" cy="10" r="8" />
-              </svg>
+              <Circle key={i} className="w-8 h-8 text-gray-300" fill="currentColor" strokeWidth={0} />
             ))}
           </div>
         </div>
@@ -660,9 +579,7 @@ export default function ProviderVerificationForm({
         {isExpertLevel ? (
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
             <div className="flex items-center justify-center gap-2 mb-2">
-              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
+              <Check className="w-6 h-6 text-green-600" />
               <p className="text-base font-bold text-green-900">High confidence achieved!</p>
             </div>
             <p className="text-sm text-green-800">
@@ -692,9 +609,7 @@ export default function ProviderVerificationForm({
           className="text-sm text-primary-600 hover:text-primary-700 inline-flex items-center gap-1"
         >
           Learn about our research methodology
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
+          <ChevronRight className="w-4 h-4" />
         </Link>
       </div>
     );
@@ -707,14 +622,7 @@ export default function ProviderVerificationForm({
     return (
       <div className="card max-w-2xl mx-auto text-center">
         <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-          <svg className="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
+          <Info className="w-10 h-10 text-blue-600" />
         </div>
 
         <h2 className="text-3xl font-bold text-gray-900 mb-4">Thank You!</h2>
@@ -759,14 +667,7 @@ export default function ProviderVerificationForm({
     return (
       <div className="card max-w-2xl mx-auto text-center">
         <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-          <svg className="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
+          <CircleDollarSign className="w-10 h-10 text-blue-600" />
         </div>
 
         <h2 className="text-3xl font-bold text-gray-900 mb-4">Thank You!</h2>

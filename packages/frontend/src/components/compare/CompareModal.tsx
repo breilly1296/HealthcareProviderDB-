@@ -5,6 +5,7 @@ import FocusTrap from 'focus-trap-react';
 import { useCompare, CompareProvider } from '@/hooks/useCompare';
 import { CONFIDENCE_THRESHOLDS } from '@/lib/constants';
 import { toDisplayCase, toAddressCase, toTitleCase } from '@/lib/formatName';
+import { ClipboardList, Building2, MapPin, CheckCircle2, ClipboardCheck, Users, Clock, Phone, X } from 'lucide-react';
 
 interface CompareModalProps {
   isOpen: boolean;
@@ -227,33 +228,20 @@ export function CompareModal({ isOpen, onClose }: CompareModalProps) {
   const comparisonRows = [
     {
       label: 'Specialty',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-        </svg>
-      ),
+      icon: <ClipboardList className="w-4 h-4" />,
       renderValue: (p: CompareProvider) => p.specialty || 'N/A',
       // Don't highlight specialty (usually same)
     },
     {
       label: 'Health System',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-        </svg>
-      ),
+      icon: <Building2 className="w-4 h-4" />,
       renderValue: (p: CompareProvider) => p.healthSystem || 'Not affiliated',
       getBestIndices: (providers: CompareProvider[]) =>
         getBestIndices(providers, (p) => p.healthSystem, 'hasValue'),
     },
     {
       label: 'Location',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-      ),
+      icon: <MapPin className="w-4 h-4" />,
       renderValue: (p: CompareProvider) => (
         <div className="text-sm">
           <div>{toAddressCase(p.address)}</div>
@@ -266,11 +254,7 @@ export function CompareModal({ isOpen, onClose }: CompareModalProps) {
     },
     {
       label: 'Confidence',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      ),
+      icon: <CheckCircle2 className="w-4 h-4" />,
       renderValue: (p: CompareProvider) => {
         const { bg, text, label } = getConfidenceColor(p.confidenceScore);
         return (
@@ -284,11 +268,7 @@ export function CompareModal({ isOpen, onClose }: CompareModalProps) {
     },
     {
       label: 'Status',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-        </svg>
-      ),
+      icon: <ClipboardCheck className="w-4 h-4" />,
       renderValue: (p: CompareProvider) => {
         const status = p.acceptanceStatus || 'UNKNOWN';
         const { bg, text } = getAcceptanceColor(status);
@@ -303,11 +283,7 @@ export function CompareModal({ isOpen, onClose }: CompareModalProps) {
     },
     {
       label: 'Verifications',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-        </svg>
-      ),
+      icon: <Users className="w-4 h-4" />,
       renderValue: (p: CompareProvider) => (
         <span>
           {p.verificationCount !== undefined ? `${p.verificationCount} user${p.verificationCount !== 1 ? 's' : ''}` : 'None'}
@@ -318,22 +294,14 @@ export function CompareModal({ isOpen, onClose }: CompareModalProps) {
     },
     {
       label: 'Last Verified',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      ),
+      icon: <Clock className="w-4 h-4" />,
       renderValue: (p: CompareProvider) => formatRelativeDate(p.lastVerified),
       getBestIndices: (providers: CompareProvider[]) =>
         getBestIndices(providers, (p) => p.lastVerified, 'mostRecent'),
     },
     {
       label: 'Phone',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-        </svg>
-      ),
+      icon: <Phone className="w-4 h-4" />,
       renderValue: (p: CompareProvider) =>
         p.phone ? (
           <a
@@ -393,9 +361,7 @@ export function CompareModal({ isOpen, onClose }: CompareModalProps) {
             "
             aria-label="Close comparison"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X className="w-5 h-5" />
           </button>
         </div>
 

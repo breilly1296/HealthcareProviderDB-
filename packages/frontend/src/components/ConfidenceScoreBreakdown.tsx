@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { progressWidth } from '@/lib/utils';
+import { FileText, Clock, Users, CheckCircle2, Check, AlertCircle, AlertTriangle, ChevronDown, BarChart3, Info } from 'lucide-react';
 
 // ============================================================================
 // Types
@@ -45,44 +46,28 @@ const FACTOR_CONFIG = [
     label: 'Data Source',
     maxPoints: 25,
     description: 'Quality of data source',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
-    ),
+    icon: <FileText className="w-4 h-4" />,
   },
   {
     key: 'recencyScore' as const,
     label: 'Recency',
     maxPoints: 30,
     description: 'How recently verified',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
+    icon: <Clock className="w-4 h-4" />,
   },
   {
     key: 'verificationScore' as const,
     label: 'Verifications',
     maxPoints: 25,
     description: 'Number of community verifications',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-      </svg>
-    ),
+    icon: <Users className="w-4 h-4" />,
   },
   {
     key: 'agreementScore' as const,
     label: 'Agreement',
     maxPoints: 20,
     description: 'Consensus among verifications',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
+    icon: <CheckCircle2 className="w-4 h-4" />,
   },
 ];
 
@@ -102,11 +87,7 @@ const LEVEL_STYLES: Record<ConfidenceLevelType, {
     progressBg: 'bg-green-100',
     progressFill: 'bg-green-500',
     label: 'Very High',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
+    icon: <CheckCircle2 className="w-5 h-5" />,
   },
   HIGH: {
     bg: 'bg-green-50',
@@ -115,11 +96,7 @@ const LEVEL_STYLES: Record<ConfidenceLevelType, {
     progressBg: 'bg-green-100',
     progressFill: 'bg-green-500',
     label: 'High',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-      </svg>
-    ),
+    icon: <Check className="w-5 h-5" />,
   },
   MEDIUM: {
     bg: 'bg-yellow-50',
@@ -128,11 +105,7 @@ const LEVEL_STYLES: Record<ConfidenceLevelType, {
     progressBg: 'bg-yellow-100',
     progressFill: 'bg-yellow-500',
     label: 'Medium',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01" />
-      </svg>
-    ),
+    icon: <AlertCircle className="w-5 h-5" />,
   },
   LOW: {
     bg: 'bg-orange-50',
@@ -141,11 +114,7 @@ const LEVEL_STYLES: Record<ConfidenceLevelType, {
     progressBg: 'bg-orange-100',
     progressFill: 'bg-orange-500',
     label: 'Low',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-      </svg>
-    ),
+    icon: <AlertTriangle className="w-5 h-5" />,
   },
   VERY_LOW: {
     bg: 'bg-red-50',
@@ -154,11 +123,7 @@ const LEVEL_STYLES: Record<ConfidenceLevelType, {
     progressBg: 'bg-red-100',
     progressFill: 'bg-red-500',
     label: 'Very Low',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
+    icon: <AlertCircle className="w-5 h-5" />,
   },
 };
 
@@ -267,14 +232,7 @@ export function ConfidenceScoreBreakdown({
             <span className="text-gray-600 ml-2">({Math.round(score)}%)</span>
           </div>
         </div>
-        <svg
-          className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
+        <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
       </button>
 
       {/* Expandable Content */}
@@ -288,9 +246,7 @@ export function ConfidenceScoreBreakdown({
           {/* Staleness Warning */}
           {metadata?.isStale && (
             <div className="mt-4 flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-              <svg className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
+              <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-medium text-amber-800">Data may be stale</p>
                 <p className="text-xs text-amber-700 mt-0.5">
@@ -304,9 +260,7 @@ export function ConfidenceScoreBreakdown({
           {/* Score Factors */}
           <div className="mt-4 space-y-4">
             <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
+              <BarChart3 className="w-4 h-4" />
               Score Breakdown
             </h4>
 
@@ -334,9 +288,7 @@ export function ConfidenceScoreBreakdown({
           {metadata?.researchNote && (
             <div className="pt-3 border-t border-gray-200/50">
               <div className="flex items-start gap-2 text-sm">
-                <svg className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <Info className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
                 <p className="text-gray-600 italic">
                   {metadata.researchNote}
                 </p>
@@ -400,15 +352,13 @@ export function ConfidenceScoreBadge({
     <>
       <span className="flex-shrink-0">
         {size === 'sm' ? (
-          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            {level === 'VERY_HIGH' || level === 'HIGH' ? (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            ) : level === 'MEDIUM' ? (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01" />
-            ) : (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            )}
-          </svg>
+          level === 'VERY_HIGH' || level === 'HIGH' ? (
+            <Check className="w-3 h-3" />
+          ) : level === 'MEDIUM' ? (
+            <AlertCircle className="w-3 h-3" />
+          ) : (
+            <AlertTriangle className="w-3 h-3" />
+          )
         ) : (
           style.icon
         )}
@@ -535,9 +485,7 @@ export function ConfidenceScoreTooltip({
           {/* Staleness Warning */}
           {metadata?.isStale && (
             <div className="mb-3 flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 px-2 py-1 rounded">
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01" />
-              </svg>
+              <AlertCircle className="w-3 h-3" />
               Data may be stale ({metadata.daysSinceVerification} days old)
             </div>
           )}

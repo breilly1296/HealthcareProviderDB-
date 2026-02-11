@@ -9,6 +9,7 @@ import {
 } from '@/components/ConfidenceScoreBreakdown';
 import { VerificationButton } from '@/components/VerificationButton';
 import FreshnessWarning from '@/components/FreshnessWarning';
+import { Search, X, ChevronRight } from 'lucide-react';
 
 interface ProviderPlansSectionProps {
   provider: ProviderDisplay;
@@ -93,19 +94,7 @@ export function ProviderPlansSection({ provider, planAcceptances }: ProviderPlan
       {acceptedPlans.length > 5 && (
         <div className="mb-6">
           <div className="relative">
-            <svg
-              className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
             <input
               type="text"
               placeholder="Search plans or carriers..."
@@ -118,9 +107,7 @@ export function ProviderPlansSection({ provider, planAcceptances }: ProviderPlan
                 onClick={() => setPlanSearchQuery('')}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <X className="w-5 h-5" />
               </button>
             )}
           </div>
@@ -140,14 +127,7 @@ export function ProviderPlansSection({ provider, planAcceptances }: ProviderPlan
                     className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left"
                   >
                     <div className="flex items-center gap-3">
-                      <svg
-                        className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
+                      <ChevronRight className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                       <span className="font-semibold text-gray-900 dark:text-white">{carrier}</span>
                     </div>
                     <span className="text-sm text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded-full">
