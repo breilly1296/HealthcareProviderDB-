@@ -76,7 +76,7 @@ export function Disclaimer({ variant = 'banner', showLearnMore = true, className
     return (
       <div className={`bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 ${className}`}>
         <div className="flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+          <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" aria-hidden="true" />
           <div className="flex-1">
             <p className="text-sm text-amber-800 dark:text-amber-200">
               <strong>Data Accuracy Notice:</strong> This information is crowdsourced and may be inaccurate or outdated.
@@ -102,7 +102,7 @@ export function Disclaimer({ variant = 'banner', showLearnMore = true, className
       <div className="container-wide py-2">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <ShieldCheck className="w-4 h-4 text-blue-500 dark:text-blue-400 flex-shrink-0" />
+            <ShieldCheck className="w-4 h-4 text-blue-500 dark:text-blue-400 flex-shrink-0" aria-hidden="true" />
             <p className="text-xs sm:text-sm text-stone-600 dark:text-gray-300 truncate">
               Data sourced from CMS NPPES and verified by real patients. Always confirm with your provider.
             </p>
@@ -120,7 +120,7 @@ export function Disclaimer({ variant = 'banner', showLearnMore = true, className
             className="p-1 rounded hover:bg-stone-200/50 dark:hover:bg-gray-700/50 transition-colors flex-shrink-0"
             aria-label="Dismiss disclaimer"
           >
-            <X className="w-4 h-4 text-stone-400 dark:text-gray-500" />
+            <X className="w-4 h-4 text-stone-400 dark:text-gray-500" aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -134,7 +134,7 @@ export function Disclaimer({ variant = 'banner', showLearnMore = true, className
 export function DisclaimerCompact({ className = '' }: { className?: string }) {
   return (
     <p className={`text-xs text-stone-500 dark:text-gray-400 ${className}`}>
-      <Info className="w-3 h-3 inline-block mr-1 -mt-0.5" />
+      <Info className="w-3 h-3 inline-block mr-1 -mt-0.5" aria-hidden="true" />
       Verify with provider before scheduling.{' '}
       <Link href="/disclaimer" className="underline hover:text-stone-700 dark:hover:text-gray-300">
         Learn more

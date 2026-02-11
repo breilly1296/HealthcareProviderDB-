@@ -29,6 +29,11 @@ function FactorRow({ label, value, max }: FactorRowProps) {
         <div
           className="h-full bg-[#137fec] rounded-full transition-all duration-500"
           style={{ width: `${percentage}%` }}
+          role="progressbar"
+          aria-valuenow={value}
+          aria-valuemin={0}
+          aria-valuemax={max}
+          aria-label={`${label}: ${value} of ${max} points`}
         />
       </div>
       <span className="w-16 text-sm font-medium text-stone-800 dark:text-white text-right">
@@ -74,6 +79,11 @@ export function ScoreBreakdown({ breakdown }: ScoreBreakdownProps) {
             <div
               className="h-full bg-gradient-to-r from-[#137fec] to-[#0d5bb5] rounded-full transition-all duration-500"
               style={{ width: `${totalPercentage}%` }}
+              role="progressbar"
+              aria-valuenow={total}
+              aria-valuemin={0}
+              aria-valuemax={maxTotal}
+              aria-label={`Total score: ${total} of ${maxTotal} points`}
             />
           </div>
           <span className="w-20 text-sm font-bold text-stone-800 dark:text-white text-right">

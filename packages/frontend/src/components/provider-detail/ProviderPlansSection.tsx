@@ -94,10 +94,11 @@ export function ProviderPlansSection({ provider, planAcceptances }: ProviderPlan
       {acceptedPlans.length > 5 && (
         <div className="mb-6">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" aria-hidden="true" />
             <input
               type="text"
               placeholder="Search plans or carriers..."
+              aria-label="Search plans or carriers"
               value={planSearchQuery}
               onChange={(e) => setPlanSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
@@ -105,9 +106,10 @@ export function ProviderPlansSection({ provider, planAcceptances }: ProviderPlan
             {planSearchQuery && (
               <button
                 onClick={() => setPlanSearchQuery('')}
+                aria-label="Clear search"
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
               >
-                <X className="w-5 h-5" />
+                <X className="w-5 h-5" aria-hidden="true" />
               </button>
             )}
           </div>
@@ -124,10 +126,11 @@ export function ProviderPlansSection({ provider, planAcceptances }: ProviderPlan
                   {/* Carrier Header */}
                   <button
                     onClick={() => toggleCarrier(carrier)}
+                    aria-expanded={isExpanded}
                     className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left"
                   >
                     <div className="flex items-center gap-3">
-                      <ChevronRight className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                      <ChevronRight className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} aria-hidden="true" />
                       <span className="font-semibold text-gray-900 dark:text-white">{carrier}</span>
                     </div>
                     <span className="text-sm text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded-full">

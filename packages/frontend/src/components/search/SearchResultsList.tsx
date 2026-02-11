@@ -69,21 +69,25 @@ export function SearchResultsList({
 
   if (error) {
     return (
-      <ErrorMessage
-        variant="server"
-        message={error}
-        action={onRetry ? { label: 'Try Again', onClick: onRetry } : undefined}
-      />
+      <div aria-live="polite">
+        <ErrorMessage
+          variant="server"
+          message={error}
+          action={onRetry ? { label: 'Try Again', onClick: onRetry } : undefined}
+        />
+      </div>
     );
   }
 
   if (hasSearched && providers.length === 0) {
     return (
-      <EmptyState
-        type="no-results"
-        suggestions={getNoResultsSuggestions()}
-        onSuggestionClick={handleSuggestionClick}
-      />
+      <div aria-live="polite">
+        <EmptyState
+          type="no-results"
+          suggestions={getNoResultsSuggestions()}
+          onSuggestionClick={handleSuggestionClick}
+        />
+      </div>
     );
   }
 

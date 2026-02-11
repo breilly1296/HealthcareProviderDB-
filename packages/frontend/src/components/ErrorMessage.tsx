@@ -64,12 +64,12 @@ export default function ErrorMessage({
   const displayMessage = message || config.defaultMessage;
 
   return (
-    <div className={`text-center py-12 ${className}`}>
-      <div className={`w-16 h-16 ${config.bgColor} rounded-full flex items-center justify-center mx-auto mb-4`}>
+    <div role="alert" className={`text-center py-12 ${className}`}>
+      <div className={`w-16 h-16 ${config.bgColor} dark:bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-4`}>
         {config.icon}
       </div>
-      <h2 className="text-xl font-semibold text-gray-900 mb-2">{displayTitle}</h2>
-      <p className="text-gray-600 mb-6 max-w-md mx-auto">{displayMessage}</p>
+      <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">{displayTitle}</h2>
+      <p className="text-gray-600 dark:text-gray-300 mb-6 max-w-md mx-auto">{displayMessage}</p>
 
       {children}
 
@@ -90,9 +90,9 @@ interface InlineErrorProps {
 
 export function InlineError({ message, className = '' }: InlineErrorProps) {
   return (
-    <div className={`flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg ${className}`}>
-      <InfoIcon className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-      <p className="text-sm text-red-800 flex-1">{message}</p>
+    <div role="alert" className={`flex items-start gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg ${className}`}>
+      <InfoIcon className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+      <p className="text-sm text-red-800 dark:text-red-200 flex-1">{message}</p>
     </div>
   );
 }

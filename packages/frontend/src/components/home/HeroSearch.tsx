@@ -92,6 +92,7 @@ export function HeroSearch() {
               value={searchText}
               onChange={e => setSearchText(e.target.value)}
               placeholder="Specialty, condition, or doctor name"
+              aria-label="Specialty, condition, or doctor name"
               className="w-full pl-10 pr-4 py-3 md:py-4 text-base bg-stone-50 dark:bg-gray-700 border border-stone-200 dark:border-gray-600 rounded-lg text-stone-800 dark:text-gray-100 placeholder-stone-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
           </div>
@@ -101,6 +102,7 @@ export function HeroSearch() {
             <select
               value={state}
               onChange={e => setState(e.target.value)}
+              aria-label="State"
               className="w-full px-4 py-3 md:py-4 text-base bg-stone-50 dark:bg-gray-700 border border-stone-200 dark:border-gray-600 rounded-lg text-stone-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent appearance-none cursor-pointer"
               required
             >
@@ -116,6 +118,7 @@ export function HeroSearch() {
             <select
               value={insurancePlanId}
               onChange={e => setInsurancePlanId(e.target.value)}
+              aria-label="Insurance plan"
               className="w-full px-4 py-3 md:py-4 text-base bg-stone-50 dark:bg-gray-700 border border-stone-200 dark:border-gray-600 rounded-lg text-stone-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent appearance-none cursor-pointer"
               disabled={insuranceLoading}
             >

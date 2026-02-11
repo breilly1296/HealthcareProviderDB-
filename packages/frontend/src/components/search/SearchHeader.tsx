@@ -39,7 +39,7 @@ export function ViewModeToggle({ viewMode, onViewModeChange }: ViewModeTogglePro
   ];
 
   return (
-    <div className="hidden md:flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1 gap-1">
+    <div role="group" aria-label="View mode" className="hidden md:flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1 gap-1">
       {modes.map(({ mode, label, Icon }) => (
         <button
           key={mode}

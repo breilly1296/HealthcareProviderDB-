@@ -44,7 +44,7 @@ export function AboutProvider({
         {/* Accepting New Patients */}
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-lg bg-stone-100 dark:bg-gray-700 flex items-center justify-center flex-shrink-0">
-            <User className="w-5 h-5 text-stone-500 dark:text-gray-400" />
+            <User className="w-5 h-5 text-stone-500 dark:text-gray-400" aria-hidden="true" />
           </div>
           <div>
             <p className="text-sm text-stone-500 dark:text-gray-400">New Patients</p>
@@ -56,7 +56,7 @@ export function AboutProvider({
         {entityType && (
           <div className="flex items-start gap-3">
             <div className="w-10 h-10 rounded-lg bg-stone-100 dark:bg-gray-700 flex items-center justify-center flex-shrink-0">
-              <Building2 className="w-5 h-5 text-stone-500 dark:text-gray-400" />
+              <Building2 className="w-5 h-5 text-stone-500 dark:text-gray-400" aria-hidden="true" />
             </div>
             <div>
               <p className="text-sm text-stone-500 dark:text-gray-400">Practice Type</p>
@@ -69,7 +69,7 @@ export function AboutProvider({
         {languages && languages.length > 0 && (
           <div className="flex items-start gap-3">
             <div className="w-10 h-10 rounded-lg bg-stone-100 dark:bg-gray-700 flex items-center justify-center flex-shrink-0">
-              <Globe className="w-5 h-5 text-stone-500 dark:text-gray-400" />
+              <Globe className="w-5 h-5 text-stone-500 dark:text-gray-400" aria-hidden="true" />
             </div>
             <div>
               <p className="text-sm text-stone-500 dark:text-gray-400">Languages</p>

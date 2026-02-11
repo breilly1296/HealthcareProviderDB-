@@ -100,14 +100,14 @@ export function ColocatedProviders({ npi }: ColocatedProvidersProps) {
                 className="text-sm font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 flex items-center gap-1"
               >
                 View all {colocatedTotal}
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight className="w-4 h-4" aria-hidden="true" />
               </Link>
             )}
           </div>
 
           {/* Location Info */}
           <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg flex items-start gap-2">
-            <MapPin className="w-5 h-5 text-gray-400 dark:text-gray-500 mt-0.5 flex-shrink-0" />
+            <MapPin className="w-5 h-5 text-gray-400 dark:text-gray-500 mt-0.5 flex-shrink-0" aria-hidden="true" />
             <div className="text-sm text-gray-700 dark:text-gray-300">
               {location.name && (
                 <p className="font-semibold text-base text-gray-900 dark:text-white mb-1">{toDisplayCase(location.name)}</p>
@@ -142,12 +142,12 @@ export function ColocatedProviders({ npi }: ColocatedProvidersProps) {
                     </p>
                     {colProvider.phone && (
                       <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1">
-                        <Phone className="w-4 h-4" />
+                        <Phone className="w-4 h-4" aria-hidden="true" />
                         {colProvider.phone}
                       </p>
                     )}
                   </div>
-                  <ChevronRight className="w-5 h-5 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                  <ChevronRight className="w-5 h-5 text-gray-400 dark:text-gray-500 flex-shrink-0" aria-hidden="true" />
                 </div>
               </Link>
             ))}

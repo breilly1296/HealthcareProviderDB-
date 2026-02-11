@@ -228,7 +228,10 @@ export function ProviderHeroCard({ provider, confidenceScore, verificationCount 
                 {toDisplayCase(provider.displayName)}
               </h1>
               {isVerified && (
-                <BadgeCheck className="w-5 h-5 text-[#137fec] flex-shrink-0 mt-1" />
+                <>
+                  <BadgeCheck className="w-5 h-5 text-[#137fec] flex-shrink-0 mt-1" aria-hidden="true" />
+                  <span className="sr-only">Verified</span>
+                </>
               )}
             </div>
 
@@ -245,7 +248,7 @@ export function ProviderHeroCard({ provider, confidenceScore, verificationCount 
             <div className="space-y-1 text-sm text-stone-600 dark:text-gray-300 mb-3">
               {streetAddress && (
                 <div className="flex items-start gap-2">
-                  <MapPin className="w-4 h-4 text-stone-400 dark:text-gray-500 flex-shrink-0 mt-0.5" />
+                  <MapPin className="w-4 h-4 text-stone-400 dark:text-gray-500 flex-shrink-0 mt-0.5" aria-hidden="true" />
                   <div>
                     <p>{streetAddress}</p>
                     {cityStateZip && <p>{cityStateZip}</p>}
@@ -261,7 +264,7 @@ export function ProviderHeroCard({ provider, confidenceScore, verificationCount 
                   href={`tel:${provider.phone}`}
                   className="inline-flex items-center gap-2 text-stone-600 dark:text-gray-300 hover:text-[#137fec] dark:hover:text-[#137fec] transition-colors"
                 >
-                  <Phone className="w-4 h-4 text-stone-400 dark:text-gray-500" />
+                  <Phone className="w-4 h-4 text-stone-400 dark:text-gray-500" aria-hidden="true" />
                   <span className="font-medium">{formatPhone(provider.phone)}</span>
                 </a>
               )}
@@ -273,7 +276,7 @@ export function ProviderHeroCard({ provider, confidenceScore, verificationCount 
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 text-[#137fec] hover:text-[#0d6edb] font-medium transition-colors"
                 >
-                  <Navigation className="w-4 h-4" />
+                  <Navigation className="w-4 h-4" aria-hidden="true" />
                   Get Directions
                 </a>
               )}

@@ -119,16 +119,22 @@ export default function ProviderDetailClient({ npi, initialProvider }: ProviderD
     <div className="min-h-screen bg-stone-100 dark:bg-gray-900">
       <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-6">
         {/* Breadcrumb */}
-        <nav className="mb-6">
-          <Link
-            href="/search"
-            className="inline-flex items-center gap-2 text-sm text-stone-600 dark:text-gray-400 hover:text-[#137fec] transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Search</span>
-            <span className="text-stone-400 dark:text-gray-600">&gt;</span>
-            <span className="text-stone-800 dark:text-white font-medium">Provider Details</span>
-          </Link>
+        <nav aria-label="Breadcrumb" className="mb-6">
+          <ol className="flex items-center gap-2 text-sm">
+            <li>
+              <Link
+                href="/search"
+                className="inline-flex items-center gap-1 text-stone-600 dark:text-gray-400 hover:text-[#137fec] transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+                Search
+              </Link>
+            </li>
+            <li className="text-stone-400 dark:text-gray-600" aria-hidden="true">&gt;</li>
+            <li aria-current="page" className="text-stone-800 dark:text-white font-medium">
+              Provider Details
+            </li>
+          </ol>
         </nav>
 
         {/* Loading State */}

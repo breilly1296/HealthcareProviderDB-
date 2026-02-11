@@ -22,7 +22,7 @@ interface SearchMapViewProps {
 
 export function SearchMapView({ pins, total, clustered, loading, onBoundsChanged }: SearchMapViewProps) {
   return (
-    <div className="h-[calc(100vh-200px)] min-h-[500px] rounded-lg overflow-hidden">
+    <div role="region" aria-label="Provider map" className="h-[calc(100vh-200px)] min-h-[500px] rounded-lg overflow-hidden">
       <ProviderMap
         pins={pins}
         loading={loading}

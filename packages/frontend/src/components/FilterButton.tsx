@@ -5,13 +5,14 @@ import { SlidersHorizontal } from 'lucide-react';
 interface FilterButtonProps {
   activeFilterCount: number;
   onClick: () => void;
+  isExpanded?: boolean;
 }
 
-export function FilterButton({ activeFilterCount, onClick }: FilterButtonProps) {
+export function FilterButton({ activeFilterCount, onClick, isExpanded = false }: FilterButtonProps) {
   return (
     <button
       onClick={onClick}
-      aria-expanded={false}
+      aria-expanded={isExpanded}
       aria-label={`Open filters${activeFilterCount > 0 ? `, ${activeFilterCount} active` : ''}`}
       className="
         md:hidden

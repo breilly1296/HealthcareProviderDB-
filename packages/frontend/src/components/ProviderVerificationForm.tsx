@@ -137,7 +137,7 @@ export default function ProviderVerificationForm({
         onMouseEnter={() => setShowTooltip(id)}
         onMouseLeave={() => setShowTooltip(null)}
         onClick={() => setShowTooltip(showTooltip === id ? null : id)}
-        className="ml-2 text-primary-600 hover:text-primary-700 focus:outline-none"
+        className="ml-2 text-primary-600 hover:text-primary-700 focus-visible:ring-2 focus-visible:ring-primary-500 rounded"
         aria-label="More information"
       >
         <Info className="w-5 h-5 inline" />

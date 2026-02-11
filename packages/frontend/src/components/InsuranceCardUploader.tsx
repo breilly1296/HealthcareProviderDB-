@@ -44,6 +44,11 @@ function ConfidenceIndicator({ confidence, score }: { confidence: ExtractionConf
         <div
           className={`h-1.5 rounded-full ${config.barColor}`}
           style={{ width: `${Math.round(score * 100)}%` }}
+          role="progressbar"
+          aria-valuenow={Math.round(score * 100)}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={`${config.label}: ${Math.round(score * 100)}%`}
         />
       </div>
     </div>
@@ -206,6 +211,10 @@ export default function InsuranceCardUploader() {
         {!selectedImage ? (
           <div
             onClick={() => fileInputRef.current?.click()}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInputRef.current?.click(); } }}
+            role="button"
+            tabIndex={0}
+            aria-label="Upload insurance card image"
             className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center cursor-pointer hover:border-primary-500 dark:hover:border-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
           >
             <ImageIcon className="w-12 h-12 mx-auto text-gray-400 dark:text-gray-500 mb-4" />
@@ -237,16 +246,19 @@ export default function InsuranceCardUploader() {
             >
               {loading ? (
                 <>
-                  <Loader2 className="animate-spin h-5 w-5" />
+                  <Loader2 className="animate-spin h-5 w-5" aria-hidden="true" />
                   Scanning card...
                 </>
               ) : (
                 <>
-                  <ClipboardList className="w-5 h-5" />
+                  <ClipboardList className="w-5 h-5" aria-hidden="true" />
                   Extract Insurance Data
                 </>
               )}
             </button>
+            <div aria-live="polite" className="sr-only">
+              {loading ? 'Scanning insurance card...' : extractedData ? 'Insurance data extracted successfully.' : ''}
+            </div>
           </div>
         )}
 
@@ -261,14 +273,15 @@ export default function InsuranceCardUploader() {
           capture="environment"
           onChange={handleFileSelect}
           className="hidden"
+          aria-describedby={validationError ? 'upload-validation-error' : undefined}
         />
       </div>
 
       {/* Validation Error Message (file type/size issues) */}
       {validationError && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-6">
+        <div id="upload-validation-error" role="alert" className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-6">
           <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-red-500 dark:text-red-400 mt-0.5" />
+            <AlertTriangle className="w-5 h-5 text-red-500 dark:text-red-400 mt-0.5" aria-hidden="true" />
             <div>
               <p className="font-medium text-red-800 dark:text-red-200">Invalid File</p>
               <p className="text-sm text-red-700 dark:text-red-300">{validationError}</p>
@@ -280,9 +293,9 @@ export default function InsuranceCardUploader() {
       {/* Extraction Failed with Suggestions */}
       {extractionResponse && !extractionResponse.success && extractionResponse.suggestions && (
         <div className="mb-6 space-y-4">
-          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+          <div role="alert" className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
             <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-yellow-500 dark:text-yellow-400 mt-0.5" />
+              <AlertTriangle className="w-5 h-5 text-yellow-500 dark:text-yellow-400 mt-0.5" aria-hidden="true" />
               <div>
                 <p className="font-medium text-yellow-800 dark:text-yellow-200">
                   {extractionResponse.userMessage || 'Could not extract insurance information'}

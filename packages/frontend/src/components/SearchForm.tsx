@@ -446,6 +446,7 @@ export const SearchForm = forwardRef<SearchFormRef, SearchFormProps>(function Se
       <button
         type="button"
         onClick={() => setShowMoreFilters(!showMoreFilters)}
+        aria-expanded={showMoreFilters}
         className="flex items-center gap-1.5 text-sm font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300"
       >
         {showMoreFilters ? (

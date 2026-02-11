@@ -60,7 +60,7 @@ export function ProviderHeader({ provider }: ProviderHeaderProps) {
                 {provider.addressLine2 && <><br />{provider.addressLine2}</>}
                 <br />
                 {provider.city}, {provider.state} {provider.zip}
-                <span className="text-xs ml-1 opacity-75">(Open in Maps)</span>
+                <span className="text-xs ml-1 opacity-75">(opens in new tab)</span>
               </span>
             </a>
             {provider.phone && (

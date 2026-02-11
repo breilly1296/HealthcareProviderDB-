@@ -10,7 +10,7 @@ export function Header() {
   return (
     <header className="bg-stone-50/95 dark:bg-gray-900 backdrop-blur-sm border-b border-stone-200 dark:border-gray-700 sticky top-0 z-50 transition-colors duration-200">
       <div className="container-wide">
-        <nav className="flex items-center justify-between h-16">
+        <nav aria-label="Primary" className="flex items-center justify-between h-16">
           <Link href="/" className="flex items-center">
             <Image
               src={resolvedTheme === 'dark' ? '/nav-logo/logo-nav-dark.svg' : '/nav-logo/logo-nav-light.svg'}

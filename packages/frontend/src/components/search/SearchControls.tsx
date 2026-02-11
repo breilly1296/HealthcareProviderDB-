@@ -47,7 +47,7 @@ export function SearchControls({
 
       {/* Mobile Filter Button + View Toggle */}
       <div className="flex items-center justify-between gap-3 mb-4 md:mb-0">
-        <FilterButton activeFilterCount={activeFilterCount} onClick={() => setIsDrawerOpen(true)} />
+        <FilterButton activeFilterCount={activeFilterCount} onClick={() => setIsDrawerOpen(true)} isExpanded={isDrawerOpen} />
         <ViewModeToggle viewMode={viewMode} onViewModeChange={onViewModeChange} />
       </div>
 

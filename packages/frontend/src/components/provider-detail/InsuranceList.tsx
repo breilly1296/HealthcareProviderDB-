@@ -366,6 +366,7 @@ function VerificationModal({ isOpen, onClose, plan, npi, providerName, onVerifie
                 value={note}
                 onChange={(e) => setNote(e.target.value.slice(0, 200))}
                 placeholder="Optional: When did you verify? Any details?"
+                aria-label="Additional notes"
                 disabled={isLoading}
                 className="w-full px-3 py-2 text-sm bg-stone-50 dark:bg-gray-700/50 border border-stone-200 dark:border-gray-600 rounded-lg text-stone-800 dark:text-white placeholder-stone-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#137fec] focus:border-transparent resize-none disabled:opacity-50"
                 rows={2}
@@ -454,6 +455,7 @@ function PlanRow({ plan, onVerify, showConfidence, isLast, indented = false, sho
         ) : (
           <button
             onClick={() => onVerify(plan)}
+            aria-label={`Verify ${plan.name}`}
             className="px-2.5 py-0.5 text-xs font-medium text-[#137fec] border border-[#137fec] rounded hover:bg-[#137fec] hover:text-white transition-colors"
           >
             Verify
@@ -505,6 +507,7 @@ function CarrierGroupSection({ group, isExpanded, onToggle, onVerify, showConfid
     <div className="border-b border-stone-200 dark:border-gray-700 last:border-b-0">
       <button
         onClick={onToggle}
+        aria-expanded={shouldExpand}
         className="w-full flex items-center justify-between py-3 hover:bg-stone-50 dark:hover:bg-gray-700/30 transition-colors -mx-2 px-2 rounded"
       >
         <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -792,6 +795,7 @@ export function InsuranceList({
                   <>
                     <button
                       onClick={() => setOtherPlansExpanded(!otherPlansExpanded)}
+                      aria-expanded={otherPlansExpanded || hasSearch}
                       className="w-full flex items-center justify-between py-2 hover:bg-stone-50 dark:hover:bg-gray-700/30 transition-colors -mx-2 px-2 rounded mb-1"
                     >
                       <div className="flex items-center gap-2 min-w-0 flex-1">
