@@ -3,7 +3,7 @@
 import { useState, useCallback, Suspense, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { Loader2, Map, List, Columns2 } from 'lucide-react';
+import { Loader2, Map, List, Columns2, ClipboardList } from 'lucide-react';
 import { useMapProviders } from '@/hooks/useMapProviders';
 
 const ProviderMap = dynamic(() => import('@/components/ProviderMap'), {
@@ -340,6 +340,19 @@ function SearchPageContent() {
             </Suspense>
           </div>
         </div>
+
+        {/* Insurance card hint banner */}
+        {searchParams.get('issuerName') && (
+          <div className="mb-6 flex items-center gap-3 px-4 py-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <ClipboardList className="w-5 h-5 text-blue-500 dark:text-blue-400 flex-shrink-0" />
+            <p className="text-sm text-blue-800 dark:text-blue-200">
+              Searching based on your{' '}
+              <strong>{searchParams.get('issuerName')}</strong>
+              {searchParams.get('planType') ? ` ${searchParams.get('planType')}` : ''} card
+              {searchParams.get('planName') ? ` — ${searchParams.get('planName')}` : ''}
+            </p>
+          </div>
+        )}
 
         {/* Desktop Search Form - hidden on mobile */}
         <div className="hidden md:block card mb-8">

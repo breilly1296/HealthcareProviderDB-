@@ -110,6 +110,9 @@ export default function InsuranceCardUploader() {
     if (!extractedData) return;
     const params = new URLSearchParams();
     params.set('state', geo.state || 'NY');
+    if (extractedData.insurance_company) params.set('issuerName', extractedData.insurance_company);
+    if (extractedData.plan_name) params.set('planName', extractedData.plan_name);
+    if (extractedData.plan_type) params.set('planType', extractedData.plan_type);
     router.push(`/search?${params.toString()}`);
   }, [extractedData, geo.state, router]);
 

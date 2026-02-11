@@ -99,6 +99,7 @@ interface UseInsurancePlansResult {
   isLoading: boolean;
   error: Error | null;
   findPlan: (planId: string) => InsurancePlanDisplay | undefined;
+  findPlanByName: (issuerName: string, planName?: string) => InsurancePlanDisplay | undefined;
   refetch: () => Promise<void>;
 }
 
@@ -214,6 +215,27 @@ export function useInsurancePlans(
     [allPlans]
   );
 
+  // Find plan by carrier name + optional plan name (substring matching)
+  const findPlanByName = useCallback(
+    (issuerName: string, planName?: string): InsurancePlanDisplay | undefined => {
+      const issuerLower = issuerName.toLowerCase();
+      const carrierMatches = allPlans.filter(p =>
+        p.carrier?.toLowerCase().includes(issuerLower) ||
+        issuerLower.includes(p.carrier?.toLowerCase() || '')
+      );
+      if (!carrierMatches.length) return undefined;
+      if (!planName) return carrierMatches[0];
+
+      const planLower = planName.toLowerCase();
+      const planMatch = carrierMatches.find(p =>
+        p.planName?.toLowerCase().includes(planLower) ||
+        planLower.includes(p.planName?.toLowerCase() || '')
+      );
+      return planMatch || carrierMatches[0];
+    },
+    [allPlans]
+  );
+
   const refetch = useCallback(async () => {
     await fetchPlans(true);
   }, [fetchPlans]);
@@ -225,6 +247,7 @@ export function useInsurancePlans(
     isLoading,
     error,
     findPlan,
+    findPlanByName,
     refetch,
   };
 }

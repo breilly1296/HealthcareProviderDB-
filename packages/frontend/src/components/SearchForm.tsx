@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, useImperativeHandle, forwardRef, useCallback } from 'react';
 import { Search, X, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { useSearchParams as useNextSearchParams } from 'next/navigation';
 import { useSearchForm, useCities, useHealthSystems, useInsurancePlans, useGeoLocation, NYC_ALL_BOROUGHS_VALUE, NYC_BOROUGHS } from '@/hooks';
 import { SearchableSelect } from './ui/SearchableSelect';
 import { SPECIALTY_OPTIONS, STATE_OPTIONS } from '@/lib/provider-utils';
@@ -81,7 +82,22 @@ export const SearchForm = forwardRef<SearchFormRef, SearchFormProps>(function Se
     state: filters.state,
     cities: filters.cities,
   });
-  const { selectOptions: insuranceOptions, isLoading: insuranceLoading, findPlan } = useInsurancePlans();
+  const { selectOptions: insuranceOptions, isLoading: insuranceLoading, findPlan, findPlanByName } = useInsurancePlans();
+
+  // Auto-match insurance plan from card-upload hint params
+  const nextSearchParams = useNextSearchParams();
+  const hintIssuerName = nextSearchParams.get('issuerName');
+  const hintPlanName = nextSearchParams.get('planName');
+  const hasAutoMatchedPlan = useRef(false);
+
+  useEffect(() => {
+    if (hasAutoMatchedPlan.current || insuranceLoading || !hintIssuerName) return;
+    hasAutoMatchedPlan.current = true;
+    const matched = findPlanByName(hintIssuerName, hintPlanName || undefined);
+    if (matched) {
+      setFilter('insurancePlanId', matched.planId);
+    }
+  }, [insuranceLoading, hintIssuerName, hintPlanName, findPlanByName, setFilter]);
 
   // Auto-fill state from geolocation if no state is set (e.g. no URL params)
   const geo = useGeoLocation();
