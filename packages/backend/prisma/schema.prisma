@@ -91,6 +91,7 @@ model PracticeLocation {
   @@index([address_hash], map: "idx_locations_address_hash")
   @@index([latitude, longitude], map: "idx_locations_lat_lng")
   @@index([geocoded_at], map: "idx_locations_geocoded_at")
+  @@unique([npi, addressLine1, city, state, zipCode], map: "uq_location_address")
   @@map("practice_locations")
 }
 
