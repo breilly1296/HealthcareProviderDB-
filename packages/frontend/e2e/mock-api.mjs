@@ -121,14 +121,16 @@ const mockCities = ['New York', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island'];
 // Helpers
 // ---------------------------------------------------------------------------
 
-function cors(res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+function cors(req, res) {
+  const origin = req.headers.origin || 'http://localhost:3000';
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Admin-Secret');
 }
 
-function json(res, status, body) {
-  cors(res);
+function json(req, res, status, body) {
+  cors(req, res);
   res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(body));
 }
@@ -145,7 +147,7 @@ const server = createServer((req, res) => {
 
   // CORS preflight
   if (req.method === 'OPTIONS') {
-    cors(res);
+    cors(req, res);
     res.writeHead(204);
     res.end();
     return;
@@ -153,7 +155,17 @@ const server = createServer((req, res) => {
 
   // Health check (matches /health and /api/v1/health)
   if (rawPath === '/health' || path === '/health') {
-    json(res, 200, { status: 'ok' });
+    json(req, res, 200, { status: 'ok' });
+    return;
+  }
+
+  // Auth endpoints (return unauthenticated — no session in E2E tests)
+  if (path === '/auth/me' && req.method === 'GET') {
+    json(req, res, 401, { success: false, error: { message: 'Not authenticated', code: 'UNAUTHORIZED', statusCode: 401 } });
+    return;
+  }
+  if (path === '/auth/refresh' && req.method === 'POST') {
+    json(req, res, 401, { success: false, error: { message: 'No refresh token', code: 'UNAUTHORIZED', statusCode: 401 } });
     return;
   }
 
@@ -176,7 +188,7 @@ const server = createServer((req, res) => {
       );
     }
 
-    json(res, 200, {
+    json(req, res, 200, {
       success: true,
       data: {
         providers: filtered,
@@ -195,7 +207,7 @@ const server = createServer((req, res) => {
   // Cities
   if (path === '/providers/cities' && req.method === 'GET') {
     const state = url.searchParams.get('state') || 'NY';
-    json(res, 200, {
+    json(req, res, 200, {
       success: true,
       data: { state, cities: mockCities, count: mockCities.length },
     });
@@ -209,12 +221,12 @@ const server = createServer((req, res) => {
     const provider = mockProviders.find((p) => p.npi === npi);
 
     if (provider) {
-      json(res, 200, {
+      json(req, res, 200, {
         success: true,
         data: { provider },
       });
     } else {
-      json(res, 404, {
+      json(req, res, 404, {
         success: false,
         error: { message: `Provider with NPI ${npi} not found`, code: 'NOT_FOUND', statusCode: 404 },
       });
@@ -225,7 +237,7 @@ const server = createServer((req, res) => {
   // Provider plans
   const plansMatch = path.match(/^\/providers\/(\d{10})\/plans$/);
   if (plansMatch && req.method === 'GET') {
-    json(res, 200, {
+    json(req, res, 200, {
       success: true,
       data: {
         npi: plansMatch[1],
@@ -237,7 +249,7 @@ const server = createServer((req, res) => {
   }
 
   // Fallback 404
-  json(res, 404, { success: false, error: { message: 'Not found', code: 'NOT_FOUND', statusCode: 404 } });
+  json(req, res, 404, { success: false, error: { message: 'Not found', code: 'NOT_FOUND', statusCode: 404 } });
 });
 
 server.listen(PORT, () => {
