@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/lib/api';
-import type { InsuranceCardResponse, InsuranceCardUpdates } from '@/lib/api';
+import type { InsuranceCardUpdates } from '@/lib/api';
 
 // ============================================================================
 // Query Keys
