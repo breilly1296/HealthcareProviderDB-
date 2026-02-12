@@ -88,7 +88,14 @@ app.use(cors({
 }));
 
 // Body parsing with size limits to prevent large payload attacks
-app.use(express.json({ limit: '100kb' }));
+// Skip global JSON parser for the insurance card scan route — it uses a
+// route-level parser with a higher limit (16mb) for base64 image payloads.
+app.use((req, res, next) => {
+  if (req.path === '/api/v1/me/insurance-card/scan' && req.method === 'POST') {
+    return next();
+  }
+  express.json({ limit: '100kb' })(req, res, next);
+});
 app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 
 // Cookie parsing (required for auth token extraction)
