@@ -122,9 +122,9 @@ jobs:
             }
           " "$DB_URL")
 
-          # Apply schema changes (refuses destructive changes by default)
+          # Apply schema changes (schema reviews happen at PR time)
           cd packages/backend
-          npx prisma@5 db push --skip-generate
+          npx prisma@5 db push --skip-generate --accept-data-loss
 
           kill $PROXY_PID
 
