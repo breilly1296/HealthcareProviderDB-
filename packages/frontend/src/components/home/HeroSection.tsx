@@ -1,14 +1,10 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { CreditCard } from 'lucide-react';
-import { WelcomeBackBanner } from '@/components/WelcomeBackBanner';
 import { HeroSearch } from './HeroSearch';
 
 export function HeroSection() {
   return (
-    <>
-      <WelcomeBackBanner />
-
       <section className="bg-gradient-to-b from-amber-50/40 to-stone-100 dark:from-gray-800 dark:to-gray-900 py-12 md:py-20">
         <div className="container-wide text-center">
           {/* Full logo - theme-aware via CSS */}
@@ -54,6 +50,5 @@ export function HeroSection() {
           </Link>
         </div>
       </section>
-    </>
   );
 }
