@@ -87,23 +87,34 @@ router.post(
  * GET /api/v1/auth/verify
  * Verify a magic link token (user clicked the email link).
  * Sets auth cookies and redirects to the app.
+ *
+ * This is a browser navigation (email link click), so ALL outcomes must
+ * redirect — never return JSON.
  */
-router.get(
-  '/verify',
-  asyncHandler(async (req, res) => {
-    const { token } = verifyQuerySchema.parse(req.query);
+router.get('/verify', async (req, res) => {
+  try {
+    const parsed = verifyQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.redirect(302, `${FRONTEND_URL}/login?error=invalid`);
+      return;
+    }
 
     const result = await verifyMagicLink(
-      token,
+      parsed.data.token,
       req.ip,
       req.get('User-Agent')
     );
 
     setAuthCookies(res, result.accessToken, result.refreshToken);
-
     res.redirect(302, `${FRONTEND_URL}/saved-providers`);
-  })
-);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '';
+    const errorCode = message.includes('expired') ? 'expired'
+      : message.includes('already been used') ? 'used'
+      : 'invalid';
+    res.redirect(302, `${FRONTEND_URL}/login?error=${errorCode}`);
+  }
+});
 
 /**
  * POST /api/v1/auth/refresh

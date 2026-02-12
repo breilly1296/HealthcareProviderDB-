@@ -1,18 +1,28 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 
 type Status = 'idle' | 'loading' | 'success' | 'error';
 
+const VERIFY_ERRORS: Record<string, string> = {
+  expired: 'This login link has expired. Please request a new one.',
+  used: 'This login link has already been used. Please request a new one.',
+  invalid: 'This login link is invalid. Please request a new one.',
+};
+
 export function LoginForm() {
   const { isAuthenticated, isLoading: authLoading, login } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState('');
+
+  // Show error from magic link verification redirect
+  const verifyError = searchParams.get('error');
 
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
@@ -76,6 +86,20 @@ export function LoginForm() {
               Get a magic link sent to your email &mdash; no password needed.
             </p>
           </div>
+
+          {/* Magic link verification error */}
+          {verifyError && VERIFY_ERRORS[verifyError] && (
+            <div className="p-4 mb-6 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+              <div className="flex gap-3">
+                <svg className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                </svg>
+                <p className="text-amber-800 dark:text-amber-300 text-sm">
+                  {VERIFY_ERRORS[verifyError]}
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Success state */}
           {status === 'success' ? (
