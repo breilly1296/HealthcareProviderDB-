@@ -89,6 +89,21 @@ const nextConfig = {
       },
     ];
   },
+
+  // Proxy /api/v1/* requests to the backend service.
+  // The frontend and backend are separate Cloud Run services; this rewrite
+  // makes backend API calls same-origin so auth cookies work correctly.
+  async rewrites() {
+    const backendUrl =
+      (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1')
+        .replace(/\/api\/v1\/?$/, '');
+    return [
+      {
+        source: '/api/v1/:path*',
+        destination: `${backendUrl}/api/v1/:path*`,
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;
