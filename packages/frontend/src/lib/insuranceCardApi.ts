@@ -89,6 +89,12 @@ const insuranceCard = {
       body: JSON.stringify({ imageBase64, mimeType }),
     }),
 
+  save: (data: InsuranceCardUpdates) =>
+    apiFetch<{ card: InsuranceCardResponse }>('/me/insurance-card/save', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
   get: () =>
     apiFetch<{ card: InsuranceCardResponse | null }>('/me/insurance-card'),
 

@@ -121,11 +121,17 @@ async function callClaudeExtraction(
 
     return { text: textContent.text.trim() };
   } catch (error) {
-    logger.error({ error: error instanceof Error ? error.message : 'Unknown' }, 'Claude API error during extraction');
+    const errMsg = error instanceof Error ? error.message : String(error);
+    logger.error({
+      error: errMsg,
+      name: error instanceof Error ? error.name : undefined,
+      status: error instanceof Anthropic.APIError ? error.status : undefined,
+      stack: error instanceof Error ? error.stack : undefined,
+    }, 'Claude API error during extraction');
     if (error instanceof Anthropic.APIError) {
-      return { error: `API error: ${error.status}` };
+      return { error: `Anthropic API error ${error.status}: ${errMsg}` };
     }
-    return { error: 'Unknown API error' };
+    return { error: `Extraction error: ${errMsg}` };
   }
 }
 

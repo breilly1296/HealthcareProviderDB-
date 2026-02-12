@@ -11,6 +11,7 @@ import {
 } from '../services/insuranceCardService';
 import type { ExtractedCardData } from '../services/insuranceCardService';
 import { extractInsuranceCard } from '../services/insuranceCardExtractor';
+import logger from '../utils/logger';
 
 const router = Router();
 
@@ -33,6 +34,31 @@ const scanRateLimiter = createRateLimiter({
 const scanBodySchema = z.object({
   imageBase64: z.string().min(1, 'Image data is required').max(15 * 1024 * 1024, 'Image must be under 15MB'),
   mimeType: z.string().regex(/^image\//, 'Must be an image MIME type'),
+});
+
+const saveBodySchema = z.object({
+  insurance_company: z.string().nullable().optional(),
+  plan_name: z.string().nullable().optional(),
+  plan_type: z.string().nullable().optional(),
+  provider_network: z.string().nullable().optional(),
+  network_notes: z.string().nullable().optional(),
+  subscriber_name: z.string().nullable().optional(),
+  subscriber_id: z.string().nullable().optional(),
+  group_number: z.string().nullable().optional(),
+  effective_date: z.string().nullable().optional(),
+  copay_pcp: z.string().nullable().optional(),
+  copay_specialist: z.string().nullable().optional(),
+  copay_urgent: z.string().nullable().optional(),
+  copay_er: z.string().nullable().optional(),
+  deductible_individual: z.string().nullable().optional(),
+  deductible_family: z.string().nullable().optional(),
+  oop_max_individual: z.string().nullable().optional(),
+  oop_max_family: z.string().nullable().optional(),
+  rxbin: z.string().nullable().optional(),
+  rxpcn: z.string().nullable().optional(),
+  rxgrp: z.string().nullable().optional(),
+  card_side: z.string().nullable().optional(),
+  confidence_score: z.number().nullable().optional(),
 });
 
 const updateBodySchema = z
@@ -85,6 +111,12 @@ router.post(
     const extraction = await extractInsuranceCard(imageBase64, mimeType);
 
     if (!extraction.success || !extraction.data) {
+      logger.error({
+        error: extraction.error,
+        userMessage: extraction.userMessage,
+        metadata: extraction.metadata,
+        suggestions: extraction.suggestions,
+      }, 'Insurance card extraction failed');
       throw AppError.badRequest(
         extraction.userMessage || extraction.error || 'Failed to extract insurance card data',
         'EXTRACTION_FAILED',
@@ -105,6 +137,28 @@ router.post(
           suggestions: extraction.suggestions ?? [],
         },
       },
+    });
+  }),
+);
+
+/**
+ * POST /api/v1/me/insurance-card/save
+ * Save already-extracted insurance card data to the user's profile.
+ * Used by the frontend two-step flow: extract on frontend, then save here.
+ * Requires authentication.
+ */
+router.post(
+  '/save',
+  defaultRateLimiter,
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const data = saveBodySchema.parse(req.body) as ExtractedCardData;
+
+    const card = await saveInsuranceCard(req.user!.id, data);
+
+    res.status(201).json({
+      success: true,
+      data: { card },
     });
   }),
 );
