@@ -14,7 +14,12 @@ import type {
 // Configuration
 // ============================================================================
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+// In the browser, use relative URLs so requests go through the Next.js
+// rewrite proxy — this keeps auth cookies same-origin.
+// On the server (SSR), use the full backend URL directly.
+const API_URL = typeof window !== 'undefined'
+  ? '/api/v1'
+  : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1');
 
 // ============================================================================
 // Retry Configuration
