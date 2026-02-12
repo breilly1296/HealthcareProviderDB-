@@ -32,7 +32,7 @@ const scanRateLimiter = createRateLimiter({
 
 const scanBodySchema = z.object({
   imageBase64: z.string().min(1, 'Image data is required').max(15 * 1024 * 1024, 'Image must be under 15MB'),
-  mimeType: z.enum(['image/jpeg', 'image/png', 'image/webp', 'image/gif']),
+  mimeType: z.string().regex(/^image\//, 'Must be an image MIME type'),
 });
 
 const updateBodySchema = z
