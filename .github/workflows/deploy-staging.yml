@@ -124,7 +124,7 @@ jobs:
 
           # Apply schema changes (refuses destructive changes by default)
           cd packages/backend
-          npx prisma db push --skip-generate
+          npx prisma@5 db push --skip-generate
 
           kill $PROXY_PID
 
