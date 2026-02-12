@@ -1,3 +1,4 @@
+import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import express, { Request, Response } from 'express';
@@ -5,6 +6,7 @@ import helmet from 'helmet';
 import prisma from './lib/prisma';
 import routes from './routes';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
+import { extractUser } from './middleware/auth';
 import { defaultRateLimiter } from './middleware/rateLimiter';
 import { requestLogger } from './middleware/requestLogger';
 import requestIdMiddleware from './middleware/requestId';
@@ -88,6 +90,12 @@ app.use(cors({
 // Body parsing with size limits to prevent large payload attacks
 app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: true, limit: '100kb' }));
+
+// Cookie parsing (required for auth token extraction)
+app.use(cookieParser());
+
+// Auth: extract user from JWT cookie (sets req.user for all downstream handlers)
+app.use(extractUser);
 
 // Health check endpoint - BEFORE rate limiter so monitoring tools aren't blocked
 app.get('/health', async (req: Request, res: Response) => {

@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo } from 'react';
 import { MapPin, Phone, BadgeCheck, Navigation, Share2, Printer, Check } from 'lucide-react';
+import { BookmarkButton } from '@/components/BookmarkButton';
 import { ConfidenceGauge } from './ConfidenceGauge';
 import { toDisplayCase, toAddressCase, toTitleCase } from '@/lib/formatName';
 
@@ -186,8 +187,9 @@ export function ProviderHeroCard({ provider, confidenceScore, verificationCount 
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-stone-200 dark:border-gray-700 p-4 sm:p-6 md:p-8 relative">
-      {/* Share & Print buttons */}
+      {/* Bookmark, Share & Print buttons */}
       <div className="absolute top-3 right-3 sm:top-4 sm:right-4 flex items-center gap-1.5 print:hidden">
+        <BookmarkButton npi={provider.npi} size="md" />
         <button
           type="button"
           onClick={handleShare}

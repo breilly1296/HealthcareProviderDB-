@@ -15,6 +15,7 @@ updated: 2026-02-05
 - `packages/backend/src/index.ts` (CORS origins, PORT, NODE_ENV)
 - `packages/backend/src/config/constants.ts` (default values for CAPTCHA settings)
 - `packages/backend/src/middleware/captcha.ts` (RECAPTCHA_SECRET_KEY, CAPTCHA_FAIL_MODE)
+- `packages/backend/src/services/authService.ts` (JWT_SECRET, RESEND_API_KEY, MAGIC_LINK_BASE_URL)
 - `packages/backend/src/routes/admin.ts` (ADMIN_SECRET)
 - `packages/backend/src/lib/redis.ts` (REDIS_URL)
 - `packages/backend/src/lib/prisma.ts` (DATABASE_URL)
@@ -59,6 +60,13 @@ updated: 2026-02-05
 |----------|----------|---------|------------|-------------|
 | `REDIS_URL` | No | — | Backend `redis.ts` | Redis connection URL. If not set, falls back to in-memory rate limiting and caching. Example: `redis://localhost:6379` or `redis://10.0.0.1:6379`. |
 
+### Authentication — Magic Link
+| Variable | Required | Default | Where Used | Description |
+|----------|----------|---------|------------|-------------|
+| `JWT_SECRET` | **Yes** (auth) | — | Backend `authService.ts` | Secret for signing JWT access & refresh tokens. Generate with: `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"`. In production: Cloud Run Secret Manager `JWT_SECRET:latest`. |
+| `RESEND_API_KEY` | **Yes** (auth) | — | Backend `authService.ts` | Resend API key for sending magic link emails. Get one at resend.com/api-keys. In production: Cloud Run Secret Manager `RESEND_API_KEY:latest`. |
+| `MAGIC_LINK_BASE_URL` | No | `https://verifymyprovider.com` | Backend `authService.ts` | Base URL for magic link verification URLs. In dev: `http://localhost:3001`. In prod: `https://verifymyprovider.com` (behind load balancer). Set via `env_vars` in deploy.yml. |
+
 ### External APIs
 | Variable | Required | Default | Where Used | Description |
 |----------|----------|---------|------------|-------------|
@@ -102,6 +110,8 @@ env_vars:
   FRONTEND_URL=${{ secrets.FRONTEND_URL }}
 secrets:
   DATABASE_URL=DATABASE_URL:latest
+  JWT_SECRET=JWT_SECRET:latest
+  RESEND_API_KEY=RESEND_API_KEY:latest
 # ADMIN_SECRET removed from secrets (--remove-secrets flag) — set separately
 ```
 
@@ -129,6 +139,8 @@ secrets:
 | Secret Name | Used By |
 |-------------|---------|
 | `DATABASE_URL` | Backend Cloud Run |
+| `JWT_SECRET` | Backend Cloud Run |
+| `RESEND_API_KEY` | Backend Cloud Run |
 | `ANTHROPIC_API_KEY` | Frontend Cloud Run |
 
 ## Checklist

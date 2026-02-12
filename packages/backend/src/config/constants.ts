@@ -76,6 +76,30 @@ export const CAPTCHA_FALLBACK_WINDOW_MS = MS_PER_HOUR;
 export const RATE_LIMIT_CLEANUP_INTERVAL_MS = MS_PER_MINUTE;
 
 // ============================================================================
+// Authentication
+// ============================================================================
+
+/**
+ * Magic link token expiry (15 minutes).
+ */
+export const MAGIC_LINK_EXPIRY_MS = 15 * MS_PER_MINUTE;
+
+/**
+ * Max magic link requests per email per hour.
+ */
+export const MAGIC_LINK_MAX_PER_HOUR = 5;
+
+/**
+ * Session duration (30 days, sliding window).
+ */
+export const SESSION_DURATION_MS = 30 * MS_PER_DAY;
+
+/**
+ * Access token (JWT) lifetime string for jose.
+ */
+export const ACCESS_TOKEN_EXPIRY = '15m';
+
+// ============================================================================
 // Pagination Defaults
 // ============================================================================
 

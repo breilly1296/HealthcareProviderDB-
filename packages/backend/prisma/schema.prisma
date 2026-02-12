@@ -40,6 +40,7 @@ model Provider {
   providerTaxonomies       ProviderTaxonomy[]
   verificationLogs         VerificationLog[]
   dataQualityAudits        DataQualityAudit[]
+  savedBy                  SavedProvider[]
 
   @@index([specialtyCategory], map: "idx_providers_category")
   @@index([credential], map: "idx_providers_credential")
@@ -338,4 +339,59 @@ enum VerificationType {
   CONTACT_INFO
   STATUS_CHANGE
   NEW_PLAN
+}
+
+model User {
+  id             String          @id @default(cuid())
+  email          String          @unique @db.VarChar(255)
+  emailVerified  DateTime?       @map("email_verified") @db.Timestamptz(6)
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  sessions       Session[]
+  savedProviders SavedProvider[]
+
+  @@map("users")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String   @map("user_id")
+  refreshToken String   @unique @map("refresh_token") @db.VarChar(500)
+  expiresAt    DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  ipAddress    String?  @map("ip_address") @db.VarChar(50)
+  userAgent    String?  @map("user_agent") @db.VarChar(500)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_sessions_user_id")
+  @@index([expiresAt], map: "idx_sessions_expires_at")
+  @@map("sessions")
+}
+
+model MagicLinkToken {
+  id        String    @id @default(cuid())
+  email     String    @db.VarChar(255)
+  token     String    @unique @db.VarChar(500)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([email], map: "idx_magic_link_email")
+  @@index([token], map: "idx_magic_link_token")
+  @@index([expiresAt], map: "idx_magic_link_expires_at")
+  @@map("magic_link_tokens")
+}
+
+model SavedProvider {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  providerNpi String   @map("provider_npi") @db.VarChar(10)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider    Provider @relation(fields: [providerNpi], references: [npi], onDelete: Cascade)
+
+  @@unique([userId, providerNpi], map: "uq_saved_provider_user_npi")
+  @@index([userId], map: "idx_saved_providers_user_id")
+  @@index([providerNpi], map: "idx_saved_providers_npi")
+  @@map("saved_providers")
 }

@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { HomeIcon, SearchIcon, MapIcon, CreditCardIcon, InfoIcon } from './icons/Icons';
+import { useAuth } from '@/context/AuthContext';
+import { HomeIcon, SearchIcon, MapIcon, CreditCardIcon, BookmarkIcon } from './icons/Icons';
 
 interface NavItem {
   href: string;
@@ -11,7 +12,7 @@ interface NavItem {
   matchPaths?: string[];
 }
 
-const NAV_ITEMS: NavItem[] = [
+const STATIC_ITEMS: NavItem[] = [
   {
     href: '/',
     icon: HomeIcon,
@@ -36,16 +37,27 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Scan Card',
     matchPaths: ['/insurance'],
   },
-  {
-    href: '/about',
-    icon: InfoIcon,
-    label: 'About',
-    matchPaths: ['/about', '/research'],
-  },
 ];
 
 export function BottomNav() {
   const pathname = usePathname();
+  const { isAuthenticated } = useAuth();
+
+  const savedItem: NavItem = isAuthenticated
+    ? {
+        href: '/saved-providers',
+        icon: BookmarkIcon,
+        label: 'Saved',
+        matchPaths: ['/saved-providers', '/login'],
+      }
+    : {
+        href: '/login',
+        icon: BookmarkIcon,
+        label: 'Sign In',
+        matchPaths: ['/login', '/saved-providers'],
+      };
+
+  const navItems = [...STATIC_ITEMS, savedItem];
 
   const isActive = (item: NavItem): boolean => {
     // Exact match for home
@@ -72,7 +84,7 @@ export function BottomNav() {
       aria-label="Main navigation"
     >
       <div className="flex justify-around items-stretch h-16">
-        {NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const active = isActive(item);
           const Icon = item.icon;
 

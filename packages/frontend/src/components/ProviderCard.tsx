@@ -8,6 +8,7 @@ import { getSpecialtyDisplay } from '@/lib/provider-utils';
 import { toDisplayCase, toAddressCase, toTitleCase } from '@/lib/formatName';
 import { LocationIcon, PhoneIcon, ChevronRightIcon } from '@/components/icons';
 import { CheckCircle, BadgeCheck } from 'lucide-react';
+import { BookmarkButton } from '@/components/BookmarkButton';
 
 interface ProviderCardProps {
   provider: ProviderDisplay;
@@ -259,7 +260,7 @@ function ProviderCardComponent({
 
           {/* Main Content */}
           <div className="flex-1 min-w-0">
-            {/* Top row: Name and Confidence */}
+            {/* Top row: Name and Confidence + Bookmark */}
             <div className="flex items-start justify-between gap-2 sm:gap-4 mb-1">
               <div className="flex items-start gap-2 min-w-0 flex-1">
                 <h3 className="text-lg sm:text-xl font-bold text-stone-800 dark:text-white line-clamp-2" title={displayName}>
@@ -270,24 +271,29 @@ function ProviderCardComponent({
                 )}
               </div>
 
-              {/* Confidence Score - compact on mobile */}
-              {hasConfidence && confidenceColors && (
-                <div
-                  className={`flex-shrink-0 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg ${confidenceColors.bg} border ${confidenceColors.border} ${confidenceColors.ring}`}
-                  aria-label={`Confidence score: ${confidenceScore} out of 100, ${confidenceScore! >= 70 ? 'high' : confidenceScore! >= 50 ? 'medium' : 'low'} confidence`}
-                  role="img"
-                >
-                  <div className={`text-xs ${confidenceColors.text} text-center`} aria-hidden="true">
-                    {confidenceScore}%
+              <div className="flex items-start gap-1 flex-shrink-0">
+                {/* Confidence Score - compact on mobile */}
+                {hasConfidence && confidenceColors && (
+                  <div
+                    className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg ${confidenceColors.bg} border ${confidenceColors.border} ${confidenceColors.ring}`}
+                    aria-label={`Confidence score: ${confidenceScore} out of 100, ${confidenceScore! >= 70 ? 'high' : confidenceScore! >= 50 ? 'medium' : 'low'} confidence`}
+                    role="img"
+                  >
+                    <div className={`text-xs ${confidenceColors.text} text-center`} aria-hidden="true">
+                      {confidenceScore}%
+                    </div>
+                    <div className="hidden sm:block w-20 h-1.5 bg-stone-200 dark:bg-gray-700 rounded-full mt-1 overflow-hidden">
+                      <div
+                        className={`h-full ${confidenceColors.bar} rounded-full transition-all`}
+                        style={{ width: `${confidenceScore}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="hidden sm:block w-20 h-1.5 bg-stone-200 dark:bg-gray-700 rounded-full mt-1 overflow-hidden">
-                    <div
-                      className={`h-full ${confidenceColors.bar} rounded-full transition-all`}
-                      style={{ width: `${confidenceScore}%` }}
-                    />
-                  </div>
-                </div>
-              )}
+                )}
+
+                {/* Bookmark */}
+                <BookmarkButton npi={provider.npi} size="sm" />
+              </div>
             </div>
 
             {/* Specialty */}

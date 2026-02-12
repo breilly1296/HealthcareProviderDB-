@@ -303,16 +303,45 @@ async function fetchWithRetry(
 }
 
 // ============================================================================
+// Token Refresh (401 interceptor)
+// ============================================================================
+
+/** Singleton promise — coalesces concurrent 401 refresh attempts */
+let refreshPromise: Promise<boolean> | null = null;
+
+async function attemptTokenRefresh(): Promise<boolean> {
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = (async () => {
+    try {
+      const response = await fetch(`${API_URL}/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      return response.ok;
+    } catch {
+      return false;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
+// ============================================================================
 // API Fetch Wrapper
 // ============================================================================
 
 /**
- * Fetch wrapper with automatic JSON parsing, error handling, and retry logic
+ * Fetch wrapper with automatic JSON parsing, error handling, retry logic,
+ * and transparent 401 token refresh.
  */
 export async function apiFetch<T>(
   endpoint: string,
   options: RequestInit = {},
-  retryOptions: RetryOptions = {}
+  retryOptions: RetryOptions = {},
+  _skipAuthRetry: boolean = false
 ): Promise<T> {
   const url = `${API_URL}${endpoint}`;
 
@@ -320,6 +349,7 @@ export async function apiFetch<T>(
     url,
     {
       ...options,
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         ...options.headers,
@@ -331,6 +361,14 @@ export async function apiFetch<T>(
   const data = await response.json();
 
   if (!response.ok) {
+    // Attempt transparent token refresh on 401
+    if (response.status === 401 && !_skipAuthRetry) {
+      const refreshed = await attemptTokenRefresh();
+      if (refreshed) {
+        return apiFetch<T>(endpoint, options, retryOptions, true);
+      }
+    }
+
     const retryAfter = data.retryAfter ?? null;
     const error = new ApiError(
       data.error?.message || data.message || 'An error occurred',
@@ -671,6 +709,76 @@ const locations = {
 };
 
 // ============================================================================
+// Auth API
+// ============================================================================
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  createdAt: string;
+}
+
+const auth = {
+  sendMagicLink: (email: string) =>
+    apiFetch<void>('/auth/magic-link', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+
+  logout: () =>
+    apiFetch<void>('/auth/logout', {
+      method: 'POST',
+    }),
+
+  getMe: () =>
+    apiFetch<{ user: AuthUser }>('/auth/me'),
+};
+
+// ============================================================================
+// Saved Providers API
+// ============================================================================
+
+export interface SavedProviderDisplay {
+  npi: string;
+  firstName: string | null;
+  lastName: string | null;
+  credential: string | null;
+  primarySpecialty: string | null;
+  specialtyCategory: string | null;
+  entityType: string;
+  organizationName: string | null;
+  location: {
+    addressLine1: string | null;
+    city: string | null;
+    state: string | null;
+    zipCode: string | null;
+  } | null;
+  savedAt: string;
+}
+
+const savedProviders = {
+  list: (params: { page?: number; limit?: number } = {}) =>
+    apiFetch<{
+      providers: SavedProviderDisplay[];
+      pagination: PaginationState;
+    }>(`/saved-providers?${buildQueryString(params)}`),
+
+  save: (npi: string) =>
+    apiFetch<{ provider: SavedProviderDisplay }>('/saved-providers', {
+      method: 'POST',
+      body: JSON.stringify({ npi }),
+    }),
+
+  unsave: (npi: string) =>
+    apiFetch<void>(`/saved-providers/${npi}`, {
+      method: 'DELETE',
+    }),
+
+  checkStatus: (npi: string) =>
+    apiFetch<{ saved: boolean }>(`/saved-providers/${npi}/status`),
+};
+
+// ============================================================================
 // Unified API Object
 // ============================================================================
 
@@ -679,6 +787,8 @@ const api = {
   plans,
   verify,
   locations,
+  auth,
+  savedProviders,
 } as const;
 
 export default api;
@@ -691,3 +801,5 @@ export const providerApi = providers;
 // planApi removed - unused
 export const verificationApi = verify;
 export const locationApi = locations;
+export const authApi = auth;
+export const savedProvidersApi = savedProviders;

@@ -365,3 +365,14 @@ export const searchRateLimiter = createRateLimiter({
   maxRequests: 100,
   message: 'Too many search requests. Please try again in 1 hour.',
 });
+
+/**
+ * Rate limiter for magic link requests.
+ * Limit: 5 requests per 15 minutes per IP
+ */
+export const magicLinkRateLimiter = createRateLimiter({
+  name: 'magic-link',
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  maxRequests: 5,
+  message: 'Too many login requests. Please try again in 15 minutes.',
+});

@@ -20,6 +20,12 @@ This document describes all environment variables used by VerifyMyProvider.
 | `ADMIN_SECRET` | Secret for admin endpoints (cleanup jobs) | None (admin endpoints disabled) |
 | `RATE_LIMIT_WINDOW_MS` | Rate limit window in milliseconds | `60000` (1 minute) |
 | `RATE_LIMIT_MAX_REQUESTS` | Max requests per window | `100` |
+| `JWT_SECRET` | Secret for signing JWT access & refresh tokens | None (auth disabled) |
+| `RESEND_API_KEY` | Resend API key for magic link emails | None (auth disabled) |
+| `MAGIC_LINK_BASE_URL` | Base URL for magic link verification links | `https://verifymyprovider.com` |
+| `RECAPTCHA_SECRET_KEY` | Google reCAPTCHA v3 secret key | None (CAPTCHA skipped) |
+| `CAPTCHA_FAIL_MODE` | Fail mode when reCAPTCHA unavailable (`open`/`closed`) | `open` |
+| `REDIS_URL` | Redis connection URL for distributed rate limiting | None (in-memory fallback) |
 
 ### CORS Configuration
 
@@ -54,6 +60,8 @@ These secrets are stored in Google Cloud Secret Manager and injected into Cloud 
 | Secret Name | Used By | Description |
 |-------------|---------|-------------|
 | `DATABASE_URL` | Backend | PostgreSQL connection string (Cloud SQL) |
+| `JWT_SECRET` | Backend | Secret for signing JWT access & refresh tokens |
+| `RESEND_API_KEY` | Backend | Resend API key for sending magic link emails |
 | `ANTHROPIC_API_KEY` | Frontend | Claude API key for insurance card OCR |
 
 ### Creating Secrets
@@ -62,6 +70,14 @@ These secrets are stored in Google Cloud Secret Manager and injected into Cloud 
 # Create DATABASE_URL secret
 echo -n "postgresql://user:pass@/db?host=/cloudsql/project:region:instance" | \
   gcloud secrets create DATABASE_URL --data-file=-
+
+# Create JWT_SECRET
+node -e "console.log(require('crypto').randomBytes(64).toString('hex'))" | \
+  gcloud secrets create JWT_SECRET --data-file=-
+
+# Create RESEND_API_KEY secret
+echo -n "re_xxxx" | \
+  gcloud secrets create RESEND_API_KEY --data-file=-
 
 # Create ANTHROPIC_API_KEY secret
 echo -n "sk-ant-..." | \
@@ -100,6 +116,11 @@ NODE_ENV=development
 
 # Optional: Enable admin endpoints locally
 ADMIN_SECRET=local-dev-secret
+
+# Optional: Enable magic link auth locally
+# JWT_SECRET=local-dev-jwt-secret
+# RESEND_API_KEY=re_xxxx
+# MAGIC_LINK_BASE_URL=http://localhost:3001
 ```
 
 ### 2. Frontend Setup
@@ -140,6 +161,8 @@ Set via `deploy.yml` workflow:
 - `NODE_ENV=production`
 - `FRONTEND_URL` (from GitHub secret)
 - `DATABASE_URL` (from GCP Secret Manager)
+- `JWT_SECRET` (from GCP Secret Manager)
+- `RESEND_API_KEY` (from GCP Secret Manager)
 
 **Frontend:**
 - `NODE_ENV=production`
@@ -162,6 +185,13 @@ Set via `deploy.yml` workflow:
 ```bash
 # Generate a secure random secret
 openssl rand -hex 32
+```
+
+### JWT_SECRET
+
+```bash
+# Generate a secure JWT signing secret
+node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 ```
 
 ### Database Password

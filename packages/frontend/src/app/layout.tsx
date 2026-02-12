@@ -12,6 +12,7 @@ import { BottomNav } from '@/components/BottomNav';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { CompareProvider } from '@/context/CompareContext';
 import { ErrorProvider } from '@/context/ErrorContext';
+import { AuthProvider } from '@/context/AuthContext';
 import { ReCaptchaProvider } from '@/components/ReCaptchaProvider';
 import { CompareBar } from '@/components/compare';
 import { GlobalErrorBanner } from '@/components/GlobalErrorBanner';
@@ -124,6 +125,7 @@ export default function RootLayout({
         <Suspense fallback={null}>
           <PostHogProvider>
             <QueryProvider>
+              <AuthProvider>
               <ThemeProvider>
                 <CompareProvider>
                   <ErrorProvider>
@@ -144,6 +146,7 @@ export default function RootLayout({
                   </ErrorProvider>
                 </CompareProvider>
               </ThemeProvider>
+              </AuthProvider>
             </QueryProvider>
           </PostHogProvider>
         </Suspense>
