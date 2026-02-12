@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import toast from 'react-hot-toast';
+import { ChevronDown, Bookmark, LogOut } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 import { UserIcon } from '@/components/icons/Icons';
@@ -63,7 +64,7 @@ export function Header() {
   );
 }
 
-/** Auth state display — separated to isolate the logout callback. */
+/** Auth state display — separated to isolate state and callbacks. */
 function AuthNav({
   user,
   isAuthenticated,
@@ -72,27 +73,61 @@ function AuthNav({
   isAuthenticated: boolean;
 }) {
   const { logout } = useAuth();
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const handleLogout = useCallback(async () => {
+    setOpen(false);
     await logout();
     toast.success('Signed out', { duration: 2000 });
   }, [logout]);
 
+  // Close dropdown on click outside
+  useEffect(() => {
+    if (!open) return;
+    function onClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [open]);
+
   if (isAuthenticated && user) {
     return (
       <>
-        {/* Desktop: email · Sign Out */}
-        <div className="hidden md:flex items-center gap-3 ml-2 pl-4 border-l border-stone-200 dark:border-gray-700">
-          <span className="text-sm text-stone-500 dark:text-gray-400 max-w-[160px] truncate">
-            {user.email}
-          </span>
-          <span className="text-stone-300 dark:text-gray-600" aria-hidden="true">&middot;</span>
+        {/* Desktop: dropdown menu */}
+        <div ref={menuRef} className="hidden md:block relative ml-2 pl-4 border-l border-stone-200 dark:border-gray-700">
           <button
-            onClick={handleLogout}
-            className="text-sm font-medium text-stone-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors whitespace-nowrap"
+            onClick={() => setOpen((v) => !v)}
+            className="flex items-center gap-1.5 text-sm text-stone-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+            aria-expanded={open}
+            aria-haspopup="true"
           >
-            Sign Out
+            <span className="max-w-[160px] truncate">{user.email}</span>
+            <ChevronDown className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`} />
           </button>
+
+          {open && (
+            <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-stone-200 dark:border-gray-700 py-1 z-50">
+              <Link
+                href="/saved-providers"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-stone-700 dark:text-gray-200 hover:bg-stone-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                <Bookmark className="w-4 h-4 text-stone-400 dark:text-gray-500" />
+                Saved Providers
+              </Link>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-stone-700 dark:text-gray-200 hover:bg-stone-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                <LogOut className="w-4 h-4 text-stone-400 dark:text-gray-500" />
+                Sign Out
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Mobile: user icon → saved providers */}
