@@ -10,6 +10,7 @@ import {
   deleteInsuranceCard,
 } from '../services/insuranceCardService';
 import type { ExtractedCardData } from '../services/insuranceCardService';
+import { extractInsuranceCard } from '../services/insuranceCardExtractor';
 
 const router = Router();
 
@@ -81,11 +82,11 @@ router.post(
   asyncHandler(async (req, res) => {
     const { imageBase64, mimeType } = scanBodySchema.parse(req.body);
 
-    const extraction = await callExtractionApi(imageBase64, mimeType);
+    const extraction = await extractInsuranceCard(imageBase64, mimeType);
 
     if (!extraction.success || !extraction.data) {
       throw AppError.badRequest(
-        extraction.error || 'Failed to extract insurance card data',
+        extraction.userMessage || extraction.error || 'Failed to extract insurance card data',
         'EXTRACTION_FAILED',
       );
     }
@@ -163,75 +164,5 @@ router.delete(
     res.json({ success: true });
   }),
 );
-
-// ============================================================================
-// Extraction API (TODO: replace with direct AI SDK call)
-// ============================================================================
-
-interface ExtractionResult {
-  success: boolean;
-  data: ExtractedCardData | null;
-  error?: string;
-  metadata: {
-    confidence: string;
-    confidenceScore: number;
-    fieldsExtracted: number;
-    totalFields: number;
-  } | null;
-  suggestions: string[];
-}
-
-/**
- * Call the Next.js frontend extraction endpoint to process a card image.
- *
- * Option B — routes through the existing frontend API which already has
- * the AI extraction logic. This avoids duplicating the prompt/parsing code
- * in the backend while we decide on the final architecture.
- */
-async function callExtractionApi(
-  imageBase64: string,
-  mimeType: string,
-): Promise<ExtractionResult> {
-  const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
-
-  let response: globalThis.Response;
-  try {
-    response = await fetch(`${FRONTEND_URL}/api/insurance-card/extract`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: imageBase64, mimeType }),
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return {
-      success: false,
-      data: null,
-      error: `Extraction service unavailable: ${message}`,
-      metadata: null,
-      suggestions: [],
-    };
-  }
-
-  if (!response.ok) {
-    const text = await response.text().catch(() => 'No response body');
-    return {
-      success: false,
-      data: null,
-      error: `Extraction failed (${response.status}): ${text}`,
-      metadata: null,
-      suggestions: [],
-    };
-  }
-
-  const body = await response.json() as Record<string, unknown>;
-
-  return {
-    success: (body.success as boolean) ?? true,
-    data: (body.data as ExtractedCardData) ?? null,
-    error: body.error as string | undefined,
-    metadata: (body.metadata as ExtractionResult['metadata']) ?? null,
-    suggestions: (body.suggestions as string[]) ?? [],
-  };
-}
 
 export default router;
