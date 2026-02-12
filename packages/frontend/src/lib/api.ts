@@ -9,6 +9,13 @@ import type {
   Verification,
   CarrierGroup,
 } from '../types';
+import insuranceCard from './insuranceCardApi';
+export type {
+  InsuranceCardResponse,
+  InsuranceCardExtraction,
+  ScanResponse,
+  InsuranceCardUpdates,
+} from './insuranceCardApi';
 
 // ============================================================================
 // Configuration
@@ -794,6 +801,7 @@ const api = {
   locations,
   auth,
   savedProviders,
+  insuranceCard,
 } as const;
 
 export default api;

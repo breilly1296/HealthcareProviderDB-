@@ -31,17 +31,25 @@ const STATIC_ITEMS: NavItem[] = [
     label: 'Map',
     matchPaths: ['/map'],
   },
-  {
-    href: '/insurance',
-    icon: CreditCardIcon,
-    label: 'Scan Card',
-    matchPaths: ['/insurance'],
-  },
 ];
 
 export function BottomNav() {
   const pathname = usePathname();
   const { isAuthenticated } = useAuth();
+
+  const insuranceItem: NavItem = isAuthenticated
+    ? {
+        href: '/dashboard/insurance',
+        icon: CreditCardIcon,
+        label: 'Insurance',
+        matchPaths: ['/dashboard/insurance', '/insurance'],
+      }
+    : {
+        href: '/insurance',
+        icon: CreditCardIcon,
+        label: 'Scan Card',
+        matchPaths: ['/insurance'],
+      };
 
   const savedItem: NavItem = isAuthenticated
     ? {
@@ -57,7 +65,7 @@ export function BottomNav() {
         matchPaths: ['/login', '/saved-providers'],
       };
 
-  const navItems = [...STATIC_ITEMS, savedItem];
+  const navItems = [...STATIC_ITEMS, insuranceItem, savedItem];
 
   const isActive = (item: NavItem): boolean => {
     // Exact match for home

@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef, useImperativeHandle, forwardRef, useCallback } from 'react';
 import { Search, X, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useSearchParams as useNextSearchParams } from 'next/navigation';
-import { useSearchForm, useCities, useHealthSystems, useInsurancePlans, useGeoLocation, NYC_ALL_BOROUGHS_VALUE, NYC_BOROUGHS } from '@/hooks';
+import { useSearchForm, useCities, useHealthSystems, useInsurancePlans, useGeoLocation, useInsuranceCard, NYC_ALL_BOROUGHS_VALUE, NYC_BOROUGHS } from '@/hooks';
 import { SearchableSelect } from './ui/SearchableSelect';
 import { SPECIALTY_OPTIONS, STATE_OPTIONS } from '@/lib/provider-utils';
 import type { SearchFilters, ProviderDisplay, PaginationState, SelectOption, GroupedSelectOptions } from '@/types';
@@ -90,14 +90,28 @@ export const SearchForm = forwardRef<SearchFormRef, SearchFormProps>(function Se
   const hintPlanName = nextSearchParams.get('planName');
   const hasAutoMatchedPlan = useRef(false);
 
+  // Saved insurance card (for logged-in users)
+  const { card: savedCard } = useInsuranceCard();
+
   useEffect(() => {
-    if (hasAutoMatchedPlan.current || insuranceLoading || !hintIssuerName) return;
-    hasAutoMatchedPlan.current = true;
-    const matched = findPlanByName(hintIssuerName, hintPlanName || undefined);
-    if (matched) {
-      setFilter('insurancePlanId', matched.planId);
+    if (hasAutoMatchedPlan.current || insuranceLoading) return;
+
+    // Priority 1: URL hint params
+    if (hintIssuerName) {
+      hasAutoMatchedPlan.current = true;
+      const matched = findPlanByName(hintIssuerName, hintPlanName || undefined);
+      if (matched) {
+        setFilter('insurancePlanId', matched.planId);
+      }
+      return;
     }
-  }, [insuranceLoading, hintIssuerName, hintPlanName, findPlanByName, setFilter]);
+
+    // Priority 2: Saved card with matched plan (no URL hints)
+    if (savedCard?.matchedPlan?.planId) {
+      hasAutoMatchedPlan.current = true;
+      setFilter('insurancePlanId', savedCard.matchedPlan.planId);
+    }
+  }, [insuranceLoading, hintIssuerName, hintPlanName, findPlanByName, setFilter, savedCard]);
 
   // Auto-fill state from geolocation if no state is set (e.g. no URL params)
   const geo = useGeoLocation();

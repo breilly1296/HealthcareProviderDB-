@@ -1,6 +1,7 @@
 import InsuranceCardUploader from '@/components/InsuranceCardUploader';
 import Link from 'next/link';
 import { Info, Check } from 'lucide-react';
+import { InsuranceAuthRedirect } from './InsuranceAuthRedirect';
 
 export const metadata = {
   title: 'Insurance Card Scanner | VerifyMyProvider',
@@ -50,6 +51,9 @@ export default function InsurancePage() {
             </div>
           </div>
         </div>
+
+        {/* Auth redirect + save CTA */}
+        <InsuranceAuthRedirect />
 
         {/* Uploader Component */}
         <InsuranceCardUploader />

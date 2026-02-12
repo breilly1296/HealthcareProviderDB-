@@ -9,6 +9,7 @@ import {
   refreshSession,
   logout,
   getMe,
+  exportUserData,
 } from '../services/authService';
 import { MS_PER_DAY } from '../config/constants';
 
@@ -166,6 +167,23 @@ router.get(
     res.json({
       success: true,
       data: { user },
+    });
+  })
+);
+
+/**
+ * GET /api/v1/auth/export
+ * Export all user data (GDPR data portability). Requires authentication.
+ */
+router.get(
+  '/export',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const data = await exportUserData(req.user!.id);
+
+    res.json({
+      success: true,
+      data,
     });
   })
 );

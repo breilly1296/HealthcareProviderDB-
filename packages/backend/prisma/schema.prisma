@@ -191,6 +191,7 @@ model InsurancePlan {
   createdAt           DateTime?                  @default(now()) @map("created_at") @db.Timestamptz(6)
   providerAcceptances ProviderPlanAcceptance[]
   verificationLogs    VerificationLog[]
+  userInsuranceCards  UserInsuranceCard[]
 
   @@index([carrier], map: "idx_insurance_plans_carrier")
   @@index([carrierId], map: "idx_insurance_plans_carrier_id")
@@ -349,6 +350,7 @@ model User {
   updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
   sessions       Session[]
   savedProviders SavedProvider[]
+  insuranceCard  UserInsuranceCard?
 
   @@map("users")
 }
@@ -394,4 +396,51 @@ model SavedProvider {
   @@index([userId], map: "idx_saved_providers_user_id")
   @@index([providerNpi], map: "idx_saved_providers_npi")
   @@map("saved_providers")
+}
+
+model UserInsuranceCard {
+  id                String          @id @default(cuid())
+  userId            String          @unique @map("user_id")
+
+  // Plan fields
+  insuranceCompany  String?         @map("insurance_company") @db.VarChar(200)
+  planName          String?         @map("plan_name") @db.VarChar(200)
+  planType          String?         @map("plan_type") @db.VarChar(20)
+  providerNetwork   String?         @map("provider_network") @db.VarChar(200)
+  networkNotes      String?         @map("network_notes") @db.VarChar(500)
+
+  // PII fields (stored encrypted)
+  subscriberIdEnc   String?         @map("subscriber_id_enc") @db.VarChar(500)
+  groupNumberEnc    String?         @map("group_number_enc") @db.VarChar(500)
+  rxbinEnc          String?         @map("rxbin_enc") @db.VarChar(500)
+  rxpcnEnc          String?         @map("rxpcn_enc") @db.VarChar(500)
+  rxgrpEnc          String?         @map("rxgrp_enc") @db.VarChar(500)
+
+  // Non-encrypted fields
+  subscriberName    String?         @map("subscriber_name") @db.VarChar(500)
+  effectiveDate     String?         @map("effective_date") @db.VarChar(20)
+
+  // Cost fields
+  copayPcp          String?         @map("copay_pcp") @db.VarChar(50)
+  copaySpecialist   String?         @map("copay_specialist") @db.VarChar(50)
+  copayUrgent       String?         @map("copay_urgent") @db.VarChar(50)
+  copayEr           String?         @map("copay_er") @db.VarChar(50)
+  deductibleIndiv   String?         @map("deductible_indiv") @db.VarChar(50)
+  deductibleFamily  String?         @map("deductible_family") @db.VarChar(50)
+  oopMaxIndiv       String?         @map("oop_max_indiv") @db.VarChar(50)
+  oopMaxFamily      String?         @map("oop_max_family") @db.VarChar(50)
+
+  // Metadata
+  matchedPlanId     String?         @map("matched_plan_id") @db.VarChar(50)
+  confidenceScore   Int?            @map("confidence_score")
+  cardSide          String?         @map("card_side") @db.VarChar(10)
+  scannedAt         DateTime        @default(now()) @map("scanned_at") @db.Timestamptz(6)
+  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  matchedPlan       InsurancePlan?  @relation(fields: [matchedPlanId], references: [planId], onUpdate: NoAction)
+
+  @@index([matchedPlanId], map: "idx_uic_matched_plan_id")
+  @@map("user_insurance_cards")
 }

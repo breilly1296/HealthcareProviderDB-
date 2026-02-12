@@ -4,7 +4,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import toast from 'react-hot-toast';
-import { ChevronDown, Bookmark, LogOut } from 'lucide-react';
+import { ChevronDown, Bookmark, CreditCard, LogOut } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 import { UserIcon } from '@/components/icons/Icons';
@@ -118,6 +118,14 @@ function AuthNav({
               >
                 <Bookmark className="w-4 h-4 text-stone-400 dark:text-gray-500" />
                 Saved Providers
+              </Link>
+              <Link
+                href="/dashboard/insurance"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-stone-700 dark:text-gray-200 hover:bg-stone-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                <CreditCard className="w-4 h-4 text-stone-400 dark:text-gray-500" />
+                My Insurance
               </Link>
               <button
                 onClick={handleLogout}

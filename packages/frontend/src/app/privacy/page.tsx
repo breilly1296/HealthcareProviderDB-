@@ -110,9 +110,32 @@ export default function PrivacyPolicyPage() {
                   network) is returned to your browser; we do not store member IDs or personal details
                 </li>
               </ul>
-              <p className="text-gray-600 dark:text-gray-300 text-sm">
+              <p className="text-gray-600 dark:text-gray-300 text-sm mb-4">
                 <strong>Your data stays private:</strong> We never see, store, or have access to your
-                insurance card images or member ID numbers after processing.
+                insurance card images after processing.
+              </p>
+
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mt-6 mb-3">
+                Saved card data (signed-in users):
+              </h3>
+              <ul className="list-disc pl-6 text-gray-600 dark:text-gray-300 space-y-2 mb-4">
+                <li>
+                  <strong>Encrypted storage:</strong> If you sign in and save your card, extracted plan data
+                  (plan name, network, copays) is stored in your profile. Sensitive fields (member ID,
+                  group number, Rx IDs) are encrypted with AES-256-GCM before storage.
+                </li>
+                <li>
+                  <strong>You control your data:</strong> You can view, update, or permanently delete your
+                  saved card from your <strong>My Insurance</strong> dashboard at any time.
+                </li>
+                <li>
+                  <strong>No images stored:</strong> Even for signed-in users, the card image is never saved —
+                  only the extracted text fields.
+                </li>
+              </ul>
+              <p className="text-gray-600 dark:text-gray-300 text-sm">
+                <strong>Guest users:</strong> If you scan a card without signing in, no data is stored on
+                our servers — it only exists in your browser session.
               </p>
             </div>
 
@@ -127,10 +150,11 @@ export default function PrivacyPolicyPage() {
               <ul className="list-disc pl-6 text-gray-600 dark:text-gray-300 space-y-2">
                 <li>Personal health information (PHI) or medical records</li>
                 <li>Insurance card images (processed in memory only, never stored)</li>
-                <li>Member IDs or insurance account numbers</li>
+                <li>Member IDs or insurance account numbers in plaintext (if you save your card
+                  while signed in, these are encrypted with AES-256-GCM and can be deleted anytime)</li>
                 <li>Social Security numbers or government IDs</li>
                 <li>Payment or financial information</li>
-                <li>Account passwords (we don&apos;t have user accounts yet)</li>
+                <li>Account passwords (we use passwordless magic-link authentication)</li>
                 <li>Precise location data beyond IP-based city/region</li>
               </ul>
               <p className="text-gray-600 dark:text-gray-300 mt-4">
@@ -353,6 +377,10 @@ export default function PrivacyPolicyPage() {
                 </li>
                 <li>
                   <strong>Account information:</strong> Retained until you request deletion
+                </li>
+                <li>
+                  <strong>Saved insurance card data:</strong> Encrypted and retained until you delete it
+                  from your dashboard or delete your account
                 </li>
                 <li>
                   <strong>Server logs (IP addresses):</strong> Retained for 90 days for security purposes

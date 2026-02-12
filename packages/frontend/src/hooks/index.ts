@@ -36,5 +36,8 @@ export type { RecentSearch, RecentSearchParams } from './useRecentSearches';
 // Geolocation
 export { useGeoLocation } from './useGeoLocation';
 
+// Insurance card
+export { useInsuranceCard } from './useInsuranceCard';
+
 // Re-export types for convenience
 export type { CityData, HealthSystem, GroupedSelectOptions } from '../types';

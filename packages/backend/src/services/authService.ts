@@ -2,6 +2,7 @@ import { randomBytes, createHash } from 'crypto';
 import { SignJWT } from 'jose';
 import prisma from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
+import { decryptCardPii } from '../lib/encryption';
 import logger from '../utils/logger';
 import {
   MS_PER_HOUR,
@@ -299,5 +300,77 @@ export async function getMe(userId: string) {
     emailVerified: user.emailVerified,
     createdAt: user.createdAt,
     savedProviderCount: user._count.savedProviders,
+  };
+}
+
+// ============================================================================
+// exportUserData (GDPR / data portability)
+// ============================================================================
+
+export async function exportUserData(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      savedProviders: {
+        select: {
+          providerNpi: true,
+          createdAt: true,
+        },
+      },
+      insuranceCard: true,
+    },
+  });
+
+  if (!user) {
+    throw AppError.notFound('User not found');
+  }
+
+  // Decrypt insurance card PII if present
+  let insuranceCard = null;
+  if (user.insuranceCard) {
+    const card = user.insuranceCard;
+    const decrypted = decryptCardPii({
+      subscriberIdEnc: card.subscriberIdEnc,
+      groupNumberEnc: card.groupNumberEnc,
+      rxbinEnc: card.rxbinEnc,
+      rxpcnEnc: card.rxpcnEnc,
+      rxgrpEnc: card.rxgrpEnc,
+    });
+
+    insuranceCard = {
+      insuranceCompany: card.insuranceCompany,
+      planName: card.planName,
+      planType: card.planType,
+      providerNetwork: card.providerNetwork,
+      subscriberName: card.subscriberName,
+      subscriberId: decrypted.subscriber_id,
+      groupNumber: decrypted.group_number,
+      effectiveDate: card.effectiveDate,
+      copayPcp: card.copayPcp,
+      copaySpecialist: card.copaySpecialist,
+      copayUrgent: card.copayUrgent,
+      copayEr: card.copayEr,
+      deductibleIndiv: card.deductibleIndiv,
+      deductibleFamily: card.deductibleFamily,
+      oopMaxIndiv: card.oopMaxIndiv,
+      oopMaxFamily: card.oopMaxFamily,
+      rxbin: decrypted.rxbin,
+      rxpcn: decrypted.rxpcn,
+      rxgrp: decrypted.rxgrp,
+      scannedAt: card.scannedAt,
+      updatedAt: card.updatedAt,
+    };
+  }
+
+  return {
+    account: {
+      id: user.id,
+      email: user.email,
+      emailVerified: user.emailVerified,
+      createdAt: user.createdAt,
+    },
+    savedProviders: user.savedProviders,
+    insuranceCard,
+    exportedAt: new Date().toISOString(),
   };
 }
