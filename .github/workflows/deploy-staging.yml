@@ -90,6 +90,44 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Setup Node.js for migrations
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Apply database schema changes
+        run: |
+          # Install Cloud SQL Auth Proxy
+          curl -sSL -o cloud-sql-proxy https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.14.1/cloud-sql-proxy.linux.amd64
+          chmod +x cloud-sql-proxy
+
+          # Start proxy in background (TCP on port 5432)
+          ./cloud-sql-proxy verifymyprovider-prod:us-central1:verifymyprovider-db --port 5432 &
+          PROXY_PID=$!
+          sleep 3
+
+          # Get DATABASE_URL from Secret Manager
+          DB_URL=$(gcloud secrets versions access latest --secret=DATABASE_URL --project=${{ secrets.GCP_PROJECT_ID }})
+
+          # Convert Unix socket URL to TCP URL for the local proxy
+          # postgresql://user:pass@/db?host=/cloudsql/... → postgresql://user:pass@127.0.0.1:5432/db
+          export DATABASE_URL=$(node -e "
+            const url = process.argv[1];
+            const m = url.match(/^(postgres(?:ql)?:\/\/[^@]+)@\/([^?]+)\?host=\/cloudsql\/[^&]+&?(.*)/);
+            if (m) {
+              const extra = m[3] ? '?' + m[3] : '';
+              console.log(m[1] + '@127.0.0.1:5432/' + m[2] + extra);
+            } else {
+              console.log(url);
+            }
+          " "$DB_URL")
+
+          # Apply schema changes (refuses destructive changes by default)
+          cd packages/backend
+          npx prisma db push --skip-generate
+
+          kill $PROXY_PID
+
       - name: Deploy Backend to Cloud Run
         id: deploy
         uses: google-github-actions/deploy-cloudrun@v2

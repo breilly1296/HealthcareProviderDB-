@@ -166,6 +166,7 @@ secrets:
 - [x] Secrets passed via GitHub Actions secrets
 - [x] Build args for public frontend env vars
 - [x] Cloud Run Secret Manager for sensitive backend vars
+- [x] Automated `prisma db push` via Cloud SQL Auth Proxy during deploy
 - [ ] No secret expiration/rotation alerts
 
 ## Questions to Ask
