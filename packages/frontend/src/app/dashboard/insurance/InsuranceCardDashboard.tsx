@@ -524,7 +524,7 @@ export function InsuranceCardDashboard() {
             <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 px-1">
               <span>Scanned {formatDate(card.scannedAt)}</span>
               {card.confidenceScore != null && (
-                <span>Confidence: {Math.round(card.confidenceScore * 100)}%</span>
+                <span>Confidence: {card.confidenceScore}%</span>
               )}
             </div>
           </div>

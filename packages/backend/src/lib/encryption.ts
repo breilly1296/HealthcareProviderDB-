@@ -5,6 +5,17 @@ const IV_LENGTH = 12;
 const AUTH_TAG_LENGTH = 16;
 const KEY_LENGTH = 32;
 
+function parseKey(b64: string, label: string): Buffer {
+  const key = Buffer.from(b64, "base64");
+  if (key.length !== KEY_LENGTH) {
+    throw new Error(
+      `${label} must decode to exactly ${KEY_LENGTH} bytes, got ${key.length}`
+    );
+  }
+  return key;
+}
+
+/** Primary key — used for all encryption and first-attempt decryption. */
 function getEncryptionKey(): Buffer {
   const b64 = process.env.INSURANCE_ENCRYPTION_KEY;
   if (!b64) {
@@ -12,14 +23,24 @@ function getEncryptionKey(): Buffer {
       "INSURANCE_ENCRYPTION_KEY environment variable is not set"
     );
   }
-  const key = Buffer.from(b64, "base64");
-  if (key.length !== KEY_LENGTH) {
-    throw new Error(
-      `INSURANCE_ENCRYPTION_KEY must decode to exactly ${KEY_LENGTH} bytes, got ${key.length}`
-    );
-  }
-  return key;
+  return parseKey(b64, "INSURANCE_ENCRYPTION_KEY");
 }
+
+/** Previous key — used only as a decryption fallback during key rotation. */
+function getPreviousEncryptionKey(): Buffer | null {
+  const b64 = process.env.INSURANCE_ENCRYPTION_KEY_PREVIOUS;
+  if (!b64) return null;
+  return parseKey(b64, "INSURANCE_ENCRYPTION_KEY_PREVIOUS");
+}
+
+/** Returns true when a previous (rotation) key is configured. */
+export function hasPreviousKey(): boolean {
+  return !!process.env.INSURANCE_ENCRYPTION_KEY_PREVIOUS;
+}
+
+// ============================================================================
+// Core encrypt / decrypt
+// ============================================================================
 
 export function encrypt(plaintext: string | null | undefined): string | null {
   if (plaintext == null) return null;
@@ -39,15 +60,13 @@ export function encrypt(plaintext: string | null | undefined): string | null {
   return `${iv.toString("hex")}:${authTag.toString("hex")}:${encrypted.toString("hex")}`;
 }
 
-export function decrypt(ciphertext: string | null | undefined): string | null {
-  if (ciphertext == null) return null;
-
+/** Decrypt a single ciphertext value using a specific key. */
+function decryptWithKey(ciphertext: string, key: Buffer): string {
   const parts = ciphertext.split(":");
   if (parts.length !== 3) {
     throw new Error("Invalid ciphertext format: expected iv:authTag:data");
   }
 
-  const key = getEncryptionKey();
   const iv = Buffer.from(parts[0], "hex");
   const authTag = Buffer.from(parts[1], "hex");
   const encrypted = Buffer.from(parts[2], "hex");
@@ -64,6 +83,39 @@ export function decrypt(ciphertext: string | null | undefined): string | null {
 
   return decrypted.toString("utf8");
 }
+
+/**
+ * Decrypt a ciphertext string.
+ *
+ * Tries the primary key first. If that fails (e.g. auth tag mismatch after
+ * key rotation) and a previous key is configured, retries with the previous
+ * key. If both fail, throws a generic error to avoid leaking crypto internals.
+ */
+export function decrypt(ciphertext: string | null | undefined): string | null {
+  if (ciphertext == null) return null;
+
+  const primaryKey = getEncryptionKey();
+
+  try {
+    return decryptWithKey(ciphertext, primaryKey);
+  } catch (primaryError) {
+    const previousKey = getPreviousEncryptionKey();
+    if (previousKey) {
+      try {
+        return decryptWithKey(ciphertext, previousKey);
+      } catch {
+        // Previous key also failed — fall through to generic error
+      }
+    }
+
+    // Never expose raw crypto error details (auth tag mismatch, invalid format, etc.)
+    throw new Error('Decryption failed');
+  }
+}
+
+// ============================================================================
+// Card PII helpers
+// ============================================================================
 
 interface CardPiiPlaintext {
   subscriber_id?: string | null;

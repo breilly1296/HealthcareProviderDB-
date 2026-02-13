@@ -1,6 +1,7 @@
 import prisma from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { encryptCardPii, decryptCardPii, encrypt } from '../lib/encryption';
+import logger from '../utils/logger';
 
 // ============================================================================
 // Types
@@ -148,8 +149,18 @@ async function matchPlan(
 // formatCardResponse — decrypt PII and map to API response shape
 // ============================================================================
 
+/** PII field names in the decrypted response (enc column → response key) */
+const PII_FIELD_MAP: Record<string, string> = {
+  subscriberIdEnc: 'subscriberId',
+  groupNumberEnc: 'groupNumber',
+  rxbinEnc: 'rxbin',
+  rxpcnEnc: 'rxpcn',
+  rxgrpEnc: 'rxgrp',
+};
+
 function formatCardResponse(
   card: Record<string, unknown> & { matchedPlan?: Record<string, unknown> | null },
+  audit: { userId: string; requestId?: string },
 ): UserInsuranceCardResponse {
   const pii = decryptCardPii({
     subscriberIdEnc: card.subscriberIdEnc as string | null,
@@ -158,6 +169,20 @@ function formatCardResponse(
     rxpcnEnc: card.rxpcnEnc as string | null,
     rxgrpEnc: card.rxgrpEnc as string | null,
   });
+
+  // Audit: log which PII fields were actually decrypted (had non-null ciphertext)
+  const decryptedFields = Object.entries(PII_FIELD_MAP)
+    .filter(([encKey]) => card[encKey] != null)
+    .map(([, responseName]) => responseName);
+
+  if (decryptedFields.length > 0) {
+    logger.info({
+      event: 'insurance_card.decrypted',
+      userId: audit.userId,
+      requestId: audit.requestId,
+      fields: decryptedFields,
+    }, 'PII fields decrypted for response');
+  }
 
   return {
     id: card.id as string,
@@ -196,6 +221,7 @@ function formatCardResponse(
 export async function saveInsuranceCard(
   userId: string,
   data: ExtractedCardData,
+  requestId?: string,
 ): Promise<UserInsuranceCardResponse> {
   const encryptedPii = encryptCardPii({
     subscriber_id: data.subscriber_id,
@@ -240,7 +266,18 @@ export async function saveInsuranceCard(
     include: MATCHED_PLAN_INCLUDE,
   });
 
-  return formatCardResponse(card);
+  const fieldsExtracted = Object.values(data).filter(v => v != null && v !== '').length;
+
+  logger.info({
+    event: 'insurance_card.scanned',
+    userId,
+    requestId,
+    matchedPlanId,
+    confidence: data.confidence_score ?? null,
+    fieldsExtracted,
+  }, 'Insurance card scanned and saved');
+
+  return formatCardResponse(card, { userId, requestId });
 }
 
 // ============================================================================
@@ -249,6 +286,7 @@ export async function saveInsuranceCard(
 
 export async function getInsuranceCard(
   userId: string,
+  requestId?: string,
 ): Promise<UserInsuranceCardResponse | null> {
   const card = await prisma.userInsuranceCard.findUnique({
     where: { userId },
@@ -257,14 +295,20 @@ export async function getInsuranceCard(
 
   if (!card) return null;
 
-  return formatCardResponse(card);
+  logger.info({
+    event: 'insurance_card.viewed',
+    userId,
+    requestId,
+  }, 'Insurance card data retrieved');
+
+  return formatCardResponse(card, { userId, requestId });
 }
 
 // ============================================================================
 // deleteInsuranceCard
 // ============================================================================
 
-export async function deleteInsuranceCard(userId: string): Promise<{ success: true }> {
+export async function deleteInsuranceCard(userId: string, requestId?: string): Promise<{ success: true }> {
   const existing = await prisma.userInsuranceCard.findUnique({
     where: { userId },
     select: { id: true },
@@ -276,6 +320,12 @@ export async function deleteInsuranceCard(userId: string): Promise<{ success: tr
 
   await prisma.userInsuranceCard.delete({ where: { userId } });
 
+  logger.info({
+    event: 'insurance_card.deleted',
+    userId,
+    requestId,
+  }, 'Insurance card deleted');
+
   return { success: true };
 }
 
@@ -286,6 +336,7 @@ export async function deleteInsuranceCard(userId: string): Promise<{ success: tr
 export async function updateInsuranceCard(
   userId: string,
   updates: Partial<ExtractedCardData>,
+  requestId?: string,
 ): Promise<UserInsuranceCardResponse> {
   const existing = await prisma.userInsuranceCard.findUnique({
     where: { userId },
@@ -348,5 +399,15 @@ export async function updateInsuranceCard(
     include: MATCHED_PLAN_INCLUDE,
   });
 
-  return formatCardResponse(card);
+  // Audit: log field names that were changed (never values)
+  const fieldsChanged = Object.keys(updates).filter(k => (updates as Record<string, unknown>)[k] !== undefined);
+
+  logger.info({
+    event: 'insurance_card.updated',
+    userId,
+    requestId,
+    fieldsChanged,
+  }, 'Insurance card updated');
+
+  return formatCardResponse(card, { userId, requestId });
 }

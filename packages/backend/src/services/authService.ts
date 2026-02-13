@@ -10,6 +10,7 @@ import {
   MAGIC_LINK_MAX_PER_HOUR,
   SESSION_DURATION_MS,
   ACCESS_TOKEN_EXPIRY,
+  MAX_SESSIONS_PER_USER,
 } from '../config/constants';
 
 // ============================================================================
@@ -190,6 +191,28 @@ export async function verifyMagicLink(token: string, ipAddress?: string, userAge
   const rawRefreshToken = randomBytes(32).toString('hex');
   const refreshTokenHash = sha256(rawRefreshToken);
 
+  // Enforce concurrent session limit — delete oldest if at max
+  const existingSessions = await prisma.session.findMany({
+    where: { userId: user.id },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true },
+  });
+
+  if (existingSessions.length >= MAX_SESSIONS_PER_USER) {
+    const sessionsToDelete = existingSessions
+      .slice(0, existingSessions.length - MAX_SESSIONS_PER_USER + 1)
+      .map(s => s.id);
+
+    await prisma.session.deleteMany({
+      where: { id: { in: sessionsToDelete } },
+    });
+
+    logger.info(
+      { userId: user.id, deletedCount: sessionsToDelete.length },
+      'Oldest sessions evicted to enforce concurrent limit'
+    );
+  }
+
   // Create session
   const session = await prisma.session.create({
     data: {
@@ -261,6 +284,33 @@ export async function refreshSession(refreshToken: string) {
 }
 
 // ============================================================================
+// Session invalidation
+// ============================================================================
+
+/** Delete ALL sessions for a user (e.g., password reset, "log out everywhere"). */
+export async function invalidateAllSessions(userId: string): Promise<number> {
+  const result = await prisma.session.deleteMany({
+    where: { userId },
+  });
+
+  logger.info({ userId, deletedCount: result.count }, 'All sessions invalidated');
+  return result.count;
+}
+
+/** Delete all sessions for a user EXCEPT the current one. */
+export async function invalidateOtherSessions(userId: string, currentSessionId: string): Promise<number> {
+  const result = await prisma.session.deleteMany({
+    where: {
+      userId,
+      id: { not: currentSessionId },
+    },
+  });
+
+  logger.info({ userId, currentSessionId, deletedCount: result.count }, 'Other sessions invalidated');
+  return result.count;
+}
+
+// ============================================================================
 // logout
 // ============================================================================
 
@@ -325,10 +375,19 @@ export async function exportUserData(userId: string) {
     throw AppError.notFound('User not found');
   }
 
-  // Decrypt insurance card PII if present
+  // Decrypt insurance card PII if present (audit logged)
   let insuranceCard = null;
   if (user.insuranceCard) {
     const card = user.insuranceCard;
+
+    const encFields = { subscriberIdEnc: card.subscriberIdEnc, groupNumberEnc: card.groupNumberEnc, rxbinEnc: card.rxbinEnc, rxpcnEnc: card.rxpcnEnc, rxgrpEnc: card.rxgrpEnc };
+    const decryptedFieldNames = Object.entries(encFields)
+      .filter(([, v]) => v != null)
+      .map(([k]) => k.replace('Enc', ''));
+    if (decryptedFieldNames.length > 0) {
+      logger.info({ event: 'insurance_card.decrypted', userId, fields: decryptedFieldNames, context: 'data_export' }, 'PII fields decrypted for data export');
+    }
+
     const decrypted = decryptCardPii({
       subscriberIdEnc: card.subscriberIdEnc,
       groupNumberEnc: card.groupNumberEnc,
@@ -373,4 +432,29 @@ export async function exportUserData(userId: string) {
     insuranceCard,
     exportedAt: new Date().toISOString(),
   };
+}
+
+// ============================================================================
+// cleanupExpiredSessions (admin)
+// ============================================================================
+
+export async function cleanupExpiredSessions(options: { dryRun?: boolean } = {}) {
+  const { dryRun = false } = options;
+  const now = new Date();
+
+  if (dryRun) {
+    const count = await prisma.session.count({
+      where: { expiresAt: { lt: now } },
+    });
+
+    logger.info({ dryRun: true, expiredCount: count }, 'Expired sessions cleanup dry run');
+    return { dryRun: true, deletedCount: 0, expiredCount: count };
+  }
+
+  const result = await prisma.session.deleteMany({
+    where: { expiresAt: { lt: now } },
+  });
+
+  logger.info({ deletedCount: result.count }, 'Expired sessions cleaned up');
+  return { dryRun: false, deletedCount: result.count, expiredCount: result.count };
 }

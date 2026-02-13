@@ -3,6 +3,7 @@ import { jwtVerify, errors as joseErrors } from 'jose';
 import prisma from '../lib/prisma';
 import { AppError } from './errorHandler';
 import logger from '../utils/logger';
+import { SESSION_ACTIVITY_DEBOUNCE_MS } from '../config/constants';
 
 // Extend Express Request to include authenticated user
 declare global {
@@ -71,6 +72,18 @@ export async function extractUser(req: Request, _res: Response, next: NextFuncti
     }
 
     req.user = { id: userId, email, sessionId };
+
+    // Touch lastUsedAt with debounce to avoid excessive DB writes
+    const now = Date.now();
+    const lastUsed = session.lastUsedAt?.getTime() ?? 0;
+    if (now - lastUsed > SESSION_ACTIVITY_DEBOUNCE_MS) {
+      prisma.session.update({
+        where: { id: sessionId },
+        data: { lastUsedAt: new Date(now) },
+      }).catch(err => {
+        logger.warn({ error: err instanceof Error ? err.message : 'Unknown', sessionId }, 'Failed to update session lastUsedAt');
+      });
+    }
   } catch (error) {
     // Expected for expired/malformed tokens — don't log as error
     if (error instanceof joseErrors.JWTExpired || error instanceof joseErrors.JWTClaimValidationFailed) {

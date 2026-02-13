@@ -25,7 +25,18 @@ jobs:
         run: npm ci
 
       - name: Security audit
-        run: npm audit --audit-level=critical
+        run: npm audit --audit-level=high
+
+      - name: Check for hardcoded secrets
+        run: |
+          # Check for common secret patterns in source code
+          if grep -rn "sk-ant\|AKIA\|password\s*=\s*['\"][^'\"]*['\"]" \
+            packages/backend/src/ packages/frontend/src/ \
+            --include="*.ts" --include="*.tsx" --include="*.js" | \
+            grep -v "\.env\.example\|test\|spec\|mock\|\.d\.ts"; then
+            echo "::error::Potential hardcoded secrets found!"
+            exit 1
+          fi
 
       - name: Run backend tests
         run: npm test

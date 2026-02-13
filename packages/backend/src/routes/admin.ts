@@ -5,7 +5,9 @@ import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { cleanupExpiredVerifications, getExpirationStats } from '../services/verificationService';
 import { recalculateAllConfidenceScores } from '../services/confidenceDecayService';
 import { getEnrichmentStats } from '../services/locationEnrichment';
+import { cleanupExpiredSessions } from '../services/authService';
 import { cacheClear, getCacheStats } from '../utils/cache';
+import { decryptCardPii, encryptCardPii, hasPreviousKey } from '../lib/encryption';
 import prisma from '../lib/prisma';
 import { adminTimeout } from '../middleware/requestTimeout';
 import logger from '../utils/logger';
@@ -90,6 +92,41 @@ router.post(
         message: dryRun
           ? `Dry run complete. ${result.expiredPlanAcceptances + result.expiredVerificationLogs} records would be deleted.`
           : `Cleanup complete. ${result.deletedPlanAcceptances + result.deletedVerificationLogs} records deleted.`,
+      },
+    });
+  })
+);
+
+/**
+ * POST /api/v1/admin/cleanup-sessions
+ * Delete expired sessions from the database.
+ *
+ * Protected by X-Admin-Secret header
+ * Designed to be called by Cloud Scheduler
+ *
+ * Query params:
+ *   - dryRun: If 'true', only return count without deleting (default: false)
+ */
+router.post(
+  '/cleanup-sessions',
+  adminAuthMiddleware,
+  adminTimeout,
+  asyncHandler(async (req, res) => {
+    const dryRun = req.query.dryRun === 'true';
+
+    logger.info({ dryRun }, 'Admin cleanup expired sessions started');
+
+    const result = await cleanupExpiredSessions({ dryRun });
+
+    logger.info({ result }, 'Admin session cleanup complete');
+
+    res.json({
+      success: true,
+      data: {
+        ...result,
+        message: dryRun
+          ? `Dry run complete. ${result.expiredCount} expired sessions would be deleted.`
+          : `Cleanup complete. ${result.deletedCount} expired sessions deleted.`,
       },
     });
   })
@@ -495,6 +532,147 @@ router.post(
         message: dryRun
           ? `Dry run complete. ${stats.updated} of ${stats.processed} records would be updated.`
           : `Recalculation complete. ${stats.updated} of ${stats.processed} records updated.`,
+      },
+    });
+  })
+);
+
+// ============================================================================
+// Encryption Key Rotation
+// ============================================================================
+
+/**
+ * POST /api/v1/admin/rotate-encryption-key
+ * Re-encrypt all insurance card PII fields with the current primary key.
+ *
+ * Workflow:
+ *   1. Set INSURANCE_ENCRYPTION_KEY to the NEW key
+ *   2. Set INSURANCE_ENCRYPTION_KEY_PREVIOUS to the OLD key
+ *   3. Deploy — decrypt will auto-fallback to the previous key
+ *   4. Call this endpoint to re-encrypt everything under the new key
+ *   5. Remove INSURANCE_ENCRYPTION_KEY_PREVIOUS from env
+ *
+ * Protected by X-Admin-Secret header
+ *
+ * Query params:
+ *   - dryRun: If 'true', only count records without re-encrypting (default: false)
+ *   - batchSize: Records per batch (default: 50)
+ */
+router.post(
+  '/rotate-encryption-key',
+  adminAuthMiddleware,
+  adminTimeout,
+  asyncHandler(async (req, res) => {
+    const dryRun = req.query.dryRun === 'true';
+    const batchSize = parseInt(req.query.batchSize as string) || 50;
+
+    // Count total cards with any encrypted field
+    const total = await prisma.userInsuranceCard.count({
+      where: {
+        OR: [
+          { subscriberIdEnc: { not: null } },
+          { groupNumberEnc: { not: null } },
+          { rxbinEnc: { not: null } },
+          { rxpcnEnc: { not: null } },
+          { rxgrpEnc: { not: null } },
+        ],
+      },
+    });
+
+    logger.info(
+      { dryRun, batchSize, total, hasPreviousKey: hasPreviousKey() },
+      'Admin: encryption key rotation started'
+    );
+
+    if (dryRun) {
+      res.json({
+        success: true,
+        data: {
+          dryRun: true,
+          totalRecords: total,
+          hasPreviousKey: hasPreviousKey(),
+          message: `Dry run complete. ${total} records would be re-encrypted.`,
+        },
+      });
+      return;
+    }
+
+    let processed = 0;
+    let errors = 0;
+    let cursor: string | undefined;
+
+    while (true) {
+      const cards = await prisma.userInsuranceCard.findMany({
+        where: {
+          OR: [
+            { subscriberIdEnc: { not: null } },
+            { groupNumberEnc: { not: null } },
+            { rxbinEnc: { not: null } },
+            { rxpcnEnc: { not: null } },
+            { rxgrpEnc: { not: null } },
+          ],
+        },
+        take: batchSize,
+        ...(cursor
+          ? { skip: 1, cursor: { id: cursor } }
+          : {}),
+        orderBy: { id: 'asc' },
+        select: {
+          id: true,
+          subscriberIdEnc: true,
+          groupNumberEnc: true,
+          rxbinEnc: true,
+          rxpcnEnc: true,
+          rxgrpEnc: true,
+        },
+      });
+
+      if (cards.length === 0) break;
+      cursor = cards[cards.length - 1].id;
+
+      for (const card of cards) {
+        try {
+          // Decrypt with primary (or fallback to previous) key
+          const plaintext = decryptCardPii({
+            subscriberIdEnc: card.subscriberIdEnc,
+            groupNumberEnc: card.groupNumberEnc,
+            rxbinEnc: card.rxbinEnc,
+            rxpcnEnc: card.rxpcnEnc,
+            rxgrpEnc: card.rxgrpEnc,
+          });
+
+          // Re-encrypt with primary key
+          const reEncrypted = encryptCardPii(plaintext);
+
+          await prisma.userInsuranceCard.update({
+            where: { id: card.id },
+            data: reEncrypted,
+          });
+
+          processed++;
+        } catch (err) {
+          errors++;
+          logger.error(
+            { cardId: card.id, error: err instanceof Error ? err.message : 'Unknown' },
+            'Failed to re-encrypt insurance card'
+          );
+        }
+      }
+    }
+
+    logger.info(
+      { processed, errors, total },
+      'Admin: encryption key rotation complete'
+    );
+
+    res.json({
+      success: true,
+      data: {
+        dryRun: false,
+        totalRecords: total,
+        processed,
+        errors,
+        message: `Re-encryption complete. ${processed} records re-encrypted, ${errors} errors.`,
       },
     });
   })

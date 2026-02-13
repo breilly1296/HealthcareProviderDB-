@@ -154,6 +154,7 @@ jobs:
             JWT_SECRET=JWT_SECRET:latest
             RESEND_API_KEY=RESEND_API_KEY:latest
             INSURANCE_ENCRYPTION_KEY=INSURANCE_ENCRYPTION_KEY:latest
+            CSRF_SECRET=CSRF_SECRET:latest
 
       - name: Smoke test backend
         run: |

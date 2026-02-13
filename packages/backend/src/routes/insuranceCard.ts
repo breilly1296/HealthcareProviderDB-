@@ -31,59 +31,67 @@ const scanRateLimiter = createRateLimiter({
 // Validation schemas
 // ============================================================================
 
+// Allowed image MIME types for card scanning (must be supported by Claude vision API)
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
+
 const scanBodySchema = z.object({
   imageBase64: z.string().min(1, 'Image data is required').max(15 * 1024 * 1024, 'Image must be under 15MB'),
-  mimeType: z.string().regex(/^image\//, 'Must be an image MIME type'),
+  mimeType: z.enum(ALLOWED_IMAGE_TYPES, {
+    errorMap: () => ({ message: 'Unsupported image type. Use JPEG, PNG, WebP, or GIF.' }),
+  }),
 });
 
+/** Reusable trimmed nullable optional string field. */
+const trimmedString = () => z.string().trim().nullable().optional();
+
 const saveBodySchema = z.object({
-  insurance_company: z.string().nullable().optional(),
-  plan_name: z.string().nullable().optional(),
-  plan_type: z.string().nullable().optional(),
-  provider_network: z.string().nullable().optional(),
-  network_notes: z.string().nullable().optional(),
-  subscriber_name: z.string().nullable().optional(),
-  subscriber_id: z.string().nullable().optional(),
-  group_number: z.string().nullable().optional(),
-  effective_date: z.string().nullable().optional(),
-  copay_pcp: z.string().nullable().optional(),
-  copay_specialist: z.string().nullable().optional(),
-  copay_urgent: z.string().nullable().optional(),
-  copay_er: z.string().nullable().optional(),
-  deductible_individual: z.string().nullable().optional(),
-  deductible_family: z.string().nullable().optional(),
-  oop_max_individual: z.string().nullable().optional(),
-  oop_max_family: z.string().nullable().optional(),
-  rxbin: z.string().nullable().optional(),
-  rxpcn: z.string().nullable().optional(),
-  rxgrp: z.string().nullable().optional(),
-  card_side: z.string().nullable().optional(),
+  insurance_company: trimmedString(),
+  plan_name: trimmedString(),
+  plan_type: trimmedString(),
+  provider_network: trimmedString(),
+  network_notes: trimmedString(),
+  subscriber_name: trimmedString(),
+  subscriber_id: trimmedString(),
+  group_number: trimmedString(),
+  effective_date: trimmedString(),
+  copay_pcp: trimmedString(),
+  copay_specialist: trimmedString(),
+  copay_urgent: trimmedString(),
+  copay_er: trimmedString(),
+  deductible_individual: trimmedString(),
+  deductible_family: trimmedString(),
+  oop_max_individual: trimmedString(),
+  oop_max_family: trimmedString(),
+  rxbin: trimmedString(),
+  rxpcn: trimmedString(),
+  rxgrp: trimmedString(),
+  card_side: trimmedString(),
   confidence_score: z.number().nullable().optional(),
 });
 
 const updateBodySchema = z
   .object({
-    insurance_company: z.string().nullable().optional(),
-    plan_name: z.string().nullable().optional(),
-    plan_type: z.string().nullable().optional(),
-    provider_network: z.string().nullable().optional(),
-    network_notes: z.string().nullable().optional(),
-    subscriber_name: z.string().nullable().optional(),
-    subscriber_id: z.string().nullable().optional(),
-    group_number: z.string().nullable().optional(),
-    effective_date: z.string().nullable().optional(),
-    copay_pcp: z.string().nullable().optional(),
-    copay_specialist: z.string().nullable().optional(),
-    copay_urgent: z.string().nullable().optional(),
-    copay_er: z.string().nullable().optional(),
-    deductible_individual: z.string().nullable().optional(),
-    deductible_family: z.string().nullable().optional(),
-    oop_max_individual: z.string().nullable().optional(),
-    oop_max_family: z.string().nullable().optional(),
-    rxbin: z.string().nullable().optional(),
-    rxpcn: z.string().nullable().optional(),
-    rxgrp: z.string().nullable().optional(),
-    card_side: z.string().nullable().optional(),
+    insurance_company: trimmedString(),
+    plan_name: trimmedString(),
+    plan_type: trimmedString(),
+    provider_network: trimmedString(),
+    network_notes: trimmedString(),
+    subscriber_name: trimmedString(),
+    subscriber_id: trimmedString(),
+    group_number: trimmedString(),
+    effective_date: trimmedString(),
+    copay_pcp: trimmedString(),
+    copay_specialist: trimmedString(),
+    copay_urgent: trimmedString(),
+    copay_er: trimmedString(),
+    deductible_individual: trimmedString(),
+    deductible_family: trimmedString(),
+    oop_max_individual: trimmedString(),
+    oop_max_family: trimmedString(),
+    rxbin: trimmedString(),
+    rxpcn: trimmedString(),
+    rxgrp: trimmedString(),
+    card_side: trimmedString(),
     confidence_score: z.number().int().nullable().optional(),
   })
   .refine(
@@ -123,7 +131,7 @@ router.post(
       );
     }
 
-    const card = await saveInsuranceCard(req.user!.id, extraction.data);
+    const card = await saveInsuranceCard(req.user!.id, extraction.data, String(req.id));
 
     res.status(201).json({
       success: true,
@@ -154,7 +162,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const data = saveBodySchema.parse(req.body) as ExtractedCardData;
 
-    const card = await saveInsuranceCard(req.user!.id, data);
+    const card = await saveInsuranceCard(req.user!.id, data, String(req.id));
 
     res.status(201).json({
       success: true,
@@ -173,7 +181,7 @@ router.get(
   defaultRateLimiter,
   requireAuth,
   asyncHandler(async (req, res) => {
-    const card = await getInsuranceCard(req.user!.id);
+    const card = await getInsuranceCard(req.user!.id, String(req.id));
 
     res.json({
       success: true,
@@ -194,7 +202,7 @@ router.patch(
   asyncHandler(async (req, res) => {
     const updates = updateBodySchema.parse(req.body) as Partial<ExtractedCardData>;
 
-    const card = await updateInsuranceCard(req.user!.id, updates);
+    const card = await updateInsuranceCard(req.user!.id, updates, String(req.id));
 
     res.json({
       success: true,
@@ -213,7 +221,7 @@ router.delete(
   defaultRateLimiter,
   requireAuth,
   asyncHandler(async (req, res) => {
-    await deleteInsuranceCard(req.user!.id);
+    await deleteInsuranceCard(req.user!.id, String(req.id));
 
     res.json({ success: true });
   }),

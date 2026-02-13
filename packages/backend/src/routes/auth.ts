@@ -3,11 +3,13 @@ import { z } from 'zod';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { requireAuth } from '../middleware/auth';
 import { magicLinkRateLimiter } from '../middleware/rateLimiter';
+import { csrfProtection, generateCsrfToken } from '../middleware/csrf';
 import {
   sendMagicLink,
   verifyMagicLink,
   refreshSession,
   logout,
+  invalidateAllSessions,
   getMe,
   exportUserData,
 } from '../services/authService';
@@ -65,12 +67,23 @@ function clearAuthCookies(res: import('express').Response) {
 // ============================================================================
 
 /**
+ * GET /api/v1/auth/csrf-token
+ * Issue a CSRF token. Sets the double-submit cookie and returns the token
+ * in the response body so the frontend can include it as a header.
+ */
+router.get('/csrf-token', (req, res) => {
+  const token = generateCsrfToken(req, res);
+  res.json({ success: true, csrfToken: token });
+});
+
+/**
  * POST /api/v1/auth/magic-link
  * Request a magic link login email.
  * Always returns success to prevent email enumeration.
  */
 router.post(
   '/magic-link',
+  csrfProtection,
   magicLinkRateLimiter,
   asyncHandler(async (req, res) => {
     const { email } = magicLinkSchema.parse(req.body);
@@ -123,6 +136,7 @@ router.get('/verify', async (req, res) => {
  */
 router.post(
   '/refresh',
+  csrfProtection,
   asyncHandler(async (req, res) => {
     const refreshToken = req.cookies?.vmp_refresh_token;
 
@@ -144,6 +158,7 @@ router.post(
  */
 router.post(
   '/logout',
+  csrfProtection,
   requireAuth,
   asyncHandler(async (req, res) => {
     await logout(req.user!.sessionId);
@@ -151,6 +166,24 @@ router.post(
     clearAuthCookies(res);
 
     res.json({ success: true });
+  })
+);
+
+/**
+ * POST /api/v1/auth/logout-all
+ * Invalidate ALL sessions for the current user ("log out everywhere").
+ * Clears auth cookies on the responding client.
+ */
+router.post(
+  '/logout-all',
+  csrfProtection,
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const deletedCount = await invalidateAllSessions(req.user!.id);
+
+    clearAuthCookies(res);
+
+    res.json({ success: true, deletedCount });
   })
 );
 

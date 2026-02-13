@@ -315,6 +315,45 @@ async function fetchWithRetry(
 }
 
 // ============================================================================
+// CSRF Token Management
+// ============================================================================
+
+const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+/** Cached CSRF token — refreshed on 403 or on first mutating request */
+let csrfToken: string | null = null;
+
+/** Singleton promise — coalesces concurrent CSRF token fetches */
+let csrfFetchPromise: Promise<string | null> | null = null;
+
+async function fetchCsrfToken(): Promise<string | null> {
+  if (csrfFetchPromise) return csrfFetchPromise;
+
+  csrfFetchPromise = (async () => {
+    try {
+      const response = await fetch(`${API_URL}/auth/csrf-token`, {
+        credentials: 'include',
+      });
+      if (!response.ok) return null;
+      const data = await response.json();
+      csrfToken = data.csrfToken ?? null;
+      return csrfToken;
+    } catch {
+      return null;
+    } finally {
+      csrfFetchPromise = null;
+    }
+  })();
+
+  return csrfFetchPromise;
+}
+
+async function ensureCsrfToken(): Promise<string | null> {
+  if (csrfToken) return csrfToken;
+  return fetchCsrfToken();
+}
+
+// ============================================================================
 // Token Refresh (401 interceptor)
 // ============================================================================
 
@@ -347,25 +386,37 @@ async function attemptTokenRefresh(): Promise<boolean> {
 
 /**
  * Fetch wrapper with automatic JSON parsing, error handling, retry logic,
- * and transparent 401 token refresh.
+ * transparent 401 token refresh, and CSRF token management.
  */
 export async function apiFetch<T>(
   endpoint: string,
   options: RequestInit = {},
   retryOptions: RetryOptions = {},
-  _skipAuthRetry: boolean = false
+  _skipAuthRetry: boolean = false,
+  _skipCsrfRetry: boolean = false
 ): Promise<T> {
   const url = `${API_URL}${endpoint}`;
+  const method = (options.method || 'GET').toUpperCase();
+
+  // Include CSRF token on mutating requests
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string>),
+  };
+
+  if (MUTATING_METHODS.has(method)) {
+    const token = await ensureCsrfToken();
+    if (token) {
+      headers['X-CSRF-Token'] = token;
+    }
+  }
 
   const response = await fetchWithRetry(
     url,
     {
       ...options,
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
+      headers,
     },
     retryOptions
   );
@@ -373,11 +424,22 @@ export async function apiFetch<T>(
   const data = await response.json();
 
   if (!response.ok) {
+    // On 403 with CSRF error, fetch a fresh token and retry once
+    if (response.status === 403 && !_skipCsrfRetry) {
+      const errorCode = data.error?.code || data.code || '';
+      if (errorCode === 'EBADCSRFTOKEN' || errorCode === 'ERR_BAD_CSRF_TOKEN' ||
+          (data.error?.message || data.message || '').toLowerCase().includes('csrf')) {
+        csrfToken = null;
+        await fetchCsrfToken();
+        return apiFetch<T>(endpoint, options, retryOptions, _skipAuthRetry, true);
+      }
+    }
+
     // Attempt transparent token refresh on 401
     if (response.status === 401 && !_skipAuthRetry) {
       const refreshed = await attemptTokenRefresh();
       if (refreshed) {
-        return apiFetch<T>(endpoint, options, retryOptions, true);
+        return apiFetch<T>(endpoint, options, retryOptions, true, _skipCsrfRetry);
       }
     }
 

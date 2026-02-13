@@ -99,6 +99,18 @@ export const SESSION_DURATION_MS = 30 * MS_PER_DAY;
  */
 export const ACCESS_TOKEN_EXPIRY = '15m';
 
+/**
+ * Maximum concurrent sessions per user.
+ * When exceeded, the oldest session is deleted on new login.
+ */
+export const MAX_SESSIONS_PER_USER = 5;
+
+/**
+ * Minimum interval between session activity (lastUsedAt) updates.
+ * Prevents excessive DB writes on every request.
+ */
+export const SESSION_ACTIVITY_DEBOUNCE_MS = 5 * MS_PER_MINUTE;
+
 // ============================================================================
 // Pagination Defaults
 // ============================================================================
