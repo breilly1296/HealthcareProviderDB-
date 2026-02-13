@@ -153,6 +153,7 @@ jobs:
             RECAPTCHA_SECRET_KEY=RECAPTCHA_SECRET_KEY:latest
             JWT_SECRET=JWT_SECRET:latest
             RESEND_API_KEY=RESEND_API_KEY:latest
+            INSURANCE_ENCRYPTION_KEY=INSURANCE_ENCRYPTION_KEY:latest
 
       - name: Smoke test backend
         run: |
