@@ -27,16 +27,16 @@ export function HeroSection() {
             />
           </div>
 
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-stone-800 dark:text-white mb-4 px-4">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-stone-800 dark:text-white mb-4">
             Find Providers Who Actually
             <span className="text-primary-600 dark:text-primary-400"> Accept Your Insurance</span>
           </h1>
-          <p className="text-lg sm:text-xl text-stone-600 dark:text-gray-300 max-w-3xl mx-auto mb-8 px-4">
+          <p className="text-lg sm:text-xl text-stone-600 dark:text-gray-300 max-w-3xl mx-auto mb-8">
             Search by specialty, location, and insurance plan.
           </p>
 
           {/* Inline search bar */}
-          <div className="max-w-4xl mx-auto px-4">
+          <div className="max-w-4xl mx-auto">
             <HeroSearch />
           </div>
 
