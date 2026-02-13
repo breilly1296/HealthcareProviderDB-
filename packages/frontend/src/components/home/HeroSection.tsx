@@ -12,16 +12,16 @@ export function HeroSection() {
             <Image
               src="/full-logo/logo-full-light.svg"
               alt="VerifyMyProvider"
-              width={400}
-              height={64}
+              width={370}
+              height={80}
               className="h-12 md:h-16 w-auto dark:hidden"
               priority
             />
             <Image
               src="/full-logo/logo-full-dark.svg"
               alt="VerifyMyProvider"
-              width={400}
-              height={64}
+              width={370}
+              height={80}
               className="h-12 md:h-16 w-auto hidden dark:block"
               priority
             />
