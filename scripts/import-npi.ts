@@ -18,6 +18,8 @@ import { createHash } from 'crypto';
 import path from 'path';
 import https from 'https';
 import http from 'http';
+import pg from 'pg';
+import { preImportCheck } from './pre-import-check';
 
 // Load environment variables
 import 'dotenv/config';
@@ -293,7 +295,8 @@ async function importNPIData(options: ImportOptions): Promise<ImportStats> {
   console.log(`\nStarting NPI import from: ${filePath}`);
   console.log(`Filtering for states: ${states?.join(', ') || 'ALL'}`);
   console.log(`Filtering for specialties: ${filterSpecialties ? 'Yes' : 'No'}`);
-  console.log(`Batch size: ${batchSize}\n`);
+  console.log(`Batch size: ${batchSize}`);
+  console.log(`\n⚠️  Import running with enrichment protection — only NPI-sourced fields will be updated on existing records\n`);
 
   const parser = createReadStream(filePath).pipe(
     parse({
@@ -312,8 +315,31 @@ async function importNPIData(options: ImportOptions): Promise<ImportStats> {
         where: { npi },
         create: data,
         update: {
-          ...data,
-          npi: undefined, // Don't update the NPI itself
+          // Only update NPI-sourced fields — never overwrite enrichment data
+          entityType: data.entityType,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          middleName: data.middleName,
+          credential: data.credential,
+          organizationName: data.organizationName,
+          addressLine1: data.addressLine1,
+          addressLine2: data.addressLine2,
+          city: data.city,
+          state: data.state,
+          zip: data.zip,
+          country: data.country,
+          phone: data.phone,
+          fax: data.fax,
+          taxonomyCode: data.taxonomyCode,
+          taxonomyDescription: data.taxonomyDescription,
+          specialtyCategory: data.specialtyCategory,
+          secondaryTaxonomies: data.secondaryTaxonomies,
+          enumerationDate: data.enumerationDate,
+          lastUpdateDate: data.lastUpdateDate,
+          deactivationDate: data.deactivationDate,
+          reactivationDate: data.reactivationDate,
+          npiStatus: data.npiStatus,
+          nppesLastSynced: new Date(),
         },
       })
     );
@@ -331,8 +357,30 @@ async function importNPIData(options: ImportOptions): Promise<ImportStats> {
             where: { npi },
             create: data,
             update: {
-              ...data,
-              npi: undefined,
+              entityType: data.entityType,
+              firstName: data.firstName,
+              lastName: data.lastName,
+              middleName: data.middleName,
+              credential: data.credential,
+              organizationName: data.organizationName,
+              addressLine1: data.addressLine1,
+              addressLine2: data.addressLine2,
+              city: data.city,
+              state: data.state,
+              zip: data.zip,
+              country: data.country,
+              phone: data.phone,
+              fax: data.fax,
+              taxonomyCode: data.taxonomyCode,
+              taxonomyDescription: data.taxonomyDescription,
+              specialtyCategory: data.specialtyCategory,
+              secondaryTaxonomies: data.secondaryTaxonomies,
+              enumerationDate: data.enumerationDate,
+              lastUpdateDate: data.lastUpdateDate,
+              deactivationDate: data.deactivationDate,
+              reactivationDate: data.reactivationDate,
+              npiStatus: data.npiStatus,
+              nppesLastSynced: new Date(),
             },
           });
           stats.insertedRecords++;
@@ -527,6 +575,11 @@ Relevant Specialties (default filter):
   try {
     console.log('Healthcare Provider NPI Import');
     console.log('==============================\n');
+
+    // Run pre-import safety check
+    const checkPool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
+    await preImportCheck(checkPool);
+    await checkPool.end();
 
     const stats = await importNPIData(options);
 

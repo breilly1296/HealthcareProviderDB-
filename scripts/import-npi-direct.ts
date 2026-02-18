@@ -10,6 +10,7 @@ import { createHash } from 'crypto';
 import path from 'path';
 import pg from 'pg';
 import { getSpecialtyCategory, getTaxonomyDescription as getTaxDesc } from '../src/taxonomy-mappings';
+import { preImportCheck } from './pre-import-check';
 
 const { Pool, Client } = pg;
 
@@ -136,7 +137,8 @@ async function importNPIData(filePath: string, databaseUrl: string): Promise<Imp
   console.log(`\nStarting NPI import from: ${filePath}`);
   console.log(`File size: ${(fileStats.size / 1024 / 1024).toFixed(2)} MB`);
   console.log(`Importing ALL providers (no specialty filter)`);
-  console.log(`Skipping deactivated providers (not reactivated)\n`);
+  console.log(`Skipping deactivated providers (not reactivated)`);
+  console.log(`\n⚠️  Import running with enrichment protection — only NPI-sourced fields will be updated on existing records\n`);
 
   const parser = createReadStream(filePath).pipe(
     parse({
@@ -172,29 +174,17 @@ async function importNPIData(filePath: string, databaseUrl: string): Promise<Imp
               $16, $17, $18, $19, $20, $21, $22, $23, $24, NOW(), NOW()
             )
             ON CONFLICT (npi) DO UPDATE SET
+              -- Only update NPI-sourced fields — never overwrite enrichment data
               "entityType" = EXCLUDED."entityType",
               "firstName" = EXCLUDED."firstName",
               "lastName" = EXCLUDED."lastName",
               "middleName" = EXCLUDED."middleName",
               credential = EXCLUDED.credential,
               "organizationName" = EXCLUDED."organizationName",
-              "addressLine1" = EXCLUDED."addressLine1",
-              "addressLine2" = EXCLUDED."addressLine2",
-              city = EXCLUDED.city,
-              state = EXCLUDED.state,
-              zip = EXCLUDED.zip,
-              country = EXCLUDED.country,
-              phone = EXCLUDED.phone,
-              fax = EXCLUDED.fax,
               "taxonomyCode" = EXCLUDED."taxonomyCode",
               "taxonomyDescription" = EXCLUDED."taxonomyDescription",
               "specialtyCategory" = EXCLUDED."specialtyCategory",
-              "secondaryTaxonomies" = EXCLUDED."secondaryTaxonomies",
-              "enumerationDate" = EXCLUDED."enumerationDate",
-              "lastUpdateDate" = EXCLUDED."lastUpdateDate",
               "deactivationDate" = EXCLUDED."deactivationDate",
-              "reactivationDate" = EXCLUDED."reactivationDate",
-              "npiStatus" = EXCLUDED."npiStatus",
               "updatedAt" = NOW()
           `, [
             record.npi,
@@ -384,6 +374,11 @@ Options:
   try {
     console.log('Healthcare Provider NPI Import (Direct PostgreSQL)');
     console.log('===================================================\n');
+
+    // Run pre-import safety check
+    const checkPool = new Pool({ connectionString: databaseUrl, max: 1 });
+    await preImportCheck(checkPool);
+    await checkPool.end();
 
     const stats = await importNPIData(filePath, databaseUrl);
 

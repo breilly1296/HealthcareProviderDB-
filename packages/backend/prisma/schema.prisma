@@ -31,6 +31,7 @@ model Provider {
   primarySpecialty          String?                    @map("primary_specialty") @db.VarChar(200)
   specialtyCategory        String?                    @map("specialty_category") @db.VarChar(100)
   nppesLastSynced          DateTime?                  @map("nppes_last_synced") @db.Timestamptz(6)
+  dataSource               String?                    @default("nppes") @map("data_source") @db.VarChar(30)
   practiceLocations        PracticeLocation[]
   providerCmsDetails       ProviderCmsDetails?
   providerHospitals        ProviderHospital[]
@@ -80,6 +81,9 @@ model PracticeLocation {
   latitude                Float?
   longitude               Float?
   geocoded_at             DateTime?                @map("geocoded_at") @db.Timestamptz(6)
+  dataSource              String?                  @default("nppes") @map("data_source") @db.VarChar(30)
+  enrichedAt              DateTime?                @map("enriched_at") @db.Timestamptz(6)
+  enrichmentSource        String?                  @map("enrichment_source") @db.VarChar(100)
   providers               Provider                 @relation(fields: [npi], references: [npi], onDelete: NoAction, onUpdate: NoAction)
   providerPlanAcceptances ProviderPlanAcceptance[]
 
@@ -313,6 +317,24 @@ model DataQualityAudit {
   @@index([auditType], map: "idx_dqa_audit_type")
   @@index([resolved], map: "idx_dqa_resolved")
   @@map("data_quality_audit")
+}
+
+model ImportConflict {
+  id              Int       @id @default(autoincrement())
+  npi             String    @db.VarChar(10)
+  tableName       String    @map("table_name") @db.VarChar(50)
+  fieldName       String    @map("field_name") @db.VarChar(50)
+  currentValue    String?   @map("current_value")
+  incomingValue   String?   @map("incoming_value")
+  currentSource   String?   @map("current_source") @db.VarChar(30)
+  incomingSource  String?   @map("incoming_source") @db.VarChar(30)
+  resolution      String    @default("pending") @db.VarChar(20)
+  resolvedAt      DateTime? @map("resolved_at") @db.Timestamptz(6)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([npi], map: "idx_conflicts_npi")
+  @@index([resolution], map: "idx_conflicts_resolution")
+  @@map("import_conflicts")
 }
 
 enum AcceptanceStatus {

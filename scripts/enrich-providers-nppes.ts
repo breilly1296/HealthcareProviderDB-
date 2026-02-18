@@ -78,6 +78,7 @@ async function main() {
   console.log(`Mode: ${applyMode ? 'APPLY' : 'DRY RUN'}`);
   console.log(`Limit: ${limit || 'ALL'}`);
   console.log(`Stale threshold: ${STALE_THRESHOLD_DAYS} days`);
+  console.log(`\n⚠️  Import running with enrichment protection — only NPI-sourced fields will be updated on existing records`);
 
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
@@ -98,6 +99,8 @@ async function main() {
     let updated = 0;
     let deactivated = 0;
     let locationsAdded = 0;
+    let locationsUpdated = 0;
+    let conflictsLogged = 0;
     let errors = 0;
     let cursor: string | null = null;
 
@@ -163,7 +166,7 @@ async function main() {
               );
               updated++;
 
-              // Add/update practice locations from NPPES
+              // Add new practice locations from NPPES; never overwrite enrichment data
               const practiceAddresses = nppes.addresses?.filter(
                 a => a.address_purpose === 'LOCATION'
               ) || [];
@@ -171,15 +174,17 @@ async function main() {
               for (const addr of practiceAddresses) {
                 // Check if location already exists
                 const existing = await client.query(
-                  `SELECT id FROM practice_locations
+                  `SELECT id, address_line2, zip_code, phone, fax
+                   FROM practice_locations
                    WHERE npi = $1 AND address_line1 = $2 AND city = $3 AND state = $4`,
                   [row.npi, addr.address_1, addr.city, addr.state]
                 );
 
                 if (existing.rows.length === 0) {
+                  // New location — insert with data_source = 'nppes'
                   await client.query(
-                    `INSERT INTO practice_locations (npi, address_type, address_line1, address_line2, city, state, zip_code, phone, fax)
-                     VALUES ($1, 'practice', $2, $3, $4, $5, $6, $7, $8)`,
+                    `INSERT INTO practice_locations (npi, address_type, address_line1, address_line2, city, state, zip_code, phone, fax, data_source)
+                     VALUES ($1, 'practice', $2, $3, $4, $5, $6, $7, $8, 'nppes')`,
                     [
                       row.npi,
                       addr.address_1,
@@ -192,6 +197,56 @@ async function main() {
                     ]
                   );
                   locationsAdded++;
+                } else {
+                  const loc = existing.rows[0];
+
+                  // Log conflicts where NPPES differs from our enriched data
+                  const conflicts: Array<{ field: string; current: string; incoming: string }> = [];
+
+                  if (loc.address_line2 && addr.address_2 && loc.address_line2 !== addr.address_2) {
+                    conflicts.push({ field: 'address_line2', current: loc.address_line2, incoming: addr.address_2 });
+                  }
+                  if (loc.zip_code && addr.postal_code && loc.zip_code !== addr.postal_code) {
+                    conflicts.push({ field: 'zip_code', current: loc.zip_code, incoming: addr.postal_code });
+                  }
+                  if (loc.phone && addr.telephone_number && loc.phone !== addr.telephone_number) {
+                    conflicts.push({ field: 'phone', current: loc.phone, incoming: addr.telephone_number });
+                  }
+                  if (loc.fax && addr.fax_number && loc.fax !== addr.fax_number) {
+                    conflicts.push({ field: 'fax', current: loc.fax, incoming: addr.fax_number });
+                  }
+
+                  for (const c of conflicts) {
+                    await client.query(
+                      `INSERT INTO import_conflicts (npi, table_name, field_name, current_value, incoming_value, current_source, incoming_source)
+                       VALUES ($1, 'practice_locations', $2, $3, $4, 'enrichment', 'nppes')`,
+                      [row.npi, c.field, c.current, c.incoming]
+                    );
+                    conflictsLogged++;
+                  }
+
+                  // Only fill in phone/fax if our current values are NULL
+                  const updates: string[] = [];
+                  const updateParams: any[] = [];
+                  let paramIdx = 1;
+
+                  if (!loc.phone && addr.telephone_number) {
+                    updates.push(`phone = $${paramIdx++}`);
+                    updateParams.push(addr.telephone_number);
+                  }
+                  if (!loc.fax && addr.fax_number) {
+                    updates.push(`fax = $${paramIdx++}`);
+                    updateParams.push(addr.fax_number);
+                  }
+
+                  if (updates.length > 0) {
+                    updateParams.push(loc.id);
+                    await client.query(
+                      `UPDATE practice_locations SET ${updates.join(', ')} WHERE id = $${paramIdx}`,
+                      updateParams
+                    );
+                    locationsUpdated++;
+                  }
                 }
               }
             }
@@ -233,7 +288,7 @@ async function main() {
         ? Math.min(100, Math.round((processed / limit) * 100))
         : Math.round((processed / eligible) * 100);
       process.stdout.write(
-        `\r  Processed: ${processed}/${limit || eligible} (${pct}%) | Updated: ${updated} | Deactivated: ${deactivated} | Locations: ${locationsAdded} | Errors: ${errors}`
+        `\r  Processed: ${processed}/${limit || eligible} (${pct}%) | Updated: ${updated} | Deactivated: ${deactivated} | Locations: +${locationsAdded} | Conflicts: ${conflictsLogged} | Errors: ${errors}`
       );
 
       if (limit && processed >= limit) break;
@@ -248,6 +303,8 @@ async function main() {
     console.log(`  Fields updated:    ${updated}`);
     console.log(`  Newly deactivated: ${deactivated}`);
     console.log(`  Locations added:   ${locationsAdded}`);
+    console.log(`  Locations updated: ${locationsUpdated} (NULL phone/fax filled)`);
+    console.log(`  Conflicts logged:  ${conflictsLogged}`);
     console.log(`  Errors:            ${errors}`);
 
     if (!applyMode) {
