@@ -10,7 +10,7 @@ import { createHash } from 'crypto';
 import path from 'path';
 import pg from 'pg';
 import { getSpecialtyCategory, getTaxonomyDescription as getTaxDesc } from '../src/taxonomy-mappings';
-import { preImportCheck } from './pre-import-check';
+import { preImportCheck, createPool } from './pre-import-check';
 
 const { Pool, Client } = pg;
 
@@ -97,14 +97,7 @@ async function importNPIData(filePath: string, databaseUrl: string): Promise<Imp
     throw new Error(`NPI data file not found: ${filePath}`);
   }
 
-  const pool = new Pool({
-    connectionString: databaseUrl,
-    max: 5,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
-    keepAlive: true,
-    keepAliveInitialDelayMillis: 10000,
-  });
+  const pool = createPool(databaseUrl, 5);
   const fileStats = await stat(filePath);
   const fileHash = await calculateFileHash(filePath);
   const startTime = Date.now();
@@ -376,9 +369,7 @@ Options:
     console.log('===================================================\n');
 
     // Run pre-import safety check
-    const checkPool = new Pool({ connectionString: databaseUrl, max: 1 });
-    await preImportCheck(checkPool);
-    await checkPool.end();
+    await preImportCheck(databaseUrl);
 
     const stats = await importNPIData(filePath, databaseUrl);
 

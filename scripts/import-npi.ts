@@ -18,7 +18,6 @@ import { createHash } from 'crypto';
 import path from 'path';
 import https from 'https';
 import http from 'http';
-import pg from 'pg';
 import { preImportCheck } from './pre-import-check';
 
 // Load environment variables
@@ -577,9 +576,7 @@ Relevant Specialties (default filter):
     console.log('==============================\n');
 
     // Run pre-import safety check
-    const checkPool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
-    await preImportCheck(checkPool);
-    await checkPool.end();
+    await preImportCheck(process.env.DATABASE_URL!);
 
     const stats = await importNPIData(options);
 

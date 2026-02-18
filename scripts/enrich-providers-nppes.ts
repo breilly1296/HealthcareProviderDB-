@@ -17,6 +17,7 @@
 
 import pg from 'pg';
 import 'dotenv/config';
+import { createPool } from './pre-import-check.js';
 
 const { Pool } = pg;
 
@@ -80,10 +81,7 @@ async function main() {
   console.log(`Stale threshold: ${STALE_THRESHOLD_DAYS} days`);
   console.log(`\n⚠️  Import running with enrichment protection — only NPI-sourced fields will be updated on existing records`);
 
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    max: 3,
-  });
+  const pool = createPool(process.env.DATABASE_URL!, 3);
 
   try {
     // Count eligible providers
