@@ -29,18 +29,26 @@ Six states have been imported for development and testing purposes:
 
 ## Import Scripts
 
+### Pre-Import Safety
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/pre-import-check.ts` | Safety check before any import. Shows enriched record counts, pending conflicts, and prompts if unresolved conflicts exist. Also exports `createPool()` for shared Cloud SQL connection handling. |
+
 ### Primary Import
 
 | Script | Purpose |
 |--------|---------|
-| `scripts/import-npi-direct.ts` | Main NPI import script. Reads NPPES CSV files and inserts directly into PostgreSQL. Batch size: 5,000 records. Processes ~60-90 minutes for NYC dataset. |
+| `scripts/import-npi-direct.ts` | Main NPI import script. Reads NPPES CSV files and inserts directly into PostgreSQL. Batch size: 5,000 records. Enrichment-safe: only updates NPI-sourced fields on conflict. |
+| `scripts/import-npi.ts` | Alternative Prisma-based NPI import. Enrichment-safe: explicit field allowlist on update. |
 
-The import script handles:
+The import scripts handle:
 - Parsing NPPES CSV format with all 329+ columns
 - Extracting relevant provider fields (NPI, name, credentials, address, taxonomy codes)
 - Batch insertion into `providers`, `practice_locations`, and `provider_taxonomies` tables
 - Deduplication on NPI (primary key)
 - Progress logging with estimated time remaining
+- Enrichment protection: never overwrite enriched fields (profile URLs, confidence scores, geocoding)
 
 ### Data Cleanup and Enrichment
 
@@ -55,6 +63,7 @@ The import script handles:
 | `scripts/verify-data-quality.ts` | Runs data quality checks and generates audit reports |
 | `scripts/extract-nyc-providers.ts` | Extracts NYC-specific providers from full NPPES dataset |
 | `scripts/enrich-location-names.ts` | Enriches location display names |
+| `scripts/enrich-providers-nppes.ts` | NPPES API enrichment. Fill-not-overwrite: phone/fax only if NULL, conflicts logged to `import_conflicts`. |
 | `scripts/analyze-health-systems.ts` | Analyzes hospital system affiliations |
 | `scripts/match-facilities.ts` | Matches providers to hospital facilities |
 | `scripts/seed.ts` | Seeds development database with sample data |
@@ -63,10 +72,10 @@ The import script handles:
 
 | Script | Purpose |
 |--------|---------|
-| `src/scripts/importInsurancePlans.ts` | Main insurance plan import script |
-| `src/scripts/insurancePlanParser.ts` | Parses raw insurance plan data into structured format |
+| `src/scripts/importInsurancePlans.ts` | Main insurance plan import script. Enrichment-safe: never downgrades confidence scores, logs conflicts to `import_conflicts` when existing confidence exceeds incoming. |
+| `src/utils/insurancePlanParser.ts` | Parses raw insurance plan data into structured format |
 
-Insurance plan data is imported from CMS marketplace plan data, parsing plan names, carrier information, plan types (HMO, PPO, EPO, POS), and state-level availability.
+Insurance plan data is imported from hospital website scrapes (via Gemini), parsing plan names, carrier information, plan types (HMO, PPO, EPO, POS), and health system source tracking.
 
 ---
 
@@ -190,13 +199,46 @@ Future consideration: Use practice location address matching to infer organizati
 
 For a fresh import, scripts should be run in this order:
 
-1. `import-npi-direct.ts` -- Import base provider data from NPPES CSV
-2. `normalize-city-names.ts` -- Clean up city name inconsistencies
-3. `backfill-specialty-fast.cjs` -- Map taxonomy codes to specialty categories
-4. `cleanup-deactivated-providers.ts` -- Remove deactivated providers
-5. `match-facilities.ts` -- Match providers to hospital facilities
-6. `enrich-location-names.ts` -- Enrich location display names
-7. `importInsurancePlans.ts` -- Import insurance plan data
-8. `backfill-verification-ttl.ts` -- Set TTL on any existing verification records
-9. `generate-cities-json.cjs` -- Generate city list for frontend
-10. `verify-data-quality.ts` -- Run quality checks and generate audit reports
+1. `pre-import-check.ts` -- Safety check (enriched record counts, pending conflicts)
+2. `import-npi-direct.ts` -- Import base provider data from NPPES CSV (enrichment-safe)
+3. `normalize-city-names.ts` -- Clean up city name inconsistencies
+4. `backfill-specialty-fast.cjs` -- Map taxonomy codes to specialty categories
+5. `cleanup-deactivated-providers.ts` -- Remove deactivated providers
+6. `match-facilities.ts` -- Match providers to hospital facilities
+7. `enrich-location-names.ts` -- Enrich location display names
+8. Enrichment CSV import -- Import practice-level enrichment data (names, websites, hospital systems, insurance, hours, confidence)
+9. `importInsurancePlans.ts` -- Import insurance plan data from hospital scrapes
+10. `backfill-verification-ttl.ts` -- Set TTL on any existing verification records
+11. `generate-cities-json.cjs` -- Generate city list for frontend
+12. `verify-data-quality.ts` -- Run quality checks and generate audit reports
+
+---
+
+## Enrichment Protection
+
+All import scripts have been hardened to protect enrichment data:
+
+- `data_source` column on `providers` and `practice_locations` tracks origin (`nppes`, `enrichment`, `user_verification`, `hospital_scrape`)
+- `enriched_at` and `enrichment_source` columns on `practice_locations`
+- `import_conflicts` table logs cases where new import data conflicts with existing enrichment
+- `pre-import-check.ts` runs before any import, showing enriched record counts and pending conflicts
+- NPI re-imports only update NPI-sourced fields (name, credential, taxonomy, dates, status)
+- Phone/fax only filled if current value is NULL
+- Latitude/longitude/geocoded_at/address_hash never overwritten by NPI import
+- Confidence scores never downgraded by lower-priority sources
+
+Data priority hierarchy:
+1. `user_verification` (highest)
+2. `enrichment` (manual verification)
+3. `hospital_scrape` (automated)
+4. `nppes` (baseline)
+
+## Import Scripts -- Enrichment Safety
+
+| Script | Purpose | Enrichment Safe? |
+|--------|---------|-----------------|
+| `pre-import-check.ts` | Safety check before imports | N/A |
+| `import-npi-direct.ts` | Primary NPI import (direct SQL) | Selective update |
+| `import-npi.ts` | Alternative NPI import (Prisma) | Selective update |
+| `enrich-providers-nppes.ts` | NPPES API enrichment | Fill-not-overwrite |
+| `importInsurancePlans.ts` | Hospital scrape insurance | Never downgrades confidence |

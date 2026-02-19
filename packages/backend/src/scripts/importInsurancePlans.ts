@@ -39,6 +39,7 @@ interface ImportStats {
   updatedPlans: number;
   newAcceptances: number;
   updatedAcceptances: number;
+  conflictsLogged: number;
   errors: number;
   skippedNoNpi: number;
   skippedNoPlans: number;
@@ -178,11 +179,12 @@ async function incrementProviderCount(planId: string): Promise<void> {
 
 /**
  * Create or update provider-plan acceptance
+ * Returns: 'new' | 'upgraded' | 'conflict' | 'unchanged'
  */
 async function upsertAcceptance(
   providerNpi: string,
   planId: string
-): Promise<boolean> {
+): Promise<'new' | 'upgraded' | 'conflict' | 'unchanged'> {
   const existing = await prisma.providerPlanAcceptance.findFirst({
     where: {
       providerNpi,
@@ -192,8 +194,26 @@ async function upsertAcceptance(
   });
 
   if (existing) {
-    // Update confidence if new source is better
-    if ((existing.confidenceScore || 0) < HOSPITAL_SCRAPE_CONFIDENCE) {
+    const currentConfidence = existing.confidenceScore || 0;
+
+    if (currentConfidence > HOSPITAL_SCRAPE_CONFIDENCE) {
+      // Never downgrade confidence — log conflict instead
+      await prisma.importConflict.create({
+        data: {
+          npi: providerNpi,
+          tableName: 'provider_plan_acceptance',
+          fieldName: 'confidence_score',
+          currentValue: String(currentConfidence),
+          incomingValue: String(HOSPITAL_SCRAPE_CONFIDENCE),
+          currentSource: 'user_verification',
+          incomingSource: 'hospital_scrape',
+        },
+      });
+      return 'conflict';
+    }
+
+    if (currentConfidence < HOSPITAL_SCRAPE_CONFIDENCE) {
+      // Upgrade confidence from lower source
       await prisma.providerPlanAcceptance.update({
         where: { id: existing.id },
         data: {
@@ -202,8 +222,10 @@ async function upsertAcceptance(
           lastVerified: new Date(),
         },
       });
+      return 'upgraded';
     }
-    return false; // Not a new record
+
+    return 'unchanged';
   }
 
   await prisma.providerPlanAcceptance.create({
@@ -217,7 +239,7 @@ async function upsertAcceptance(
     },
   });
 
-  return true; // New record
+  return 'new';
 }
 
 /**
@@ -234,6 +256,7 @@ async function importInsurancePlans(
     updatedPlans: 0,
     newAcceptances: 0,
     updatedAcceptances: 0,
+    conflictsLogged: 0,
     errors: 0,
     skippedNoNpi: 0,
     skippedNoPlans: 0,
@@ -304,13 +327,21 @@ async function importInsurancePlans(
         }
 
         // Create acceptance record
-        const isNewAcceptance = await upsertAcceptance(npi, planInfo.planId);
-        if (isNewAcceptance) {
-          stats.newAcceptances++;
-          // Increment provider count on the plan
-          await incrementProviderCount(planInfo.planId);
-        } else {
-          stats.updatedAcceptances++;
+        const result = await upsertAcceptance(npi, planInfo.planId);
+        switch (result) {
+          case 'new':
+            stats.newAcceptances++;
+            await incrementProviderCount(planInfo.planId);
+            break;
+          case 'upgraded':
+            stats.updatedAcceptances++;
+            break;
+          case 'conflict':
+            stats.conflictsLogged++;
+            break;
+          case 'unchanged':
+            stats.updatedAcceptances++;
+            break;
         }
       }
 
@@ -363,7 +394,8 @@ async function main(): Promise<void> {
     const stats = await importInsurancePlans(absolutePath, healthSystem);
 
     console.log('\n===========================================');
-    console.log('Import Complete!');
+    console.log(`Import Complete — ${healthSystem}`);
+    console.log(`Finished at: ${new Date().toISOString()}`);
     console.log('===========================================');
     console.log(`Total rows in CSV:      ${stats.totalRows}`);
     console.log(`Processed rows:         ${stats.processedRows}`);
@@ -375,6 +407,7 @@ async function main(): Promise<void> {
     console.log(`Plans updated:          ${stats.updatedPlans}`);
     console.log(`New acceptances:        ${stats.newAcceptances}`);
     console.log(`Acceptances updated:    ${stats.updatedAcceptances}`);
+    console.log(`Conflicts logged:       ${stats.conflictsLogged}`);
     console.log('===========================================\n');
   } catch (error) {
     console.error('Import failed:', error);
