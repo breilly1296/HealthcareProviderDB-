@@ -199,18 +199,21 @@ async function main() {
                   const loc = existing.rows[0];
 
                   // Log conflicts where NPPES differs from our enriched data
+                  // Normalize before comparing: strip non-digits from phones, compare first 5 digits of zip
+                  const digitsOnly = (s: string) => s.replace(/\D/g, '');
+                  const zip5 = (s: string) => s.substring(0, 5);
                   const conflicts: Array<{ field: string; current: string; incoming: string }> = [];
 
                   if (loc.address_line2 && addr.address_2 && loc.address_line2 !== addr.address_2) {
                     conflicts.push({ field: 'address_line2', current: loc.address_line2, incoming: addr.address_2 });
                   }
-                  if (loc.zip_code && addr.postal_code && loc.zip_code !== addr.postal_code) {
+                  if (loc.zip_code && addr.postal_code && zip5(loc.zip_code) !== zip5(addr.postal_code)) {
                     conflicts.push({ field: 'zip_code', current: loc.zip_code, incoming: addr.postal_code });
                   }
-                  if (loc.phone && addr.telephone_number && loc.phone !== addr.telephone_number) {
+                  if (loc.phone && addr.telephone_number && digitsOnly(loc.phone) !== digitsOnly(addr.telephone_number)) {
                     conflicts.push({ field: 'phone', current: loc.phone, incoming: addr.telephone_number });
                   }
-                  if (loc.fax && addr.fax_number && loc.fax !== addr.fax_number) {
+                  if (loc.fax && addr.fax_number && digitsOnly(loc.fax) !== digitsOnly(addr.fax_number)) {
                     conflicts.push({ field: 'fax', current: loc.fax, incoming: addr.fax_number });
                   }
 
