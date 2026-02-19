@@ -10,7 +10,7 @@ priority: 2
 # Sybil Attack Prevention
 
 ## Files to Review
-- `prisma/schema.prisma` (indexes and constraints)
+- `packages/backend/prisma/schema.prisma` (indexes and constraints)
 - `packages/backend/src/services/verificationService.ts` (prevention logic)
 - `packages/backend/src/middleware/rateLimiter.ts` (rate limiting)
 - `packages/backend/src/middleware/captcha.ts` (CAPTCHA)
@@ -75,6 +75,17 @@ A Sybil attack is when an attacker creates multiple fake identities to manipulat
 │  • (npi, planId, sourceIp, createdAt)      │
 │  • (npi, planId, submittedBy, createdAt)   │
 │  • 30-day window check before accepting    │
+└─────────────────────────────────────────────┘
+```
+
+### Layer 6: User Authentication (NEW)
+```
+┌─────────────────────────────────────────────┐
+│  User Accounts (middleware/auth.ts)          │
+│  • Magic link authentication available      │
+│  • Authenticated users have higher trust    │
+│  • Session tracking (IP, user agent)        │
+│  • CSRF protection on mutating routes       │
 └─────────────────────────────────────────────┘
 ```
 

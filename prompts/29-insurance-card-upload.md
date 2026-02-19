@@ -16,6 +16,14 @@ priority: 3
 - `packages/frontend/src/lib/imagePreprocess.ts` (image preprocessing with Sharp)
 - `packages/frontend/src/types/insurance.ts` (TypeScript types)
 - `packages/frontend/src/app/insurance/page.tsx` (insurance page)
+- `packages/backend/src/routes/insuranceCard.ts` (CRUD + scan endpoints — requireAuth)
+- `packages/backend/src/services/insuranceCardService.ts` (save, get, update, delete with encryption)
+- `packages/backend/src/services/insuranceCardExtractor.ts` (Claude AI extraction)
+- `packages/backend/src/lib/encryption.ts` (AES encryption for PII fields)
+- `packages/frontend/src/app/dashboard/insurance/page.tsx` (insurance card dashboard)
+- `packages/frontend/src/app/dashboard/insurance/InsuranceCardDashboard.tsx` (dashboard component)
+- `packages/frontend/src/components/InsuranceCardScanner.tsx` (webcam scanner)
+- `packages/backend/prisma/schema.prisma` (UserInsuranceCard model)
 
 ## Feature Overview
 
@@ -31,6 +39,10 @@ Optional feature that uses AI (Anthropic Claude) to extract insurance plan infor
 7. If low confidence, retry with alternative prompt
 8. Extracted data displayed with confidence indicator
 9. User can verify and use data to search for providers
+10. User can save extracted data to their profile (requires login)
+11. Saved card data encrypted at rest (subscriber ID, group number, pharmacy info)
+12. User can view/update/delete saved card from dashboard
+13. Saved plan can be matched to database plans for provider search
 
 ## Implementation
 
@@ -118,12 +130,64 @@ Confidence levels:
 // - Mobile camera support
 ```
 
+## Backend Storage (NEW -- Feb 2026)
+
+### Prisma Model: UserInsuranceCard
+```prisma
+model UserInsuranceCard {
+  id               String  @id @default(cuid())
+  userId           String  @unique @map("user_id")  // One card per user
+  insuranceCompany String? // plaintext
+  planName         String? // plaintext
+  planType         String? // plaintext (PPO, HMO, etc.)
+  providerNetwork  String? // plaintext
+  subscriberIdEnc  String? // AES encrypted
+  groupNumberEnc   String? // AES encrypted
+  rxbinEnc         String? // AES encrypted
+  rxpcnEnc         String? // AES encrypted
+  rxgrpEnc         String? // AES encrypted
+  // ... copay, deductible, OOP max fields (plaintext)
+  matchedPlanId    String? // FK to InsurancePlan
+  confidenceScore  Int?
+  cardSide         String? // front/back
+  scannedAt        DateTime
+  updatedAt        DateTime @updatedAt
+}
+```
+
+### Backend Routes (`/api/v1/me/insurance-card`)
+All routes require authentication (requireAuth middleware). CSRF protection applied at router level.
+
+| Method | Path | Rate Limit | Description |
+|--------|------|-----------|-------------|
+| POST | `/scan` | 10/hr per user | Scan image via Claude AI -> extract -> encrypt PII -> save |
+| POST | `/save` | default | Save pre-extracted data (frontend two-step flow) |
+| GET | `/` | default | Get saved card (decrypts PII for response) |
+| PATCH | `/` | default | Update specific card fields |
+| DELETE | `/` | default | Remove saved card |
+
+### Encryption
+PII fields encrypted with AES via `lib/encryption.ts`:
+- `subscriber_id` -> `subscriber_id_enc`
+- `group_number` -> `group_number_enc`
+- `rxbin` -> `rxbin_enc`
+- `rxpcn` -> `rxpcn_enc`
+- `rxgrp` -> `rxgrp_enc`
+
+Requires `INSURANCE_ENCRYPTION_KEY` environment variable.
+
+### Frontend Dashboard
+- `app/dashboard/insurance/page.tsx` -- Dashboard page
+- `InsuranceCardDashboard.tsx` -- View/edit/delete saved card
+- `InsuranceCardScanner.tsx` -- Webcam-based card scanner
+
 ## Configuration
 
 ### Environment Variables
 | Variable | Required | Purpose |
 |----------|----------|---------|
 | `ANTHROPIC_API_KEY` | Yes (for feature) | Anthropic API access |
+| `INSURANCE_ENCRYPTION_KEY` | Yes (for storage) | AES encryption key for PII fields |
 
 ### Constants
 | Setting | Value | Description |
@@ -148,9 +212,11 @@ The feature is optional and gracefully degrades:
 - [x] File size limits enforced (10MB max)
 
 ### Privacy
-- [x] No member IDs stored in database
+- [x] Member IDs stored ENCRYPTED (AES) -- subscriber_id_enc, group_number_enc, rx fields
 - [x] No card images retained
 - [x] Extraction results not logged
+- [x] INSURANCE_ENCRYPTION_KEY required for decryption
+- [x] Encryption key in GCP Secret Manager (production)
 - [ ] Privacy policy updated for feature
 
 ### API Security
@@ -159,6 +225,9 @@ The feature is optional and gracefully degrades:
 - [x] File size limit (10MB)
 - [x] Base64 format validation
 - [ ] CAPTCHA on upload (optional enhancement)
+- [x] Authentication required (requireAuth middleware)
+- [x] CSRF protection on all mutating routes
+- [x] One card per user (unique constraint on userId)
 
 ## Checklist
 

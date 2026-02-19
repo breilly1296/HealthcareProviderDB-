@@ -92,6 +92,32 @@ Centralized fetch wrapper with:
 | `getRecent(params)` | `GET /verify/recent` | Recent verifications |
 | `getForPair(npi, planId)` | `GET /verify/:npi/:planId` | Verification pair data |
 
+**`auth`**
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| `getCsrfToken()` | `GET /auth/csrf-token` | Get CSRF token for double-submit |
+| `requestMagicLink(email)` | `POST /auth/magic-link` | Request magic link email |
+| `refresh()` | `POST /auth/refresh` | Refresh access token |
+| `logout()` | `POST /auth/logout` | Logout and clear session |
+| `getMe()` | `GET /auth/me` | Get current user profile |
+
+**`savedProviders`**
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| `list(page, limit)` | `GET /saved-providers` | List saved providers |
+| `save(npi)` | `POST /saved-providers` | Bookmark a provider |
+| `unsave(npi)` | `DELETE /saved-providers/:npi` | Remove bookmark |
+| `checkStatus(npi)` | `GET /saved-providers/:npi/status` | Check if saved |
+
+**`insuranceCard`**
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| `scan(imageBase64, mimeType)` | `POST /me/insurance-card/scan` | Scan card with AI |
+| `save(data)` | `POST /me/insurance-card/save` | Save extracted data |
+| `get()` | `GET /me/insurance-card` | Get saved card |
+| `update(fields)` | `PATCH /me/insurance-card` | Update card fields |
+| `delete()` | `DELETE /me/insurance-card` | Delete card |
+
 **`locations` (exported as `locationApi`)**
 Note: Backend locations route is active with 5 endpoints (search, health-systems, stats/:state, /:locationId, /:locationId/providers).
 
@@ -145,6 +171,10 @@ export const providerKeys = {
 |------|------|---------|
 | `useRecentSearches()` | `useRecentSearches.ts` | Recent search history |
 | `useCompare()` | `useCompare.ts` | Access CompareContext (add/remove/clear providers, max 4) |
+| `useInsuranceCard()` | `useInsuranceCard.ts` | Get, save, update, delete user's insurance card (React Query mutations) |
+| `useGeoLocation()` | `useGeoLocation.ts` | Browser Geolocation API wrapper for map-based search |
+| `useMapProviders()` | `useMapProviders.ts` | Provider data formatted for Google Maps markers |
+| `useCaptcha()` | `useCaptcha.ts` | reCAPTCHA v3 token generation for verify/vote forms |
 
 ## Client State (React Context)
 

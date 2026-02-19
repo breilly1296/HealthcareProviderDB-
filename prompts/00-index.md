@@ -4,7 +4,7 @@ tags:
   - meta
 type: index
 priority: 1
-updated: 2026-02-05
+updated: 2026-02-18
 ---
 
 # VerifyMyProvider Prompts Index
@@ -20,17 +20,17 @@ Quick reference for all available prompts.
 
 | # | Prompt | Purpose | Priority |
 |---|--------|---------|----------|
-| 01 | [[01-database-schema]] | 15 Prisma models, indexes, relationships | Critical |
-| 02 | [[02-no-hipaa-compliance]] | Why no HIPAA needed (public data only) | Critical |
-| 03 | [[03-authentication]] | Admin auth (X-Admin-Secret) + future strategy | High |
-| 04 | [[04-csrf]] | CSRF protection (not needed yet — no auth cookies) | Medium |
+| 01 | [[01-database-schema]] | 21 Prisma models, indexes, relationships | Critical |
+| 02 | [[02-no-hipaa-compliance]] | Why no HIPAA needed (public data + encrypted card PII) | Critical |
+| 03 | [[03-authentication]] | Magic link auth, JWT sessions, admin secret | High |
+| 04 | [[04-csrf]] | CSRF double-submit cookie (implemented via csrf-csrf) | High |
 | 05 | [[05-audit-logging]] | Structured logging, PII exclusion, DB audit trail | Medium |
-| 06 | [[06-api-routes]] | All API endpoints: providers, plans, verify, admin | High |
+| 06 | [[06-api-routes]] | All API endpoints: providers, plans, verify, auth, admin, saved, card | High |
 | 07 | [[07-input-validation]] | Zod validation on all endpoints | High |
 | 08 | [[08-rate-limiting]] | Dual-mode (Redis/in-memory), sliding window, CAPTCHA | Critical |
 | 09 | [[09-external-apis]] | 5 APIs: reCAPTCHA, Claude, PostHog, NPI Registry, Redis | Medium |
-| 10 | [[10-frontend-structure]] | Next.js pages, 40+ components, state management | Medium |
-| 11 | [[11-environment-secrets]] | 20+ env vars, GCP Secret Manager, CI/CD injection | Critical |
+| 10 | [[10-frontend-structure]] | Next.js 15+ pages, 70+ components, auth, map, dashboard | Medium |
+| 11 | [[11-environment-secrets]] | 25+ env vars, GCP Secret Manager, CI/CD injection | Critical |
 | 12 | [[12-confidence-scoring]] | 4-factor algorithm (25/30/25/20), specialty-aware | High |
 | 13 | [[13-npi-data-pipeline]] | Import scripts, taxonomy mapping, data quality | High |
 
@@ -64,19 +64,19 @@ Quick reference for all available prompts.
 
 ---
 
-## Feature Prompts (28-43)
+## Feature Prompts (28-46)
 
 | # | Prompt | Purpose | Status |
 |---|--------|---------|--------|
 | 28 | [[28-location-features]] | Location abstraction (practice_locations) | Active |
-| 29 | [[29-insurance-card-upload]] | Insurance card OCR via Claude AI | Accurate |
+| 29 | [[29-insurance-card-upload]] | Insurance card OCR + encrypted storage + dashboard | Updated |
 | 30 | [[30-testing-strategy]] | Testing approach | Reference |
 | 31 | [[31-redis-caching]] | Redis caching strategy | Reference |
 | 32 | [[32-ttl-data-expiration]] | TTL and data expiration | Reference |
 | 33 | [[33-provider-comparison]] | Provider comparison feature | Reference |
 | 34 | [[34-analytics-posthog]] | PostHog analytics (privacy-preserving) | Updated |
 | 35 | [[35-monorepo-structure]] | npm workspace monorepo | Reference |
-| 36 | [[36-sybil-attack-prevention]] | 4-layer anti-spam (all implemented) | Updated |
+| 36 | [[36-sybil-attack-prevention]] | 6-layer anti-spam (all implemented) | Updated |
 | 37 | [[37-error-handling]] | AppError class + asyncHandler | Accurate |
 | 38 | [[38-admin-endpoints]] | Admin endpoints reference | Reference |
 | 39 | [[39-insurance-plans]] | Insurance plans feature (end-to-end) | **New** |
@@ -85,6 +85,8 @@ Quick reference for all available prompts.
 | 42 | [[42-provider-detail-page]] | Provider detail page architecture | **New** |
 | 43 | [[43-search-architecture]] | Search flow (frontend + backend) | **New** |
 | 44 | [[44-seo-sitemap]] | SEO strategy, dynamic sitemap, provider page ISR | **New** |
+| 45 | [[45-user-accounts]] | Magic link auth, saved providers, bookmarks | **New** |
+| 46 | [[46-map-geospatial]] | Map page, geolocation, Google Maps integration | **New** |
 
 ---
 
@@ -116,6 +118,8 @@ Quick reference for all available prompts.
 3. **Insurance plans:** [[39-insurance-plans]]
 4. **Data fetching:** [[41-frontend-data-fetching]]
 5. **Confidence scoring:** [[12-confidence-scoring]]
+6. **User accounts:** [[45-user-accounts]]
+7. **Map/geospatial:** [[46-map-geospatial]]
 
 ### Updating Documentation?
 1. Run individual prompts 14-25 as needed
@@ -133,7 +137,7 @@ Quick reference for all available prompts.
 ### In Claude Code
 Best for prompts that scan code:
 - 01-13 (security & architecture audits)
-- 39-43 (feature deep-dives)
+- 39-46 (feature deep-dives)
 - 16-architecture-doc, 17-api-reference-doc
 
 ### In Claude.ai
@@ -151,9 +155,9 @@ Best for Q&A prompts:
 | Aspect | OwnMyHealth | VerifyMyProvider |
 |--------|-------------|------------------|
 | HIPAA | Required | NOT required |
-| Encryption | PHI at rest | Not needed |
+| Encryption | PHI at rest | AES for card PII only |
 | Compliance | Complex | Simple |
-| Auth | Full accounts | Admin-only (no user auth yet) |
+| Auth | Full accounts | Magic link + JWT (implemented Feb 2026) |
 | Data Type | Private health | Public provider data |
 
 ---
@@ -166,4 +170,4 @@ These prompts should be updated when:
 - Architecture changes (new services, database changes, etc.)
 - New external API integrations are added
 
-**Last full audit:** 2026-02-06 (see `PROMPT-AUDIT-REPORT.md`)
+**Last full audit:** 2026-02-18 (see `PROMPT-AUDIT-REPORT.md`)

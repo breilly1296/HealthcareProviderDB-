@@ -44,6 +44,13 @@ priority: 1
 - [ ] User insurance selections - NOT linked to identity
 - [ ] Individual medical records - NEVER collected
 
+**Note on Insurance Card Storage (Feb 2026):** User insurance card data (subscriber ID, group number, pharmacy IDs) is now stored **encrypted** in the `user_insurance_cards` table. This is user-provided data linked to their account, NOT pulled from medical records. The data is:
+- Voluntarily submitted by the user (not from a healthcare provider)
+- Encrypted at rest (AES via INSURANCE_ENCRYPTION_KEY)
+- Not linked to health conditions, diagnoses, or treatments
+- Deletable by the user at any time
+This does NOT trigger HIPAA because no Protected Health Information (PHI) is collected — the card data identifies an insurance plan, not a health condition or treatment.
+
 ### 3. Safe vs Unsafe Patterns
 
 **SAFE (What We Do):**
@@ -82,6 +89,7 @@ Verification record:
 - [x] Data accuracy disclaimers — `app/disclaimer/page.tsx` + `Disclaimer.tsx` component
 - [ ] CMS Terms of Use (NPI Registry data usage) — not explicitly documented
 - [x] Basic security (HTTPS, rate limiting, CAPTCHA) — all implemented
+- [x] Insurance card data encrypted at rest — AES encryption for subscriber IDs, group numbers, pharmacy info
 
 **Note on Insurance Card Upload:** The insurance card extraction feature processes card images via Claude AI but does NOT store them permanently. Images are processed server-side and discarded. This does not introduce PHI since no card data is linked to user identity. However, the privacy policy should mention this feature.
 

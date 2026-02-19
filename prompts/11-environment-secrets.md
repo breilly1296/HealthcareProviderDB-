@@ -38,6 +38,7 @@ updated: 2026-02-05
 | `NODE_ENV` | No | `development` | Both | Environment mode. `development`, `test`, or `production`. Controls CAPTCHA skip, log format, CORS. |
 | `CORS_ORIGIN` | No | — | Backend | Additional CORS origin (legacy). Hardcoded origins in `index.ts` take priority. |
 | `FRONTEND_URL` | No | — | Backend (deploy) | Cloud Run frontend URL, added to CORS whitelist dynamically. Set via deploy.yml env_vars. |
+| `LOG_LEVEL` | No | `info` | Backend `logger.ts` | Pino log level. Options: `trace`, `debug`, `info`, `warn`, `error`, `fatal`. |
 
 ### Security — CAPTCHA (Google reCAPTCHA v3)
 | Variable | Required | Default | Where Used | Description |
@@ -54,6 +55,12 @@ updated: 2026-02-05
 | Variable | Required | Default | Where Used | Description |
 |----------|----------|---------|------------|-------------|
 | `ADMIN_SECRET` | Prod only | — | Backend `admin.ts` | Secret for `X-Admin-Secret` header on admin endpoints. If not set, admin endpoints return 503. |
+
+### Security — Encryption
+| Variable | Required | Default | Where Used | Description |
+|----------|----------|---------|------------|-------------|
+| `INSURANCE_ENCRYPTION_KEY` | **Yes** (card storage) | — | Backend `encryption.ts` | AES key for encrypting insurance card PII (subscriber ID, group number, pharmacy info). In production: Cloud Run Secret Manager `INSURANCE_ENCRYPTION_KEY:latest`. Generate with: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`. |
+| `CSRF_SECRET` | **Yes** (auth) | — | Backend `csrf.ts` | Secret for CSRF double-submit cookie token signing. Required — throws Error if missing. In production: Cloud Run Secret Manager. |
 
 ### Caching — Redis
 | Variable | Required | Default | Where Used | Description |
@@ -142,6 +149,8 @@ secrets:
 | `JWT_SECRET` | Backend Cloud Run |
 | `RESEND_API_KEY` | Backend Cloud Run |
 | `ANTHROPIC_API_KEY` | Frontend Cloud Run |
+| `INSURANCE_ENCRYPTION_KEY` | Backend Cloud Run |
+| `CSRF_SECRET` | Backend Cloud Run |
 
 ## Checklist
 

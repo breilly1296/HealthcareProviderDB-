@@ -17,6 +17,11 @@ updated: 2026-02-05
 - `packages/backend/src/routes/verify.ts` (verification submissions, votes, stats)
 - `packages/backend/src/routes/admin.ts` (admin cleanup, stats, cache — requires X-Admin-Secret)
 - `packages/backend/src/routes/locations.ts` (location/geographic endpoints)
+- `packages/backend/src/routes/auth.ts` (authentication — magic links, JWT, sessions)
+- `packages/backend/src/routes/savedProviders.ts` (saved provider bookmarks — requireAuth)
+- `packages/backend/src/routes/insuranceCard.ts` (insurance card CRUD + AI scan — requireAuth)
+- `packages/backend/src/middleware/auth.ts` (JWT verification, extractUser, requireAuth)
+- `packages/backend/src/middleware/csrf.ts` (CSRF double-submit cookie protection)
 - `packages/backend/src/middleware/rateLimiter.ts` (rate limiting)
 - `packages/backend/src/middleware/captcha.ts` (reCAPTCHA v3 on verify/vote)
 - `packages/backend/src/middleware/errorHandler.ts` (error handling)
@@ -110,6 +115,47 @@ File: `routes/locations.ts` (registered in `routes/index.ts`)
 | GET | `/:locationId` | defaultRateLimiter (200/hr) | None | Location details |
 | GET | `/:locationId/providers` | defaultRateLimiter (200/hr) | None | Providers at a location |
 
+### Auth Routes (`/api/v1/auth`)
+File: `routes/auth.ts`
+
+| Method | Path | Rate Limit | Auth | Middleware | Description |
+|--------|------|-----------|------|------------|-------------|
+| GET | `/csrf-token` | defaultRateLimiter | None | — | Issue CSRF token (sets cookie + returns in body) |
+| POST | `/magic-link` | magicLinkRateLimiter | None | csrfProtection, Zod validation | Request magic link login email. Always returns success (prevents email enumeration). |
+| GET | `/verify` | — | None | Zod validation | Verify magic link token from email click. Sets auth cookies, redirects to /saved-providers. |
+| POST | `/refresh` | — | None | csrfProtection | Refresh access token using refresh cookie |
+| POST | `/logout` | — | requireAuth | csrfProtection | Clear session and auth cookies |
+| POST | `/logout-all` | — | requireAuth | csrfProtection | Invalidate ALL user sessions |
+| GET | `/me` | — | requireAuth | — | Get current user profile |
+| GET | `/export` | — | requireAuth | — | GDPR data export (all user data) |
+
+**Cookie setup:**
+- `vmp_access_token` — HttpOnly, Secure (prod), SameSite lax, 15min, path /
+- `vmp_refresh_token` — HttpOnly, Secure (prod), SameSite lax, 30 days, path /api/v1/auth
+
+### Saved Provider Routes (`/api/v1/saved-providers`)
+File: `routes/savedProviders.ts`
+**CSRF protection applied at router level** (in routes/index.ts)
+
+| Method | Path | Rate Limit | Auth | Middleware | Description |
+|--------|------|-----------|------|------------|-------------|
+| GET | `/` | defaultRateLimiter | requireAuth | Zod validation | List saved providers (paginated) |
+| POST | `/` | defaultRateLimiter | requireAuth | Zod validation | Save (bookmark) a provider. Idempotent. |
+| DELETE | `/:npi` | defaultRateLimiter | requireAuth | NPI validation | Remove saved provider. Idempotent. |
+| GET | `/:npi/status` | defaultRateLimiter | None* | NPI validation | Check if provider is saved. Returns `{saved: false}` for anonymous. |
+
+### Insurance Card Routes (`/api/v1/me/insurance-card`)
+File: `routes/insuranceCard.ts`
+**CSRF protection applied at router level** (in routes/index.ts)
+
+| Method | Path | Rate Limit | Auth | Middleware | Description |
+|--------|------|-----------|------|------------|-------------|
+| POST | `/scan` | scanRateLimiter (10/hr) | requireAuth | 16MB body limit, Zod validation | Scan card image via Claude AI, extract data, save to profile |
+| POST | `/save` | defaultRateLimiter | requireAuth | Zod validation | Save pre-extracted card data (two-step flow) |
+| GET | `/` | defaultRateLimiter | requireAuth | — | Get saved insurance card |
+| PATCH | `/` | defaultRateLimiter | requireAuth | Zod validation | Update card fields |
+| DELETE | `/` | defaultRateLimiter | requireAuth | — | Delete saved card |
+
 ### Infrastructure Endpoints (not under `/api/v1`)
 File: `index.ts`
 
@@ -127,6 +173,8 @@ File: `index.ts`
 4. cors                    — CORS with whitelist (verifymyprovider.com, Cloud Run, localhost)
 5. express.json            — Body parsing (100kb limit)
 6. express.urlencoded      — URL-encoded body parsing (100kb limit)
+6.5 cookie-parser          — Parse cookies (auth tokens, CSRF)
+6.6 extractUser            — Optional JWT auth on ALL requests (reads vmp_access_token cookie, sets req.user)
 7. /health endpoint        — Health check (BEFORE rate limiter)
 8. defaultRateLimiter      — 200 req/hr global rate limit
 9. requestLogger           — Usage tracking (searches, verifications, votes)
@@ -145,8 +193,9 @@ File: `index.ts`
 - [x] **Request ID correlation:** Unique ID per request for log tracing
 - [x] **Body size limit:** 100kb max
 - [x] **Admin auth:** Timing-safe secret comparison
-- [ ] **User authentication:** Not implemented (all routes public)
-- [ ] **CSRF:** Not needed until auth is added
+- [x] **User authentication:** Magic link auth with JWT access/refresh tokens (HttpOnly cookies)
+- [x] **CSRF:** Double-submit cookie pattern via csrf-csrf on auth + protected routes
+- [x] **Encrypted PII:** Insurance card subscriber IDs encrypted at rest
 - [x] **Locations route:** Active and registered
 
 ## Questions to Ask

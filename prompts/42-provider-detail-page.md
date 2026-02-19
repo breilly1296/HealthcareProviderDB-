@@ -77,6 +77,7 @@ ProviderDetailPage
     │   ├── Phone number
     │   ├── ConfidenceBadge (overall score)
     │   └── Verification count
+    ├── BookmarkButton (save/unsave provider, requires auth)
     ├── Disclaimer (inline variant, with "Learn More" link)
     ├── AboutProvider
     │   ├── Entity type (Individual vs Organization)
@@ -162,6 +163,19 @@ Data accuracy disclaimer:
 - Links to full `/disclaimer` page
 - Required for all provider-specific data display
 
+### BookmarkButton
+Provider save/unsave toggle:
+- Shows filled bookmark icon if saved, outline if not
+- Requires authentication — prompts login if anonymous
+- Uses `savedProviders.checkStatus(npi)` for initial state
+- Calls `savedProviders.save(npi)` / `savedProviders.unsave(npi)` on toggle
+- Optimistic UI update
+
+### SaveProfileButton
+Alternative save button variant for sidebar:
+- Renders in ProviderSidebar
+- Same auth + API behavior as BookmarkButton
+
 ## States
 
 ### Loading
@@ -201,6 +215,8 @@ Data accuracy disclaimer:
 - [x] AboutProvider (entity type, new patients, languages)
 - [x] ColocatedProviders
 - [x] Data accuracy Disclaimer
+- [x] BookmarkButton (save/unsave with auth)
+- [x] SaveProfileButton (sidebar variant)
 
 ### Missing / Future
 - [x] Server-side rendering for SEO — implemented with `revalidate: 3600` and metadata generation

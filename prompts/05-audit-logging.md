@@ -12,7 +12,7 @@ priority: 3
 ## Files to Review
 - `packages/backend/src/middleware/requestLogger.ts` (✅ IMPLEMENTED - structured logging)
 - `packages/backend/src/routes/` (logging in route handlers)
-- `prisma/schema.prisma` (VerificationLog model for audit trail)
+- `packages/backend/prisma/schema.prisma` (VerificationLog model for audit trail)
 - `packages/backend/src/services/verificationService.ts` (verification audit logic)
 
 ## VerifyMyProvider Audit Architecture
@@ -27,7 +27,7 @@ priority: 3
 - [ ] Vote submissions (verification ID, vote, IP)
 - [ ] Rate limit hits (IP, endpoint, timestamp)
 - [ ] API errors (endpoint, error type, not full stack)
-- [ ] Authentication events (when auth is added)
+- [x] Authentication events — magic link requests, login success/failure, session creation/expiration, logout
 
 ### 2. What NOT to Log
 - [ ] User passwords (never)
@@ -62,6 +62,13 @@ priority: 3
   - `VoteLog.sourceIp` — stored for vote deduplication (unique constraint)
 - **API responses**: PII is stripped before returning via `stripVerificationPII()` in `verificationService.ts`
 - This is intentional: IPs are needed for anti-abuse but are NOT exposed in logs or API responses
+
+**Session & Auth Logging:**
+- Magic link requests logged (email redacted in logs)
+- Session creation logged with IP and user agent (stored in `sessions` table)
+- Failed JWT verifications logged at debug/warn level (not error)
+- CSRF validation failures logged
+- Session `lastUsedAt` updated with debounce to reduce DB writes
 
 ## Questions to Ask
 

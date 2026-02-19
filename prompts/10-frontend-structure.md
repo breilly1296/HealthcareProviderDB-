@@ -49,6 +49,10 @@ updated: 2026-02-05
 | `/privacy` | `app/privacy/page.tsx` | Privacy policy |
 | `/terms` | `app/terms/page.tsx` | Terms of service |
 | `/disclaimer` | `app/disclaimer/page.tsx` | Medical disclaimer |
+| `/login` | `app/login/page.tsx` | Login — Magic link authentication form |
+| `/saved-providers` | `app/saved-providers/page.tsx` | Saved providers — bookmarked provider list (requireAuth) |
+| `/dashboard/insurance` | `app/dashboard/insurance/page.tsx` | Insurance card dashboard — view/edit saved card (requireAuth) |
+| `/map` | `app/map/page.tsx` | Map view — geographic provider search with Google Maps |
 
 **Layout:** `app/layout.tsx` — Root layout with Header, ThemeToggle, BottomNav, ToastProvider, PostHogProvider, QueryProvider
 
@@ -70,6 +74,10 @@ updated: 2026-02-05
 - `ProviderCard.tsx` — Provider card in search results
 - `ProviderCardSkeleton.tsx` — Loading skeleton
 - `RecentSearches.tsx` — Recent search history
+
+### Map & Location
+- `search/SearchMapView.tsx` — Map view within search results
+- `ProviderMap.tsx` — Map visualization component
 
 ### Filtering
 - `FilterButton.tsx` — Filter toggle button
@@ -106,6 +114,13 @@ updated: 2026-02-05
 
 ### Insurance
 - `InsuranceCardUploader.tsx` — Drag-and-drop card upload with Claude extraction
+- `InsuranceCardScanner.tsx` — Webcam-based card scanner
+- `search/InsuranceCardBanner.tsx` — Banner in search promoting card upload
+
+### Authentication
+- `app/login/LoginForm.tsx` — Magic link login form
+- `app/saved-providers/SavedProvidersList.tsx` — Paginated saved provider list
+- `app/dashboard/insurance/InsuranceCardDashboard.tsx` — Insurance card management
 
 ### UI Components
 - `Header.tsx` — Main header/nav
@@ -121,6 +136,8 @@ updated: 2026-02-05
 - `Disclaimer.tsx` — Medical disclaimer
 - `LocationCard.tsx` — Location card
 - `GlobalErrorBanner.tsx` — Global error banner
+- `BookmarkButton.tsx` — Save/unsave provider bookmark (requires auth)
+- `CookieConsent.tsx` — Cookie consent banner
 - `ui/Skeleton.tsx`, `ui/Shimmer.tsx` — Loading effects
 
 ### Icons & Illustrations
@@ -139,6 +156,10 @@ Custom hooks in `hooks/`:
 - `useInsurancePlans` — Get insurance plans
 - `useHealthSystems` — Get health systems
 - `useRecentSearches` — Get recent searches
+- `useInsuranceCard` — Get/save/update/delete insurance card
+- `useGeoLocation` — Browser geolocation API wrapper
+- `useMapProviders` — Provider data for map display
+- `useCaptcha` — reCAPTCHA token handling
 
 ### Client State (React Context)
 - `context/CompareContext.tsx` — Compare state (providers array, add/remove/clear, max 4)
@@ -186,6 +207,10 @@ Methods:
 - [x] Legal pages (privacy, terms, disclaimer)
 - [x] About and research pages
 - [x] Error boundary
+- [x] Login page with magic link auth
+- [x] Saved providers (authenticated)
+- [x] Insurance card dashboard (authenticated)
+- [x] Map view with Google Maps
 
 ### State Management
 - [x] React Query for server state
