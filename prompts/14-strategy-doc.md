@@ -2,14 +2,20 @@
 tags:
   - documentation
   - strategy
-type: prompt
+type: template
 priority: 2
+updated: 2026-04-16
+role: doc-writer
+output_format: document
 ---
 
 # Generate STRATEGY.md
 
-## Purpose
-Create or update the strategic direction document for VerifyMyProvider.
+## Task
+
+Generate a single Markdown document named `STRATEGY.md` that answers the questions below and conforms to the **Output Format** template at the bottom of this file. The user will answer the questions conversationally (or you should ask them interactively if details are missing); your job is to synthesize the answers into a polished strategic document, not to return the raw Q&A.
+
+**This is a Claude.ai / conversation-mode prompt**, not a code-scan prompt. Don't grep the repo — ask the user.
 
 ## Questions to Ask
 

@@ -3,14 +3,20 @@ tags:
   - documentation
   - ecosystem
   - strategy
-type: prompt
+type: template
 priority: 2
+updated: 2026-04-16
+role: doc-writer
+output_format: document
 ---
 
 # Generate ECOSYSTEM.md
 
-## Purpose
-Document the VerifyMyProvider + OwnMyHealth ecosystem integration strategy.
+## Task
+
+Generate a Markdown document (`ECOSYSTEM.md`) describing how VerifyMyProvider and OwnMyHealth fit together as a two-product portfolio. Use the questions below to gather context from the user (this is a conversation-mode prompt, not a code-scan), then produce a polished document following the **Output Format** at the bottom.
+
+Do not invent business details — ask the user if anything is unclear.
 
 ## Questions to Ask
 

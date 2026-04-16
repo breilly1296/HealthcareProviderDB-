@@ -5,6 +5,9 @@ tags:
   - critical
 type: prompt
 priority: 1
+updated: 2026-04-16
+role: auditor
+output_format: checklist
 ---
 
 # No HIPAA Compliance Review
@@ -27,22 +30,22 @@ priority: 1
 ## Checklist
 
 ### 1. What VerifyMyProvider Stores (ALL PUBLIC DATA)
-- [ ] Provider names - from public NPI Registry
-- [ ] Provider addresses - from public NPI Registry
-- [ ] Provider specialties - from public taxonomy codes
-- [ ] Insurance plan names - from public marketplace data
-- [ ] Acceptance verifications - anonymous "yes/no" answers
-- [ ] Verification dates - when verification occurred
-- [ ] IP addresses - for rate limiting only
+- [x] Provider names - from public NPI Registry
+- [x] Provider addresses - from public NPI Registry
+- [x] Provider specialties - from public taxonomy codes
+- [x] Insurance plan names - from public marketplace data
+- [x] Acceptance verifications - anonymous "yes/no" answers
+- [x] Verification dates - when verification occurred
+- [x] IP addresses - for rate limiting only (DB-only, not in app logs)
 
 ### 2. What VerifyMyProvider Does NOT Store (NO PHI)
-- [ ] Patient names - NEVER collected
-- [ ] Patient addresses - NEVER collected
-- [ ] User health conditions - NEVER collected
-- [ ] Visit reasons - NEVER collected
-- [ ] Treatment details - NEVER collected
-- [ ] User insurance selections - NOT linked to identity
-- [ ] Individual medical records - NEVER collected
+- [x] Patient names - NEVER collected
+- [x] Patient addresses - NEVER collected
+- [x] User health conditions - NEVER collected
+- [x] Visit reasons - NEVER collected
+- [x] Treatment details - NEVER collected
+- [x] User insurance selections - NOT linked to identity
+- [x] Individual medical records - NEVER collected
 
 **Note on Insurance Card Storage (Feb 2026):** User insurance card data (subscriber ID, group number, pharmacy IDs) is now stored **encrypted** in the `user_insurance_cards` table. This is user-provided data linked to their account, NOT pulled from medical records. The data is:
 - Voluntarily submitted by the user (not from a healthcare provider)
@@ -78,10 +81,10 @@ Verification record:
 ```
 
 ### 4. Comparison to Similar Services
-- [ ] Zocdoc - NOT HIPAA-covered (business reviews)
-- [ ] Healthgrades - NOT HIPAA-covered (provider ratings)
-- [ ] Google Reviews for doctors - NOT HIPAA-covered
-- [ ] **VerifyMyProvider** - NOT HIPAA-covered (acceptance verification)
+- [x] Zocdoc - NOT HIPAA-covered (business reviews)
+- [x] Healthgrades - NOT HIPAA-covered (provider ratings)
+- [x] Google Reviews for doctors - NOT HIPAA-covered
+- [x] **VerifyMyProvider** - NOT HIPAA-covered (acceptance verification)
 
 ### 5. Compliance We DO Need
 - [x] Terms of Service — `app/terms/page.tsx` implemented
@@ -94,19 +97,19 @@ Verification record:
 **Note on Insurance Card Upload:** The insurance card extraction feature processes card images via Claude AI but does NOT store them permanently. Images are processed server-side and discarded. This does not introduce PHI since no card data is linked to user identity. However, the privacy policy should mention this feature.
 
 ### 6. Benefits of No HIPAA
-- [ ] Faster iteration (no compliance review per change)
-- [ ] Lower costs (~30-40% cheaper than OwnMyHealth)
-- [ ] Simpler deployment (no encryption at rest required)
-- [ ] Public API possible (no PHI exposure concerns)
-- [ ] B2B licensing easier (no BAA negotiations)
-- [ ] Can expose data freely (search engines, partners)
+- [x] Faster iteration (no compliance review per change)
+- [x] Lower costs (~30-40% cheaper than OwnMyHealth)
+- [x] Simpler deployment (no encryption at rest required)
+- [x] Public API possible (no PHI exposure concerns)
+- [x] B2B licensing easier (no BAA negotiations)
+- [x] Can expose data freely (search engines, partners)
 
 ### 7. Boundary with OwnMyHealth
-- [ ] OwnMyHealth calls VerifyMyProvider API for provider search
-- [ ] OwnMyHealth sends only: specialty, zip code, plan ID
-- [ ] OwnMyHealth receives only: public provider information
-- [ ] NO PHI crosses the API boundary
-- [ ] NO user identity shared between products
+- [x] OwnMyHealth calls VerifyMyProvider API for provider search
+- [x] OwnMyHealth sends only: specialty, zip code, plan ID
+- [x] OwnMyHealth receives only: public provider information
+- [x] NO PHI crosses the API boundary
+- [x] NO user identity shared between products
 
 ## Questions to Ask
 1. Have any users, advisors, or partners questioned HIPAA compliance?

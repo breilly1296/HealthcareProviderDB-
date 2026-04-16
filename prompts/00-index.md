@@ -2,9 +2,9 @@
 tags:
   - index
   - meta
-type: index
+type: meta
 priority: 1
-updated: 2026-02-18
+updated: 2026-04-16
 ---
 
 # VerifyMyProvider Prompts Index
@@ -13,6 +13,17 @@ updated: 2026-02-18
 **Note:** 6 states (FL, AL, AK, AR, AZ, CA) were imported for pipeline testing; NYC is the launch dataset.
 
 Quick reference for all available prompts.
+
+---
+
+## Shared References
+
+Files prefixed with `_` are shared reference docs — other prompts link to them rather than duplicate content.
+
+| File | Purpose |
+|---|---|
+| [[_env-vars-reference]] | Canonical env-var inventory. Link from security/deploy prompts instead of restating. |
+| [[_frontmatter-schema]] | Required frontmatter fields for all prompts in this directory. |
 
 ---
 
@@ -84,17 +95,28 @@ Quick reference for all available prompts.
 | 41 | [[41-frontend-data-fetching]] | React Query, API client, state management | **New** |
 | 42 | [[42-provider-detail-page]] | Provider detail page architecture | **New** |
 | 43 | [[43-search-architecture]] | Search flow (frontend + backend) | **New** |
-| 44 | [[44-seo-sitemap]] | SEO strategy, dynamic sitemap, provider page ISR | **New** |
-| 45 | [[45-user-accounts]] | Magic link auth, saved providers, bookmarks | **New** |
-| 46 | [[46-map-geospatial]] | Map page, geolocation, Google Maps integration | **New** |
+| 44 | [[44-seo-sitemap]] | SEO strategy, dynamic sitemap, provider page ISR | Reference |
+| 45 | [[45-user-accounts]] | Magic link auth, saved providers, bookmarks | Reference |
+| 46 | [[46-map-geospatial]] | Map page, geolocation, Google Maps integration | Reference |
 
 ---
 
-## Standalone Research
+## Operational Prompts (47-49)
 
-| Location | Prompt | Purpose |
-|----------|--------|---------|
-| `Hospital Data Pull/` | [[28-hospital-analysis-prompt]] | NYC hospital affiliation research task |
+| # | Prompt | Purpose | Status |
+|---|--------|---------|--------|
+| 47 | [[47-observability-logging]] | Logging, error tracking, metrics, alerting gap analysis | **New** |
+| 48 | [[48-database-migrations]] | Prisma migration workflow, rollback, zero-downtime patterns | **New** |
+| 49 | [[49-testing-strategy-deep-dive]] | Coverage audit, flake, contract/security tests | **New** |
+
+---
+
+## Archive
+
+Historical / one-off content has been moved to `archive/`:
+
+- `archive/PROMPT-AUDIT-REPORT-2026-02-18.md` — Feb 2026 accuracy audit. Findings already integrated into individual prompts.
+- `archive/Hospital Data Pull/` — One-off NYC hospital affiliation research task from Jan 2026.
 
 ---
 
@@ -138,6 +160,7 @@ Quick reference for all available prompts.
 Best for prompts that scan code:
 - 01-13 (security & architecture audits)
 - 39-46 (feature deep-dives)
+- 47-49 (observability, migrations, testing)
 - 16-architecture-doc, 17-api-reference-doc
 
 ### In Claude.ai
@@ -170,4 +193,7 @@ These prompts should be updated when:
 - Architecture changes (new services, database changes, etc.)
 - New external API integrations are added
 
-**Last full audit:** 2026-02-18 (see `PROMPT-AUDIT-REPORT.md`)
+Frontmatter conventions: see [[_frontmatter-schema]]. Bump `updated:` when content changes.
+
+**Last full audit:** 2026-02-18 (archived at `archive/PROMPT-AUDIT-REPORT-2026-02-18.md`)
+**Last prompt-collection cleanup:** 2026-04-16 (added shared references, prompts 47-49, Response Format blocks, archived stale audit)

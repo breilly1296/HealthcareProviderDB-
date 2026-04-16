@@ -3,14 +3,20 @@ tags:
   - documentation
   - status
   - roadmap
-type: prompt
+type: template
 priority: 1
+updated: 2026-04-16
+role: doc-writer
+output_format: document
 ---
 
 # Generate PROGRESS.md
 
-## Purpose
-Track what's done, what's next, and what's blocking progress.
+## Task
+
+Generate a `PROGRESS.md` that captures current project status, recent wins, in-flight work, blockers, and next milestones. Use the questions below to gather information from the user, then output a single Markdown document matching the **Output Format** template at the bottom.
+
+This is a conversation-mode prompt. Augment with `git log`, `gh pr list`, and recent commits if available — but prefer asking the user over guessing.
 
 ## Questions to Ask
 

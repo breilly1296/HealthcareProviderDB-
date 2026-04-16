@@ -6,6 +6,9 @@ tags:
 type: prompt
 priority: 2
 created: 2026-02-18
+updated: 2026-04-16
+role: auditor
+output_format: analysis
 ---
 
 # User Accounts & Saved Providers
@@ -255,6 +258,19 @@ model SavedProvider {
 - [ ] OAuth providers (Google, Apple)
 - [ ] Session activity dashboard
 - [ ] Notification preferences
+
+## Response Format
+
+Produce a review with these sections:
+1. **Summary** — 2-3 sentences on the feature's current state and maturity.
+2. **Findings** — grouped CRITICAL / HIGH / MEDIUM / LOW; each cites file:line.
+3. **Checklist verification** — walk the Checklist above, mark each item verified / partial / missing with evidence.
+4. **Recommendations** — ranked, 1-2 sentences each, with a concrete next action.
+5. **Open questions** — pull unanswered items from "Questions to Ask" below.
+
+Keep ≤400 lines. Cite file:line references; avoid generic advice.
+
+---
 
 ## Questions to Ask
 1. Should expired sessions be cleaned up automatically (like verification TTL)?

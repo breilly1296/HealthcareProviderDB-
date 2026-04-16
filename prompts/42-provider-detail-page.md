@@ -6,6 +6,9 @@ tags:
 type: prompt
 priority: 3
 created: 2026-02-05
+updated: 2026-04-16
+role: architect
+output_format: analysis
 ---
 
 # Provider Detail Page Architecture
@@ -225,6 +228,19 @@ Alternative save button variant for sidebar:
 - [ ] Print-friendly view
 - [ ] Verification history timeline (component exists but not wired in)
 - [ ] Score breakdown modal (component exists but not wired in)
+
+## Response Format
+
+Produce a review with these sections:
+1. **Summary** — 2-3 sentences on the feature's current state and maturity.
+2. **Findings** — grouped CRITICAL / HIGH / MEDIUM / LOW; each cites file:line.
+3. **Checklist verification** — walk the Checklist above, mark each item verified / partial / missing with evidence.
+4. **Recommendations** — ranked, 1-2 sentences each, with a concrete next action.
+5. **Open questions** — pull unanswered items from "Questions to Ask" below.
+
+Keep ≤400 lines. Cite file:line references; avoid generic advice.
+
+---
 
 ## Questions to Ask
 1. Should provider detail pages be server-rendered for SEO?

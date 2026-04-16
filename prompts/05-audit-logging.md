@@ -5,6 +5,9 @@ tags:
   - medium
 type: prompt
 priority: 3
+updated: 2026-04-16
+role: auditor
+output_format: checklist
 ---
 
 # Audit Logging Review
@@ -23,18 +26,18 @@ priority: 3
 ## Checklist
 
 ### 1. What to Log (Simpler Than OwnMyHealth)
-- [ ] Verification submissions (NPI, plan, accepted, IP)
-- [ ] Vote submissions (verification ID, vote, IP)
-- [ ] Rate limit hits (IP, endpoint, timestamp)
-- [ ] API errors (endpoint, error type, not full stack)
+- [x] Verification submissions — persisted to `VerificationLog` table (NPI, plan, accepted, IP)
+- [x] Vote submissions — persisted to `VoteLog` table (verification ID, vote, IP)
+- [x] Rate limit hits — emitted via `requestLogger.ts` with IP-free context
+- [x] API errors — structured error logs via `errorHandler.ts` (no full stack in prod)
 - [x] Authentication events — magic link requests, login success/failure, session creation/expiration, logout
 
 ### 2. What NOT to Log
-- [ ] User passwords (never)
-- [ ] Full stack traces in production
-- [ ] Database query results (can be large)
-- [ ] CSRF tokens
-- [ ] Session IDs
+- [x] User passwords — N/A (magic-link auth, no passwords stored)
+- [x] Full stack traces in production — stripped by `errorHandler.ts`
+- [x] Database query results — never logged
+- [x] CSRF tokens — never logged
+- [x] Session IDs — never logged (only hashed reference in DB)
 
 ### 3. Current Logging (✅ IMPLEMENTED Jan 2026)
 - [x] Structured JSON logging via `requestLogger.ts` middleware
