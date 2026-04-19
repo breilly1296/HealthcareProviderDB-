@@ -43,7 +43,7 @@ Document known issues, limitations, and workarounds in VerifyMyProvider.
 9. **Provider addresses stale** — NPI data is self-reported and rarely updated. Some providers show outdated addresses.
 
 ### Security
-10. **No automated secret scanning** — No gitleaks or truffleHog in CI pipeline.
+10. ~~**No automated secret scanning**~~ — **Resolved (F-05, 2026-04-19).** `gitleaks` runs in `.github/workflows/security-scan.yml` on every push to `main`/`staging` and every PR targeting those branches, with full-history fetch (`fetch-depth: 0`) and the default ruleset extended via `.gitleaks.toml`. CodeQL (security-and-quality queries) covers JavaScript/TypeScript in parallel, including a weekly Monday 06:00 UTC schedule. A quick `grep` backstop for the most common secret patterns also runs in `test.yml`.
 
 11. **No Cloud Armor / DDoS protection** — Cloud Run services are publicly accessible without WAF.
 
