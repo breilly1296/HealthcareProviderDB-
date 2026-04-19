@@ -1,9 +1,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://verifymyprovider.com';
+
 export const metadata: Metadata = {
   title: 'Terms of Service | VerifyMyProvider',
   description: "Terms of service for using VerifyMyProvider's healthcare provider directory and insurance verification platform.",
+  alternates: { canonical: `${SITE_URL}/terms` },
 };
 
 export default function TermsOfServicePage() {

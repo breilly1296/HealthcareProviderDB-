@@ -25,12 +25,12 @@ export interface ProviderWithPlans extends Omit<ProviderDisplay, 'planAcceptance
   nppesLastSynced?: string | null;
   locations?: Array<{
     id: number;
-    address_type?: string | null;
-    address_line1?: string | null;
-    address_line2?: string | null;
+    addressType?: string | null;
+    addressLine1?: string | null;
+    addressLine2?: string | null;
     city?: string | null;
     state?: string | null;
-    zip_code?: string | null;
+    zipCode?: string | null;
     phone?: string | null;
     fax?: string | null;
   }>;

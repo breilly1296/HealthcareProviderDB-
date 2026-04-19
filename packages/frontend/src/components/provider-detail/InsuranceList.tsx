@@ -28,10 +28,10 @@ interface InsurancePlan {
 
 interface ProviderLocation {
   id: number;
-  address_line1?: string | null;
+  addressLine1?: string | null;
   city?: string | null;
   state?: string | null;
-  zip_code?: string | null;
+  zipCode?: string | null;
 }
 
 interface InsuranceListProps {
@@ -576,8 +576,8 @@ function formatLastVerified(dateString: string | null | undefined): string {
 
 function formatLocationLabel(loc: ProviderLocation): string {
   const parts = [loc.city, loc.state].filter(Boolean);
-  if (loc.address_line1) {
-    return `${loc.address_line1}${parts.length > 0 ? `, ${parts.join(', ')}` : ''}`;
+  if (loc.addressLine1) {
+    return `${loc.addressLine1}${parts.length > 0 ? `, ${parts.join(', ')}` : ''}`;
   }
   return parts.join(', ') || `Location #${loc.id}`;
 }

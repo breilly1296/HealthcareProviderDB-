@@ -1,9 +1,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://verifymyprovider.com';
+
 export const metadata: Metadata = {
   title: 'Privacy Policy | VerifyMyProvider',
   description: 'How VerifyMyProvider collects, uses, and protects your personal information.',
+  alternates: { canonical: `${SITE_URL}/privacy` },
 };
 
 export default function PrivacyPolicyPage() {

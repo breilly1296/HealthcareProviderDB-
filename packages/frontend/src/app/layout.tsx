@@ -60,6 +60,14 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
   },
+  // Search Console ownership verification. Set NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION
+  // to the content value from the HTML-tag method in Search Console; Next.js
+  // renders <meta name="google-site-verification" content="..."> at build time.
+  // Left undefined (tag not emitted) when the env var is unset — no hard-coded
+  // verification code in the repo. (F-18)
+  verification: {
+    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || undefined,
+  },
 };
 
 function Footer() {

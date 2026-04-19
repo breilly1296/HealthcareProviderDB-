@@ -1,9 +1,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://verifymyprovider.com';
+
 export const metadata: Metadata = {
   title: 'About VerifyMyProvider - Our Mission & Team',
   description: 'Learn about VerifyMyProvider\'s mission to create accurate, community-verified provider directories and help patients find care.',
+  alternates: { canonical: `${SITE_URL}/about` },
 };
 
 export default function AboutPage() {
