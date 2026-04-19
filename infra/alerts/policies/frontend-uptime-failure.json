@@ -1,0 +1,37 @@
+{
+  "displayName": "Frontend uptime check failing (verifymyprovider-frontend)",
+  "documentation": {
+    "content": "The synthetic HTTPS check on the frontend root path is failing from multiple regions. Frontend is stateless Next.js behind Cloud Run — if this fires in isolation, check the Cloud Run revision health, domain mapping, and CDN. Paired with backend-uptime-failure it's almost certainly DNS/LB. Metric source: monitoring.googleapis.com/uptime_check/check_passed on the frontend uptime check.",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "Uptime check failing from 2+ regions for 5m",
+      "conditionThreshold": {
+        "filter": "metric.type=\"monitoring.googleapis.com/uptime_check/check_passed\" resource.type=\"uptime_url\" metric.label.check_id=\"verifymyprovider-frontend-root\"",
+        "comparison": "COMPARISON_LT",
+        "thresholdValue": 1,
+        "duration": "300s",
+        "aggregations": [
+          {
+            "alignmentPeriod": "60s",
+            "perSeriesAligner": "ALIGN_NEXT_OLDER",
+            "crossSeriesReducer": "REDUCE_COUNT_FALSE",
+            "groupByFields": [
+              "resource.label.host"
+            ]
+          }
+        ],
+        "trigger": {
+          "count": 2
+        }
+      }
+    }
+  ],
+  "alertStrategy": {
+    "autoClose": "1800s"
+  },
+  "enabled": true,
+  "notificationChannels": []
+}

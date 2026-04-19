@@ -1,0 +1,38 @@
+{
+  "displayName": "Cloud Run liveness probe failures (verifymyprovider-backend)",
+  "documentation": {
+    "content": "Cloud Run's liveness probe (HTTP GET /health) is failing. After 3 failures in a row Cloud Run will kill and restart the container; this alert gives a heads-up that the service is likely unhealthy before the restart cascade. Metric source: built-in run.googleapis.com/container/probe_attempt_count filtered to probe_type=liveness, result=failed.",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "Liveness probe failures >= 3 in 5m",
+      "conditionThreshold": {
+        "filter": "metric.type=\"run.googleapis.com/container/probe_attempt_count\" resource.type=\"cloud_run_revision\" resource.label.service_name=\"verifymyprovider-backend\" metric.label.probe_type=\"liveness\" metric.label.result=\"failed\"",
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": 2,
+        "duration": "0s",
+        "aggregations": [
+          {
+            "alignmentPeriod": "300s",
+            "perSeriesAligner": "ALIGN_DELTA",
+            "crossSeriesReducer": "REDUCE_SUM",
+            "groupByFields": [
+              "resource.label.service_name",
+              "resource.label.revision_name"
+            ]
+          }
+        ],
+        "trigger": {
+          "count": 1
+        }
+      }
+    }
+  ],
+  "alertStrategy": {
+    "autoClose": "1800s"
+  },
+  "enabled": true,
+  "notificationChannels": []
+}
