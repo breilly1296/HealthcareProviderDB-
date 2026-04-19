@@ -16,8 +16,8 @@ COPY packages/frontend/package.json ./packages/frontend/
 # Create directories so npm recognizes workspaces
 RUN mkdir -p packages/shared packages/frontend
 
-# Install all dependencies
-RUN npm install --force
+# Install all dependencies from package-lock.json (fails if lockfile drifts)
+RUN npm ci
 
 # Copy source code
 COPY packages/shared ./packages/shared

@@ -95,7 +95,7 @@ jobs:
         with:
           node-version: 20
 
-      - name: Apply database schema changes
+      - name: Apply database migrations
         run: |
           # Install Cloud SQL Auth Proxy
           curl -sSL -o cloud-sql-proxy https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.14.1/cloud-sql-proxy.linux.amd64
@@ -122,9 +122,9 @@ jobs:
             }
           " "$DB_URL")
 
-          # Apply schema changes (schema reviews happen at PR time)
+          # Apply versioned migrations — reviewed at PR time via migration-diff job
           cd packages/backend
-          npx prisma@5 db push --skip-generate --accept-data-loss
+          npm run db:migrate:deploy
 
           kill $PROXY_PID
 
@@ -144,6 +144,13 @@ jobs:
             --max-instances=10
             --concurrency=80
             --add-cloudsql-instances=verifymyprovider-prod:us-central1:verifymyprovider-db
+            --startup-probe-http-path=/health
+            --startup-probe-initial-delay=5s
+            --startup-probe-period=10s
+            --startup-probe-failure-threshold=3
+            --liveness-probe-http-path=/health
+            --liveness-probe-period=30s
+            --liveness-probe-failure-threshold=3
           env_vars: |
             NODE_ENV=production
             FRONTEND_URL=${{ secrets.FRONTEND_URL }}
@@ -233,6 +240,10 @@ jobs:
             --min-instances=0
             --max-instances=10
             --concurrency=80
+            --startup-probe-http-path=/
+            --startup-probe-initial-delay=5s
+            --startup-probe-period=10s
+            --startup-probe-failure-threshold=3
           env_vars: |
             NODE_ENV=production
           secrets: |
@@ -259,6 +270,12 @@ jobs:
     runs-on: ubuntu-latest
     needs: [deploy-backend, deploy-frontend]
     if: always()
+    # statuses: write is required by the commit-status step below so
+    # the deploy outcome is visible on the commit/PR page, not just in
+    # the Actions tab. contents: read is the default minimum.
+    permissions:
+      contents: read
+      statuses: write
 
     steps:
       - name: Deployment Summary
@@ -269,3 +286,52 @@ jobs:
           echo "|---------|--------|-----|" >> $GITHUB_STEP_SUMMARY
           echo "| Backend | ${{ needs.deploy-backend.result }} | ${{ needs.deploy-backend.outputs.backend_url }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Frontend | ${{ needs.deploy-frontend.result }} | ${{ needs.deploy-frontend.outputs.frontend_url }} |" >> $GITHUB_STEP_SUMMARY
+
+      # Post a commit status so the deploy outcome appears as a green/red
+      # check on the commit itself (visible in the PR view and commit log),
+      # not just as a step-summary hidden inside a workflow run.
+      - name: Post deployment commit status
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const backendStatus = '${{ needs.deploy-backend.result }}';
+            const frontendStatus = '${{ needs.deploy-frontend.result }}';
+            const success = backendStatus === 'success' && frontendStatus === 'success';
+            const environment = 'production';
+
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.sha,
+              state: success ? 'success' : 'failure',
+              target_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              description: success
+                ? `${environment} deploy succeeded`
+                : `${environment} deploy failed (backend: ${backendStatus}, frontend: ${frontendStatus})`,
+              context: `deploy/${environment}`,
+            });
+
+            if (!success) {
+              core.error(`${environment.toUpperCase()} DEPLOYMENT FAILED — backend: ${backendStatus}, frontend: ${frontendStatus}`);
+            }
+
+      # Placeholder for a future Slack/email notification. Kept as a failure-
+      # only step so successful deploys stay quiet; flip the commented curl
+      # once SLACK_WEBHOOK_URL is wired up.
+      #
+      # To activate Slack notifications:
+      #   1. In Slack: create an incoming webhook (https://api.slack.com/messaging/webhooks)
+      #      for the channel that should receive deploy alerts.
+      #   2. Add the resulting URL as a repo secret named SLACK_WEBHOOK_URL
+      #      (Settings → Secrets and variables → Actions → New repository secret).
+      #   3. Uncomment the curl block below.
+      - name: Notify on failure (placeholder — wire SLACK_WEBHOOK_URL to activate)
+        if: failure()
+        env:
+          ENVIRONMENT: production
+        run: |
+          echo "::warning::Deployment failed. Configure SLACK_WEBHOOK_URL secret to enable Slack notifications."
+          # curl -X POST -H 'Content-type: application/json' \
+          #   --data "{\"text\":\":rotating_light: *${ENVIRONMENT}* deploy failed for \`${GITHUB_SHA:0:7}\` on ${GITHUB_REF_NAME}. <https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}|View run>\"}" \
+          #   "${{ secrets.SLACK_WEBHOOK_URL }}"

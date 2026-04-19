@@ -2,7 +2,9 @@ const path = require('path');
 
 /** @type {import('jest').Config} */
 const config = {
-  testEnvironment: 'node',
+  // jsdom so React Testing Library component tests work out of the box.
+  // Pure-logic suites under lib/ don't care which environment runs them.
+  testEnvironment: 'jsdom',
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
     // Handle CSS imports
