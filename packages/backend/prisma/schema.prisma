@@ -248,6 +248,7 @@ model VerificationLog {
   sourceIp           String?            @db.VarChar(50)
   userAgent          String?            @db.VarChar(500)
   submittedBy        String?            @db.VarChar(200)
+  userId             String?            @map("user_id") @db.VarChar(100)
   upvotes            Int                @default(0)
   downvotes          Int                @default(0)
   isApproved         Boolean?
@@ -269,6 +270,8 @@ model VerificationLog {
   @@index([providerNpi], map: "idx_vl_provider_npi")
   @@index([providerNpi, planId, submittedBy, createdAt], map: "idx_vl_sybil_email")
   @@index([providerNpi, planId, sourceIp, createdAt], map: "idx_vl_sybil_ip")
+  @@index([providerNpi, planId, userId, createdAt], map: "idx_vl_sybil_user")
+  @@index([userId], map: "idx_vl_user_id")
   @@index([verificationType], map: "idx_vl_verification_type")
   @@map("verification_logs")
 }
@@ -277,12 +280,19 @@ model VoteLog {
   id             String          @id @default(cuid())
   verificationId String          @map("verification_id")
   sourceIp       String          @map("source_ip") @db.VarChar(50)
+  userId         String?         @map("user_id") @db.VarChar(100)
   vote           String          @db.VarChar(10)
   createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
   verification   VerificationLog @relation(fields: [verificationId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
+  // Per-IP dedup for anonymous voters (existing).
   @@unique([verificationId, sourceIp])
+  // Per-user dedup for authenticated voters — closes the IP-rotation bypass.
+  // Postgres treats NULLs as distinct in UNIQUE constraints, so multiple
+  // anonymous rows (userId = NULL) coexist without conflict.
+  @@unique([verificationId, userId])
   @@index([sourceIp], map: "idx_vote_logs_source_ip")
+  @@index([userId], map: "idx_vote_logs_user_id")
   @@index([verificationId], map: "idx_vote_logs_verification_id")
   @@map("vote_logs")
 }
@@ -380,6 +390,30 @@ model MagicLinkToken {
   @@index([token], map: "idx_magic_link_token")
   @@index([expiresAt], map: "idx_magic_link_expires_at")
   @@map("magic_link_tokens")
+}
+
+/// Append-only audit log for admin endpoint invocations. Records endpoint,
+/// source IP, request ID, sanitized params, dry-run flag, result count, and
+/// duration. Written fire-and-forget by adminAudit middleware so admin
+/// responses are never blocked on audit I/O. Because admin auth is a shared
+/// secret, this table is the only persistent "who actually called it" trail
+/// — treat rows as read-only once written. See MEDIUM-04 / IM-11.
+model AdminAction {
+  id          String   @id @default(cuid())
+  endpoint    String   @db.VarChar(200)
+  method      String   @db.VarChar(10)
+  params      Json?
+  sourceIp    String?  @map("source_ip") @db.VarChar(50)
+  requestId   String?  @map("request_id") @db.VarChar(100)
+  dryRun      Boolean  @default(false) @map("dry_run")
+  resultCount Int?     @map("result_count")
+  durationMs  Int?     @map("duration_ms")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([endpoint], map: "idx_admin_actions_endpoint")
+  @@index([createdAt], map: "idx_admin_actions_created_at")
+  @@index([sourceIp], map: "idx_admin_actions_source_ip")
+  @@map("admin_actions")
 }
 
 model SavedProvider {

@@ -75,7 +75,17 @@ describe('honeypotCheck middleware', () => {
     middleware(req as Request, res as unknown as Response, next);
 
     expect(next).not.toHaveBeenCalled();
-    expect(res.json).toHaveBeenCalledWith({ success: true, data: { id: 'submitted' } });
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.jsonData).toEqual({
+      success: true,
+      data: {
+        verification: {
+          id: expect.stringMatching(/^c[a-z0-9]{24}$/),
+          createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+        },
+        message: 'Verification submitted successfully',
+      },
+    });
   });
 
   it('does NOT call next() when honeypot is triggered (blocks pipeline)', () => {
@@ -120,7 +130,15 @@ describe('honeypotCheck middleware', () => {
     middleware(req as Request, res as unknown as Response, next);
 
     expect(next).not.toHaveBeenCalled();
-    expect(res.json).toHaveBeenCalledWith({ success: true, data: { id: 'submitted' } });
+    expect(res.jsonData).toEqual({
+      success: true,
+      data: {
+        verification: expect.objectContaining({
+          id: expect.stringMatching(/^c[a-z0-9]{24}$/),
+        }),
+        message: 'Verification submitted successfully',
+      },
+    });
   });
 
   it('ignores default field when checking custom field name', () => {
@@ -172,18 +190,23 @@ describe('honeypotCheck middleware', () => {
     expect(res.json).toHaveBeenCalled();
   });
 
-  it('returns consistent fake response shape to fool bots', () => {
+  it('returns a fresh cuid-shaped id on each call (defeats shape-diff detection)', () => {
     const middleware = honeypotCheck();
-    const req = makeMockReq({ website: 'http://malicious.bot/form' });
-    const res = makeMockRes();
     const next = jest.fn();
 
-    middleware(req as Request, res as unknown as Response, next);
+    const ids: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      const req = makeMockReq({ website: 'http://malicious.bot/form' });
+      const res = makeMockRes();
+      middleware(req as Request, res as unknown as Response, next);
+      ids.push(res.jsonData.data.verification.id);
+    }
 
-    const responseData = res.jsonData;
-    expect(responseData).toEqual({
-      success: true,
-      data: { id: 'submitted' },
-    });
+    // Every id is cuid-shaped and unique — a bot that submits twice and
+    // diffs the responses can't use `id === id` to confirm the honeypot.
+    for (const id of ids) {
+      expect(id).toMatch(/^c[a-z0-9]{24}$/);
+    }
+    expect(new Set(ids).size).toBe(ids.length);
   });
 });

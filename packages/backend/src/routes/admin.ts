@@ -1,18 +1,112 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { timingSafeEqual } from 'crypto';
+import { createHash, timingSafeEqual } from 'crypto';
 import { z } from 'zod';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
-import { cleanupExpiredVerifications, getExpirationStats } from '../services/verificationService';
+import { cleanupExpiredVerifications, getExpirationStats, getDisputedVerifications } from '../services/verificationService';
+import { paginationSchema } from '../schemas/commonSchemas';
 import { recalculateAllConfidenceScores } from '../services/confidenceDecayService';
 import { getEnrichmentStats } from '../services/locationEnrichment';
-import { cleanupExpiredSessions } from '../services/authService';
+import { cleanupExpiredSessions, cleanupExpiredMagicLinkTokens } from '../services/authService';
 import { cacheClear, getCacheStats } from '../utils/cache';
+import { getRedisStatus } from '../lib/redis';
 import { decryptCardPii, encryptCardPii, hasPreviousKey } from '../lib/encryption';
 import prisma from '../lib/prisma';
 import { adminTimeout } from '../middleware/requestTimeout';
+import { adminRateLimiter } from '../middleware/rateLimiter';
+import { adminAudit } from '../middleware/adminAudit';
 import logger from '../utils/logger';
 
 const router = Router();
+
+/**
+ * Optional IP allowlist for admin endpoints. Set ADMIN_IP_ALLOWLIST to a
+ * comma-separated list of IPs to restrict admin access to known callers
+ * (e.g. Cloud Scheduler egress, office VPN). Unset / empty = no restriction
+ * (backwards compatible). Matches on exact string equality; CIDR is out of
+ * scope for this MVP — add a proper parser if range support is needed.
+ *
+ * Example: ADMIN_IP_ALLOWLIST="35.187.132.4,104.132.100.5"
+ *
+ * Cloud Scheduler's egress IPs for a given project/region can be found via
+ * `gcloud compute addresses list` or the GCP console. (IM-28 / LOW-02)
+ */
+const ADMIN_IP_ALLOWLIST = process.env.ADMIN_IP_ALLOWLIST
+  ? process.env.ADMIN_IP_ALLOWLIST.split(',').map(ip => ip.trim()).filter(Boolean)
+  : null;
+
+if (ADMIN_IP_ALLOWLIST) {
+  logger.info({ count: ADMIN_IP_ALLOWLIST.length }, 'Admin IP allowlist configured');
+}
+
+function adminIpCheck(req: Request, _res: Response, next: NextFunction): void {
+  // Not configured — allow all (default, matches pre-IM-28 behavior).
+  if (!ADMIN_IP_ALLOWLIST) {
+    return next();
+  }
+  const clientIp = req.ip || '';
+  if (ADMIN_IP_ALLOWLIST.includes(clientIp)) {
+    return next();
+  }
+  // Logged distinctly from auth failures so operators can tell "unauthorized
+  // IP" from "bad secret" when tuning the allowlist.
+  logger.warn(
+    { ip: clientIp, path: req.path },
+    'Admin request from non-allowlisted IP rejected'
+  );
+  throw AppError.forbidden('Access denied');
+}
+
+// IP allowlist runs FIRST so non-allowlisted callers never consume rate-limit
+// budget and never reach the audit table — they just get a 403 and a log
+// line. (IM-28)
+router.use(adminIpCheck);
+
+// Brute-force throttle on the X-Admin-Secret header — applied at the router
+// level so every admin endpoint is covered, and BEFORE adminAuthMiddleware
+// so failed auth attempts count against the per-IP budget.
+router.use(adminRateLimiter);
+
+// Append-only audit trail for every admin invocation. Applied before the
+// route handlers so both successful and failed (post-auth) calls are
+// recorded with their source IP, request ID, and result count.
+router.use(adminAudit);
+
+// ============================================================================
+// Query-param validation schemas
+// ============================================================================
+// Shared Zod schemas for admin query params. Replace previous manual
+// parseInt / === 'true' parsing so bounds and types are validated uniformly
+// and invalid input produces a consistent 400 via the errorHandler's
+// built-in ZodError handling. All fields are optional — defaults match the
+// historical manual parsing behavior so operator muscle memory still works.
+
+/** Base schema shared by every admin cleanup/maintenance endpoint. */
+const dryRunQuerySchema = z.object({
+  dryRun: z.enum(['true', 'false']).optional().transform(v => v === 'true'),
+});
+
+/** Used by /cleanup-expired. Default batchSize 1000. */
+const cleanupQuerySchema = dryRunQuerySchema.extend({
+  batchSize: z.coerce.number().int().min(1).max(10000).optional().default(1000),
+});
+
+/**
+ * Used by /rotate-encryption-key. Crypto re-encryption is slower per row
+ * than a plain DELETE, so the batch default is intentionally lower (50).
+ */
+const rotationQuerySchema = dryRunQuerySchema.extend({
+  batchSize: z.coerce.number().int().min(1).max(10000).optional().default(50),
+});
+
+/** Used by /cleanup/sync-logs and /cleanup-admin-actions. Default 90 days. */
+const retentionQuerySchema = dryRunQuerySchema.extend({
+  retentionDays: z.coerce.number().int().min(1).max(365).optional().default(90),
+});
+
+/** Used by /recalculate-confidence. `limit` stays optional (no default). */
+const confidenceQuerySchema = dryRunQuerySchema.extend({
+  limit: z.coerce.number().int().min(1).max(100000).optional(),
+});
 
 /**
  * Admin secret authentication middleware
@@ -40,15 +134,13 @@ function adminAuthMiddleware(req: Request, res: Response, next: NextFunction) {
 
   const providedSecret = req.headers['x-admin-secret'];
 
-  // Use timing-safe comparison to prevent timing attacks
-  const providedBuffer = Buffer.from(String(providedSecret || ''));
-  const secretBuffer = Buffer.from(adminSecret);
-
-  // timingSafeEqual requires equal length buffers, so check length first
-  // Then use constant-time comparison to prevent timing-based secret extraction
-  const isValid =
-    providedBuffer.length === secretBuffer.length &&
-    timingSafeEqual(providedBuffer, secretBuffer);
+  // Hash both sides before comparing. SHA-256 always emits 32 bytes, so the
+  // length pre-check that `timingSafeEqual` otherwise requires is gone — and
+  // with it the timing channel that previously leaked the secret's length
+  // when attackers submitted probes of varying size. (IM-30 / LOW-04)
+  const providedHash = createHash('sha256').update(String(providedSecret || '')).digest();
+  const secretHash = createHash('sha256').update(adminSecret).digest();
+  const isValid = timingSafeEqual(providedHash, secretHash);
 
   if (!isValid) {
     throw AppError.unauthorized('Invalid or missing admin secret');
@@ -73,8 +165,7 @@ router.post(
   adminAuthMiddleware,
   adminTimeout,
   asyncHandler(async (req, res) => {
-    const dryRun = req.query.dryRun === 'true';
-    const batchSize = parseInt(req.query.batchSize as string) || 1000;
+    const { dryRun, batchSize } = cleanupQuerySchema.parse(req.query);
 
     logger.info({ dryRun, batchSize }, 'Admin cleanup expired verifications started');
 
@@ -112,7 +203,7 @@ router.post(
   adminAuthMiddleware,
   adminTimeout,
   asyncHandler(async (req, res) => {
-    const dryRun = req.query.dryRun === 'true';
+    const { dryRun } = dryRunQuerySchema.parse(req.query);
 
     logger.info({ dryRun }, 'Admin cleanup expired sessions started');
 
@@ -127,6 +218,94 @@ router.post(
         message: dryRun
           ? `Dry run complete. ${result.expiredCount} expired sessions would be deleted.`
           : `Cleanup complete. ${result.deletedCount} expired sessions deleted.`,
+      },
+    });
+  })
+);
+
+/**
+ * POST /api/v1/admin/cleanup-magic-links
+ * Delete expired or already-used magic link tokens from the database.
+ *
+ * Protected by X-Admin-Secret header
+ * Designed to be called by Cloud Scheduler
+ *
+ * Query params:
+ *   - dryRun: If 'true', only return count without deleting (default: false)
+ */
+router.post(
+  '/cleanup-magic-links',
+  adminAuthMiddleware,
+  adminTimeout,
+  asyncHandler(async (req, res) => {
+    const { dryRun } = dryRunQuerySchema.parse(req.query);
+
+    logger.info({ dryRun }, 'Admin cleanup expired magic link tokens started');
+
+    const result = await cleanupExpiredMagicLinkTokens({ dryRun });
+
+    logger.info({ result }, 'Admin magic link token cleanup complete');
+
+    res.json({
+      success: true,
+      data: {
+        ...result,
+        message: dryRun
+          ? `Dry run complete. ${result.expiredCount} expired/used magic link tokens would be deleted.`
+          : `Cleanup complete. ${result.deletedCount} expired/used magic link tokens deleted.`,
+      },
+    });
+  })
+);
+
+/**
+ * POST /api/v1/admin/cleanup-admin-actions
+ * Retention trim for the admin_actions audit table. Keeps the last 90 days
+ * of entries by default — long enough to investigate any incident reported
+ * within a quarter, short enough to keep the table small.
+ *
+ * Protected by X-Admin-Secret header
+ * TODO(ops): wire this into Cloud Scheduler (see infra/scheduler/README.md)
+ * on a weekly cadence once backlog allows.
+ *
+ * Query params:
+ *   - dryRun: If 'true', only return count without deleting (default: false)
+ *   - retentionDays: override the default 90-day window (1..365)
+ */
+router.post(
+  '/cleanup-admin-actions',
+  adminAuthMiddleware,
+  adminTimeout,
+  asyncHandler(async (req, res) => {
+    const { dryRun, retentionDays } = retentionQuerySchema.parse(req.query);
+
+    const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
+    const where = { createdAt: { lt: cutoff } };
+
+    logger.info({ dryRun, retentionDays }, 'Admin cleanup admin_actions started');
+
+    let deletedCount = 0;
+    let expiredCount = 0;
+    if (dryRun) {
+      expiredCount = await prisma.adminAction.count({ where });
+    } else {
+      const result = await prisma.adminAction.deleteMany({ where });
+      deletedCount = result.count;
+      expiredCount = result.count;
+    }
+
+    logger.info({ dryRun, retentionDays, deletedCount, expiredCount }, 'Admin admin_actions cleanup complete');
+
+    res.json({
+      success: true,
+      data: {
+        dryRun,
+        retentionDays,
+        deletedCount,
+        expiredCount,
+        message: dryRun
+          ? `Dry run complete. ${expiredCount} admin_actions rows older than ${retentionDays} days would be deleted.`
+          : `Cleanup complete. ${deletedCount} admin_actions rows older than ${retentionDays} days deleted.`,
       },
     });
   })
@@ -152,6 +331,48 @@ router.get(
 );
 
 /**
+ * GET /api/v1/admin/verifications/disputed
+ * Review queue for provider-plan pairs stuck in active dispute — 3+
+ * crowdsourced verifications, both accepted and not-accepted present, and
+ * neither side holding a 2:1 majority (so `determineAcceptanceStatus` keeps
+ * the pair in PENDING).
+ *
+ * Useful for spotting Sybil-shaped attacks: look for pairs where
+ * `totalVerifications` is high but `uniqueIps` / `uniqueUsers` is low
+ * relative to it.
+ *
+ * Read-only, no PII — aggregate counts only. Protected by X-Admin-Secret.
+ *
+ * Query params:
+ *   - page  (default 1)
+ *   - limit (default 20, max 100 — enforced by paginationSchema)
+ *
+ * (IM-45 / Sybil M2)
+ */
+router.get(
+  '/verifications/disputed',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    const { page, limit } = paginationSchema.parse(req.query);
+    const { disputes, total } = await getDisputedVerifications({ page, limit });
+
+    res.json({
+      success: true,
+      data: {
+        disputes,
+        total,
+        pagination: {
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+          hasMore: page * limit < total,
+        },
+      },
+    });
+  })
+);
+
+/**
  * GET /api/v1/admin/health
  * Health check endpoint for monitoring with retention metrics
  *
@@ -163,57 +384,106 @@ router.get(
   asyncHandler(async (req, res) => {
     const cacheStats = getCacheStats();
 
-    // Get retention metrics
+    // Get retention metrics — success doubles as our DB liveness signal. If
+    // these queries fail the DB is unhealthy and we still want to respond
+    // with a structured body rather than a raw 500 (this endpoint is an
+    // operator diagnostic, so partial data is more useful than a stack
+    // trace). (F-06)
     const sevenDaysFromNow = new Date();
     sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
 
-    const [
-      verificationLogTotal,
-      verificationLogExpiringSoon,
-      verificationLogOldest,
-      syncLogTotal,
-      syncLogOldest,
-      voteTotal,
-    ] = await Promise.all([
-      // Verification logs
-      prisma.verificationLog.count(),
-      prisma.verificationLog.count({
-        where: { expiresAt: { lte: sevenDaysFromNow } },
-      }),
-      prisma.verificationLog.findFirst({
-        orderBy: { createdAt: 'asc' },
-        select: { createdAt: true },
-      }),
-      // Sync logs
-      prisma.syncLog.count(),
-      prisma.syncLog.findFirst({
-        orderBy: { startedAt: 'asc' },
-        select: { startedAt: true },
-      }),
-      // Vote logs
-      prisma.voteLog.count(),
-    ]);
+    let dbHealthy = false;
+    let retention: {
+      verificationLogs: { total: number; expiringIn7Days: number; oldestRecord: string | null };
+      syncLogs: { total: number; oldestRecord: string | null };
+      voteLogs: { total: number };
+    } | null = null;
+
+    try {
+      const [
+        verificationLogTotal,
+        verificationLogExpiringSoon,
+        verificationLogOldest,
+        syncLogTotal,
+        syncLogOldest,
+        voteTotal,
+      ] = await Promise.all([
+        prisma.verificationLog.count(),
+        prisma.verificationLog.count({ where: { expiresAt: { lte: sevenDaysFromNow } } }),
+        prisma.verificationLog.findFirst({
+          orderBy: { createdAt: 'asc' },
+          select: { createdAt: true },
+        }),
+        prisma.syncLog.count(),
+        prisma.syncLog.findFirst({
+          orderBy: { startedAt: 'asc' },
+          select: { startedAt: true },
+        }),
+        prisma.voteLog.count(),
+      ]);
+
+      dbHealthy = true;
+      retention = {
+        verificationLogs: {
+          total: verificationLogTotal,
+          expiringIn7Days: verificationLogExpiringSoon,
+          oldestRecord: verificationLogOldest?.createdAt?.toISOString() || null,
+        },
+        syncLogs: {
+          total: syncLogTotal,
+          oldestRecord: syncLogOldest?.startedAt?.toISOString() || null,
+        },
+        voteLogs: {
+          total: voteTotal,
+        },
+      };
+    } catch (err) {
+      logger.error({ err }, 'admin/health: DB queries failed');
+    }
+
+    // Redis state — reuses the same normalization as GET /health and
+    // GET /admin/redis/status.
+    const redisStatus = getRedisStatus();
+    const redisHealthy = !redisStatus.configured || redisStatus.connected;
+
+    // Config presence checks — boolean-only, never the secret value. Safe
+    // to expose here because this endpoint is behind X-Admin-Secret auth.
+    const secretConfigured = (name: string) => !!process.env[name];
 
     res.json({
       success: true,
       data: {
+        // `status` kept for backwards compatibility; new `overallStatus`
+        // adds a degraded state when a dependency is down.
         status: 'healthy',
+        overallStatus: dbHealthy && redisHealthy ? 'healthy' : 'degraded',
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
         cache: cacheStats,
-        retention: {
-          verificationLogs: {
-            total: verificationLogTotal,
-            expiringIn7Days: verificationLogExpiringSoon,
-            oldestRecord: verificationLogOldest?.createdAt?.toISOString() || null,
+        checks: {
+          database: dbHealthy ? 'healthy' : 'unhealthy',
+          redis: {
+            status: redisStatus.configured
+              ? (redisStatus.connected ? 'connected' : 'disconnected')
+              : 'not-configured',
+            mode: process.env.REDIS_URL ? 'redis' : 'memory',
+            tlsEnabled: process.env.REDIS_URL?.startsWith('rediss://') ?? false,
           },
-          syncLogs: {
-            total: syncLogTotal,
-            oldestRecord: syncLogOldest?.startedAt?.toISOString() || null,
+          secrets: {
+            adminSecret: secretConfigured('ADMIN_SECRET') ? 'configured' : 'missing',
+            jwt: secretConfigured('JWT_SECRET') ? 'configured' : 'missing',
+            encryption: secretConfigured('INSURANCE_ENCRYPTION_KEY') ? 'configured' : 'missing',
+            resend: secretConfigured('RESEND_API_KEY') ? 'configured' : 'missing',
+            captcha: secretConfigured('RECAPTCHA_SECRET_KEY') ? 'configured' : 'missing',
+            csrf: secretConfigured('CSRF_SECRET') ? 'configured' : 'missing',
           },
-          voteLogs: {
-            total: voteTotal,
-          },
+        },
+        // Retention metrics are null when DB is down; shape is preserved
+        // for existing consumers that only read the per-table `total`.
+        retention: retention ?? {
+          verificationLogs: { total: null, expiringIn7Days: null, oldestRecord: null },
+          syncLogs: { total: null, oldestRecord: null },
+          voteLogs: { total: null },
         },
       },
     });
@@ -271,6 +541,34 @@ router.get(
   })
 );
 
+/**
+ * GET /api/v1/admin/redis/status
+ * Admin-level detail on the Redis connection: configured-ness, connection
+ * state, ioredis status, and whether TLS was negotiated. Complements the
+ * coarser `/health` check by exposing the internal fields operators need
+ * to distinguish "unconfigured" from "configured-but-down" from "connected
+ * but not over TLS". (F-21)
+ *
+ * Protected by X-Admin-Secret header
+ */
+router.get(
+  '/redis/status',
+  adminAuthMiddleware,
+  asyncHandler(async (_req, res) => {
+    const status = getRedisStatus();
+    const redisUrl = process.env.REDIS_URL;
+
+    res.json({
+      success: true,
+      data: {
+        ...status,
+        mode: redisUrl ? 'redis' : 'memory',
+        tlsEnabled: redisUrl?.startsWith('rediss://') ?? false,
+      },
+    });
+  })
+);
+
 // ============================================================================
 // Location Enrichment Endpoints
 // ============================================================================
@@ -314,8 +612,7 @@ router.post(
   adminAuthMiddleware,
   adminTimeout,
   asyncHandler(async (req, res) => {
-    const dryRun = req.query.dryRun === 'true';
-    const retentionDays = parseInt(req.query.retentionDays as string) || 90;
+    const { dryRun, retentionDays } = retentionQuerySchema.parse(req.query);
 
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
@@ -504,12 +801,7 @@ router.post(
   adminAuthMiddleware,
   adminTimeout,
   asyncHandler(async (req, res) => {
-    const dryRun = req.query.dryRun === 'true';
-    const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : undefined;
-
-    if (limit !== undefined && (isNaN(limit) || limit < 1)) {
-      throw AppError.badRequest('limit must be a positive integer');
-    }
+    const { dryRun, limit } = confidenceQuerySchema.parse(req.query);
 
     logger.info({ dryRun, limit }, 'Admin: starting confidence recalculation');
 
@@ -563,8 +855,7 @@ router.post(
   adminAuthMiddleware,
   adminTimeout,
   asyncHandler(async (req, res) => {
-    const dryRun = req.query.dryRun === 'true';
-    const batchSize = parseInt(req.query.batchSize as string) || 50;
+    const { dryRun, batchSize } = rotationQuerySchema.parse(req.query);
 
     // Count total cards with any encrypted field
     const total = await prisma.userInsuranceCard.count({
@@ -597,9 +888,26 @@ router.post(
       return;
     }
 
+    // Acquire a Postgres advisory lock so two concurrent rotation attempts
+    // can't read-then-write the same rows under inconsistent key assumptions
+    // (e.g. accidental double-click, duplicate Cloud Scheduler job). We use
+    // pg_try_advisory_lock so a second caller gets an immediate 409 instead
+    // of blocking indefinitely. Lock ID is arbitrary but stable across the
+    // process — any other rotation using ROTATION_LOCK_ID will conflict.
+    // (F-07 / FINDING-38-05)
+    const ROTATION_LOCK_ID = 4820173905;
+    const lockResult = await prisma.$queryRaw<[{ pg_try_advisory_lock: boolean }]>`
+      SELECT pg_try_advisory_lock(${ROTATION_LOCK_ID})
+    `;
+    if (!lockResult[0]?.pg_try_advisory_lock) {
+      throw AppError.conflict('Encryption key rotation is already in progress');
+    }
+
     let processed = 0;
     let errors = 0;
     let cursor: string | undefined;
+
+    try {
 
     while (true) {
       const cards = await prisma.userInsuranceCard.findMany({
@@ -675,6 +983,13 @@ router.post(
         message: `Re-encryption complete. ${processed} records re-encrypted, ${errors} errors.`,
       },
     });
+
+    } finally {
+      // Release the advisory lock on both success and error paths. Postgres
+      // also auto-releases at session end, but we free it explicitly so
+      // another rotation can run immediately after this returns.
+      await prisma.$queryRaw`SELECT pg_advisory_unlock(${ROTATION_LOCK_ID})`;
+    }
   })
 );
 
