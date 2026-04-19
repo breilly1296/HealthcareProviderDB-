@@ -95,9 +95,30 @@ async function checkSybilAttack(
   providerNpi: string,
   planId: string,
   sourceIp?: string,
-  submittedBy?: string
+  submittedBy?: string,
+  userId?: string | null
 ): Promise<void> {
   const cutoffDate = new Date(Date.now() - SYBIL_PREVENTION_WINDOW_MS);
+
+  // Check for duplicate verification from same authenticated user. Runs
+  // first because it's the strongest signal — a userId survives IP/device
+  // rotation that would bypass the sourceIp check.
+  if (userId) {
+    const existingFromUser = await prisma.verificationLog.findFirst({
+      where: {
+        providerNpi,
+        planId,
+        userId,
+        createdAt: { gte: cutoffDate },
+      },
+    });
+
+    if (existingFromUser) {
+      throw AppError.conflict(
+        'You have already submitted a verification for this provider-plan pair within the last 30 days.'
+      );
+    }
+  }
 
   // Check for duplicate verification from same IP
   if (sourceIp) {
@@ -312,6 +333,9 @@ export interface SubmitVerificationInput {
   submittedBy?: string;
   sourceIp?: string;
   userAgent?: string;
+  // When the submitter is authenticated, the server passes req.user.id here.
+  // Null/absent for anonymous submissions (which are still allowed).
+  userId?: string | null;
 }
 
 export interface VerificationStats {
@@ -350,13 +374,14 @@ export async function submitVerification(input: SubmitVerificationInput) {
     submittedBy,
     sourceIp,
     userAgent,
+    userId,
   } = input;
 
   // Step 1: Validate provider and plan exist
   const { providerNpi, planId: validPlanId } = await validateProviderAndPlan(npi, planId);
 
-  // Step 2: Check for Sybil attack patterns
-  await checkSybilAttack(providerNpi, validPlanId, sourceIp, submittedBy);
+  // Step 2: Check for Sybil attack patterns (IP, email, and userId)
+  await checkSybilAttack(providerNpi, validPlanId, sourceIp, submittedBy, userId);
 
   // Step 3: Get existing acceptance record for previousValue
   // If locationId is provided, look for a location-specific record first
@@ -414,6 +439,7 @@ export async function submitVerification(input: SubmitVerificationInput) {
       submittedBy,
       sourceIp,
       userAgent,
+      userId: userId ?? null,
       upvotes: 0,
       downvotes: 0,
       expiresAt: getExpirationDate(),
@@ -443,7 +469,8 @@ export async function submitVerification(input: SubmitVerificationInput) {
 export async function voteOnVerification(
   verificationId: string,
   vote: 'up' | 'down',
-  sourceIp?: string
+  sourceIp?: string,
+  userId?: string | null
 ) {
   // Validate sourceIp is provided
   if (!sourceIp) {
@@ -459,15 +486,28 @@ export async function voteOnVerification(
     throw AppError.notFound('Verification not found');
   }
 
-  // Check for existing vote from this IP
-  const existingVote = await prisma.voteLog.findUnique({
-    where: {
-      verificationId_sourceIp: {
-        verificationId,
-        sourceIp,
+  // Look up the voter's existing vote. UserId takes precedence because it
+  // survives IP rotation (mobile ↔ VPN ↔ new device) that would otherwise
+  // let an authenticated voter double-vote. Anonymous voters fall back to
+  // the existing per-IP check.
+  let existingVote: { id: string; vote: string } | null = null;
+  if (userId) {
+    existingVote = await prisma.voteLog.findFirst({
+      where: { verificationId, userId },
+      select: { id: true, vote: true },
+    });
+  }
+  if (!existingVote) {
+    existingVote = await prisma.voteLog.findUnique({
+      where: {
+        verificationId_sourceIp: {
+          verificationId,
+          sourceIp,
+        },
       },
-    },
-  });
+      select: { id: true, vote: true },
+    });
+  }
 
   let updatedVerification;
   let voteChanged = false;
@@ -478,17 +518,14 @@ export async function voteOnVerification(
       throw AppError.conflict('You have already voted on this verification');
     }
 
-    // Changing vote direction - update existing vote and adjust counts
+    // Changing vote direction - update existing vote and adjust counts.
+    // Key the update by vote row id (not the composite-unique) so both
+    // userId-matched and sourceIp-matched rows can be updated uniformly.
     voteChanged = true;
+    const existingVoteId = existingVote.id;
     await prisma.$transaction(async (tx) => {
-      // Update the vote record
       await tx.voteLog.update({
-        where: {
-          verificationId_sourceIp: {
-            verificationId,
-            sourceIp,
-          },
-        },
+        where: { id: existingVoteId },
         data: { vote },
       });
 
@@ -521,6 +558,7 @@ export async function voteOnVerification(
         data: {
           verificationId,
           sourceIp,
+          userId: userId ?? null,
           vote,
         },
       });
@@ -906,4 +944,188 @@ export async function getExpirationStats(): Promise<{
       expiringWithin30Days: acceptancesExpiring30Days,
     },
   };
+}
+
+// ============================================================================
+// getDisputedVerifications — admin review queue (IM-45 / Sybil M2)
+// ============================================================================
+
+/**
+ * Shape of one row in the disputes queue. Never includes PII — aggregate
+ * counts only. `uniqueIps` and `uniqueUsers` are useful triage signals but
+ * the actual IPs / userIds stay in verification_logs, visible only via
+ * direct DB access.
+ */
+export interface DisputedPair {
+  providerNpi: string;
+  planId: string;
+  providerName: string | null;
+  planName: string | null;
+  issuerName: string | null;
+  totalVerifications: number;
+  accepted: number;
+  notAccepted: number;
+  uniqueIps: number;
+  uniqueUsers: number;
+  currentStatus: string | null;
+  confidenceScore: number | null;
+  lastVerifiedAt: string | null;
+}
+
+/**
+ * Find provider-plan pairs whose crowdsourced verifications are in active
+ * dispute — 3+ verifications, both ACCEPTED and NOT_ACCEPTED present, and
+ * neither side holding a 2:1 majority (the same bar `determineAcceptanceStatus`
+ * uses before moving a pair out of PENDING).
+ *
+ * Runs as a single raw aggregation over verification_logs, then joins
+ * provider/plan/acceptance data back in app code so the response is
+ * type-safe. Read-only — no mutations.
+ */
+export async function getDisputedVerifications(options: {
+  page: number;
+  limit: number;
+}): Promise<{ disputes: DisputedPair[]; total: number }> {
+  const { page, limit } = options;
+  const offset = (page - 1) * limit;
+
+  // Aggregation in raw SQL — Prisma's groupBy can't express COUNT FILTER.
+  // Column-name quoting reflects the mixed-case schema:
+  //   - `"newValue"`, `"sourceIp"`, `"verificationSource"`, `"verificationType"`
+  //     are camelCase in the DB (no @map in schema.prisma)
+  //   - `provider_npi`, `plan_id`, `user_id`, `created_at` are snake_case (@map)
+  interface DisputeAggregateRow {
+    providerNpi: string;
+    planId: string;
+    totalVerifications: bigint;
+    accepted: bigint;
+    notAccepted: bigint;
+    uniqueIps: bigint;
+    uniqueUsers: bigint;
+    lastVerifiedAt: Date;
+  }
+
+  const rows = await prisma.$queryRaw<DisputeAggregateRow[]>`
+    SELECT
+      vl.provider_npi                                                                                 AS "providerNpi",
+      vl.plan_id                                                                                      AS "planId",
+      COUNT(*)                                                                                        AS "totalVerifications",
+      COUNT(*) FILTER (WHERE vl."newValue"->>'acceptanceStatus' = 'ACCEPTED')                         AS "accepted",
+      COUNT(*) FILTER (WHERE vl."newValue"->>'acceptanceStatus' = 'NOT_ACCEPTED')                     AS "notAccepted",
+      COUNT(DISTINCT vl."sourceIp")                                                                   AS "uniqueIps",
+      COUNT(DISTINCT vl.user_id)                                                                      AS "uniqueUsers",
+      MAX(vl.created_at)                                                                              AS "lastVerifiedAt"
+    FROM verification_logs vl
+    WHERE vl."verificationSource" = 'CROWDSOURCE'
+      AND vl."verificationType"   = 'PLAN_ACCEPTANCE'
+      AND vl.provider_npi IS NOT NULL
+      AND vl.plan_id      IS NOT NULL
+    GROUP BY vl.provider_npi, vl.plan_id
+    HAVING COUNT(*) >= 3
+       AND COUNT(*) FILTER (WHERE vl."newValue"->>'acceptanceStatus' = 'ACCEPTED')     > 0
+       AND COUNT(*) FILTER (WHERE vl."newValue"->>'acceptanceStatus' = 'NOT_ACCEPTED') > 0
+       AND COUNT(*) FILTER (WHERE vl."newValue"->>'acceptanceStatus' = 'ACCEPTED')
+           <= COUNT(*) FILTER (WHERE vl."newValue"->>'acceptanceStatus' = 'NOT_ACCEPTED') * 2
+       AND COUNT(*) FILTER (WHERE vl."newValue"->>'acceptanceStatus' = 'NOT_ACCEPTED')
+           <= COUNT(*) FILTER (WHERE vl."newValue"->>'acceptanceStatus' = 'ACCEPTED') * 2
+    ORDER BY COUNT(*) DESC, MAX(vl.created_at) DESC
+    LIMIT ${limit}
+    OFFSET ${offset}
+  `;
+
+  // Separate total count for pagination. Reuses the same HAVING filter so
+  // the count is exact for the current filter criteria.
+  const totalRows = await prisma.$queryRaw<[{ total: bigint }]>`
+    SELECT COUNT(*)::bigint AS "total" FROM (
+      SELECT vl.provider_npi, vl.plan_id
+      FROM verification_logs vl
+      WHERE vl."verificationSource" = 'CROWDSOURCE'
+        AND vl."verificationType"   = 'PLAN_ACCEPTANCE'
+        AND vl.provider_npi IS NOT NULL
+        AND vl.plan_id      IS NOT NULL
+      GROUP BY vl.provider_npi, vl.plan_id
+      HAVING COUNT(*) >= 3
+         AND COUNT(*) FILTER (WHERE vl."newValue"->>'acceptanceStatus' = 'ACCEPTED')     > 0
+         AND COUNT(*) FILTER (WHERE vl."newValue"->>'acceptanceStatus' = 'NOT_ACCEPTED') > 0
+         AND COUNT(*) FILTER (WHERE vl."newValue"->>'acceptanceStatus' = 'ACCEPTED')
+             <= COUNT(*) FILTER (WHERE vl."newValue"->>'acceptanceStatus' = 'NOT_ACCEPTED') * 2
+         AND COUNT(*) FILTER (WHERE vl."newValue"->>'acceptanceStatus' = 'NOT_ACCEPTED')
+             <= COUNT(*) FILTER (WHERE vl."newValue"->>'acceptanceStatus' = 'ACCEPTED') * 2
+    ) AS disputed_pairs
+  `;
+  const total = Number(totalRows[0]?.total ?? 0);
+
+  if (rows.length === 0) {
+    return { disputes: [], total };
+  }
+
+  // Pull provider + plan + acceptance details in batched lookups so the
+  // response carries human-readable names without a multi-join raw query.
+  const providerNpis = Array.from(new Set(rows.map(r => r.providerNpi)));
+  const planIds = Array.from(new Set(rows.map(r => r.planId)));
+
+  const [providers, plans, acceptances] = await Promise.all([
+    prisma.provider.findMany({
+      where: { npi: { in: providerNpis } },
+      select: {
+        npi: true,
+        firstName: true,
+        lastName: true,
+        organizationName: true,
+        entityType: true,
+      },
+    }),
+    prisma.insurancePlan.findMany({
+      where: { planId: { in: planIds } },
+      select: { planId: true, planName: true, issuerName: true },
+    }),
+    prisma.providerPlanAcceptance.findMany({
+      where: {
+        providerNpi: { in: providerNpis },
+        planId: { in: planIds },
+      },
+      select: {
+        providerNpi: true,
+        planId: true,
+        acceptanceStatus: true,
+        confidenceScore: true,
+      },
+    }),
+  ]);
+
+  const providerByNpi = new Map(providers.map(p => [p.npi, p]));
+  const planById = new Map(plans.map(p => [p.planId, p]));
+  const acceptanceByKey = new Map(
+    acceptances.map(a => [`${a.providerNpi}|${a.planId}`, a])
+  );
+
+  const disputes: DisputedPair[] = rows.map(row => {
+    const provider = providerByNpi.get(row.providerNpi);
+    const plan = planById.get(row.planId);
+    const acceptance = acceptanceByKey.get(`${row.providerNpi}|${row.planId}`);
+
+    const providerName = provider
+      ? (provider.entityType === 'INDIVIDUAL'
+          ? [provider.firstName, provider.lastName].filter(Boolean).join(' ') || null
+          : provider.organizationName)
+      : null;
+
+    return {
+      providerNpi: row.providerNpi,
+      planId: row.planId,
+      providerName,
+      planName: plan?.planName ?? null,
+      issuerName: plan?.issuerName ?? null,
+      totalVerifications: Number(row.totalVerifications),
+      accepted: Number(row.accepted),
+      notAccepted: Number(row.notAccepted),
+      uniqueIps: Number(row.uniqueIps),
+      uniqueUsers: Number(row.uniqueUsers),
+      currentStatus: acceptance?.acceptanceStatus ?? null,
+      confidenceScore: acceptance?.confidenceScore ?? null,
+      lastVerifiedAt: row.lastVerifiedAt?.toISOString() ?? null,
+    };
+  });
+
+  return { disputes, total };
 }
