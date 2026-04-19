@@ -44,6 +44,17 @@ export function getRedisClient(): Redis | null {
   }
 
   try {
+    // TLS is opt-in via the URL scheme: `rediss://` turns it on, `redis://`
+    // keeps the previous plaintext behavior untouched. Empty `tls: {}`
+    // uses Node's default trust store, which is what Memorystore expects
+    // (Google-managed certs are in the system CA bundle). (IM-35 / I-55)
+    const useTls = redisUrl.startsWith('rediss://');
+    if (useTls) {
+      logger.info('Redis TLS enabled (rediss:// scheme)');
+    } else {
+      logger.warn('Redis connection is not using TLS — use rediss:// in production');
+    }
+
     logger.info('Initializing Redis connection');
 
     redisClient = new Redis(redisUrl, {
@@ -66,6 +77,11 @@ export function getRedisClient(): Redis | null {
       // Don't block startup if Redis is slow
       enableReadyCheck: true,
       lazyConnect: false,
+
+      // Enable TLS only for rediss:// URLs. Passing an object (even empty)
+      // switches ioredis into TLS mode; omitting the key leaves the plain
+      // redis:// path unchanged.
+      ...(useTls && { tls: {} }),
     });
 
     // Connection event handlers

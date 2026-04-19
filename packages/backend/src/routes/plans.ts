@@ -12,6 +12,7 @@ import {
 } from '../services/planService';
 import { paginationSchema, planIdParamSchema, stateQuerySchema } from '../schemas/commonSchemas';
 import { buildPaginationMeta, sendSuccess } from '../utils/responseHelpers';
+import { cacheGet, cacheSet, CACHE_TTL } from '../utils/cache';
 
 const router = Router();
 
@@ -65,10 +66,19 @@ router.get(
       state: z.string().length(2).toUpperCase().optional(),
     }).parse(req.query);
 
+    // 15 min TTL — grouped plans change less often than raw search but more
+    // often than pure metadata (a new carrier joining a state's exchange).
+    const cacheKey = `plans:grouped:${query.search?.toLowerCase() ?? '_'}:${query.state ?? '_'}`;
+    const cached = await cacheGet<Awaited<ReturnType<typeof getGroupedPlans>>>(cacheKey);
+    if (cached) {
+      return sendSuccess(res, cached);
+    }
+
     const result = await getGroupedPlans({
       search: query.search,
       state: query.state,
     });
+    await cacheSet(cacheKey, result, CACHE_TTL.AGGREGATION);
 
     sendSuccess(res, result);
   })
@@ -84,11 +94,20 @@ router.get(
   asyncHandler(async (req, res) => {
     const query = stateQuerySchema.parse(req.query);
 
+    // 30 min TTL — issuer list only moves when plan data is imported.
+    const cacheKey = `meta:issuers:${query.state ?? 'ALL'}`;
+    const cached = await cacheGet<{ issuers: unknown; count: number }>(cacheKey);
+    if (cached) {
+      return sendSuccess(res, cached);
+    }
+
     const issuers = await getIssuers({
       state: query.state,
     });
+    const payload = { issuers, count: issuers.length };
+    await cacheSet(cacheKey, payload, CACHE_TTL.METADATA);
 
-    sendSuccess(res, { issuers, count: issuers.length });
+    sendSuccess(res, payload);
   })
 );
 
@@ -104,12 +123,21 @@ router.get(
       issuerName: z.string().min(1).max(200).optional(),
     }).parse(req.query);
 
+    // 30 min TTL — plan types are a closed enum per (state, issuer) pair.
+    const cacheKey = `meta:types:${query.state ?? 'ALL'}:${query.issuerName?.toLowerCase() ?? 'ALL'}`;
+    const cached = await cacheGet<{ planTypes: string[]; count: number }>(cacheKey);
+    if (cached) {
+      return sendSuccess(res, cached);
+    }
+
     const types = await getPlanTypes({
       state: query.state,
       issuerName: query.issuerName,
     });
+    const payload = { planTypes: types, count: types.length };
+    await cacheSet(cacheKey, payload, CACHE_TTL.METADATA);
 
-    sendSuccess(res, { planTypes: types, count: types.length });
+    sendSuccess(res, payload);
   })
 );
 

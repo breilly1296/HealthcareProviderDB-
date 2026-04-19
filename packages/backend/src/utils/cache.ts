@@ -19,7 +19,22 @@ import logger from './logger';
 // Configuration
 // ============================================================================
 
-const DEFAULT_TTL_SECONDS = 300; // 5 minutes
+/**
+ * Named TTL tiers so callers don't scatter magic numbers across route
+ * handlers. Slow-changing metadata (plan issuers, cities) can cache far
+ * longer than search results; aggregation (grouped plans, stats) sits in
+ * between. Values are in seconds.
+ *
+ * `cacheClear()` wipes every tier regardless of TTL — these tiers only
+ * affect natural expiry, not explicit invalidation. (F-22)
+ */
+export const CACHE_TTL = {
+  DEFAULT: 300,       // 5 min — search results, provider detail
+  AGGREGATION: 900,   // 15 min — grouped plans, stats
+  METADATA: 1800,     // 30 min — plan types, issuers, cities (import-driven)
+} as const;
+
+const DEFAULT_TTL_SECONDS = CACHE_TTL.DEFAULT;
 const CACHE_PREFIX = 'cache:';
 const SEARCH_CACHE_PREFIX = 'search:';
 
