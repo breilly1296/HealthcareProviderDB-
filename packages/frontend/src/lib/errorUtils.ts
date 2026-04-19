@@ -49,6 +49,8 @@ export interface AppError {
   statusCode?: number;
   /** Whether the operation can be retried */
   retryable: boolean;
+  /** X-Request-ID for the failing request, when available — usable as a support ref and for backend log correlation. */
+  requestId?: string;
   /** Original error for debugging */
   originalError?: unknown;
 }
@@ -65,6 +67,7 @@ interface ApiError extends Error {
   statusCode?: number;
   code?: string;
   status?: number;
+  requestId?: string | null;
 }
 
 // ============================================================================
@@ -189,6 +192,7 @@ export function toAppError(error: unknown): AppError {
       statusCode,
       code: apiError.code,
       retryable: isRetryableStatus(statusCode) && !isNotFoundError(error.message),
+      requestId: apiError.requestId ?? undefined,
       originalError: error,
     };
   }
@@ -386,20 +390,14 @@ export function logError(context: string, error: unknown): void {
     console.error(`[${context}] ${appError.message}`);
   }
 
-  // Track error in PostHog (no PII — only error metadata)
+  // Route through the centralized helper — it handles SSR guards, ApiError
+  // filtering (4xx skip, 5xx captured by apiFetch), and PII discipline.
+  // Use dynamic import to avoid a cycle: analytics.ts → (future) → errorUtils.
   if (typeof window !== 'undefined') {
-    import('posthog-js').then(({ default: posthog }) => {
-      if (posthog.__loaded) {
-        posthog.capture('$exception', {
-          $exception_message: appError.message,
-          $exception_type: appError.code || 'unknown',
-          $exception_source: context,
-          status_code: appError.statusCode,
-          retryable: appError.retryable,
-        });
-      }
-    }).catch(() => {
-      // PostHog not available — silently ignore
-    });
+    import('./analytics')
+      .then(({ trackException }) => trackException(error, { source: context }))
+      .catch(() => {
+        // analytics module failed to load — silently ignore
+      });
   }
 }
