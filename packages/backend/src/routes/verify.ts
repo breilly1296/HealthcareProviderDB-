@@ -67,6 +67,10 @@ router.post(
       ...body,
       sourceIp: req.ip,
       userAgent: req.get('User-Agent'),
+      // Additive — anonymous submissions still work when req.user is absent.
+      // When present, a cuid-based userId gives us stronger Sybil dedup that
+      // survives IP rotation.
+      userId: req.user?.id ?? null,
     });
 
     // Invalidate search cache to ensure fresh data
@@ -100,7 +104,7 @@ router.post(
     const { vote } = voteSchema.parse(req.body);
     const sourceIp = req.ip || 'unknown';
 
-    const result = await voteOnVerification(verificationId, vote, sourceIp);
+    const result = await voteOnVerification(verificationId, vote, sourceIp, req.user?.id ?? null);
 
     res.json({
       success: true,

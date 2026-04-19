@@ -1,0 +1,37 @@
+{
+  "displayName": "Backend 5xx error rate (verifymyprovider-backend)",
+  "documentation": {
+    "content": "Backend Cloud Run service is returning 5xx responses at a rate higher than expected. Investigate recent deploys, Cloud SQL health, and the /health endpoint. Metric source: log-based counter verifymyprovider_backend_5xx on httpRequest.status >= 500.",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "5xx responses > 5 in 5m",
+      "conditionThreshold": {
+        "filter": "metric.type=\"logging.googleapis.com/user/verifymyprovider_backend_5xx\" resource.type=\"cloud_run_revision\"",
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": 5,
+        "duration": "0s",
+        "aggregations": [
+          {
+            "alignmentPeriod": "300s",
+            "perSeriesAligner": "ALIGN_DELTA",
+            "crossSeriesReducer": "REDUCE_SUM",
+            "groupByFields": [
+              "resource.label.service_name"
+            ]
+          }
+        ],
+        "trigger": {
+          "count": 1
+        }
+      }
+    }
+  ],
+  "alertStrategy": {
+    "autoClose": "1800s"
+  },
+  "enabled": true,
+  "notificationChannels": []
+}

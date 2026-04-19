@@ -3,6 +3,7 @@ import ProviderDetailClient from '@/components/provider-detail/ProviderDetailCli
 import type { ProviderWithPlans } from '@/components/provider-detail/ProviderDetailClient';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://verifymyprovider.com';
 
 async function getProvider(npi: string): Promise<ProviderWithPlans | null> {
   try {
@@ -46,6 +47,9 @@ export async function generateMetadata({
   return {
     title: `${name} - ${specialty} in ${location} | VerifyMyProvider`,
     description: `Verify insurance acceptance for ${name}, ${specialty} in ${location}. Check which insurance plans are accepted with community-verified data.`,
+    alternates: {
+      canonical: `${SITE_URL}/provider/${npi}`,
+    },
     openGraph: {
       title: `${name} - ${specialty}`,
       description: `Insurance verification for ${name} in ${location}`,
@@ -75,10 +79,10 @@ export default async function ProviderDetailPage({
         ...(firstLocation && {
           address: {
             '@type': 'PostalAddress',
-            streetAddress: firstLocation.address_line1,
+            streetAddress: firstLocation.addressLine1,
             addressLocality: firstLocation.city,
             addressRegion: firstLocation.state,
-            postalCode: firstLocation.zip_code,
+            postalCode: firstLocation.zipCode,
           },
         }),
         ...(firstLocation?.phone && { telephone: firstLocation.phone }),

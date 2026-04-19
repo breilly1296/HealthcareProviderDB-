@@ -2,9 +2,12 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { AlertTriangle } from 'lucide-react';
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://verifymyprovider.com';
+
 export const metadata: Metadata = {
   title: 'Data Accuracy Disclaimer - VerifyMyProvider',
   description: 'Important information about the accuracy and reliability of crowdsourced healthcare provider data on VerifyMyProvider.',
+  alternates: { canonical: `${SITE_URL}/disclaimer` },
 };
 
 export default function DisclaimerPage() {

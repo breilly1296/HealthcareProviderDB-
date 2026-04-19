@@ -13,6 +13,7 @@ import requestIdMiddleware from './middleware/requestId';
 import httpLogger from './middleware/httpLogger';
 import logger from './utils/logger';
 import { getCacheStats } from './utils/cache';
+import { getRedisStatus } from './lib/redis';
 import { generalTimeout } from './middleware/requestTimeout';
 
 // Load environment variables
@@ -108,6 +109,21 @@ app.use(extractUser);
 app.get('/health', async (req: Request, res: Response) => {
   const cacheStats = getCacheStats();
 
+  // Normalize Redis status into a small enum the health response commits to.
+  // - not-configured: REDIS_URL is unset; Redis is optional so this is fine
+  // - connected:      ready and accepting commands
+  // - disconnected:   transient state (connecting / reconnecting) — not fatal
+  // - error:          configured but in a broken state — degrades health
+  const redisRaw = getRedisStatus();
+  const redisHealth: 'connected' | 'disconnected' | 'not-configured' | 'error' =
+    !redisRaw.configured
+      ? 'not-configured'
+      : redisRaw.connected && redisRaw.status === 'ready'
+        ? 'connected'
+        : redisRaw.status === 'connecting' || redisRaw.status === 'reconnecting'
+          ? 'disconnected'
+          : 'error';
+
   const health = {
     status: 'ok' as 'ok' | 'degraded',
     timestamp: new Date().toISOString(),
@@ -120,6 +136,7 @@ app.get('/health', async (req: Request, res: Response) => {
     },
     checks: {
       database: 'unknown' as 'healthy' | 'unhealthy' | 'unknown',
+      redis: redisHealth,
     },
     cache: {
       hits: cacheStats.hits,
@@ -139,6 +156,15 @@ app.get('/health', async (req: Request, res: Response) => {
 
     health.checks.database = 'healthy';
     (health as Record<string, unknown>).databaseResponseTime = `${responseTime}ms`;
+
+    // Only a configured-but-broken Redis degrades us. `not-configured` is
+    // deliberately fine: Redis is optional, the app falls back to in-memory
+    // cache and rate limiting. Transient `disconnected` is self-healing.
+    if (redisHealth === 'error') {
+      health.status = 'degraded';
+      res.status(503).json(health);
+      return;
+    }
 
     res.json(health);
   } catch (error) {

@@ -1,0 +1,37 @@
+{
+  "displayName": "Backend uptime check failing (verifymyprovider-backend)",
+  "documentation": {
+    "content": "The synthetic HTTPS check at /health on the backend is failing from multiple regions. Distinguish from the liveness-probe alert: this fires on external reachability (TLS, DNS, LB, routing) whereas the liveness probe is internal to Cloud Run. If both fire together the service itself is down; if only this fires, suspect DNS/load-balancer/cert issues. Metric source: monitoring.googleapis.com/uptime_check/check_passed on the backend uptime check.",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "Uptime check failing from 2+ regions for 2m",
+      "conditionThreshold": {
+        "filter": "metric.type=\"monitoring.googleapis.com/uptime_check/check_passed\" resource.type=\"uptime_url\" metric.label.check_id=\"verifymyprovider-backend-health\"",
+        "comparison": "COMPARISON_LT",
+        "thresholdValue": 1,
+        "duration": "120s",
+        "aggregations": [
+          {
+            "alignmentPeriod": "60s",
+            "perSeriesAligner": "ALIGN_NEXT_OLDER",
+            "crossSeriesReducer": "REDUCE_COUNT_FALSE",
+            "groupByFields": [
+              "resource.label.host"
+            ]
+          }
+        ],
+        "trigger": {
+          "count": 2
+        }
+      }
+    }
+  ],
+  "alertStrategy": {
+    "autoClose": "1800s"
+  },
+  "enabled": true,
+  "notificationChannels": []
+}

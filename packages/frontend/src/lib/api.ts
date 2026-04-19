@@ -1,4 +1,5 @@
 import toast from 'react-hot-toast';
+import { trackException } from './analytics';
 import type {
   SearchFilters,
   PaginationState,
@@ -65,13 +66,16 @@ export class ApiError extends Error {
   public readonly code: string;
   public readonly details: ApiErrorDetails | null;
   public readonly retryAfter: number | null;
+  /** X-Request-ID sent with the failing request — use to correlate with backend logs. */
+  public requestId: string | null;
 
   constructor(
     message: string,
     statusCode: number,
     code: string = 'UNKNOWN_ERROR',
     details: ApiErrorDetails | null = null,
-    retryAfter: number | null = null
+    retryAfter: number | null = null,
+    requestId: string | null = null
   ) {
     super(message);
     this.name = 'ApiError';
@@ -79,6 +83,7 @@ export class ApiError extends Error {
     this.code = code;
     this.details = details;
     this.retryAfter = retryAfter;
+    this.requestId = requestId;
   }
 
   isRateLimited(): boolean {
@@ -111,6 +116,22 @@ export class ApiError extends Error {
  */
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Generate a client-side request ID for log correlation.
+ *
+ * Prefers `crypto.randomUUID()` (available in all modern browsers and Node
+ * 19+). Falls back to a timestamp + random segment for SSR environments
+ * with an older global `crypto` or contexts where `randomUUID` is missing
+ * (old Safari, some embedded WebViews). The backend's requestId middleware
+ * accepts either form — it uses whatever arrives in `X-Request-ID`.
+ */
+function generateRequestId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
 /**
@@ -397,11 +418,15 @@ export async function apiFetch<T>(
 ): Promise<T> {
   const url = `${API_URL}${endpoint}`;
   const method = (options.method || 'GET').toUpperCase();
+  const requestId = generateRequestId();
 
   // Include CSRF token on mutating requests
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
+    // Set after the caller-header spread so our generated ID always wins
+    // — the backend's requestId middleware honors whatever arrives here.
+    'X-Request-ID': requestId,
   };
 
   if (MUTATING_METHODS.has(method)) {
@@ -449,7 +474,8 @@ export async function apiFetch<T>(
       response.status,
       data.error?.code || 'API_ERROR',
       data.error?.details || null,
-      retryAfter
+      retryAfter,
+      requestId
     );
 
     // Show toast for rate limiting (only if we've exhausted retries)
@@ -458,6 +484,20 @@ export async function apiFetch<T>(
       toast.error(`Rate limit exceeded. Try again in ${formatRetryTime(retrySeconds)}.`, {
         duration: 6000,
         id: 'rate-limit',
+      });
+    }
+
+    // Capture 5xx (server-side failures) — 4xx are expected user errors and
+    // are deliberately skipped per the privacy/signal-to-noise contract.
+    // Send pathname only: query params may contain specialty/location/NPI
+    // values (see privacy banner in analytics.ts).
+    if (response.status >= 500) {
+      const apiPath = endpoint.split('?')[0];
+      trackException(error, {
+        source: 'apiFetch',
+        apiStatus: response.status,
+        apiPath,
+        requestId,
       });
     }
 
@@ -616,10 +656,10 @@ const providers = {
 
 const plans = {
   search: (params: {
-    carrierName?: string;
+    issuerName?: string;
     planType?: string;
+    search?: string;
     state?: string;
-    planYear?: number;
     page?: number;
     limit?: number;
   }) =>
@@ -640,10 +680,10 @@ const plans = {
       `/plans/meta/issuers?${buildQueryString({ state })}`
     ),
 
-  getPlanTypes: (params?: { state?: string; carrier?: string }) => {
+  getPlanTypes: (params?: { state?: string; issuerName?: string }) => {
     const query = buildQueryString(params || {});
     return apiFetch<{ planTypes: string[]; count: number }>(
-      `/plans/meta/plan-types${query ? `?${query}` : ''}`
+      `/plans/meta/types${query ? `?${query}` : ''}`
     );
   },
 
@@ -655,9 +695,6 @@ const plans = {
   getProviders: (
     planId: string,
     params: {
-      state?: string;
-      city?: string;
-      specialty?: string;
       page?: number;
       limit?: number;
     } = {}
@@ -873,7 +910,6 @@ export default api;
 // ============================================================================
 
 export const providerApi = providers;
-// planApi removed - unused
 export const verificationApi = verify;
 export const locationApi = locations;
 export const authApi = auth;

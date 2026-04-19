@@ -18,7 +18,7 @@ import { mapEntityTypeToApi } from '../services/utils';
 import prisma from '../lib/prisma';
 import { paginationSchema, npiParamSchema } from '../schemas/commonSchemas';
 import { buildPaginationMeta, sendSuccess } from '../utils/responseHelpers';
-import { cacheGet, cacheSet, generateSearchCacheKey } from '../utils/cache';
+import { cacheGet, cacheSet, generateSearchCacheKey, CACHE_TTL } from '../utils/cache';
 import { searchTimeout } from '../middleware/requestTimeout';
 import logger from '../utils/logger';
 
@@ -292,7 +292,7 @@ router.get(
 
     // Only cache if we have results
     if (result.providers.length > 0) {
-      await cacheSet(cacheKey, responseData, 300); // 5 minute TTL
+      await cacheSet(cacheKey, responseData, CACHE_TTL.DEFAULT);
     }
 
     res.json({
@@ -315,9 +315,22 @@ router.get(
     });
 
     const { state } = stateSchema.parse(req.query);
-    const cities = await getCitiesByState(state);
 
-    sendSuccess(res, { state, cities, count: cities.length });
+    // Cached for 30 min — cities only change when new providers are
+    // imported for new locations. Namespaced separately from search:*
+    // so `invalidateSearchCache()` doesn't wipe it on verification
+    // submissions. (F-22)
+    const cacheKey = `cities:${state}`;
+    const cached = await cacheGet<{ state: string; cities: string[]; count: number }>(cacheKey);
+    if (cached) {
+      return sendSuccess(res, cached);
+    }
+
+    const cities = await getCitiesByState(state);
+    const payload = { state, cities, count: cities.length };
+    await cacheSet(cacheKey, payload, CACHE_TTL.METADATA);
+
+    sendSuccess(res, payload);
   })
 );
 
@@ -515,7 +528,7 @@ router.get(
     });
 
     if (result.pins.length > 0) {
-      await cacheSet(cacheKey, result, 300); // 5 minute TTL
+      await cacheSet(cacheKey, result, CACHE_TTL.DEFAULT);
     }
 
     res.json({

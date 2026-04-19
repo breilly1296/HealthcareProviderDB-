@@ -16,8 +16,8 @@ COPY packages/backend/package.json ./packages/backend/
 # Create directories so npm recognizes workspaces
 RUN mkdir -p packages/shared packages/backend
 
-# Install all dependencies
-RUN npm install --force
+# Install all dependencies from package-lock.json (fails if lockfile drifts)
+RUN npm ci
 
 # Copy source code
 COPY packages/shared ./packages/shared
@@ -57,8 +57,8 @@ COPY packages/backend/package.json ./packages/backend/
 # Create empty directories so npm recognizes workspaces
 RUN mkdir -p packages/shared packages/backend
 
-# Install production dependencies only
-RUN npm install --omit=dev --force
+# Install production dependencies only from package-lock.json
+RUN npm ci --omit=dev
 
 # Copy built files
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist

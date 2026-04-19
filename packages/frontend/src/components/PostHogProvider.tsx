@@ -4,6 +4,7 @@ import posthog from 'posthog-js';
 import { PostHogProvider as PHProvider } from 'posthog-js/react';
 import { useEffect } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
+import { trackException } from '@/lib/analytics';
 
 // Initialize PostHog only in browser
 if (typeof window !== 'undefined') {
@@ -44,12 +45,48 @@ function PostHogPageview() {
 }
 
 /**
+ * Attaches window-level listeners for uncaught errors and unhandled promise
+ * rejections. These fire for crashes that escape React's error boundary
+ * (e.g. exceptions in async callbacks, event handlers, or setTimeout).
+ */
+function GlobalErrorTracker() {
+  useEffect(() => {
+    const handleError = (event: ErrorEvent) => {
+      trackException(event.error ?? event.message, {
+        source: 'window.onerror',
+        lineno: event.lineno,
+        colno: event.colno,
+        stackTrace: event.error instanceof Error ? event.error.stack : undefined,
+      });
+    };
+
+    const handleRejection = (event: PromiseRejectionEvent) => {
+      const reason = event.reason;
+      trackException(reason, {
+        source: 'unhandledrejection',
+        stackTrace: reason instanceof Error ? reason.stack : undefined,
+      });
+    };
+
+    window.addEventListener('error', handleError);
+    window.addEventListener('unhandledrejection', handleRejection);
+    return () => {
+      window.removeEventListener('error', handleError);
+      window.removeEventListener('unhandledrejection', handleRejection);
+    };
+  }, []);
+
+  return null;
+}
+
+/**
  * PostHog Provider wrapper for the app
  */
 export function PostHogProvider({ children }: { children: React.ReactNode }) {
   return (
     <PHProvider client={posthog}>
       <PostHogPageview />
+      <GlobalErrorTracker />
       {children}
     </PHProvider>
   );

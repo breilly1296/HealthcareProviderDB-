@@ -86,38 +86,58 @@ export async function getProvidersForMap(params: MapQueryParams): Promise<MapRes
   const total = await prisma.practiceLocation.count({ where: locationWhere });
   const clustered = total > limit;
 
-  // Fetch locations with provider data
-  // Use distinct on address_hash to deduplicate co-located providers
-  // Each pin represents a unique physical address
-  const locations = await prisma.practiceLocation.findMany({
-    where: locationWhere,
+  // Shared shape for both halves of the split query below.
+  const locationSelect = {
+    latitude: true,
+    longitude: true,
+    addressLine1: true,
+    city: true,
+    state: true,
+    zipCode: true,
+    phone: true,
+    address_hash: true,
+    npi: true,
+    providers: {
+      select: {
+        npi: true,
+        firstName: true,
+        lastName: true,
+        organizationName: true,
+        entityType: true,
+        credential: true,
+        primarySpecialty: true,
+        specialtyCategory: true,
+      },
+    },
+  } satisfies Prisma.PracticeLocationSelect;
+
+  // Split the query in two:
+  //   - hashed   : use Prisma's `distinct` on address_hash to collapse
+  //                co-located providers into one pin (intended behavior).
+  //   - unhashed : address_hash IS NULL — can't dedup these because Prisma's
+  //                `distinct` collapses ALL null values into a single bucket,
+  //                which was causing potentially thousands of un-geocoded
+  //                locations to appear as one pin. (IM-43)
+  // Budget the `take` so the combined result still respects `limit`.
+  const hashedLocations = await prisma.practiceLocation.findMany({
+    where: { ...locationWhere, address_hash: { not: null } },
     distinct: ['address_hash'],
     take: limit,
     orderBy: { id: 'asc' },
-    select: {
-      latitude: true,
-      longitude: true,
-      addressLine1: true,
-      city: true,
-      state: true,
-      zipCode: true,
-      phone: true,
-      address_hash: true,
-      npi: true,
-      providers: {
-        select: {
-          npi: true,
-          firstName: true,
-          lastName: true,
-          organizationName: true,
-          entityType: true,
-          credential: true,
-          primarySpecialty: true,
-          specialtyCategory: true,
-        },
-      },
-    },
+    select: locationSelect,
   });
+
+  const remainingBudget = Math.max(0, limit - hashedLocations.length);
+  const unhashedLocations = remainingBudget > 0
+    ? await prisma.practiceLocation.findMany({
+        where: { ...locationWhere, address_hash: null },
+        take: remainingBudget,
+        orderBy: { id: 'asc' },
+        select: locationSelect,
+      })
+    : [];
+
+  const locations = [...hashedLocations, ...unhashedLocations];
 
   // Get provider counts per address_hash
   const addressHashes = locations

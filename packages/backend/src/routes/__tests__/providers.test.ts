@@ -18,6 +18,9 @@ jest.mock('../../utils/cache', () => ({
   cacheDelete: jest.fn().mockResolvedValue(undefined),
   invalidateSearchCache: jest.fn().mockResolvedValue(undefined),
   generateSearchCacheKey: jest.fn().mockReturnValue('test-cache-key'),
+  // Keep in sync with the real export in src/utils/cache.ts so route
+  // handlers that read CACHE_TTL.* don't explode on undefined property access.
+  CACHE_TTL: { DEFAULT: 300, AGGREGATION: 900, METADATA: 1800 },
 }));
 
 jest.mock('../../utils/logger', () => ({

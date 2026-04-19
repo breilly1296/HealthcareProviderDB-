@@ -1,8 +1,13 @@
 name: Security Scan
 
+# Coverage matrix:
+#   - push to main / staging    → full-history gitleaks scan on the deploy branch
+#   - pull_request to main / staging → scans the PR's diff + all commits being merged
+# fetch-depth: 0 ensures gitleaks walks the full commit history, not just HEAD —
+# this catches secrets that were committed and later force-pushed away.
 on:
   push:
-    branches: [main]
+    branches: [main, staging]
   pull_request:
     branches: [main, staging]
 
@@ -23,3 +28,18 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Scan summary
+        if: always()
+        run: |
+          {
+            echo "## Security Scan Summary"
+            echo ""
+            echo "| Scanner | Scope | Config |"
+            echo "|---------|-------|--------|"
+            echo "| gitleaks | full git history on \`${GITHUB_REF_NAME}\` | \`.gitleaks.toml\` (extends default ruleset) |"
+            echo ""
+            echo "Related workflows:"
+            echo "- **CodeQL** (JavaScript/TypeScript \`security-and-quality\` queries): runs on every PR to main/staging and weekly on Monday 06:00 UTC — see \`.github/workflows/codeql.yml\`."
+            echo "- **Hardcoded-secret grep** (quick backstop): runs in \`.github/workflows/test.yml\` on every PR."
+          } >> "$GITHUB_STEP_SUMMARY"

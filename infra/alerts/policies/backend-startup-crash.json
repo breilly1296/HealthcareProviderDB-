@@ -1,0 +1,37 @@
+{
+  "displayName": "Backend startup / DB connection crash (verifymyprovider-backend)",
+  "documentation": {
+    "content": "Backend emitted PrismaClientInitializationError or ECONNREFUSED. Usually means the Cloud SQL instance is unreachable (wrong instance pin, proxy not attached, IAM role missing) or the DATABASE_URL secret is malformed. Metric source: log-based counter verifymyprovider_backend_startup_crash.",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "Any startup/DB crash occurrence",
+      "conditionThreshold": {
+        "filter": "metric.type=\"logging.googleapis.com/user/verifymyprovider_backend_startup_crash\" resource.type=\"cloud_run_revision\"",
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": 0,
+        "duration": "0s",
+        "aggregations": [
+          {
+            "alignmentPeriod": "60s",
+            "perSeriesAligner": "ALIGN_DELTA",
+            "crossSeriesReducer": "REDUCE_SUM",
+            "groupByFields": [
+              "resource.label.service_name"
+            ]
+          }
+        ],
+        "trigger": {
+          "count": 1
+        }
+      }
+    }
+  ],
+  "alertStrategy": {
+    "autoClose": "1800s"
+  },
+  "enabled": true,
+  "notificationChannels": []
+}

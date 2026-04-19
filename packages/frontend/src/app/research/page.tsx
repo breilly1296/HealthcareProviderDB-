@@ -2,9 +2,12 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { CircleDollarSign, AlertTriangle, FileText, Zap } from 'lucide-react';
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://verifymyprovider.com';
+
 export const metadata: Metadata = {
   title: 'Our Research | VerifyMyProvider',
   description: "The peer-reviewed research behind VerifyMyProvider's insurance verification methodology and confidence scoring.",
+  alternates: { canonical: `${SITE_URL}/research` },
 };
 
 export default function ResearchPage() {

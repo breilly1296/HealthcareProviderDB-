@@ -1,4 +1,15 @@
+# gitleaks configuration — used by .github/workflows/security-scan.yml.
+#
+# Strategy: inherit gitleaks' built-in ruleset (AWS keys, PEM blocks, GCP
+# service-account JSON, Anthropic API keys, etc.) and scope allowlists to
+# files that legitimately contain tokens-shaped strings but aren't real
+# secrets (tests, example envs, placeholder docker-compose defaults).
+
+[extend]
+useDefault = true
+
 [allowlist]
+  description = "Non-secret files and known-placeholder patterns"
   paths = [
     '''\.env\.example$''',
     '''docker-compose\.yml$''',
@@ -11,8 +22,9 @@
 
   regexTarget = "line"
   regexes = [
-    # Placeholder secrets in example configs
+    # Placeholder secrets in example configs — `your-jwt-secret-here`, etc.
     '''(?i)(your-.*-here|changeme|placeholder|xxxx|example\.com)''',
-    # Default dev postgres credentials
+    # Default dev postgres credentials — only ever appear in docker-compose
+    # dev files and test fixtures, never in real config.
     '''postgres:postgres@localhost''',
   ]

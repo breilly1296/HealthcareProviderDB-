@@ -20,6 +20,10 @@ import {
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const MAGIC_LINK_BASE_URL = process.env.MAGIC_LINK_BASE_URL || 'https://verifymyprovider.com';
 const RESEND_API_URL = 'https://api.resend.com/emails';
+// 10s is plenty for a simple transactional-email API; prevents the auth
+// flow from hanging on an unresponsive Resend. AbortError propagates from
+// the fetch and is logged distinctly below.
+const RESEND_TIMEOUT_MS = 10_000;
 
 /**
  * JWT secret encoded as Uint8Array for jose SignJWT.
@@ -44,6 +48,28 @@ function getJwtSecret(): Uint8Array {
 /** SHA-256 hash a string and return hex digest */
 function sha256(input: string): string {
   return createHash('sha256').update(input).digest('hex');
+}
+
+/**
+ * Redact an email for logging: `jane.doe@example.com` → `j******e@example.com`.
+ *
+ * Keeps the first and last character of the local-part plus the full domain,
+ * masking the middle. Deterministic (same input → same output) so log lines
+ * for the same user still correlate, but the full address can't be recovered
+ * from logs alone — addresses Cloud Logging PII exposure (MEDIUM-01).
+ *
+ * Used in logger calls only — never touch stored data, API responses, or
+ * Prisma queries.
+ */
+function redactEmail(email: string): string {
+  const atIdx = email.indexOf('@');
+  if (atIdx <= 0) return '***';
+  const local = email.slice(0, atIdx);
+  const domain = email.slice(atIdx + 1);
+  const redactedLocal = local.length <= 2
+    ? '*'.repeat(local.length)
+    : local[0] + '*'.repeat(local.length - 2) + local[local.length - 1];
+  return `${redactedLocal}@${domain}`;
 }
 
 /** Generate a signed access token JWT */
@@ -84,14 +110,16 @@ export async function sendMagicLink(email: string, ipAddress?: string) {
     );
   }
 
-  // Generate token
-  const token = randomBytes(32).toString('hex');
+  // Generate raw token (sent in email) and store only its SHA-256 hash —
+  // a DB breach should not expose usable magic links.
+  const rawToken = randomBytes(32).toString('hex');
+  const tokenHash = sha256(rawToken);
 
-  // Store with 15-min expiry
+  // Store hash with 15-min expiry
   await prisma.magicLinkToken.create({
     data: {
       email: normalizedEmail,
-      token,
+      token: tokenHash,
       expiresAt: new Date(Date.now() + MAGIC_LINK_EXPIRY_MS),
     },
   });
@@ -99,12 +127,14 @@ export async function sendMagicLink(email: string, ipAddress?: string) {
   // Build magic link — points directly to the backend API route.
   // The load balancer routes /api/* to the backend service, so cookies
   // are set on the same domain and the redirect lands on the frontend.
-  const magicLink = `${MAGIC_LINK_BASE_URL}/api/v1/auth/verify?token=${token}`;
+  const magicLink = `${MAGIC_LINK_BASE_URL}/api/v1/auth/verify?token=${rawToken}`;
 
   // Send email via Resend
   if (!RESEND_API_KEY) {
-    logger.warn({ email: normalizedEmail }, 'RESEND_API_KEY not configured, skipping email send');
+    logger.warn({ email: redactEmail(normalizedEmail) }, 'RESEND_API_KEY not configured, skipping email send');
   } else {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), RESEND_TIMEOUT_MS);
     try {
       const response = await fetch(RESEND_API_URL, {
         method: 'POST',
@@ -128,19 +158,32 @@ export async function sendMagicLink(email: string, ipAddress?: string) {
             '</body></html>',
           ].join(''),
         }),
+        signal: controller.signal,
       });
 
       if (!response.ok) {
         const body = await response.text();
-        logger.error({ status: response.status, body, email: normalizedEmail }, 'Resend API error');
+        logger.error({ status: response.status, body, email: redactEmail(normalizedEmail) }, 'Resend API error');
       } else {
-        logger.info({ email: normalizedEmail }, 'Magic link email sent');
+        logger.info({ email: redactEmail(normalizedEmail) }, 'Magic link email sent');
       }
     } catch (error) {
+      // AbortError here means our timeout fired, not user cancellation
+      // (we're the only one holding the AbortController). Log distinctly
+      // so Cloud Logging can distinguish Resend-hanging from Resend-erroring.
+      const isTimeout = error instanceof Error && error.name === 'AbortError';
       logger.error(
-        { error: error instanceof Error ? error.message : 'Unknown error', email: normalizedEmail },
-        'Failed to send magic link email'
+        {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          errorName: error instanceof Error ? error.name : undefined,
+          isTimeout,
+          timeoutMs: isTimeout ? RESEND_TIMEOUT_MS : undefined,
+          email: redactEmail(normalizedEmail),
+        },
+        isTimeout ? 'Resend request timed out' : 'Failed to send magic link email'
       );
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 
@@ -152,9 +195,10 @@ export async function sendMagicLink(email: string, ipAddress?: string) {
 // ============================================================================
 
 export async function verifyMagicLink(token: string, ipAddress?: string, userAgent?: string) {
-  // Find token
+  // Look up by hash — the DB only stores hashes (see sendMagicLink).
+  const tokenHash = sha256(token);
   const magicToken = await prisma.magicLinkToken.findUnique({
-    where: { token },
+    where: { token: tokenHash },
   });
 
   if (!magicToken) {
@@ -456,5 +500,39 @@ export async function cleanupExpiredSessions(options: { dryRun?: boolean } = {})
   });
 
   logger.info({ deletedCount: result.count }, 'Expired sessions cleaned up');
+  return { dryRun: false, deletedCount: result.count, expiredCount: result.count };
+}
+
+// ============================================================================
+// cleanupExpiredMagicLinkTokens (admin)
+// ============================================================================
+
+/**
+ * Delete magic-link tokens that are no longer useful — either past their
+ * 15-minute expiry, or already consumed (usedAt set). Both conditions are
+ * safe: tokens are single-use hashed secrets and have no post-verify
+ * lifecycle. Without this cleanup the `magic_link_tokens` table grows
+ * unboundedly.
+ */
+export async function cleanupExpiredMagicLinkTokens(options: { dryRun?: boolean } = {}) {
+  const { dryRun = false } = options;
+  const now = new Date();
+  const where = {
+    OR: [
+      { expiresAt: { lt: now } },
+      { usedAt: { not: null } },
+    ],
+  };
+
+  if (dryRun) {
+    const count = await prisma.magicLinkToken.count({ where });
+
+    logger.info({ dryRun: true, expiredCount: count }, 'Expired magic link tokens cleanup dry run');
+    return { dryRun: true, deletedCount: 0, expiredCount: count };
+  }
+
+  const result = await prisma.magicLinkToken.deleteMany({ where });
+
+  logger.info({ deletedCount: result.count }, 'Expired magic link tokens cleaned up');
   return { dryRun: false, deletedCount: result.count, expiredCount: result.count };
 }

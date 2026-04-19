@@ -31,8 +31,15 @@ const RATE_LIMIT_PER_HOUR = 10; // 10 extractions per hour per IP
 const RETRY_CONFIDENCE_THRESHOLD = 0.3; // Retry if confidence below this
 const MIN_FIELDS_FOR_SUCCESS = 2; // Need at least this many fields for success
 
+// Vision extraction with large images can run long; 30s is generous enough
+// for legitimate requests while preventing indefinite Cloud Run resource
+// pin on a hung upstream. The SDK raises APIConnectionTimeoutError (a
+// subclass of APIError) when this fires.
+const ANTHROPIC_TIMEOUT_MS = 30_000;
+
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
+  timeout: ANTHROPIC_TIMEOUT_MS,
 });
 
 type ImageMediaType = 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif';
@@ -211,7 +218,23 @@ async function callExtractionAPI(
 
     return { text: textContent.text.trim() };
   } catch (error) {
-    console.error('Claude API error:', error);
+    // Log shape includes error.name so Cloud Logging can distinguish
+    // timeouts (APIConnectionTimeoutError) from other upstream failures.
+    const errorName = error instanceof Error ? error.name : 'Unknown';
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const isTimeout = errorName === 'APIConnectionTimeoutError';
+
+    console.error('Claude API error:', {
+      name: errorName,
+      message: errorMessage,
+      isTimeout,
+      timeoutMs: isTimeout ? ANTHROPIC_TIMEOUT_MS : undefined,
+      status: error instanceof Anthropic.APIError ? error.status : undefined,
+    });
+
+    if (isTimeout) {
+      return { error: `API timeout after ${ANTHROPIC_TIMEOUT_MS}ms` };
+    }
     if (error instanceof Anthropic.APIError) {
       return { error: `API error: ${error.status}` };
     }

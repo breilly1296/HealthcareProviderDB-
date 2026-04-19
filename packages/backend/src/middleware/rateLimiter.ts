@@ -218,27 +218,24 @@ function createRedisRateLimiter(options: RateLimiterOptions): RateLimiterMiddlew
     const windowStart = now - windowMs;
 
     try {
-      // Sliding window using Redis sorted set
-      // Score = timestamp, Member = unique request ID
-      const multi = redis.multi();
+      // Sliding window using Redis sorted set. The transaction is split in
+      // two so semantics match the in-memory limiter exactly:
+      //   pass 1: evict stale entries, then ZCARD -> `requestCount` is the
+      //           PRE-add count (how many requests are already in the window).
+      //   pass 2: only if we are going to allow this request, ZADD it and
+      //           refresh the TTL.
+      //
+      // Why split? The previous ZADD-before-ZCARD structure made
+      // `requestCount` a post-add count, which needed `> maxRequests` to
+      // match memory's `>= maxRequests` and produced an inconsistent
+      // X-RateLimit-Remaining header across modes. It also left rejected
+      // requests polluting the sorted set. (I-11 / MEDIUM-02)
+      const checkTx = redis.multi();
+      checkTx.zremrangebyscore(redisKey, 0, windowStart);
+      checkTx.zcard(redisKey);
+      const checkResults = await checkTx.exec();
 
-      // 1. Remove entries outside the current window
-      multi.zremrangebyscore(redisKey, 0, windowStart);
-
-      // 2. Add current request with timestamp as score
-      // Use timestamp + random suffix to ensure uniqueness
-      const requestId = `${now}-${Math.random().toString(36).substring(2, 9)}`;
-      multi.zadd(redisKey, now, requestId);
-
-      // 3. Count requests in current window
-      multi.zcard(redisKey);
-
-      // 4. Set key expiration (cleanup after window passes)
-      multi.expire(redisKey, Math.ceil(windowMs / 1000) + 1);
-
-      const results = await multi.exec();
-
-      if (!results) {
+      if (!checkResults) {
         // Transaction failed, fail open
         logger.warn({ limiter: name }, 'Rate limiter Redis transaction failed, allowing request');
         res.setHeader('X-RateLimit-Status', 'degraded');
@@ -246,11 +243,12 @@ function createRedisRateLimiter(options: RateLimiterOptions): RateLimiterMiddlew
         return;
       }
 
-      // Extract count from ZCARD result (3rd command, index 2)
-      const zcardResult = results[2];
-      const requestCount = (zcardResult && zcardResult[1] as number) || 0;
+      // checkResults: [0]=ZREMRANGEBYSCORE reply, [1]=ZCARD reply.
+      // Each reply is [err, value]; we want the ZCARD value.
+      const zcardReply = checkResults[1];
+      const requestCount = (zcardReply && zcardReply[1] as number) || 0;
 
-      // Calculate rate limit headers
+      // Headers now reflect the pre-add count, matching the memory limiter.
       const remaining = Math.max(0, maxRequests - requestCount);
       const resetTimestamp = Math.ceil((now + windowMs) / 1000);
       const retryAfterSeconds = Math.ceil(windowMs / 1000);
@@ -259,7 +257,7 @@ function createRedisRateLimiter(options: RateLimiterOptions): RateLimiterMiddlew
       res.setHeader('X-RateLimit-Remaining', remaining);
       res.setHeader('X-RateLimit-Reset', resetTimestamp);
 
-      if (requestCount > maxRequests) {
+      if (requestCount >= maxRequests) {
         res.setHeader('Retry-After', retryAfterSeconds);
         res.status(429).json({
           error: 'Too many requests',
@@ -268,6 +266,17 @@ function createRedisRateLimiter(options: RateLimiterOptions): RateLimiterMiddlew
         });
         return;
       }
+
+      // Record the accepted request. A second round-trip is the cost of
+      // keeping rejected requests out of the sorted set; sliding-window
+      // rate limiting is a best-effort system anyway, so the non-atomic
+      // gap between check and write is acceptable (worst case: one extra
+      // request slips through under a thundering herd).
+      const writeTx = redis.multi();
+      const requestId = `${now}-${Math.random().toString(36).substring(2, 9)}`;
+      writeTx.zadd(redisKey, now, requestId);
+      writeTx.expire(redisKey, Math.ceil(windowMs / 1000) + 1);
+      await writeTx.exec();
 
       next();
     } catch (error) {
@@ -375,4 +384,37 @@ export const magicLinkRateLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
   maxRequests: 5,
   message: 'Too many login requests. Please try again in 15 minutes.',
+});
+
+/**
+ * Rate limiter for session-refresh requests.
+ * Limit: 30 requests per hour per IP.
+ *
+ * Legitimate clients refresh roughly every 15 minutes (~4/hr), so 30/hr
+ * leaves plenty of headroom for tab reloads and parallel-tab refreshes
+ * while clamping down on attackers hammering the endpoint with a stolen
+ * refresh token.
+ */
+export const refreshRateLimiter = createRateLimiter({
+  name: 'refresh',
+  windowMs: 60 * 60 * 1000, // 1 hour
+  maxRequests: 30,
+  message: 'Too many session refresh requests. Please try again in 1 hour.',
+});
+
+/**
+ * Strict rate limiter for admin endpoints (defense-in-depth against
+ * brute-forcing the X-Admin-Secret header). Limit: 10 requests per hour
+ * per IP.
+ *
+ * Legitimate admin traffic is sparse — Cloud Scheduler runs cleanup jobs
+ * a few times per day, and manual admin calls are rare. Applied at the
+ * router level BEFORE adminAuthMiddleware, so failed auth attempts count
+ * against the limit.
+ */
+export const adminRateLimiter = createRateLimiter({
+  name: 'admin',
+  windowMs: 60 * 60 * 1000, // 1 hour
+  maxRequests: 10,
+  message: 'Too many admin requests. Please try again in 1 hour.',
 });

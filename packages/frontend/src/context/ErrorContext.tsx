@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, ReactNode, useRef, useEffect } from 'react';
 import { AppError, toAppError, getUserMessage, getErrorVariant, ErrorVariant } from '@/lib/errorUtils';
+import { trackException } from '@/lib/analytics';
 
 interface ErrorContextValue {
   // Current global error (if any)
@@ -50,6 +51,7 @@ export function ErrorProvider({ children }: { children: ReactNode }) {
 
     const appError = toAppError(err);
     setErrorState(appError);
+    trackException(err, { source: 'ErrorContext' });
   }, []);
 
   const clearError = useCallback(() => {
@@ -69,6 +71,7 @@ export function ErrorProvider({ children }: { children: ReactNode }) {
 
     const appError = toAppError(err);
     setErrorState(appError);
+    trackException(err, { source: 'ErrorContext' });
 
     if (duration > 0) {
       timeoutRef.current = setTimeout(() => {

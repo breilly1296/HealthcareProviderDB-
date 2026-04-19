@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { requireAuth } from '../middleware/auth';
-import { magicLinkRateLimiter } from '../middleware/rateLimiter';
+import { magicLinkRateLimiter, refreshRateLimiter } from '../middleware/rateLimiter';
 import { csrfProtection, generateCsrfToken } from '../middleware/csrf';
 import {
   sendMagicLink,
@@ -137,6 +137,7 @@ router.get('/verify', async (req, res) => {
 router.post(
   '/refresh',
   csrfProtection,
+  refreshRateLimiter,
   asyncHandler(async (req, res) => {
     const refreshToken = req.cookies?.vmp_refresh_token;
 

@@ -1,11 +1,15 @@
+import type { Metadata } from 'next';
 import InsuranceCardUploader from '@/components/InsuranceCardUploader';
 import Link from 'next/link';
 import { Info, Check } from 'lucide-react';
 import { InsuranceAuthRedirect } from './InsuranceAuthRedirect';
 
-export const metadata = {
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://verifymyprovider.com';
+
+export const metadata: Metadata = {
   title: 'Insurance Card Scanner | VerifyMyProvider',
   description: 'Upload your insurance card to extract plan information and find in-network providers.',
+  alternates: { canonical: `${SITE_URL}/insurance` },
 };
 
 export default function InsurancePage() {
