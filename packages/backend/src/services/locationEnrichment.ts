@@ -1,64 +1,43 @@
 /**
  * Location Enrichment Service
  *
- * Enriches practiceLocations with hospital/health-system data from providerHospitals.
- * No writes to practiceLocations — enrichment data is returned for API responses.
+ * Enriches practiceLocations with hospital/health-system data from
+ * providerHospitals. No writes to practiceLocations — enrichment data is
+ * returned for API responses.
+ *
+ * Live exports:
+ *
+ *   • getLocationHealthSystem(npi)
+ *       — routes/providers.ts:448 (GET /api/v1/providers/:npi/colocated,
+ *         executed in parallel with getColocatedNpis to populate the
+ *         synthetic `location.healthSystem` field on the response).
+ *
+ *   • getEnrichmentStats()
+ *       — routes/admin.ts:620 (GET /api/v1/admin/enrichment/stats,
+ *         admin-protected, returns counts of enriched
+ *         practice_locations / provider_hospitals rows).
+ *
+ * Deleted 2026-04-26:
+ *
+ *   • enrichLocationWithHospitalData — never wired at runtime. Intended for
+ *     a future GET /api/v1/locations/:id enrichment shape that hasn't been
+ *     built. Reintroduce from git history when the feature lands; design
+ *     was a single-row hospital-affiliation lookup and is straightforward
+ *     to recreate.
+ *
+ *   • findColocatedProviders — consolidated into
+ *     locationService.getColocatedNpis, which now performs the same
+ *     "providers at this address" match using the indexed `address_hash`
+ *     column (single-index lookup) with the original multi-field ILIKE
+ *     match as a fallback for legacy rows that pre-date the hash backfill.
+ *     The legacy duplicate had no callers since the schema split.
  */
 
 import prisma from '../lib/prisma';
 
 // ============================================================================
-// Shared Selects (avoid address_hash — not yet migrated)
-// ============================================================================
-
-const locationSelect = {
-  id: true,
-  npi: true,
-  addressType: true,
-  addressLine1: true,
-  addressLine2: true,
-  city: true,
-  state: true,
-  zipCode: true,
-  phone: true,
-  fax: true,
-} as const;
-
-// ============================================================================
 // Service Functions
 // ============================================================================
-
-/**
- * Enrich a single practice_location with hospital affiliation data.
- *
- * Looks up the provider's NPI from the location, then checks providerHospitals
- * for hospitalSystem and hospitalName. Returns enrichment data (does not write).
- */
-export async function enrichLocationWithHospitalData(locationId: number) {
-  const location = await prisma.practiceLocation.findUnique({
-    where: { id: locationId },
-    select: { ...locationSelect, providers: { select: { npi: true } } },
-  });
-
-  if (!location) {
-    return null;
-  }
-
-  const hospitals = await prisma.providerHospital.findMany({
-    where: { npi: location.npi },
-    select: {
-      hospitalName: true,
-      hospitalSystem: true,
-      ccn: true,
-      confidence: true,
-    },
-  });
-
-  return {
-    location,
-    hospitalAffiliations: hospitals,
-  };
-}
 
 /**
  * Get enrichment statistics across practiceLocations and providerHospitals.
@@ -109,50 +88,6 @@ export async function getEnrichmentStats() {
       count: s._count.id,
     })),
   };
-}
-
-/**
- * Find co-located providers at the same address (case-insensitive match).
- */
-export async function findColocatedProviders(
-  addressLine1: string,
-  city: string,
-  state: string,
-  zipCode: string
-) {
-  const locations = await prisma.practiceLocation.findMany({
-    where: {
-      addressLine1: { equals: addressLine1, mode: 'insensitive' },
-      city: { equals: city, mode: 'insensitive' },
-      state: { equals: state, mode: 'insensitive' },
-      zipCode: zipCode,
-    },
-    select: {
-      ...locationSelect,
-      providers: {
-        select: {
-          npi: true,
-          firstName: true,
-          lastName: true,
-          organizationName: true,
-          entityType: true,
-          primarySpecialty: true,
-        },
-      },
-    },
-  });
-
-  return locations.map((loc) => ({
-    locationId: loc.id,
-    npi: loc.npi,
-    address: {
-      addressLine1: loc.addressLine1,
-      city: loc.city,
-      state: loc.state,
-      zipCode: loc.zipCode,
-    },
-    provider: loc.providers,
-  }));
 }
 
 /**
