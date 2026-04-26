@@ -146,7 +146,7 @@ export const DEFAULT_FILTERS: SearchFilters = {
 - "All insurance plans" if insurance filter is active
 
 ### Comparison Integration
-Each `ProviderCard` includes a `CompareCheckbox` that adds/removes providers to the `CompareContext` (max 4). When providers are selected, `CompareBar` appears at the bottom.
+Each `ProviderCard` includes a `CompareCheckbox` that adds/removes providers to the `CompareContext` (max 3 — `MAX_COMPARE_PROVIDERS` in `lib/constants.ts`). When providers are selected, `CompareBar` appears at the bottom.
 
 ## Backend Architecture
 

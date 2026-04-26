@@ -5,7 +5,7 @@ tags:
   - implemented
 type: prompt
 priority: 2
-updated: 2026-02-05
+updated: 2026-04-26
 ---
 
 # API Reference Document
@@ -17,7 +17,7 @@ Generate a complete API reference for the VerifyMyProvider backend, covering all
 - `packages/backend/src/routes/providers.ts` (3 provider endpoints)
 - `packages/backend/src/routes/plans.ts` (6 plan endpoints)
 - `packages/backend/src/routes/verify.ts` (5 verification endpoints)
-- `packages/backend/src/routes/admin.ts` (9 admin endpoints)
+- `packages/backend/src/routes/admin.ts` (16 admin endpoints — see also `prompts/38-admin-endpoints.md` for the full inventory)
 - `packages/backend/src/routes/locations.ts` (5 location endpoints — active)
 - `packages/backend/src/routes/index.ts` (route registration + health check)
 - `packages/backend/src/middleware/rateLimiter.ts` (rate limits)
@@ -65,6 +65,29 @@ Generate a complete API reference for the VerifyMyProvider backend, covering all
 | POST | `/api/v1/admin/cleanup/sync-logs` | Clean old sync logs |
 | GET | `/api/v1/admin/retention/stats` | Retention statistics |
 | POST | `/api/v1/admin/recalculate-confidence` | Confidence decay recalculation |
+
+### Error Codes
+All error responses share the shape `{ success: false, error: { message, code, statusCode, requestId } }`. The `code` field is stable across releases; `message` is human-readable and may change. Sorted by HTTP status.
+
+| Code | HTTP | Source |
+|------|------|--------|
+| `VALIDATION_ERROR` | 400 | Zod schema parse failure. `error.details` carries the field-level Zod issues. Emitted by `errorHandler` when `err.name === 'ZodError'`. |
+| `EXTRACTION_FAILED` | 400 | Insurance card OCR scan failure. `routes/insuranceCard.ts:130`. |
+| `FOREIGN_KEY_VIOLATION` | 400 | Prisma `P2003` foreign-key constraint. `errorHandler.ts:163`. |
+| `UNAUTHORIZED` | 401 | Missing or invalid auth credentials (`X-Admin-Secret` mismatch, expired/missing JWT, etc.). `AppError.unauthorized`. |
+| `FORBIDDEN` | 403 | `csrf-csrf` `EBADCSRFTOKEN` (CSRF mismatch); `ADMIN_IP_ALLOWLIST` rejection (`routes/admin.ts:57`); `AppError.forbidden`. |
+| `NOT_FOUND` | 404 | Prisma `P2025` (`errorHandler.ts:150`) and `AppError.notFound`. Used when a queried record doesn't exist. |
+| `ROUTE_NOT_FOUND` | 404 | `notFoundHandler` for HTTP requests that don't match any registered route. |
+| `DUPLICATE_ENTRY` | 409 | Prisma `P2002` unique-constraint violation. `errorHandler.ts:137`. |
+| `CONFLICT` | 409 | `AppError.conflict` — Sybil dedup rejections, vote double-submit, generic state conflicts. |
+| `PAYLOAD_TOO_LARGE` | 413 | Body exceeds the configured limit. 16 MB on `POST /me/insurance-card/scan`; 100 KB on every other route. `errorHandler.ts:121`. |
+| `TOO_MANY_REQUESTS` | 429 | Rate limiter exceeded. Response also carries `Retry-After` (seconds) header and `retryAfter` (seconds) body field. `middleware/rateLimiter.ts:165`. |
+| `INTERNAL_ERROR` | 500 | Default fallback for any unhandled error. Stack trace and message are redacted in production. |
+| `QUERY_ERROR` | 500 | Prisma `P2010` raw-query error. `errorHandler.ts:194`. |
+| `DATABASE_ERROR` | 500 | Catch-all for unhandled Prisma errors — `PrismaClientKnownRequestError` codes other than the above five (P2014/P2026/P2034/...), plus `PrismaClientUnknownRequestError`, `PrismaClientValidationError`, `PrismaClientRustPanicError`. Full Prisma context (code, meta, errorName) is logged for debugging; clients see only the generic message. Added 2026-04-26. |
+| `ADMIN_NOT_CONFIGURED` | 503 | `ADMIN_SECRET` env var unset on the backend — admin router returns this so the deploy can boot without secrets configured yet. `routes/admin.ts` `adminAuthMiddleware`. |
+| `DATABASE_TIMEOUT` | 503 | Prisma `P2024` connection-pool timeout. `errorHandler.ts:176`. |
+| `DATABASE_UNAVAILABLE` | 503 | `PrismaClientInitializationError` — the pool couldn't connect to Cloud SQL at all. `errorHandler.ts:218`. |
 
 ## Questions to Ask
 1. Should the API reference be auto-generated from code (e.g., Swagger/OpenAPI)?

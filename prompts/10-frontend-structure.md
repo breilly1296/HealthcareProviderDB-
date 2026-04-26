@@ -5,7 +5,7 @@ tags:
   - medium
 type: prompt
 priority: 3
-updated: 2026-02-05
+updated: 2026-04-26
 ---
 
 # Frontend Structure Review
@@ -93,7 +93,7 @@ updated: 2026-02-05
 - `ColocatedProviders.tsx` — Other providers at same location
 - `InsuranceList.tsx` — Plans listing
 - `ConfidenceGauge.tsx` — Visual confidence score gauge
-- `ScoreBreakdown.tsx` — Confidence factor breakdown
+- ~~`ScoreBreakdown.tsx`~~ — **DELETED 2026-04-26** as superseded dead code. The active confidence breakdown ships via `components/ConfidenceScoreBreakdown.tsx` rendered inside `components/provider-detail/ConfidenceGauge.tsx`'s "How is this calculated?" modal.
 
 ### Verification & Voting
 - `ProviderVerificationForm.tsx` — Verification submission form
@@ -232,8 +232,9 @@ Methods:
 - [x] Toast notifications
 - [x] Scroll-to-top
 - [x] Welcome back banner
-- [ ] Offline support / service worker
-- [ ] PWA manifest
+- [x] Offline support / service worker — `components/ServiceWorkerRegistration.tsx` registers a worker; `app/offline/page.tsx` is the offline fallback route.
+- [x] PWA manifest — `app/manifest.ts` generates the Web App Manifest dynamically (theme color, icons, name).
+- [ ] (Caveat: scaffolding exists but a full PWA audit — caching strategies, install-prompt UX, update flow — has not been done.)
 
 ### Accessibility
 - [x] Focus trap for modals

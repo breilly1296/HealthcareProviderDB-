@@ -227,7 +227,7 @@ Alternative save button variant for sidebar:
 - [ ] Share provider button
 - [ ] Print-friendly view
 - [ ] Verification history timeline (component exists but not wired in)
-- [ ] Score breakdown modal (component exists but not wired in)
+- [x] Score breakdown modal — wired via `ConfidenceGauge`'s "How is this calculated?" trigger (`components/provider-detail/ConfidenceGauge.tsx:147-209`). The modal renders `ConfidenceScoreBreakdown` from `components/ConfidenceScoreBreakdown.tsx`. The earlier `provider-detail/ScoreBreakdown.tsx` was a parallel/abandoned design and was deleted as dead code on 2026-04-26.
 
 ## Response Format
 

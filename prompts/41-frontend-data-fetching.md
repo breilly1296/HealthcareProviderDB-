@@ -6,7 +6,7 @@ tags:
 type: prompt
 priority: 3
 created: 2026-02-05
-updated: 2026-04-16
+updated: 2026-04-26
 role: architect
 output_format: analysis
 ---
@@ -73,7 +73,7 @@ Centralized fetch wrapper with:
 | `search(filters, page, limit)` | `GET /providers/search` | Search with all filters |
 | `getByNpi(npi)` | `GET /providers/:npi` | Provider detail + plan acceptances |
 | `getCities(state)` | `GET /providers/cities` | Cities for state dropdown |
-| `getPlans(npi, params)` | `GET /providers/:npi/plans` | Provider's plan acceptances (**no backend route — will 404**) |
+| ~~`getPlans(npi, params)`~~ | ~~`GET /providers/:npi/plans`~~ | **Resolved 2026-04-26**: dead client method removed (`api.ts`), `useProviderPlans` hook removed, `providerKeys.plans` removed. Plan-acceptance data is exposed via `getByNpi` which already returns `provider.planAcceptances` inline — no separate endpoint needed. |
 | `getColocated(npi, params)` | `GET /providers/:npi/colocated` | Co-located providers |
 
 **`plans`**
@@ -220,7 +220,7 @@ export const providerKeys = {
 - [x] Form state orchestration
 
 ### Client State
-- [x] CompareContext (provider comparison, max 4)
+- [x] CompareContext (provider comparison, max 3 — `MAX_COMPARE_PROVIDERS` in `lib/constants.ts`)
 - [x] ErrorContext (global error banner)
 - [x] ThemeContext (dark/light mode)
 
@@ -228,7 +228,7 @@ export const providerKeys = {
 - [ ] Optimistic updates for verifications/votes
 - [ ] Infinite scroll / virtual list for large result sets
 - [ ] Service worker for offline caching
-- [ ] React Query devtools in development
+- [x] React Query devtools in development — wired in `components/providers/QueryProvider.tsx` via `next/dynamic` + `ssr: false`, gated on `process.env.NODE_ENV === 'development'` so the devtools chunk is stripped from the production bundle. `@tanstack/react-query-devtools@^5.90.20` in `packages/frontend/package.json` devDependencies. Added 2026-04-26.
 
 ## Response Format
 
@@ -246,6 +246,6 @@ Keep ≤400 lines. Cite file:line references; avoid generic advice.
 ## Questions to Ask
 1. Should we add optimistic updates for verification submissions?
 2. Is the retry logic appropriate for the expected traffic patterns?
-3. Should dropdown data (cities, plans) be prefetched on app load or on-demand?
-4. Should we add React Query devtools for development debugging?
+3. ~~Should dropdown data (cities, plans) be prefetched on app load or on-demand?~~ **Resolved 2026-04-26**: `LaunchPrefetcher` in `components/providers/QueryProvider.tsx` warms `prefetchCities('NY')` + `prefetchHealthSystems('NY')` on first client render (`useEffect` with `[]` deps). NY is hardcoded for the NYC launch market; revisit when expanding beyond NYC.
+4. ~~Should we add React Query devtools for development debugging?~~ **Resolved 2026-04-26**: see "Tooling" checklist above.
 5. Is the max 4 provider comparison limit sufficient?
