@@ -55,16 +55,39 @@ const DEFAULT_RETRY_OPTIONS: Required<RetryOptions> = {
 // ApiError Class
 // ============================================================================
 
-export interface ApiErrorDetails {
+/**
+ * One field-level error from the backend's structured details array. Used
+ * by Zod validation responses (`errorHandler.ts` auto-emits these) and by
+ * `AppError.badRequest(message, code, details)` callers that pass per-
+ * field info.
+ */
+export type ApiErrorDetail = { field?: string; message: string };
+
+/**
+ * Legacy single-object details shape. Older backend error paths emitted
+ * an object with `field` / `constraint` instead of an array. Kept in the
+ * union for runtime compatibility — the backend can still surface this
+ * shape, and consumers shouldn't crash if it does.
+ */
+export type ApiErrorDetailsLegacy = {
   field?: string;
   constraint?: string;
   [key: string]: unknown;
-}
+};
+
+/**
+ * Backend sends an array for Zod / structured AppError errors, or a
+ * legacy single-object for older error paths. Consumers narrow at the
+ * boundary — see `extractClientErrorDetails` in lib/errorUtils.ts for
+ * the canonical runtime check that pulls the array shape into
+ * `ClientError.details`.
+ */
+export type ApiErrorDetails = ApiErrorDetail[] | ApiErrorDetailsLegacy | null;
 
 export class ApiError extends Error {
   public readonly statusCode: number;
   public readonly code: string;
-  public readonly details: ApiErrorDetails | null;
+  public readonly details: ApiErrorDetails;
   public readonly retryAfter: number | null;
   /** X-Request-ID sent with the failing request — use to correlate with backend logs. */
   public requestId: string | null;
@@ -73,7 +96,7 @@ export class ApiError extends Error {
     message: string,
     statusCode: number,
     code: string = 'UNKNOWN_ERROR',
-    details: ApiErrorDetails | null = null,
+    details: ApiErrorDetails = null,
     retryAfter: number | null = null,
     requestId: string | null = null
   ) {
@@ -598,21 +621,6 @@ const providers = {
       `/providers/cities?state=${encodeURIComponent(state)}`
     ),
 
-  getPlans: (
-    npi: string,
-    params: {
-      status?: string;
-      minConfidence?: number;
-      page?: number;
-      limit?: number;
-    } = {}
-  ) =>
-    apiFetch<{
-      npi: string;
-      acceptances: PlanAcceptanceDisplay[];
-      pagination: PaginationState;
-    }>(`/providers/${npi}/plans?${buildQueryString(params)}`),
-
   getColocated: (
     npi: string,
     params: { page?: number; limit?: number } = {}
@@ -652,6 +660,50 @@ const providers = {
     clustered: boolean;
     bounds: { north: number; south: number; east: number; west: number };
   }>(`/providers/map?${buildQueryString(params)}`),
+
+  // Radius-based proximity search (F-16). Consumer of useGeoLocation (IM-41)
+  // or a user-selected ZIP centroid — returns providers sorted by distance
+  // with `distanceMiles` per result for "2.3 miles away" rendering.
+  nearby: (params: {
+    lat: number;
+    lng: number;
+    radius?: number;
+    specialty?: string;
+    specialtyCategory?: string;
+    name?: string;
+    entityType?: string;
+    page?: number;
+    limit?: number;
+  }) =>
+    apiFetch<{
+      providers: Array<{
+        npi: string;
+        entityType: string;
+        firstName: string | null;
+        lastName: string | null;
+        organizationName: string | null;
+        credential: string | null;
+        displayName: string;
+        primarySpecialty: string | null;
+        specialtyCategory: string | null;
+        taxonomyCode: string | null;
+        npiStatus: 'ACTIVE' | 'DEACTIVATED';
+        practiceLocation: {
+          id: number;
+          addressLine1: string | null;
+          addressLine2: string | null;
+          city: string | null;
+          state: string | null;
+          zipCode: string | null;
+          phone: string | null;
+          latitude: number;
+          longitude: number;
+        };
+        distanceMiles: number;
+      }>;
+      pagination: PaginationState;
+      searchCenter: { lat: number; lng: number; radiusMiles: number };
+    }>(`/providers/nearby?${buildQueryString(params)}`),
 };
 
 const plans = {

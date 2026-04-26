@@ -1,5 +1,5 @@
 import {
-  toAppError,
+  toClientError,
   getUserMessage,
   isRetryableStatus,
   getErrorVariant,
@@ -8,17 +8,17 @@ import {
   isValidationError,
   isAbortError,
   createErrorState,
-  type AppError,
+  type ClientError,
 } from '../errorUtils';
 
 describe('errorUtils', () => {
   // ============================================================================
-  // toAppError
+  // toClientError
   // ============================================================================
-  describe('toAppError', () => {
-    it('converts Error instance to AppError', () => {
+  describe('toClientError', () => {
+    it('converts Error instance to ClientError', () => {
       const error = new Error('Something went wrong');
-      const result = toAppError(error);
+      const result = toClientError(error);
 
       expect(result.message).toBe('Something went wrong');
       expect(result.retryable).toBe(true);
@@ -28,7 +28,7 @@ describe('errorUtils', () => {
     it('extracts statusCode from Error with statusCode property', () => {
       const error = new Error('Not found') as Error & { statusCode: number };
       error.statusCode = 404;
-      const result = toAppError(error);
+      const result = toClientError(error);
 
       expect(result.statusCode).toBe(404);
       expect(result.retryable).toBe(false); // 404 is not retryable
@@ -37,7 +37,7 @@ describe('errorUtils', () => {
     it('extracts statusCode from Error with status property', () => {
       const error = new Error('Server error') as Error & { status: number };
       error.status = 500;
-      const result = toAppError(error);
+      const result = toClientError(error);
 
       expect(result.statusCode).toBe(500);
       expect(result.retryable).toBe(true); // 500 is retryable
@@ -49,7 +49,7 @@ describe('errorUtils', () => {
         statusCode: 400,
         code: 'VALIDATION_ERROR',
       };
-      const result = toAppError(error);
+      const result = toClientError(error);
 
       expect(result.message).toBe('Custom error');
       expect(result.statusCode).toBe(400);
@@ -57,22 +57,22 @@ describe('errorUtils', () => {
     });
 
     it('handles string error', () => {
-      const result = toAppError('Simple string error');
+      const result = toClientError('Simple string error');
 
       expect(result.message).toBe('Simple string error');
       expect(result.retryable).toBe(true);
     });
 
     it('handles null/undefined with fallback message', () => {
-      const nullResult = toAppError(null);
-      const undefinedResult = toAppError(undefined);
+      const nullResult = toClientError(null);
+      const undefinedResult = toClientError(undefined);
 
       expect(nullResult.message).toBe('An unexpected error occurred');
       expect(undefinedResult.message).toBe('An unexpected error occurred');
     });
 
     it('handles number error', () => {
-      const result = toAppError(42);
+      const result = toClientError(42);
 
       expect(result.message).toBe('An unexpected error occurred');
       expect(result.retryable).toBe(true);
@@ -84,7 +84,7 @@ describe('errorUtils', () => {
   // ============================================================================
   describe('getUserMessage', () => {
     it('returns rate limit message for 429', () => {
-      const error: AppError = {
+      const error: ClientError = {
         message: 'Too many requests',
         statusCode: 429,
         retryable: true,
@@ -96,7 +96,7 @@ describe('errorUtils', () => {
     });
 
     it('returns session expired message for 401', () => {
-      const error: AppError = {
+      const error: ClientError = {
         message: 'Unauthorized',
         statusCode: 401,
         retryable: false,
@@ -108,7 +108,7 @@ describe('errorUtils', () => {
     });
 
     it('returns permission message for 403', () => {
-      const error: AppError = {
+      const error: ClientError = {
         message: 'Forbidden',
         statusCode: 403,
         retryable: false,
@@ -119,7 +119,7 @@ describe('errorUtils', () => {
     });
 
     it('returns not found message for 404', () => {
-      const error: AppError = {
+      const error: ClientError = {
         message: 'Not found',
         statusCode: 404,
         retryable: false,
@@ -130,7 +130,7 @@ describe('errorUtils', () => {
     });
 
     it('returns server error message for 5xx', () => {
-      const error: AppError = {
+      const error: ClientError = {
         message: 'Internal server error',
         statusCode: 500,
         retryable: true,
@@ -141,7 +141,7 @@ describe('errorUtils', () => {
     });
 
     it('returns network error message for network-related errors', () => {
-      const error: AppError = {
+      const error: ClientError = {
         message: 'Failed to fetch',
         retryable: true,
       };
@@ -151,7 +151,7 @@ describe('errorUtils', () => {
     });
 
     it('returns validation error as-is (already user-friendly)', () => {
-      const error: AppError = {
+      const error: ClientError = {
         message: 'Email must be valid',
         retryable: false,
       };
@@ -225,43 +225,43 @@ describe('errorUtils', () => {
   // ============================================================================
   describe('getErrorVariant', () => {
     it('returns rate-limit for 429', () => {
-      const error: AppError = { message: 'Rate limited', statusCode: 429, retryable: true };
+      const error: ClientError = { message: 'Rate limited', statusCode: 429, retryable: true };
       expect(getErrorVariant(error)).toBe('rate-limit');
     });
 
     it('returns not-found for 404', () => {
-      const error: AppError = { message: 'Not found', statusCode: 404, retryable: false };
+      const error: ClientError = { message: 'Not found', statusCode: 404, retryable: false };
       expect(getErrorVariant(error)).toBe('not-found');
     });
 
     it('returns validation for 4xx (except 404, 429)', () => {
-      const error400: AppError = { message: 'Bad request', statusCode: 400, retryable: false };
-      const error422: AppError = { message: 'Unprocessable', statusCode: 422, retryable: false };
+      const error400: ClientError = { message: 'Bad request', statusCode: 400, retryable: false };
+      const error422: ClientError = { message: 'Unprocessable', statusCode: 422, retryable: false };
 
       expect(getErrorVariant(error400)).toBe('validation');
       expect(getErrorVariant(error422)).toBe('validation');
     });
 
     it('returns server for 5xx', () => {
-      const error500: AppError = { message: 'Server error', statusCode: 500, retryable: true };
-      const error503: AppError = { message: 'Unavailable', statusCode: 503, retryable: true };
+      const error500: ClientError = { message: 'Server error', statusCode: 500, retryable: true };
+      const error503: ClientError = { message: 'Unavailable', statusCode: 503, retryable: true };
 
       expect(getErrorVariant(error500)).toBe('server');
       expect(getErrorVariant(error503)).toBe('server');
     });
 
     it('returns network for network-related messages', () => {
-      const error: AppError = { message: 'Network error', retryable: true };
+      const error: ClientError = { message: 'Network error', retryable: true };
       expect(getErrorVariant(error)).toBe('network');
     });
 
     it('returns not-found for not found messages', () => {
-      const error: AppError = { message: 'Resource not found', retryable: false };
+      const error: ClientError = { message: 'Resource not found', retryable: false };
       expect(getErrorVariant(error)).toBe('not-found');
     });
 
     it('returns validation for validation messages', () => {
-      const error: AppError = { message: 'Field is invalid', retryable: false };
+      const error: ClientError = { message: 'Field is invalid', retryable: false };
       expect(getErrorVariant(error)).toBe('validation');
     });
 
