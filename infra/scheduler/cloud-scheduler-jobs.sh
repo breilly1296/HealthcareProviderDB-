@@ -228,6 +228,18 @@ create_or_update_job \
   "1" \
   "Weekly retention cleanup of sync_logs table (Wednesdays)"
 
+# 6. cleanup-admin-actions — weekly retention trim of the admin_actions audit
+#    table. Lower volume than the other logs (only admin endpoint invocations),
+#    so weekly is plenty. Staggered to Saturday 05:30 UTC so it does not
+#    overlap the Sunday confidence-decay run.
+create_or_update_job \
+  "cleanup-admin-actions" \
+  "30 5 * * 6" \
+  "/api/v1/admin/cleanup-admin-actions" \
+  "60" \
+  "1" \
+  "Weekly cleanup of admin_actions audit table (default 90-day retention)"
+
 echo
 echo "=========================================================="
 echo "  done."

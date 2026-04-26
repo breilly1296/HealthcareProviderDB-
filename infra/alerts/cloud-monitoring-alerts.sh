@@ -15,11 +15,32 @@
 #   bash infra/alerts/cloud-monitoring-alerts.sh            # apply
 #   bash infra/alerts/cloud-monitoring-alerts.sh --dry-run  # print only
 #
-# TODO(notifications): This script intentionally leaves notificationChannels
-# empty. To page someone, create channels with `gcloud alpha monitoring
-# channels create` and either patch the policy JSON files or run:
-#   gcloud alpha monitoring policies update POLICY_ID \
-#     --add-notification-channels=projects/PROJECT/notificationChannels/CH_ID
+# ---------------------------------------------------------------------------
+# Notification channels
+# ---------------------------------------------------------------------------
+# The policy JSON files in policies/ ship with `notificationChannels: []` so
+# they apply cleanly on a fresh project. To page someone, set
+# NOTIFICATION_CHANNEL_ID before running this script and the channel will be
+# injected into each policy at apply time (the JSON files stay untouched).
+#
+# First-run setup:
+#   1. Create a notification channel:
+#        gcloud beta monitoring channels create \
+#          --type=slack \
+#          --display-name="VMP Alerts" \
+#          --channel-labels=channel_name=#alerts
+#      (Alternative: --type=email --channel-labels=email_address=alerts@verifymyprovider.com)
+#
+#   2. Get the channel ID:
+#        gcloud beta monitoring channels list --format="value(name)"
+#      The value looks like: projects/PROJECT/notificationChannels/123456789
+#
+#   3. Re-run this script with the ID set:
+#        NOTIFICATION_CHANNEL_ID=projects/PROJECT/notificationChannels/123456789 \
+#          bash infra/alerts/cloud-monitoring-alerts.sh
+#
+# If NOTIFICATION_CHANNEL_ID is empty or unset, the script still applies the
+# policies but emits a loud warning — alerts will fire and notify nobody.
 
 set -euo pipefail
 
@@ -31,6 +52,11 @@ PROJECT_ID="${GCP_PROJECT_ID:-verifymyprovider-prod}"
 BACKEND_SERVICE="verifymyprovider-backend"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 POLICIES_DIR="$SCRIPT_DIR/policies"
+
+# Optional channel ID injected into each policy at apply time. See the
+# "Notification channels" comment block above for setup. Empty = no channels
+# attached (alert fires but pages no one — warning emitted below).
+NOTIFICATION_CHANNEL_ID="${NOTIFICATION_CHANNEL_ID:-}"
 
 DRY_RUN=false
 for arg in "$@"; do
@@ -52,8 +78,26 @@ echo "=========================================================="
 echo "  Cloud Monitoring alerts (dry-run=$DRY_RUN)"
 echo "  project : $PROJECT_ID"
 echo "  service : $BACKEND_SERVICE"
+if [[ -n "$NOTIFICATION_CHANNEL_ID" ]]; then
+  echo "  channel : $NOTIFICATION_CHANNEL_ID"
+else
+  echo "  channel : (none — alerts will fire silently)"
+fi
 echo "=========================================================="
 echo
+
+if [[ -z "$NOTIFICATION_CHANNEL_ID" ]]; then
+  echo "WARNING: No NOTIFICATION_CHANNEL_ID set — alert policies will fire" >&2
+  echo "         but notify nobody. See the 'Notification channels' comment" >&2
+  echo "         block at the top of this script for setup steps." >&2
+  echo >&2
+fi
+
+# Detect jq once so each policy apply doesn't re-shell out.
+HAVE_JQ=false
+if command -v jq >/dev/null 2>&1; then
+  HAVE_JQ=true
+fi
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -92,6 +136,40 @@ create_or_update_metric() {
   fi
 }
 
+# If NOTIFICATION_CHANNEL_ID is set, return the path to a temp file that's a
+# copy of the input policy with notificationChannels populated. Otherwise
+# echo the original path. Caller is responsible for cleaning up the temp file
+# if one was created (we register a trap below).
+#
+# Prefer jq for structural correctness; fall back to sed when jq is missing.
+# The sed fallback assumes the canonical `"notificationChannels": []` shape
+# our policy files use — verified across all six JSON files.
+inject_notification_channel() {
+  local in_file="$1"
+
+  if [[ -z "$NOTIFICATION_CHANNEL_ID" ]]; then
+    echo "$in_file"
+    return 0
+  fi
+
+  local out_file
+  out_file=$(mktemp -t "vmp-policy-XXXXXX.json")
+  TEMP_FILES+=("$out_file")
+
+  if [[ "$HAVE_JQ" == "true" ]]; then
+    jq --arg ch "$NOTIFICATION_CHANNEL_ID" \
+      '.notificationChannels = [$ch]' \
+      "$in_file" > "$out_file"
+  else
+    # Escape forward slashes in the channel ID so they don't terminate the
+    # sed s|...| delimiter we're using.
+    sed "s|\"notificationChannels\": \\[\\]|\"notificationChannels\": [\"${NOTIFICATION_CHANNEL_ID}\"]|" \
+      "$in_file" > "$out_file"
+  fi
+
+  echo "$out_file"
+}
+
 # Create an alert policy from a JSON file if no policy with the same
 # displayName already exists in the project. We don't auto-update existing
 # policies — edits to a policy JSON file should be applied manually via
@@ -116,12 +194,26 @@ create_policy_if_absent() {
     return 0
   fi
 
+  local apply_file
+  apply_file=$(inject_notification_channel "$policy_file")
+
   echo "[create] policy '$display_name'"
   run gcloud alpha monitoring policies create \
-    --policy-from-file="$policy_file" \
+    --policy-from-file="$apply_file" \
     --project="$PROJECT_ID" \
     --quiet
 }
+
+# Track temp files generated by inject_notification_channel so we can clean
+# them up on exit (success, failure, or interrupt). Initialized empty so
+# `set -u` plus `${TEMP_FILES[@]+...}` expansion is safe.
+TEMP_FILES=()
+cleanup_temp_files() {
+  if [[ ${#TEMP_FILES[@]} -gt 0 ]]; then
+    rm -f "${TEMP_FILES[@]}"
+  fi
+}
+trap cleanup_temp_files EXIT
 
 # ---------------------------------------------------------------------------
 # Step 1: log-based metrics
@@ -182,6 +274,19 @@ resource.labels.service_name=\"${BACKEND_SERVICE}\"
   OR jsonPayload.rateLimitStatus=\"degraded\"
 )"
 
+# 1d. Prisma engine-panic counter — fires when the catch-all Prisma branch
+# in errorHandler.ts logs an event with errorName="PrismaClientRustPanic
+# Error". Distinct from the startup/init-error counter (1b): a Rust panic
+# is the engine subprocess crashing mid-query, not a connection failure.
+# Rare but serious — a single occurrence pages on the prisma-rust-panic
+# alert policy (CRITICAL severity).
+create_or_update_metric \
+  "verifymyprovider_prisma_rust_panic" \
+  "Count of PrismaClientRustPanicError occurrences (engine panic)." \
+  "resource.type=\"cloud_run_revision\"
+resource.labels.service_name=\"${BACKEND_SERVICE}\"
+jsonPayload.errorName=\"PrismaClientRustPanicError\""
+
 echo
 
 # ---------------------------------------------------------------------------
@@ -199,7 +304,8 @@ for policy in \
     "$POLICIES_DIR/backend-5xx.json" \
     "$POLICIES_DIR/backend-startup-crash.json" \
     "$POLICIES_DIR/captcha-fail-open.json" \
-    "$POLICIES_DIR/liveness-probe-failures.json"; do
+    "$POLICIES_DIR/liveness-probe-failures.json" \
+    "$POLICIES_DIR/prisma-rust-panic.json"; do
   if [[ ! -f "$policy" ]]; then
     echo "ERROR: missing policy file $policy" >&2
     exit 1

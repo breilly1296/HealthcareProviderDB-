@@ -3,6 +3,7 @@ import { createHash, timingSafeEqual } from 'crypto';
 import { z } from 'zod';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { cleanupExpiredVerifications, getExpirationStats, getDisputedVerifications } from '../services/verificationService';
+import { detectAnomalies } from '../services/anomalyDetectionService';
 import { paginationSchema } from '../schemas/commonSchemas';
 import { recalculateAllConfidenceScores } from '../services/confidenceDecayService';
 import { getEnrichmentStats } from '../services/locationEnrichment';
@@ -264,9 +265,9 @@ router.post(
  * of entries by default — long enough to investigate any incident reported
  * within a quarter, short enough to keep the table small.
  *
- * Protected by X-Admin-Secret header
- * TODO(ops): wire this into Cloud Scheduler (see infra/scheduler/README.md)
- * on a weekly cadence once backlog allows.
+ * Protected by X-Admin-Secret header. Wired to Cloud Scheduler as the
+ * `cleanup-admin-actions` job (Saturday 05:30 UTC weekly) — see
+ * infra/scheduler/cloud-scheduler-jobs.sh.
  *
  * Query params:
  *   - dryRun: If 'true', only return count without deleting (default: false)
@@ -369,6 +370,39 @@ router.get(
         },
       },
     });
+  })
+);
+
+/**
+ * GET /api/v1/admin/anomalies
+ * Subnet-level anomaly detection over verification_logs (F-20).
+ *
+ * Scans the last `window` hours (default 24, max 168 = 7 days) for three
+ * abuse-shaped patterns — subnet concentration, velocity spike, provider
+ * targeting — and returns a structured report. Detection only, no
+ * blocking. Report carries /24 subnet prefixes only (never full IPs).
+ *
+ * Read-only. Protected by X-Admin-Secret. See anomalyDetectionService.ts
+ * for thresholds and detector details.
+ *
+ * Query params:
+ *   - window: hours to look back (default 24, max 168)
+ */
+router.get(
+  '/anomalies',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    // z.coerce.number keeps the value aligned with the rest of the admin
+    // surface's coerce-from-query style; the service also clamps internally
+    // so a missing/NaN param still produces a safe 24h window.
+    const schema = z.object({
+      window: z.coerce.number().int().min(1).max(168).optional().default(24),
+    });
+    const { window: windowHours } = schema.parse(req.query);
+
+    const report = await detectAnomalies(windowHours);
+
+    res.json({ success: true, data: report });
   })
 );
 
