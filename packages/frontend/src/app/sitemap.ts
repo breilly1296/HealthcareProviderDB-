@@ -17,9 +17,18 @@ const PAGES_PER_SHARD = PROVIDERS_PER_SITEMAP / BACKEND_PAGE_LIMIT; // 100
 // Daily regeneration. Used by each per-shard sitemap route.
 export const revalidate = 86_400;
 
+interface SearchResponseProvider {
+  npi: string;
+  // Populated by backend transformProvider() in routes/providers.ts (line 187):
+  // `locations: provider.practiceLocations || []`. Array (possibly empty) when
+  // present, omitted on minimal payloads.
+  locations?: unknown[] | null;
+  confidenceScore?: number | null;
+}
+
 interface SearchResponse {
   data?: {
-    providers?: Array<{ npi: string }>;
+    providers?: SearchResponseProvider[];
     pagination?: { total?: number };
   };
 }
@@ -89,13 +98,25 @@ export default async function sitemap({ id }: { id: number }): Promise<MetadataR
   for (const response of responses) {
     const providers = response?.data?.providers ?? [];
     for (const provider of providers) {
-      if (typeof provider.npi === 'string') {
-        urls.push({
-          url: `${SITE_URL}/provider/${provider.npi}`,
-          changeFrequency: 'weekly',
-          priority: 0.7,
-        });
-      }
+      if (typeof provider.npi !== 'string') continue;
+
+      // Exclude providers without addresses or confidence data — sparse pages
+      // dilute domain SEO quality. A provider with no practice_locations will
+      // render a detail page with no address, no map, and no plan acceptance
+      // breakdown; a provider with confidenceScore null/0 has no verification
+      // signal at all. Both should reach the index only after the next
+      // enrichment pass populates real data.
+      const hasLocations =
+        Array.isArray(provider.locations) && provider.locations.length > 0;
+      const hasConfidence =
+        typeof provider.confidenceScore === 'number' && provider.confidenceScore > 0;
+      if (!hasLocations || !hasConfidence) continue;
+
+      urls.push({
+        url: `${SITE_URL}/provider/${provider.npi}`,
+        changeFrequency: 'weekly',
+        priority: 0.7,
+      });
     }
   }
   return urls;

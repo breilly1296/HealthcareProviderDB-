@@ -1,99 +1,74 @@
-'use client';
+import type { Metadata } from 'next';
+import SearchPageClient from './SearchPageClient';
 
-import { useState, useCallback, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import { SearchResultsSkeleton } from '@/components/ProviderCardSkeleton';
-import {
-  SearchHeader, SearchControls, InsuranceCardBanner,
-  SearchResultsList, SearchMapView, SearchViewLayout,
-  type ViewMode,
-} from '@/components/search';
-import { useMapProviders } from '@/hooks/useMapProviders';
-import { useRecentSearches, type RecentSearchParams } from '@/hooks/useRecentSearches';
-import type { ProviderDisplay, PaginationState } from '@/types';
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://verifymyprovider.com';
 
-function SearchPageContent() {
-  const [providers, setProviders] = useState<ProviderDisplay[]>([]);
-  const [pagination, setPagination] = useState<PaginationState | null>(null);
-  const [hasSearched, setHasSearched] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>('list');
+/**
+ * Allowlist of query params that are part of a search's canonical identity.
+ * Anything not in this list (`view`, `lat`, `lng`, `radius`, ad-hoc params)
+ * is excluded from the canonical so the same logical search produces the
+ * same canonical regardless of UI state or coordinate noise.
+ *
+ *   - lat/lng/radius are excluded deliberately: near-me queries vary by
+ *     six-decimal coordinates and would otherwise produce a near-infinite
+ *     canonical surface that dilutes domain authority on a feature that
+ *     isn't really meant to be a landing page.
+ *   - `view` (list/map/split) is UI state; not SEO content.
+ *   - `page` is included so paginated slices stay distinct (page 2 isn't
+ *     the same content as page 1).
+ *
+ * Already-sorted alphabetically — matches the canonical query-string order.
+ */
+const SEARCH_CANONICAL_KEYS = [
+  'cities',
+  'healthSystem',
+  'insurancePlanId',
+  'name',
+  'page',
+  'specialty',
+  'specialtyCategory',
+  'state',
+  'zipCode',
+] as const;
 
-  const { recentSearches, removeSearch, clearAll: clearAllSearches, isHydrated } = useRecentSearches();
-  const router = useRouter();
-  const searchParams = useSearchParams();
+function buildCanonical(
+  searchParams: Record<string, string | string[] | undefined>
+): string {
+  const sp = new URLSearchParams();
+  for (const key of SEARCH_CANONICAL_KEYS) {
+    const raw = searchParams[key];
+    const value = Array.isArray(raw) ? raw[0] : raw;
+    if (!value) continue;
+    // Skip page=1 — semantically identical to no page param.
+    if (key === 'page' && value === '1') continue;
+    sp.set(key, value);
+  }
+  const qs = sp.toString();
+  return qs ? `${SITE_URL}/search?${qs}` : `${SITE_URL}/search`;
+}
 
-  const { pins, total: mapTotal, clustered, loading: mapLoading, onBoundsChanged } = useMapProviders({
-    specialty: searchParams.get('specialty') || undefined,
-    enabled: viewMode === 'map' || viewMode === 'split',
-  });
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}): Promise<Metadata> {
+  const params = await searchParams;
+  const canonical = buildCanonical(params);
 
-  const handleRecentSearchSelect = useCallback((params: RecentSearchParams) => {
-    const urlParams = new URLSearchParams();
-    if (params.state) urlParams.set('state', params.state);
-    if (params.specialty) urlParams.set('specialty', params.specialty);
-    if (params.cities) urlParams.set('cities', params.cities);
-    if (params.healthSystem) urlParams.set('healthSystem', params.healthSystem);
-    if (params.insurancePlanId) urlParams.set('insurancePlanId', params.insurancePlanId);
-    if (params.zipCode) urlParams.set('zipCode', params.zipCode);
-    router.push(`/search?${urlParams.toString()}`);
-  }, [router]);
-
-  const handleResultsChange = useCallback((newProviders: ProviderDisplay[], newPagination: PaginationState | null) => {
-    setProviders(newProviders);
-    setPagination(newPagination);
-    setHasSearched(newProviders.length > 0 || newPagination !== null);
-    setError(null);
-  }, []);
-
-  return (
-    <div className="py-8 md:py-12">
-      <div className="container-wide">
-        <SearchHeader />
-        <InsuranceCardBanner />
-        <SearchControls
-          viewMode={viewMode}
-          onViewModeChange={setViewMode}
-          onResultsChange={handleResultsChange}
-          onFilterCountChange={() => {}}
-          onLoadingChange={setIsLoading}
-        />
-        <SearchViewLayout
-          viewMode={viewMode}
-          isLoading={isLoading}
-          listContent={
-            <SearchResultsList
-              providers={providers}
-              pagination={pagination}
-              hasSearched={hasSearched}
-              error={error}
-              recentSearches={recentSearches}
-              isHydrated={isHydrated}
-              onRecentSearchSelect={handleRecentSearchSelect}
-              onRecentSearchRemove={removeSearch}
-              onRecentSearchClearAll={clearAllSearches}
-            />
-          }
-          mapContent={
-            <SearchMapView
-              pins={pins}
-              total={mapTotal}
-              clustered={clustered}
-              loading={mapLoading}
-              onBoundsChanged={onBoundsChanged}
-            />
-          }
-        />
-      </div>
-    </div>
-  );
+  return {
+    title: 'Search Healthcare Providers | VerifyMyProvider',
+    description:
+      'Search verified healthcare providers by specialty, location, and insurance plan. Community-verified data on which providers accept which plans.',
+    alternates: { canonical },
+    openGraph: {
+      title: 'Search Healthcare Providers',
+      description: 'Find providers by specialty, location, and insurance plan.',
+      type: 'website',
+      url: canonical,
+    },
+  };
 }
 
 export default function SearchPage() {
-  return (
-    <Suspense fallback={<SearchResultsSkeleton count={5} />}>
-      <SearchPageContent />
-    </Suspense>
-  );
+  return <SearchPageClient />;
 }
