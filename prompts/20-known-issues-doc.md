@@ -4,7 +4,7 @@ tags:
   - issues
 type: prompt
 priority: 2
-updated: 2026-02-05
+updated: 2026-04-19
 ---
 
 # Known Issues Document
@@ -38,7 +38,7 @@ Document known issues, limitations, and workarounds in VerifyMyProvider.
 ### Data
 7. **NPI data partially imported** — Only 6 states imported (FL, AL, AK, AR, AZ, CA, ~2.1M providers). 44 states + territories remaining.
 
-8. **City name quality** — Typos, trailing state codes, and trailing punctuation in city names from NPI data. Cleanup script exists but not yet run across all data.
+8. **City name quality (DATA-02)** — Typos, trailing state codes, and trailing punctuation in city names from NPI data. The previous cleanup script (`scripts/normalize-city-names.ts`) was archived on 2026-04-26 because it targets `providers.city`/`providers.state`, columns that moved to `practice_locations` in migration `20260114113939`. A replacement targeting `practice_locations.city` is required before DATA-02 can be resolved — the archived script also only covered 6 metros (NYC, LA, Chicago, Houston, Phoenix, Philadelphia) and would not have fixed the canonical Alabama/Birmingham examples even if it ran. See `scripts/archive/README.md` for what's worth lifting into the replacement.
 
 9. **Provider addresses stale** — NPI data is self-reported and rarely updated. Some providers show outdated addresses.
 
@@ -53,6 +53,31 @@ Document known issues, limitations, and workarounds in VerifyMyProvider.
 13. **No offline support** — No service worker or PWA manifest.
 
 14. **No full accessibility audit** — Focus trap exists for modals but full keyboard navigation and screen reader testing not done.
+
+### Resolved in 2026-04-19 session
+- ~~**Staging DB shared with prod**~~ (IM-04) — `deploy-staging.yml` now targets `verifymyprovider-db-staging` via `DATABASE_URL_STAGING`.
+- ~~**`prisma db push --accept-data-loss` in prod deploy**~~ (IM-04) — both deploy workflows now use `prisma migrate deploy` + PR-time `prisma migrate diff` job.
+- ~~**Magic-link tokens stored plaintext**~~ (VMP-2026-005) — tokens now SHA-256 hashed before DB write; raw token only in the email URL.
+- ~~**`POST /auth/refresh` only behind 200/hr default limiter**~~ (IM-10) — dedicated `refreshRateLimiter` (30/hr/IP).
+- ~~**Admin endpoints only behind default limiter**~~ (IM-12) — dedicated `adminRateLimiter` (10/hr/IP) + IM-28 optional IP allowlist + IM-11 append-only audit table.
+- ~~**Admin secret timing-leaked by length pre-check**~~ (IM-30) — both sides now hashed to 32 bytes before `timingSafeEqual`.
+- ~~**Honeypot returned static `{ id: 'submitted' }`**~~ (IM-46) — now emits a fresh cuid-shaped id + full `POST /verify` response shape per request.
+- ~~**Rate-limiter off-by-one between Redis and memory modes**~~ (I-11) — Redis path now checks before `ZADD`, both modes use pre-add count + `>= maxRequests`.
+- ~~**Plaintext email in auth logs**~~ (IM-09) — `redactEmail()` helper redacts before every `logger.*` call.
+- ~~**No AbortController timeout on Resend fetch / Anthropic SDK**~~ (IM-19) — 10s / 30s timeouts with distinct failure logging.
+- ~~**No frontend error tracking**~~ (IM-05) — PostHog `$exception` capture via `trackException` helper, global `error` + `unhandledrejection` listeners, Next.js error boundary.
+- ~~**No X-Request-ID propagation**~~ (IM-08) — frontend `apiFetch` generates a cuid-style id on every request, attached to `ApiError.requestId` and PostHog `request_id`.
+- ~~**Cloud Run liveness/startup probes missing**~~ (IM-07) — both deploy workflows configure `/health` probes.
+- ~~**No Redis health in `/health`**~~ (IM-20) — `checks.redis` added; degrades on `error`, not `not-configured`.
+- ~~**Prisma slow queries invisible**~~ (IM-21) — queries over 500ms logged at `warn` with params redacted.
+- ~~**Map pin under-count from NULL `address_hash`**~~ (IM-43) — two-pass query (hashed deduped, unhashed counted individually).
+- ~~**Sitemap limited to 500 providers**~~ (IM-37) — Next.js `generateSitemaps()` shards to 10K URLs each, 100% coverage of provider table.
+- ~~**No robots.txt, no canonical URLs, no GSC verification**~~ (IM-36, IM-39, IM-40, F-18) — all added.
+- ~~**Frontend/backend API contract drift (`/meta/plan-types` 404, `totalCount` vs `total`, snake_case locations)**~~ (I-05, IM-38) — paths + casing fixed; contract test suite at `packages/backend/src/__tests__/api-contracts.test.ts` (IM-25) guards against recurrence.
+- ~~**No Cloud Monitoring alerts / Scheduler / uptime checks as IaC**~~ (IM-06, IM-14, IM-32) — `infra/alerts/`, `infra/scheduler/`, `infra/uptime/` directories with idempotent `gcloud` scripts.
+- ~~**No CI coverage gate**~~ (IM-16) — backend coverage thresholds enforced (28/20/25/28), per-metric summary on every PR.
+- ~~**Frontend jest testEnvironment was `'node'`**~~ (IM-17) — switched to `'jsdom'` so future component tests work out of the box.
+- ~~**Authenticated verifications not linked to userId**~~ (IM-44) — `verification_logs.user_id` + `vote_logs.user_id` + per-user unique constraint; strongest Sybil signal.
 
 ## Questions to Ask
 1. Which issues should be prioritized for the next sprint?
