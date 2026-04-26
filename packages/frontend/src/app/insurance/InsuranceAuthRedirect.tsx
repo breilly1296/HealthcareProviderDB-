@@ -28,9 +28,9 @@ export function InsuranceAuthRedirect() {
             <CreditCard className="w-6 h-6 text-primary-600 dark:text-primary-400" aria-hidden="true" />
           </div>
           <div className="flex-1 text-center sm:text-left">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
               Save your card to your profile
-            </h3>
+            </h2>
             <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
               Sign in to save your insurance card data securely and access it anytime.
             </p>

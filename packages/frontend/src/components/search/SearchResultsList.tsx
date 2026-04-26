@@ -173,11 +173,13 @@ export function SearchResultsList({
         </div>
       )}
 
-      <div className="space-y-5">
+      <ul className="space-y-5 list-none p-0" aria-label="Search results">
         {providers.map((provider) => (
-          <ProviderCard key={provider.id} provider={provider} />
+          <li key={provider.id}>
+            <ProviderCard provider={provider} />
+          </li>
         ))}
-      </div>
+      </ul>
 
       {pagination && (
         <SearchPagination pagination={pagination} currentParams={paginationParams} />
@@ -185,7 +187,14 @@ export function SearchResultsList({
 
       <p className="text-center text-xs text-stone-400 dark:text-gray-500 mt-8 mb-4">
         Data sourced from CMS NPPES and community verifications.
-        <Link href="/disclaimer" className="underline hover:text-stone-600 dark:hover:text-gray-300 ml-1">
+        {/* M27 (F-09): visible "Learn more" stays (it matches the surrounding
+            sentence), but aria-label gives SR users the concrete destination
+            instead of a list of identical "learn more" links on the page. */}
+        <Link
+          href="/disclaimer"
+          aria-label="Learn more about our data sources and disclaimer"
+          className="underline hover:text-stone-600 dark:hover:text-gray-300 ml-1"
+        >
           Learn more
         </Link>
       </p>

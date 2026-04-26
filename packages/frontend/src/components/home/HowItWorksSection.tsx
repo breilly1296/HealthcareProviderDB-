@@ -26,7 +26,7 @@ const steps = [
 
 export function HowItWorksSection() {
   const [visible, setVisible] = useState(false);
-  const gridRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLOListElement>(null);
 
   const handleIntersect = useCallback((entries: IntersectionObserverEntry[]) => {
     if (entries[0]?.isIntersecting) {
@@ -55,9 +55,9 @@ export function HowItWorksSection() {
           Three simple steps to find the right provider.
         </p>
 
-        <div ref={gridRef} className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-0 max-w-4xl mx-auto">
+        <ol ref={gridRef} className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-0 max-w-4xl mx-auto list-none p-0">
           {steps.map((step, index) => (
-            <div key={step.number} className="flex flex-col items-center md:flex-row md:items-stretch">
+            <li key={step.number} className="flex flex-col items-center md:flex-row md:items-stretch">
               {/* Step card */}
               <div
                 className={`
@@ -83,18 +83,18 @@ export function HowItWorksSection() {
               {index < steps.length - 1 && (
                 <>
                   {/* Desktop: horizontal arrow */}
-                  <div className="hidden md:flex items-center justify-center w-10 flex-shrink-0">
-                    <ArrowRight className="w-6 h-6 text-stone-300 dark:text-gray-600" aria-hidden="true" />
+                  <div aria-hidden="true" className="hidden md:flex items-center justify-center w-10 flex-shrink-0">
+                    <ArrowRight className="w-6 h-6 text-stone-300 dark:text-gray-600" />
                   </div>
                   {/* Mobile: vertical arrow */}
-                  <div className="flex md:hidden items-center justify-center h-8 flex-shrink-0">
-                    <ArrowDown className="w-6 h-6 text-stone-300 dark:text-gray-600" aria-hidden="true" />
+                  <div aria-hidden="true" className="flex md:hidden items-center justify-center h-8 flex-shrink-0">
+                    <ArrowDown className="w-6 h-6 text-stone-300 dark:text-gray-600" />
                   </div>
                 </>
               )}
-            </div>
+            </li>
           ))}
-        </div>
+        </ol>
       </div>
     </section>
   );

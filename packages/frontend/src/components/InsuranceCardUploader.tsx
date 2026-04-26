@@ -14,19 +14,21 @@ function ConfidenceIndicator({ confidence, score }: { confidence: ExtractionConf
   const configs = {
     high: {
       label: 'High Confidence',
-      color: 'text-green-600 dark:text-green-400',
+      // -700 on -100 ≈ 7:1 (AA pass); -300 on -900/30 ≈ 8:1.
+      color: 'text-green-700 dark:text-green-300',
       bgColor: 'bg-green-100 dark:bg-green-900/30',
       barColor: 'bg-green-500',
     },
     medium: {
       label: 'Medium Confidence',
-      color: 'text-yellow-600 dark:text-yellow-400',
+      // -600 on -100 was ~4.0:1 (AA fail); -700 lifts to ~7:1.
+      color: 'text-yellow-700 dark:text-yellow-300',
       bgColor: 'bg-yellow-100 dark:bg-yellow-900/30',
       barColor: 'bg-yellow-500',
     },
     low: {
       label: 'Low Confidence',
-      color: 'text-red-600 dark:text-red-400',
+      color: 'text-red-700 dark:text-red-300',
       bgColor: 'bg-red-100 dark:bg-red-900/30',
       barColor: 'bg-red-500',
     },
@@ -192,12 +194,15 @@ export default function InsuranceCardUploader() {
     }
   };
 
+  // M4 (F-09): extracted card data is a definition list (term → value), so
+  // the container renders as <dl> and each row is <div role="presentation">
+  // wrapping <dt>/<dd>. The visual layout is unchanged — only semantics.
   const renderDataField = (label: string, value: string | null) => {
     if (!value) return null;
     return (
-      <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
-        <span className="text-gray-600 dark:text-gray-400 text-sm">{label}</span>
-        <span className="font-medium text-gray-900 dark:text-white text-sm text-right max-w-[60%]">{value}</span>
+      <div role="presentation" className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
+        <dt className="text-gray-600 dark:text-gray-400 text-sm font-normal">{label}</dt>
+        <dd className="font-medium text-gray-900 dark:text-white text-sm text-right max-w-[60%]">{value}</dd>
       </div>
     );
   };
@@ -218,7 +223,11 @@ export default function InsuranceCardUploader() {
             className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center cursor-pointer hover:border-primary-500 dark:hover:border-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
           >
             <ImageIcon className="w-12 h-12 mx-auto text-gray-400 dark:text-gray-500 mb-4" />
-            <p className="text-gray-600 dark:text-gray-300 mb-2">Click to upload or drag and drop</p>
+            {/* M5 (F-09): no drag handlers are wired here — promising
+                drag-and-drop would break the affordance for keyboard and
+                screen-reader users. The button role + Enter/Space handlers
+                above already give full keyboard access. */}
+            <p className="text-gray-600 dark:text-gray-300 mb-2">Click or press Enter to upload</p>
             <p className="text-sm text-gray-500 dark:text-gray-400">PNG, JPG, WebP or GIF (max 10MB)</p>
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">Your image will be processed securely and not stored</p>
           </div>
@@ -227,12 +236,12 @@ export default function InsuranceCardUploader() {
             <div className="relative">
               <img
                 src={selectedImage}
-                alt="Insurance card preview"
+                alt="Preview of the insurance card image you uploaded"
                 className="w-full rounded-lg border border-gray-200 dark:border-gray-700"
               />
               <button
                 onClick={handleReset}
-                aria-label="Remove image"
+                aria-label="Remove uploaded insurance card image"
                 className="absolute top-2 right-2 bg-white dark:bg-gray-700 rounded-full p-1 shadow-md hover:bg-gray-100 dark:hover:bg-gray-600"
               >
                 <X className="w-5 h-5 text-gray-600 dark:text-gray-300" aria-hidden="true" />
@@ -346,33 +355,33 @@ export default function InsuranceCardUploader() {
           )}
 
           <div className="p-6 space-y-6">
-            {/* Plan Information */}
+            {/* Plan Information — M21 icons aria-hidden, M4 dl/dt/dd */}
             <div>
               <h4 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                <FileText className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+                <FileText className="w-4 h-4 text-primary-600 dark:text-primary-400" aria-hidden="true" />
                 Plan Information
               </h4>
-              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+              <dl className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                 {renderDataField('Insurance Company', extractedData.insurance_company)}
                 {renderDataField('Plan Name', extractedData.plan_name)}
                 {renderDataField('Plan Type', extractedData.plan_type)}
                 {renderDataField('Provider Network', extractedData.provider_network)}
                 {renderDataField('Network Notes', extractedData.network_notes)}
-              </div>
+              </dl>
             </div>
 
             {/* Subscriber Information */}
             <div>
               <h4 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                <User className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+                <User className="w-4 h-4 text-primary-600 dark:text-primary-400" aria-hidden="true" />
                 Subscriber Information
               </h4>
-              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+              <dl className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                 {renderDataField('Subscriber Name', extractedData.subscriber_name)}
                 {renderDataField('Subscriber ID', extractedData.subscriber_id)}
                 {renderDataField('Group Number', extractedData.group_number)}
                 {renderDataField('Effective Date', extractedData.effective_date)}
-              </div>
+              </dl>
             </div>
 
             {/* Copays */}
@@ -382,15 +391,15 @@ export default function InsuranceCardUploader() {
               extractedData.copay_er) && (
               <div>
                 <h4 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                  <CircleDollarSign className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+                  <CircleDollarSign className="w-4 h-4 text-primary-600 dark:text-primary-400" aria-hidden="true" />
                   Copays
                 </h4>
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                <dl className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                   {renderDataField('Primary Care', extractedData.copay_pcp)}
                   {renderDataField('Specialist', extractedData.copay_specialist)}
                   {renderDataField('Urgent Care', extractedData.copay_urgent)}
                   {renderDataField('Emergency Room', extractedData.copay_er)}
-                </div>
+                </dl>
               </div>
             )}
 
@@ -401,15 +410,15 @@ export default function InsuranceCardUploader() {
               extractedData.oop_max_family) && (
               <div>
                 <h4 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                  <Calculator className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+                  <Calculator className="w-4 h-4 text-primary-600 dark:text-primary-400" aria-hidden="true" />
                   Deductibles & Out-of-Pocket Max
                 </h4>
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                <dl className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                   {renderDataField('Individual Deductible', extractedData.deductible_individual)}
                   {renderDataField('Family Deductible', extractedData.deductible_family)}
                   {renderDataField('Individual OOP Max', extractedData.oop_max_individual)}
                   {renderDataField('Family OOP Max', extractedData.oop_max_family)}
-                </div>
+                </dl>
               </div>
             )}
 
@@ -417,14 +426,14 @@ export default function InsuranceCardUploader() {
             {(extractedData.rxbin || extractedData.rxpcn || extractedData.rxgrp) && (
               <div>
                 <h4 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                  <FlaskConical className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+                  <FlaskConical className="w-4 h-4 text-primary-600 dark:text-primary-400" aria-hidden="true" />
                   Pharmacy Information
                 </h4>
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                <dl className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                   {renderDataField('RxBIN', extractedData.rxbin)}
                   {renderDataField('RxPCN', extractedData.rxpcn)}
                   {renderDataField('RxGRP', extractedData.rxgrp)}
-                </div>
+                </dl>
               </div>
             )}
 
@@ -432,13 +441,13 @@ export default function InsuranceCardUploader() {
             {(extractedData.customer_care_phone || extractedData.website) && (
               <div>
                 <h4 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                  <Phone className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+                  <Phone className="w-4 h-4 text-primary-600 dark:text-primary-400" aria-hidden="true" />
                   Contact Information
                 </h4>
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                <dl className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                   {renderDataField('Customer Care', extractedData.customer_care_phone)}
                   {renderDataField('Website', extractedData.website)}
-                </div>
+                </dl>
               </div>
             )}
           </div>

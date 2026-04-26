@@ -168,6 +168,11 @@ export default function ProviderMap({
   }
 
   return (
+    // TODO(a11y): Google Maps markers are not keyboard-reachable in this
+    // imperative-marker setup; clusters/markers can only be activated by
+    // mouse. Full keyboard nav (Tab to markers, Enter to open InfoWindow)
+    // requires either the react-google-maps MarkerF or a custom listbox
+    // overlay — see report 2026-04-26.
     <div className="relative" style={{ width: '100%', height }}>
       <GoogleMap
         mapContainerStyle={{ width: '100%', height: '100%' }}

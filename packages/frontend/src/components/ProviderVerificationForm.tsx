@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { progressWidth } from '@/lib/utils';
 import { verificationApi } from '@/lib/api';
@@ -70,6 +70,35 @@ export default function ProviderVerificationForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showTooltip, setShowTooltip] = useState<string | null>(null);
   const [honeypot, setHoneypot] = useState('');
+
+  // Tooltip global dismiss handlers — Escape and click-outside. Mounts only
+  // when a tooltip is open so we don't burn listeners during the long
+  // periods where no tooltip is visible.
+  const tooltipContainerRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!showTooltip) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowTooltip(null);
+    };
+    const handlePointerDown = (e: MouseEvent) => {
+      // Click-outside closes the tooltip. The trigger button + tooltip live
+      // inside tooltipContainerRef; clicks anywhere else dismiss.
+      if (
+        tooltipContainerRef.current &&
+        !tooltipContainerRef.current.contains(e.target as Node)
+      ) {
+        setShowTooltip(null);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mousedown', handlePointerDown);
+    };
+  }, [showTooltip]);
   const { getToken } = useCaptcha();
 
   const totalSteps = 4; // Main verification questions
@@ -129,31 +158,50 @@ export default function ProviderVerificationForm({
     }
   };
 
-  // Research tooltip component
-  const Tooltip = ({ id, children }: { id: string; children: React.ReactNode }) => (
-    <div className="relative inline-block">
-      <button
-        type="button"
-        onMouseEnter={() => setShowTooltip(id)}
-        onMouseLeave={() => setShowTooltip(null)}
-        onClick={() => setShowTooltip(showTooltip === id ? null : id)}
-        className="ml-2 text-primary-600 hover:text-primary-700 focus-visible:ring-2 focus-visible:ring-primary-500 rounded"
-        aria-label="More information"
+  // Research tooltip component. Full ARIA tooltip pattern:
+  //   - role="tooltip" on the popup
+  //   - aria-describedby on trigger when open (links to popup id)
+  //   - aria-expanded reflects open state
+  //   - focus/blur mirror mouseenter/leave for keyboard + SR users
+  //   - Escape dismisses (handled by the parent useEffect)
+  //   - click-outside dismisses (handled by the parent useEffect via
+  //     tooltipContainerRef on the wrapping div)
+  const Tooltip = ({ id, children }: { id: string; children: React.ReactNode }) => {
+    const tooltipId = `tooltip-${id}`;
+    const isOpen = showTooltip === id;
+    return (
+      <div
+        className="relative inline-block"
+        ref={isOpen ? tooltipContainerRef : undefined}
       >
-        <Info className="w-5 h-5 inline" />
-      </button>
-      {showTooltip === id && (
-        <div className="absolute z-10 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-lg -top-2 left-8">
-          {children}
-          <div className="absolute top-3 -left-1 w-2 h-2 bg-gray-900 transform rotate-45"></div>
-        </div>
-      )}
-    </div>
-  );
+        <button
+          type="button"
+          onMouseEnter={() => setShowTooltip(id)}
+          onMouseLeave={() => setShowTooltip(null)}
+          onFocus={() => setShowTooltip(id)}
+          onBlur={() => setShowTooltip(null)}
+          onClick={() => setShowTooltip(isOpen ? null : id)}
+          className="ml-2 text-primary-600 hover:text-primary-700 focus-visible:ring-2 focus-visible:ring-primary-500 rounded"
+          aria-label="More information"
+          aria-describedby={isOpen ? tooltipId : undefined}
+          aria-expanded={isOpen}
+        >
+          <Info className="w-5 h-5 inline" aria-hidden="true" />
+        </button>
+        {isOpen && (
+          <div id={tooltipId} role="tooltip" className="absolute z-10 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-lg -top-2 left-8">
+            {children}
+            <div className="absolute top-3 -left-1 w-2 h-2 bg-gray-900 transform rotate-45" aria-hidden="true"></div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // Progress indicator component
   const ProgressBar = () => {
     const barWidth = progressWidth((currentStepNumber / totalSteps) * 100);
+    const progressPct = Math.round((currentStepNumber / totalSteps) * 100);
 
     return (
       <div className="mb-8">
@@ -165,7 +213,14 @@ export default function ProviderVerificationForm({
             ~{Math.max(1, totalSteps - currentStepNumber)} min remaining
           </span>
         </div>
-        <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+        <div
+          role="progressbar"
+          aria-valuenow={progressPct}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={`Verification progress, question ${currentStepNumber} of ${totalSteps}`}
+          className="w-full h-2 bg-gray-200 rounded-full overflow-hidden"
+        >
           <div
             className="h-full bg-primary-600 transition-all duration-300 ease-in-out"
             style={barWidth}
@@ -175,7 +230,7 @@ export default function ProviderVerificationForm({
       {/* Verification count progress */}
       <div className="mt-4 text-center">
         <div className="inline-flex items-center gap-2 bg-primary-50 text-primary-900 px-4 py-2 rounded-full border border-primary-200">
-          <CheckCircle2 className="w-5 h-5 text-primary-600" />
+          <CheckCircle2 className="w-5 h-5 text-primary-600" aria-hidden="true" />
           <span className="text-sm font-semibold">
             Verification {newVerificationTotal} of 3 needed for high confidence
           </span>
@@ -199,7 +254,7 @@ export default function ProviderVerificationForm({
     return (
       <div className="card max-w-2xl mx-auto">
         <div className="text-center mb-6">
-          <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <div aria-hidden="true" className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <CheckCircle2 className="w-8 h-8 text-primary-600" />
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Verify Provider Information</h2>
@@ -211,7 +266,7 @@ export default function ProviderVerificationForm({
         {/* Research Context Banner */}
         <div className="bg-primary-50 border border-primary-200 rounded-lg p-4 mb-6">
           <div className="flex items-start gap-3">
-            <FileText className="w-6 h-6 text-primary-600 flex-shrink-0 mt-0.5" />
+            <FileText className="w-6 h-6 text-primary-600 flex-shrink-0 mt-0.5" aria-hidden="true" />
             <div>
               <h3 className="font-semibold text-primary-900 mb-1">
                 Your 2-minute verification helps prevent surprise bills
@@ -226,7 +281,7 @@ export default function ProviderVerificationForm({
         {/* Verification Progress Indicator */}
         <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
           <div className="flex items-center gap-3 mb-3">
-            <div className="flex gap-1">
+            <div className="flex gap-1" aria-hidden="true">
               {[...Array(Math.min(3, newVerificationTotal))].map((_, i) => (
                 <CheckCircle2 key={i} className="w-8 h-8 text-green-500" fill="currentColor" strokeWidth={0} />
               ))}
@@ -247,33 +302,33 @@ export default function ProviderVerificationForm({
           </div>
         </div>
 
-        <div className="space-y-4 mb-6">
-          <div className="flex items-start gap-3">
-            <Check className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+        <ul className="space-y-4 mb-6">
+          <li className="flex items-start gap-3">
+            <Check className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" aria-hidden="true" />
             <div>
               <strong className="text-gray-900">4 simple yes/no questions</strong>
               <p className="text-sm text-gray-600">One question at a time, no typing required</p>
             </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <Clock className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+          </li>
+          <li className="flex items-start gap-3">
+            <Clock className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" aria-hidden="true" />
             <div>
               <strong className="text-gray-900">Under 2 minutes total</strong>
               <p className="text-sm text-gray-600">
                 Research shows short tasks maintain attention and accuracy
               </p>
             </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+          </li>
+          <li className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" aria-hidden="true" />
             <div>
               <strong className="text-gray-900">Prevent surprise bills</strong>
               <p className="text-sm text-gray-600">
                 Research: wrong directories cause 4x more surprise bills
               </p>
             </div>
-          </div>
-        </div>
+          </li>
+        </ul>
 
         <button
           onClick={() => handleNext('accepts-insurance-general')}
@@ -544,8 +599,8 @@ export default function ProviderVerificationForm({
     const isExpertLevel = newVerificationTotal >= 3;
 
     return (
-      <div className="card max-w-2xl mx-auto text-center">
-        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+      <div className="card max-w-2xl mx-auto text-center" role="status" aria-live="polite">
+        <div aria-hidden="true" className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
           <Check className="w-10 h-10 text-green-600" />
         </div>
 
@@ -566,7 +621,7 @@ export default function ProviderVerificationForm({
 
         {/* Visual Progress */}
         <div className="flex items-center justify-center gap-2 mb-4">
-          <div className="flex gap-1">
+          <div className="flex gap-1" aria-hidden="true">
             {[...Array(Math.min(3, newVerificationTotal))].map((_, i) => (
               <CheckCircle2 key={i} className="w-8 h-8 text-green-500" fill="currentColor" strokeWidth={0} />
             ))}
@@ -579,7 +634,7 @@ export default function ProviderVerificationForm({
         {isExpertLevel ? (
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
             <div className="flex items-center justify-center gap-2 mb-2">
-              <Check className="w-6 h-6 text-green-600" />
+              <Check className="w-6 h-6 text-green-600" aria-hidden="true" />
               <p className="text-base font-bold text-green-900">High confidence achieved!</p>
             </div>
             <p className="text-sm text-green-800">
@@ -609,7 +664,7 @@ export default function ProviderVerificationForm({
           className="text-sm text-primary-600 hover:text-primary-700 inline-flex items-center gap-1"
         >
           Learn about our research methodology
-          <ChevronRight className="w-4 h-4" />
+          <ChevronRight className="w-4 h-4" aria-hidden="true" />
         </Link>
       </div>
     );
@@ -620,8 +675,8 @@ export default function ProviderVerificationForm({
   // ============================================================
   if (currentStep === 'thank-you-not-sure') {
     return (
-      <div className="card max-w-2xl mx-auto text-center">
-        <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+      <div className="card max-w-2xl mx-auto text-center" role="status" aria-live="polite">
+        <div aria-hidden="true" className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
           <Info className="w-10 h-10 text-blue-600" />
         </div>
 
@@ -665,8 +720,8 @@ export default function ProviderVerificationForm({
   // ============================================================
   if (currentStep === 'thank-you-cash-only') {
     return (
-      <div className="card max-w-2xl mx-auto text-center">
-        <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+      <div className="card max-w-2xl mx-auto text-center" role="status" aria-live="polite">
+        <div aria-hidden="true" className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
           <CircleDollarSign className="w-10 h-10 text-blue-600" />
         </div>
 

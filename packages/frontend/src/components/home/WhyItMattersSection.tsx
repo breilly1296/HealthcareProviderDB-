@@ -45,7 +45,7 @@ const colorStyles = {
 
 export function WhyItMattersSection() {
   const [visible, setVisible] = useState(false);
-  const sectionRef = useRef<HTMLDivElement>(null);
+  const sectionRef = useRef<HTMLUListElement>(null);
 
   const handleIntersect = useCallback((entries: IntersectionObserverEntry[]) => {
     if (entries[0]?.isIntersecting) {
@@ -80,18 +80,18 @@ export function WhyItMattersSection() {
           Insurance directories are wrong up to half the time — and patients pay the price.
         </p>
 
-        <div ref={sectionRef} className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 max-w-4xl mx-auto">
+        <ul ref={sectionRef} className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 max-w-4xl mx-auto list-none p-0">
           {cards.map((card, index) => {
             const styles = colorStyles[card.color];
             return (
-              <div
+              <li
                 key={card.headline}
                 className={`text-center p-6 rounded-xl shadow-sm ${styles.bg} border ${styles.border} ${
                   visible ? 'animate-fade-up' : 'opacity-0'
                 }`}
                 style={visible ? { animationDelay: `${index * 100}ms` } : undefined}
               >
-                <div className={`flex justify-center mb-3 ${styles.iconColor}`}>
+                <div aria-hidden="true" className={`flex justify-center mb-3 ${styles.iconColor}`}>
                   {card.icon}
                 </div>
                 <h3 className="text-lg font-bold text-stone-800 dark:text-white mb-2">
@@ -100,10 +100,10 @@ export function WhyItMattersSection() {
                 <p className="text-sm text-stone-600 dark:text-gray-300">
                   {card.body}
                 </p>
-              </div>
+              </li>
             );
           })}
-        </div>
+        </ul>
 
         <p className="text-center mt-6">
           <Link

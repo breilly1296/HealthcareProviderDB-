@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, FormEvent, useEffect, useRef, useCallback } from 'react';
+import FocusTrap from 'focus-trap-react';
 import { verificationApi } from '@/lib/api';
 import { trackVerificationSubmit } from '@/lib/analytics';
 import { useCaptcha } from '@/hooks/useCaptcha';
@@ -41,9 +42,11 @@ export function VerificationButton({
 
   const { getToken } = useCaptcha();
 
-  // Refs for focus trap
-  const modalRef = useRef<HTMLDivElement>(null);
-  const previousActiveElement = useRef<Element | null>(null);
+  // FocusTrap (focus-trap-react) handles focus capture, initial focus, and
+  // return-on-deactivate automatically; we only need a ref for the close
+  // button to use as the initial focus target. Mirrors CompareModal /
+  // FilterDrawer / InsuranceList VerificationModal.
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   // Validate email with regex
   const validateEmail = (emailValue: string): boolean => {
@@ -116,11 +119,9 @@ export function VerificationButton({
   };
 
   const handleClose = useCallback(() => {
+    // FocusTrap restores focus to the trigger automatically on unmount
+    // (returnFocusOnDeactivate defaults to true), so no manual restore here.
     setIsOpen(false);
-    // Restore focus to the element that opened the modal
-    if (previousActiveElement.current instanceof HTMLElement) {
-      previousActiveElement.current.focus();
-    }
     // Reset form after animation
     setTimeout(() => {
       setStep('form');
@@ -136,7 +137,6 @@ export function VerificationButton({
   }, [initialPlanId, initialPlanName]);
 
   const handleOpen = () => {
-    previousActiveElement.current = document.activeElement;
     setIsOpen(true);
   };
 
@@ -153,42 +153,6 @@ export function VerificationButton({
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, handleClose]);
-
-  // Focus trap: keep focus within modal
-  useEffect(() => {
-    if (!isOpen || !modalRef.current) return;
-
-    // Focus the first focusable element when modal opens
-    const focusableElements = modalRef.current.querySelectorAll<HTMLElement>(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-    );
-    const firstFocusable = focusableElements[0];
-    const lastFocusable = focusableElements[focusableElements.length - 1];
-
-    // Focus first element
-    firstFocusable?.focus();
-
-    const handleTabKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab') return;
-
-      if (e.shiftKey) {
-        // Shift + Tab
-        if (document.activeElement === firstFocusable) {
-          e.preventDefault();
-          lastFocusable?.focus();
-        }
-      } else {
-        // Tab
-        if (document.activeElement === lastFocusable) {
-          e.preventDefault();
-          firstFocusable?.focus();
-        }
-      }
-    };
-
-    document.addEventListener('keydown', handleTabKey);
-    return () => document.removeEventListener('keydown', handleTabKey);
-  }, [isOpen, step]);
 
   // Prevent body scroll when modal is open
   useEffect(() => {
@@ -208,12 +172,23 @@ export function VerificationButton({
         onClick={handleOpen}
         className="btn-primary"
       >
-        <CheckCircle2 className="w-5 h-5 mr-2" />
+        {/* M23: decorative — button text carries the meaning */}
+        <CheckCircle2 className="w-5 h-5 mr-2" aria-hidden="true" />
         Verify Insurance
       </button>
 
       {/* Modal */}
       {isOpen && (
+        <FocusTrap
+          focusTrapOptions={{
+            initialFocus: () => closeButtonRef.current,
+            allowOutsideClick: true,
+            // Escape is handled by the existing keydown listener above so it
+            // can also reset form state via handleClose. Disabling the
+            // library handler avoids dueling deactivations.
+            escapeDeactivates: false,
+          }}
+        >
         <div
           className="fixed inset-0 z-50 overflow-y-auto"
           role="dialog"
@@ -230,16 +205,16 @@ export function VerificationButton({
 
             {/* Modal content */}
             <div
-              ref={modalRef}
               className="relative bg-white rounded-xl shadow-xl max-w-lg w-full p-6"
             >
               {/* Close button */}
               <button
+                ref={closeButtonRef}
                 onClick={handleClose}
                 className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
                 aria-label="Close modal"
               >
-                <X className="w-6 h-6" />
+                <X className="w-6 h-6" aria-hidden="true" />
               </button>
 
               {step === 'form' && (
@@ -281,25 +256,28 @@ export function VerificationButton({
                         <button
                           type="button"
                           onClick={() => setAcceptsInsurance(true)}
+                          /* M9 (F-09): toggle button — aria-pressed exposes state */
+                          aria-pressed={acceptsInsurance === true}
                           className={`flex-1 py-3 px-4 rounded-lg border-2 font-medium transition-colors ${
                             acceptsInsurance === true
                               ? 'border-green-500 bg-green-50 text-green-700'
                               : 'border-gray-200 hover:border-gray-300'
                           }`}
                         >
-                          <Check className="w-5 h-5 mx-auto mb-1" />
+                          <Check className="w-5 h-5 mx-auto mb-1" aria-hidden="true" />
                           Yes
                         </button>
                         <button
                           type="button"
                           onClick={() => setAcceptsInsurance(false)}
+                          aria-pressed={acceptsInsurance === false}
                           className={`flex-1 py-3 px-4 rounded-lg border-2 font-medium transition-colors ${
                             acceptsInsurance === false
                               ? 'border-red-500 bg-red-50 text-red-700'
                               : 'border-gray-200 hover:border-gray-300'
                           }`}
                         >
-                          <X className="w-5 h-5 mx-auto mb-1" />
+                          <X className="w-5 h-5 mx-auto mb-1" aria-hidden="true" />
                           No
                         </button>
                       </div>
@@ -314,6 +292,7 @@ export function VerificationButton({
                         <button
                           type="button"
                           onClick={() => setAcceptsNewPatients(true)}
+                          aria-pressed={acceptsNewPatients === true}
                           className={`flex-1 py-2 px-4 rounded-lg border-2 font-medium transition-colors ${
                             acceptsNewPatients === true
                               ? 'border-primary-500 bg-primary-50 text-primary-700'
@@ -325,6 +304,7 @@ export function VerificationButton({
                         <button
                           type="button"
                           onClick={() => setAcceptsNewPatients(false)}
+                          aria-pressed={acceptsNewPatients === false}
                           className={`flex-1 py-2 px-4 rounded-lg border-2 font-medium transition-colors ${
                             acceptsNewPatients === false
                               ? 'border-primary-500 bg-primary-50 text-primary-700'
@@ -336,6 +316,7 @@ export function VerificationButton({
                         <button
                           type="button"
                           onClick={() => setAcceptsNewPatients(null)}
+                          aria-pressed={acceptsNewPatients === null}
                           className={`flex-1 py-2 px-4 rounded-lg border-2 font-medium transition-colors ${
                             acceptsNewPatients === null
                               ? 'border-primary-500 bg-primary-50 text-primary-700'
@@ -406,8 +387,11 @@ export function VerificationButton({
               )}
 
               {step === 'submitting' && (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary-200 border-t-primary-600 mx-auto mb-4" />
+                /* M10 (F-09): role=status announces the submit state to SR
+                   users; aria-live=polite so it interrupts at the next
+                   natural pause rather than cutting off current speech. */
+                <div role="status" aria-live="polite" className="text-center py-8">
+                  <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary-200 border-t-primary-600 mx-auto mb-4" aria-hidden="true" />
                   <p className="text-gray-600">Submitting your verification...</p>
                 </div>
               )}
@@ -415,7 +399,7 @@ export function VerificationButton({
               {step === 'success' && (
                 <div className="text-center py-8">
                   <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Check className="w-8 h-8 text-green-600" />
+                    <Check className="w-8 h-8 text-green-600" aria-hidden="true" />
                   </div>
                   <h3 className="text-xl font-semibold text-gray-900 mb-2">
                     Thank You!
@@ -432,7 +416,7 @@ export function VerificationButton({
               {step === 'error' && (
                 <div className="text-center py-8">
                   <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <X className="w-8 h-8 text-red-600" />
+                    <X className="w-8 h-8 text-red-600" aria-hidden="true" />
                   </div>
                   <h3 className="text-xl font-semibold text-gray-900 mb-2">
                     Submission Failed
@@ -453,6 +437,7 @@ export function VerificationButton({
             </div>
           </div>
         </div>
+        </FocusTrap>
       )}
     </>
   );

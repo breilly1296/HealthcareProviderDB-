@@ -94,10 +94,10 @@ function CardSection({
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <h4 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+        <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
           <Icon className="w-4 h-4 text-primary-600 dark:text-primary-400" aria-hidden="true" />
           {title}
-        </h4>
+        </h2>
         {hasSensitive && (
           <button
             onClick={() => setShowRaw((prev) => !prev)}
@@ -418,17 +418,17 @@ export function InsuranceCardDashboard() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8 md:py-12">
       <div className="container-wide">
         {/* Breadcrumb */}
-        <nav className="mb-6">
+        <nav aria-label="Breadcrumb" className="mb-6">
           <ol className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
             <li>
               <Link href="/" className="hover:text-primary-600 dark:hover:text-primary-400">Home</Link>
             </li>
-            <li>/</li>
+            <li aria-hidden="true">/</li>
             <li>
               <Link href="/saved-providers" className="hover:text-primary-600 dark:hover:text-primary-400">Dashboard</Link>
             </li>
-            <li>/</li>
-            <li className="text-gray-900 dark:text-white font-medium">My Insurance</li>
+            <li aria-hidden="true">/</li>
+            <li aria-current="page" className="text-gray-900 dark:text-white font-medium">My Insurance</li>
           </ol>
         </nav>
 

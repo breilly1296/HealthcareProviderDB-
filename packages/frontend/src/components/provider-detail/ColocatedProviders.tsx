@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { providerApi } from '@/lib/api';
-import { toAppError, getUserMessage, logError } from '@/lib/errorUtils';
+import { toClientError, getUserMessage, logError } from '@/lib/errorUtils';
 import { Shimmer } from '@/components/ui/Shimmer';
 import { toDisplayCase, toAddressCase, toTitleCase } from '@/lib/formatName';
 import { ChevronRight, MapPin, Phone } from 'lucide-react';
@@ -35,8 +35,8 @@ export function ColocatedProviders({ npi }: ColocatedProvidersProps) {
     } catch (err) {
       // Use standardized error handling
       logError('ColocatedProviders.fetchColocatedProviders', err);
-      const appError = toAppError(err);
-      setError(getUserMessage(appError));
+      const clientError = toClientError(err);
+      setError(getUserMessage(clientError));
       setFetched(true); // Mark as fetched even on error to stop showing skeleton
     } finally {
       setLoading(false);
@@ -88,7 +88,13 @@ export function ColocatedProviders({ npi }: ColocatedProvidersProps) {
       )}
 
       {/* Colocated providers list */}
-      {!loading && !error && fetched && colocatedTotal !== null && colocatedTotal > 0 && location && (
+      {!loading && !error && fetched && colocatedTotal !== null && colocatedTotal > 0 && location && (() => {
+        // Prefer the location detail page when the backend gave us a real
+        // practice_locations.id; fall back to a city/zip search if id is
+        // missing or 0 (older clients / unexpected payload shape).
+        const searchHref = `/search?city=${encodeURIComponent(location.city)}&state=${location.state}&zipCode=${location.zipCode.substring(0, 5)}`;
+        const locationHref = location.id ? `/location/${location.id}` : searchHref;
+        return (
         <div className="card !p-4 sm:!p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">
@@ -96,7 +102,7 @@ export function ColocatedProviders({ npi }: ColocatedProvidersProps) {
             </h2>
             {colocatedTotal > 10 && (
               <Link
-                href={`/search?city=${encodeURIComponent(location.city)}&state=${location.state}&zipCode=${location.zipCode.substring(0, 5)}`}
+                href={locationHref}
                 className="text-sm font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 flex items-center gap-1"
               >
                 View all {colocatedTotal}
@@ -125,38 +131,40 @@ export function ColocatedProviders({ npi }: ColocatedProvidersProps) {
           </div>
 
           {/* Provider List */}
-          <div className="space-y-3">
+          <ul className="space-y-3 list-none p-0">
             {colocatedProviders.slice(0, 10).map((colProvider) => (
-              <Link
-                key={colProvider.npi}
-                href={`/provider/${colProvider.npi}`}
-                className="block p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-300 dark:hover:border-primary-600 hover:bg-primary-50/30 dark:hover:bg-primary-900/20 transition-all"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <h3 className="font-medium text-gray-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400">
-                      {toDisplayCase(colProvider.displayName)}
-                    </h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                      {colProvider.taxonomyDescription || colProvider.specialtyCategory || 'Healthcare Provider'}
-                    </p>
-                    {colProvider.phone && (
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1">
-                        <Phone className="w-4 h-4" aria-hidden="true" />
-                        {colProvider.phone}
+              <li key={colProvider.npi}>
+                <Link
+                  href={`/provider/${colProvider.npi}`}
+                  aria-label={`View details for ${toDisplayCase(colProvider.displayName)}`}
+                  className="block p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-300 dark:hover:border-primary-600 hover:bg-primary-50/30 dark:hover:bg-primary-900/20 transition-all"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <h3 className="font-medium text-gray-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400">
+                        {toDisplayCase(colProvider.displayName)}
+                      </h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        {colProvider.taxonomyDescription || colProvider.specialtyCategory || 'Healthcare Provider'}
                       </p>
-                    )}
+                      {colProvider.phone && (
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1">
+                          <Phone className="w-4 h-4" aria-hidden="true" />
+                          {colProvider.phone}
+                        </p>
+                      )}
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-gray-400 dark:text-gray-500 flex-shrink-0" aria-hidden="true" />
                   </div>
-                  <ChevronRight className="w-5 h-5 text-gray-400 dark:text-gray-500 flex-shrink-0" aria-hidden="true" />
-                </div>
-              </Link>
+                </Link>
+              </li>
             ))}
-          </div>
+          </ul>
 
           {colocatedTotal > 10 && (
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 text-center">
               <Link
-                href={`/search?city=${encodeURIComponent(location.city)}&state=${location.state}&zipCode=${location.zipCode.substring(0, 5)}`}
+                href={locationHref}
                 className="btn-secondary"
               >
                 View all {colocatedTotal} providers at this location
@@ -164,7 +172,8 @@ export function ColocatedProviders({ npi }: ColocatedProvidersProps) {
             </div>
           )}
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

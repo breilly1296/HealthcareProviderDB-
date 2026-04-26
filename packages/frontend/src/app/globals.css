@@ -9,6 +9,21 @@
     scroll-behavior: smooth;
   }
 
+  /* M20 (F-09): respect the OS reduced-motion preference. Users with
+     vestibular or migraine sensitivity set this at the system level; we
+     disable smooth scroll + any CSS animations/transitions for them. */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
   body {
     @apply antialiased text-stone-800 bg-stone-100;
     @apply dark:text-gray-100 dark:bg-gray-900;
@@ -132,14 +147,34 @@
   }
 }
 
-/* Print styles - show only essential provider content */
+/* Print styles — show only essential provider content. The provider
+   detail page is the canonical print target; rules below are scoped so
+   any page that prints (provider, location, search results) gets a
+   clean, ink-thrifty rendering. */
 @media print {
-  header, footer, nav {
+  /* Hide chrome and any element that explicitly opts out of print, plus
+     a blanket button-hide with an opt-in escape hatch (`data-print-show`).
+     Buttons that should still appear on paper (e.g. a provider phone
+     number rendered as a button) need `data-print-show` to override. */
+  header, footer, nav,
+  [data-print-hide],
+  button:not([data-print-show]),
+  .print\:hidden {
     display: none !important;
   }
 
-  .print\:hidden {
-    display: none !important;
+  /* Reset sticky / fixed positioning so anything that survives display:none
+     above doesn't float on top of content. Belt-and-suspenders against
+     fixed-positioned elements that lack print:hidden. */
+  header, .sticky, [class*="fixed"] {
+    position: static !important;
+  }
+
+  /* Strip every shadow project-wide — saves ink and printer paper. The
+     blanket selector replaces the previous card-only rule and catches
+     button-shadows, modal-shadows, etc. */
+  * {
+    box-shadow: none !important;
   }
 
   body {
@@ -149,7 +184,25 @@
   }
 
   .card, [class*="rounded-xl"] {
-    box-shadow: none !important;
     border: 1px solid #d1d5db !important;
+  }
+
+  /* Avoid splitting a card / section across page boundaries. Apply
+     `data-print-section` to a wrapping element to keep it intact. */
+  .card, .provider-card, [data-print-section] {
+    break-inside: avoid;
+  }
+
+  /* Show full URLs after external links so the printout is a useful
+     reference document. Internal links are suppressed — printing
+     "(/provider/1234567890)" after a name adds no value. */
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.8em;
+    color: #666;
+  }
+  a[href^="/"]::after,
+  a[href^="#"]::after {
+    content: none;
   }
 }
