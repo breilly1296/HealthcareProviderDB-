@@ -123,7 +123,18 @@ export interface HealthSystem {
 }
 
 /**
- * Location data (frontend representation)
+ * Location data (frontend representation).
+ *
+ * NOTE (2026-04-26): The backend `locationSelect` in
+ * packages/backend/src/services/locationService.ts returns id, npi,
+ * addressType, addressLine1, addressLine2, city, state, zipCode, phone,
+ * fax, latitude, longitude, geocoded_at — and nothing else. The fields
+ * marked optional below (`name`, `healthSystem`, `facilityType`,
+ * `providerCount`) are NOT populated by the current API. They were
+ * present in an earlier schema design that included facility metadata
+ * on `practice_locations`. Components that render these fields must
+ * guard with `&&` / optional chaining; rendering them unconditionally
+ * produces "undefined" on the page.
  */
 export interface Location {
   id: number;
@@ -132,10 +143,10 @@ export interface Location {
   city: string;
   state: string;
   zipCode: string;
-  name: string | null;
-  healthSystem: string | null;
-  facilityType: string | null;
-  providerCount: number;
+  name?: string | null;
+  healthSystem?: string | null;
+  facilityType?: string | null;
+  providerCount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -284,6 +295,10 @@ export interface ProviderDisplay {
   confidenceScore?: number | null;
   planAcceptances?: PlanAcceptancePreview[];
   locationCount?: number;
+  // F-16 / Near-Me: populated only by /providers/nearby results. Absent
+  // from the regular /providers/search response. Consumers check `!= null`
+  // before rendering a distance badge so a 0 (exact hit) still shows.
+  distanceMiles?: number;
 }
 
 /**
