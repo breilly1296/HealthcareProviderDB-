@@ -108,8 +108,13 @@ describe('providerService', () => {
       expect(whereStr.toLowerCase()).toContain('insensitive');
     });
 
-    // Test 4: Filters by specialty
-    it('filters by specialty across multiple fields', async () => {
+    // Test 4: Filters by specialty using exact match on specialtyCategory.
+    // Contract (C2 fix): the dropdown sends an enum value (CARDIOLOGY,
+    // PEDIATRICS, etc.) that must match specialty_category exactly. The
+    // older OR-of-three with substring matching was removed because it
+    // leaked cross-specialty results (a "Pediatric Cardiology" entry in
+    // primary_specialty would surface under a CARDIOLOGY query).
+    it('filters by specialty with exact match on specialtyCategory', async () => {
       (mockPrisma.provider.findMany as jest.Mock).mockResolvedValue([]);
       (mockPrisma.provider.count as jest.Mock).mockResolvedValue(0);
 
@@ -118,10 +123,13 @@ describe('providerService', () => {
       const callArgs = (mockPrisma.provider.findMany as jest.Mock).mock.calls[0][0];
       const whereStr = JSON.stringify(callArgs.where);
 
-      // Should create OR condition across specialty fields
-      expect(whereStr).toContain('Cardiology');
-      // Check it searches multiple specialty-related fields
-      expect(whereStr).toContain('primarySpecialty');
+      // Exact-match contract: equals + insensitive mode + only the category field.
+      expect(whereStr).toContain('"specialtyCategory"');
+      expect(whereStr).toContain('"equals":"Cardiology"');
+      expect(whereStr).toContain('"mode":"insensitive"');
+      // Confirm the leaky fields are no longer part of the filter.
+      expect(whereStr).not.toContain('primarySpecialty');
+      expect(whereStr).not.toContain('primaryTaxonomyCode');
     });
 
     // Test 5: Handles name search parsing "John Smith" into firstName/lastName
