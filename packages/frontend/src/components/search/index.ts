@@ -5,3 +5,4 @@ export { SearchMapView } from './SearchMapView';
 export { SearchViewLayout } from './SearchViewLayout';
 export { InsuranceCardBanner } from './InsuranceCardBanner';
 export { SearchControls } from './SearchControls';
+export { NearbyBanner } from './NearbyBanner';
