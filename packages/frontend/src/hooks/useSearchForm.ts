@@ -48,7 +48,7 @@ export function useSearchForm(options: UseSearchFormOptions = {}): UseSearchForm
 
   const mergedDefaultFilters: SearchFilters = { ...DEFAULT_FILTERS, ...userDefaultFilters };
 
-  const { getInitialFilters, updateUrl } = useSearchUrlParams({
+  const { getInitialFilters, updateUrl, currentPage } = useSearchUrlParams({
     syncWithUrl,
     defaultFilters: mergedDefaultFilters,
   });
@@ -64,6 +64,7 @@ export function useSearchForm(options: UseSearchFormOptions = {}): UseSearchForm
     autoSearch,
     autoSearchDebounce,
     canSearch: filterState.canSearch,
+    currentPage,
   });
 
   const clearFilters = () => {

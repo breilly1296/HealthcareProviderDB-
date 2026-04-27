@@ -48,6 +48,17 @@ export function parseUrlToFilters(searchParams: URLSearchParams): Partial<Search
 }
 
 /**
+ * Parse URL `?page=N` param. Returns 1 for missing/invalid values so the
+ * caller never has to special-case them.
+ */
+export function parsePageFromUrl(searchParams: URLSearchParams): number {
+  const raw = searchParams.get('page');
+  if (!raw) return 1;
+  const n = parseInt(raw, 10);
+  return Number.isFinite(n) && n >= 1 ? n : 1;
+}
+
+/**
  * Convert SearchFilters to URLSearchParams
  */
 export function filtersToSearchParams(
@@ -105,6 +116,8 @@ export interface UseSearchParamsResult {
   getInitialFilters: () => Partial<SearchFilters>;
   /** Update URL with new filters */
   updateUrl: (filters: SearchFilters) => void;
+  /** Current page from URL `?page=N` (defaults to 1). Reactive. */
+  currentPage: number;
 }
 
 export function useSearchUrlParams(options: UseSearchParamsOptions): UseSearchParamsResult {
@@ -133,8 +146,14 @@ export function useSearchUrlParams(options: UseSearchParamsOptions): UseSearchPa
     [syncWithUrl, pathname, router, defaultFilters]
   );
 
+  // Reactive: re-derives when URL search params change (e.g. pagination
+  // link click flips ?page=2 → ?page=3). Consumers using this in deps
+  // will re-fire effects on navigation.
+  const currentPage = syncWithUrl ? parsePageFromUrl(searchParams) : 1;
+
   return {
     getInitialFilters,
     updateUrl,
+    currentPage,
   };
 }

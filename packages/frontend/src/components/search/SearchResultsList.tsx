@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { ProviderCard } from '@/components/ProviderCard';
@@ -112,8 +112,25 @@ export function SearchResultsList({
 
   const resultCount = pagination?.total || 0;
   const pageSize = pagination?.limit || 20;
+  const currentPage = pagination?.page || 1;
   const isBroadSearch =
     resultCount > 500 && !specialty && !cities && !name && !npi && !insurancePlanId;
+
+  // Range like "21-40 of 248,068" — the lower bound is what the user
+  // sees as the first result on this page. Upper bound is clamped to
+  // resultCount for the last (potentially partial) page.
+  const rangeStart = resultCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const rangeEnd = Math.min(currentPage * pageSize, resultCount);
+
+  // Scroll back to the top of the results when the page changes via
+  // pagination link, so the user lands on result #1 of the new page
+  // rather than wherever they were when they clicked the link. Smooth
+  // scroll respects user's prefers-reduced-motion.
+  useEffect(() => {
+    if (currentPage > 1) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [currentPage]);
 
   // Build params for pagination links (only known filter fields)
   const paginationParams = new URLSearchParams();
@@ -121,6 +138,9 @@ export function SearchResultsList({
   if (state) paginationParams.set('state', state);
   if (cities) paginationParams.set('cities', cities);
   if (healthSystem) paginationParams.set('healthSystem', healthSystem);
+  if (insurancePlanId) paginationParams.set('insurancePlanId', insurancePlanId);
+  if (name) paginationParams.set('name', name);
+  if (npi) paginationParams.set('npi', npi);
 
   return (
     <div aria-live="polite">
@@ -134,7 +154,11 @@ export function SearchResultsList({
         <p className="text-stone-600 dark:text-gray-300">
           {isBroadSearch ? (
             <>
-              Showing first {pageSize} of{' '}
+              Showing{' '}
+              <strong className="text-stone-800 dark:text-white">
+                {rangeStart.toLocaleString()}-{rangeEnd.toLocaleString()}
+              </strong>{' '}
+              of{' '}
               <strong className="text-stone-800 dark:text-white">
                 {resultCount.toLocaleString()}
               </strong>{' '}

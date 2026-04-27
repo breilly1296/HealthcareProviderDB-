@@ -20,6 +20,13 @@ export interface UseSearchExecutionOptions {
   /** Debounce delay for auto-search in ms. Default: 450ms (SEARCH_DEBOUNCE_MS) */
   autoSearchDebounce?: number;
   canSearch: boolean;
+  /**
+   * Page to fetch on next auto-search trigger. Reactive — changes (e.g.
+   * pagination link click that flips `?page=N`) re-fire the search at the
+   * new page. Defaults to 1. Filter changes via `searchImmediate` always
+   * reset to page 1 regardless of this value (new search semantics).
+   */
+  currentPage?: number;
 }
 
 export interface UseSearchExecutionResult {
@@ -78,6 +85,7 @@ export function useSearchExecution(options: UseSearchExecutionOptions): UseSearc
     autoSearch,
     autoSearchDebounce = SEARCH_DEBOUNCE_MS,
     canSearch,
+    currentPage = 1,
   } = options;
 
   // State
@@ -174,11 +182,19 @@ export function useSearchExecution(options: UseSearchExecutionOptions): UseSearc
   // Create debounced search function with configurable delay
   const debouncedSearchRef = useRef<DebouncedFunction<() => void> | null>(null);
 
+  // Track the most recent currentPage in a ref so the debounced function
+  // always reads the current value without needing to be re-created on
+  // every page change (which would cancel pending debounced calls).
+  const currentPageRefForDebounce = useRef(currentPage);
+  useEffect(() => {
+    currentPageRefForDebounce.current = currentPage;
+  }, [currentPage]);
+
   // Initialize/update debounced function when delay changes
   useEffect(() => {
     debouncedSearchRef.current = debounce(
       () => {
-        performSearch(1);
+        performSearch(currentPageRefForDebounce.current);
       },
       autoSearchDebounce,
       { leading: false, trailing: true }
@@ -233,9 +249,12 @@ export function useSearchExecution(options: UseSearchExecutionOptions): UseSearc
       return;
     }
 
-    // Trigger debounced search when filters change
+    // Trigger debounced search when filters change OR when the URL page
+    // param flips (pagination link click). Both routes use the same
+    // debounced path; the ref above ensures the debounced function picks
+    // up the latest currentPage when it fires.
     search();
-  }, [filters, autoSearch, canSearch, search]);
+  }, [filters, autoSearch, canSearch, search, currentPage]);
 
   // ============================================================================
   // Cleanup on Unmount
