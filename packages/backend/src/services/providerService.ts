@@ -238,14 +238,13 @@ export async function searchProviders(params: ProviderSearchParams): Promise<Pro
     });
   }
 
-  // Specialty filter - searches primarySpecialty, primaryTaxonomyCode, and specialtyCategory
+  // specialtyCategory is an enum-like value (CARDIOLOGY, PEDIATRICS, etc.)
+  // sent by the frontend dropdown. Exact match only — substring matching
+  // leaks cross-specialty results (e.g. searching CARDIOLOGY would match
+  // a "Pediatric Cardiology" entry in primarySpecialty).
   if (specialty) {
     addAndCondition(where, {
-      OR: [
-        { primarySpecialty: { contains: specialty, mode: 'insensitive' } },
-        { primaryTaxonomyCode: { contains: specialty, mode: 'insensitive' } },
-        { specialtyCategory: { contains: specialty, mode: 'insensitive' } },
-      ]
+      specialtyCategory: { equals: specialty, mode: 'insensitive' }
     });
   }
 
@@ -548,9 +547,12 @@ export async function findNearbyProviders(params: NearbyParams): Promise<NearbyR
   // Optional WHERE fragments. Each Prisma.sql`...` still parameterizes any
   // interpolated value — only the SQL template around it is literal.
   const filters: Prisma.Sql[] = [];
+  // specialtyCategory is an enum-like value (CARDIOLOGY, PEDIATRICS, etc.)
+  // sent by the frontend dropdown. Exact match only — substring matching
+  // leaks cross-specialty results (e.g. searching CARDIOLOGY would match
+  // a "Pediatric Cardiology" entry in primary_specialty).
   if (specialty) {
-    const like = `%${specialty}%`;
-    filters.push(Prisma.sql`AND (p.primary_specialty ILIKE ${like} OR p.specialty_category ILIKE ${like} OR p.primary_taxonomy_code ILIKE ${like})`);
+    filters.push(Prisma.sql`AND p.specialty_category ILIKE ${specialty}`);
   }
   if (specialtyCategory) {
     filters.push(Prisma.sql`AND p.specialty_category ILIKE ${`%${specialtyCategory}%`}`);
