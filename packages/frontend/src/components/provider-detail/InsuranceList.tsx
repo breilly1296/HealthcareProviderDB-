@@ -96,10 +96,22 @@ interface CarrierGroup {
 // ============================================================================
 
 function DataFreshnessBadge({ dateString }: { dateString: string | null | undefined }) {
+  // M7 (F-09): previously the freshness signal was color-only (green/yellow
+  // /red dot) + an HTML `title` attribute — neither is reliably exposed to
+  // screen readers (title is opt-in, dots carry no color semantics on their
+  // own). Now each branch emits an aria-label with the actual freshness
+  // label ("Verified recently" / "<N> days ago") AND an sr-only text copy,
+  // so both AT users and hover users get the full info.
   if (!dateString) {
     return (
-      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium text-stone-400 dark:text-gray-500 bg-stone-100 dark:bg-gray-700/50 rounded" title="Never verified">
-        <span className="w-1.5 h-1.5 rounded-full bg-stone-300 dark:bg-gray-600" />
+      <span
+        role="img"
+        aria-label="Never verified"
+        className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium text-stone-400 dark:text-gray-500 bg-stone-100 dark:bg-gray-700/50 rounded"
+        title="Never verified"
+      >
+        <span className="w-1.5 h-1.5 rounded-full bg-stone-300 dark:bg-gray-600" aria-hidden="true" />
+        <span className="sr-only">Never verified</span>
       </span>
     );
   }
@@ -109,24 +121,33 @@ function DataFreshnessBadge({ dateString }: { dateString: string | null | undefi
 
   let color: string;
   let dotColor: string;
+  let freshnessLabel: string;
 
   if (diffDays < 30) {
     color = 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20';
     dotColor = 'bg-green-500';
+    freshnessLabel = `Recently verified (${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago)`;
   } else if (diffDays < 90) {
     color = 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20';
     dotColor = 'bg-yellow-500';
+    freshnessLabel = `Verified ${diffDays} days ago`;
   } else {
     color = 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20';
     dotColor = 'bg-red-500';
+    freshnessLabel = `Stale — last verified ${diffDays} days ago`;
   }
+
+  const tooltip = `Last verified: ${date.toLocaleDateString()}`;
 
   return (
     <span
+      role="img"
+      aria-label={`${freshnessLabel}. ${tooltip}`}
       className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium ${color} rounded`}
-      title={`Last verified: ${date.toLocaleDateString()}`}
+      title={tooltip}
     >
-      <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
+      <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} aria-hidden="true" />
+      <span className="sr-only">{freshnessLabel}</span>
     </span>
   );
 }
@@ -337,6 +358,10 @@ function VerificationModal({ isOpen, onClose, plan, npi, providerName, onVerifie
                 key={value}
                 onClick={() => setVerificationDate(verificationDate === value ? null : value)}
                 disabled={isLoading}
+                /* M8 (F-09): chip acts as a toggle — aria-pressed communicates
+                   the selection state to SR users. Selected color alone
+                   isn't exposed to AT. */
+                aria-pressed={verificationDate === value}
                 className={`px-3 py-1 text-xs rounded-full border transition-all disabled:opacity-50 ${
                   verificationDate === value
                     ? 'bg-blue-600 text-white border-blue-600'
@@ -439,7 +464,7 @@ function PlanRow({ plan, onVerify, showConfidence, isLast, indented = false, sho
             className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] text-stone-400 dark:text-gray-500 bg-stone-50 dark:bg-gray-700/50 rounded"
             title={`${plan.location.city}, ${plan.location.state}`}
           >
-            <MapPin className="w-2.5 h-2.5" />
+            <MapPin className="w-2.5 h-2.5" aria-hidden="true" />
             {plan.location.city}
           </span>
         )}
@@ -449,7 +474,7 @@ function PlanRow({ plan, onVerify, showConfidence, isLast, indented = false, sho
         <DataFreshnessBadge dateString={plan.lastVerifiedAt} />
         {recentlyVerified ? (
           <span className="flex items-center gap-1 px-2.5 py-0.5 text-xs font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded">
-            <CheckCircle className="w-3 h-3" />
+            <CheckCircle className="w-3 h-3" aria-hidden="true" />
             Verified
           </span>
         ) : (
@@ -512,9 +537,9 @@ function CarrierGroupSection({ group, isExpanded, onToggle, onVerify, showConfid
       >
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {shouldExpand ? (
-            <ChevronDown className="w-4 h-4 text-stone-400 flex-shrink-0" />
+            <ChevronDown className="w-4 h-4 text-stone-400 flex-shrink-0" aria-hidden="true" />
           ) : (
-            <ChevronRight className="w-4 h-4 text-stone-400 flex-shrink-0" />
+            <ChevronRight className="w-4 h-4 text-stone-400 flex-shrink-0" aria-hidden="true" />
           )}
           <span className="font-medium text-stone-800 dark:text-white truncate">{group.displayName}</span>
           <span className="text-sm text-stone-500 dark:text-gray-400 flex-shrink-0">
@@ -601,10 +626,6 @@ export function InsuranceList({
   const [otherPlansExpanded, setOtherPlansExpanded] = useState(false);
   const [recentlyVerifiedPlans, setRecentlyVerifiedPlans] = useState<Set<string>>(new Set());
   const [selectedLocationId, setSelectedLocationId] = useState<number | 'all'>('all');
-
-  const acceptedCount = plans.filter(p => p.status === 'accepted').length;
-  const notAcceptedCount = plans.filter(p => p.status === 'not_accepted').length;
-  const pendingCount = plans.filter(p => p.status === 'pending').length;
 
   // Check if we have location-specific plan data
   const hasLocationSpecificPlans = useMemo(() => {
@@ -713,12 +734,25 @@ export function InsuranceList({
   const hasSearch = searchQuery.trim().length > 0;
   const totalGroupedPlans = groups.reduce((sum, g) => sum + g.plans.length, 0) + singlePlans.length;
 
-  // Status summary line
-  const statusParts: string[] = [];
-  if (acceptedCount > 0) statusParts.push(`${acceptedCount} accepted`);
-  if (notAcceptedCount > 0) statusParts.push(`${notAcceptedCount} not accepted`);
-  if (pendingCount > 0) statusParts.push(`${pendingCount} pending`);
-  const statusSummary = statusParts.join(', ') || `${plans.length} plans`;
+  // Status summary line — always leads with the total count of displayed
+  // plans (matches what the user sees rendered below). Status breakdown
+  // is appended only when one of the tracked statuses is non-zero;
+  // `unknown` plans aren't called out explicitly because the bare total
+  // already covers them. Using filteredPlans keeps the summary in sync
+  // with the search/location filter.
+  const filteredAccepted = filteredPlans.filter(p => p.status === 'accepted').length;
+  const filteredNotAccepted = filteredPlans.filter(p => p.status === 'not_accepted').length;
+  const filteredPending = filteredPlans.filter(p => p.status === 'pending').length;
+  const filteredTotal = filteredPlans.length;
+  const breakdownParts: string[] = [];
+  if (filteredAccepted > 0) breakdownParts.push(`${filteredAccepted} accepted`);
+  if (filteredNotAccepted > 0) breakdownParts.push(`${filteredNotAccepted} not accepted`);
+  if (filteredPending > 0) breakdownParts.push(`${filteredPending} pending`);
+  const planLabel = filteredTotal === 1 ? 'plan' : 'plans';
+  const statusSummary =
+    breakdownParts.length > 0
+      ? `${filteredTotal} ${planLabel} (${breakdownParts.join(', ')})`
+      : `${filteredTotal} ${planLabel}`;
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-stone-200 dark:border-gray-700 p-4 sm:p-6">
@@ -800,9 +834,9 @@ export function InsuranceList({
                     >
                       <div className="flex items-center gap-2 min-w-0 flex-1">
                         {otherPlansExpanded || hasSearch ? (
-                          <ChevronDown className="w-4 h-4 text-stone-400 flex-shrink-0" />
+                          <ChevronDown className="w-4 h-4 text-stone-400 flex-shrink-0" aria-hidden="true" />
                         ) : (
-                          <ChevronRight className="w-4 h-4 text-stone-400 flex-shrink-0" />
+                          <ChevronRight className="w-4 h-4 text-stone-400 flex-shrink-0" aria-hidden="true" />
                         )}
                         <span className="text-sm font-medium text-stone-500 dark:text-gray-400">
                           Other Plans ({singlePlans.length})
@@ -858,14 +892,23 @@ export function InsuranceList({
       {/* Verification CTA */}
       <div className="mt-6 pt-4 border-t border-stone-100 dark:border-gray-700">
         <p className="text-sm text-stone-600 dark:text-gray-400 text-center mb-3">
-          {formatLastVerified(lastVerifiedAt)}
+          {/* When no user has verified yet but plans still have confidence
+              percentages from registry/recency signals, "No verifications
+              yet" reads as a contradiction next to those percentages.
+              Disambiguate: call out the data source so the percentages
+              aren't mistaken for crowd verification rates. */}
+          {lastVerifiedAt
+            ? formatLastVerified(lastVerifiedAt)
+            : verificationCount === 0 && plans.length > 0
+              ? 'Confidence shown is based on registry data — not yet community-verified'
+              : 'No verifications yet'}
         </p>
 
         <button
           onClick={handleOpenGeneralVerify}
           className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-400 hover:to-cyan-400 text-white font-medium rounded-lg shadow-lg shadow-blue-500/25 transition-all hover:scale-[1.02]"
         >
-          <MessageSquarePlus className="w-5 h-5" />
+          <MessageSquarePlus className="w-5 h-5" aria-hidden="true" />
           Verify Insurance Acceptance
         </button>
 
