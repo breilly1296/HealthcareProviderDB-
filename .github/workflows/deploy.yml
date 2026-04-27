@@ -338,20 +338,22 @@ jobs:
       #   2. Add the resulting URL as a repo secret named SLACK_WEBHOOK_URL
       #      (Settings → Secrets and variables → Actions → New repository secret).
       - name: Notify Slack on failure
-        if: failure() && secrets.SLACK_WEBHOOK_URL != ''
+        # GitHub Actions doesn't allow `secrets` context inside `if:`
+        # expressions, so the secret-presence check has to live at runtime
+        # (env-injection + bash). When SLACK_WEBHOOK_URL is unset the step
+        # logs a `::warning::` and exits cleanly — failures aren't silent
+        # while the integration is being wired.
+        if: failure()
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           ENVIRONMENT: production
         run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "::warning::Deployment failed. Configure the SLACK_WEBHOOK_URL repo secret to receive Slack notifications."
+            exit 0
+          fi
           SHORT_SHA="${GITHUB_SHA:0:7}"
           RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           curl -sS -X POST -H 'Content-Type: application/json' \
             --data "{\"text\":\"🚨 Deploy failed for ${GITHUB_REPOSITORY} on ${GITHUB_REF_NAME} (${SHORT_SHA})\\nWorkflow: ${GITHUB_WORKFLOW}\\n<${RUN_URL}|View run>\"}" \
             "$SLACK_WEBHOOK_URL"
-
-      # When SLACK_WEBHOOK_URL is unset, log a soft warning so failures
-      # aren't completely invisible while the integration is being wired.
-      - name: Warn that Slack notifications are not configured
-        if: failure() && secrets.SLACK_WEBHOOK_URL == ''
-        run: |
-          echo "::warning::Deployment failed. Configure the SLACK_WEBHOOK_URL repo secret to receive Slack notifications."
