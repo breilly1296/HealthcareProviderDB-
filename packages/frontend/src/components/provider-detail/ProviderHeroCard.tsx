@@ -5,6 +5,7 @@ import { MapPin, Phone, BadgeCheck, Navigation, Share2, Printer, Check } from 'l
 import { BookmarkButton } from '@/components/BookmarkButton';
 import { ConfidenceGauge } from './ConfidenceGauge';
 import { toDisplayCase, toAddressCase, toTitleCase } from '@/lib/formatName';
+import { getSpecialtyDisplay } from '@/lib/provider-utils';
 
 interface Provider {
   npi: string;
@@ -146,7 +147,11 @@ function getConfidenceHighlights(
 
 export function ProviderHeroCard({ provider, confidenceScore, verificationCount = 0, nppesLastSynced, confidenceBreakdown }: ProviderHeroCardProps) {
   const initials = getInitials(provider.displayName);
-  const specialty = provider.specialty || provider.specialtyCategory || provider.taxonomyDescription || 'Healthcare Provider';
+  // specialtyCategory is the user-facing specialty grouping (CARDIOLOGY → "Cardiology").
+  // taxonomyDescription is the NPPES taxonomy label which can differ
+  // (e.g. subspecialties — "Nuclear Medicine" for a CARDIOLOGY provider).
+  // Use specialtyCategory for consistency across body + SEO.
+  const specialty = getSpecialtyDisplay(provider.specialtyCategory, provider.taxonomyDescription);
   const isVerified = confidenceScore >= 70;
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState(false);

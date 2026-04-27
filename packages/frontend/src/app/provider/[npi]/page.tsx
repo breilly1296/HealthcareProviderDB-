@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import ProviderDetailClient from '@/components/provider-detail/ProviderDetailClient';
 import type { ProviderWithPlans } from '@/components/provider-detail/ProviderDetailClient';
 import { safeJsonLd } from '@/lib/jsonLd';
+import { getSpecialtyDisplay } from '@/lib/provider-utils';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://verifymyprovider.com';
@@ -40,7 +41,11 @@ export async function generateMetadata({
   }
 
   const name = getProviderName(provider);
-  const specialty = provider.taxonomyDescription || provider.specialtyCategory || 'Healthcare Provider';
+  // specialtyCategory is the user-facing specialty grouping (CARDIOLOGY → "Cardiology").
+  // taxonomyDescription is the NPPES taxonomy label which can differ
+  // (e.g. subspecialties — "Nuclear Medicine" for a CARDIOLOGY provider).
+  // Use specialtyCategory for consistency across body + SEO.
+  const specialty = getSpecialtyDisplay(provider.specialtyCategory, provider.taxonomyDescription);
   const city = provider.city || '';
   const state = provider.state || '';
   const location = [city, state].filter(Boolean).join(', ');
@@ -68,7 +73,14 @@ export default async function ProviderDetailPage({
   const provider = await getProvider(npi);
 
   const name = provider ? getProviderName(provider) : null;
-  const specialty = provider?.taxonomyDescription || provider?.specialtyCategory || null;
+  // Same source-of-truth as generateMetadata — see comment above.
+  // Skip emitting medicalSpecialty in JSON-LD when both source fields are
+  // missing (avoids a meaningless "Healthcare Provider" sentinel in the
+  // structured data).
+  const specialty =
+    provider && (provider.specialtyCategory || provider.taxonomyDescription)
+      ? getSpecialtyDisplay(provider.specialtyCategory, provider.taxonomyDescription)
+      : null;
   const firstLocation = provider?.locations?.[0];
 
   // Accepted insurance plans → schema.org `availableService`. Filters:
