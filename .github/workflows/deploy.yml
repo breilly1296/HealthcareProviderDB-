@@ -237,10 +237,6 @@ jobs:
             --min-instances=0
             --max-instances=10
             --concurrency=80
-            --startup-probe-http-path=/
-            --startup-probe-initial-delay=5s
-            --startup-probe-period=10s
-            --startup-probe-failure-threshold=3
           env_vars: |
             NODE_ENV=production
           secrets: |
