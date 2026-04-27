@@ -13,13 +13,13 @@ export default function TermsOfServicePage() {
   return (
     <div>
       {/* Header */}
-      <section className="bg-gradient-to-b from-primary-50 to-white py-12 md:py-16">
+      <section className="bg-gradient-to-b from-primary-50 to-white dark:from-primary-900/20 dark:to-gray-900 py-12 md:py-16">
         <div className="container-wide">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
             Terms of Service
           </h1>
-          <p className="text-lg text-gray-600">
-            Last updated: January 2025
+          <p className="text-lg text-gray-600 dark:text-gray-300">
+            Last updated: April 2026
           </p>
         </div>
       </section>
@@ -31,10 +31,10 @@ export default function TermsOfServicePage() {
 
             {/* Introduction */}
             <div className="card mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
                 Welcome to VerifyMyProvider
               </h2>
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-300">
                 VerifyMyProvider ("we," "our," or "us") provides a healthcare provider directory
                 service that combines public data with crowdsourced verifications. By using our
                 website and services, you agree to these Terms of Service.
@@ -43,14 +43,14 @@ export default function TermsOfServicePage() {
 
             {/* Service Description */}
             <div className="card mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
                 1. Our Service
               </h2>
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
                 VerifyMyProvider is a directory that helps users find healthcare providers and
                 verify insurance acceptance information. Our data comes from:
               </p>
-              <ul className="list-disc pl-6 text-gray-600 space-y-2">
+              <ul className="list-disc pl-6 text-gray-600 dark:text-gray-300 space-y-2">
                 <li>
                   <strong>Public NPI data</strong> from the Centers for Medicare & Medicaid
                   Services (CMS) National Plan and Provider Enumeration System (NPPES)
@@ -64,15 +64,15 @@ export default function TermsOfServicePage() {
 
             {/* Data Accuracy Disclaimer */}
             <div className="card mb-8 border-l-4 border-l-yellow-500">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
                 2. Data Accuracy Disclaimer
               </h2>
-              <p className="text-gray-600 mb-4">
-                <strong className="text-gray-900">Important:</strong> While we strive to provide
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
+                <strong className="text-gray-900 dark:text-white">Important:</strong> While we strive to provide
                 accurate information, provider details and insurance acceptance can change frequently.
                 Our data is crowdsourced and may not always be current.
               </p>
-              <p className="text-gray-600 font-medium">
+              <p className="text-gray-600 dark:text-gray-300 font-medium">
                 Always verify insurance acceptance directly with the provider's office before
                 scheduling an appointment.
               </p>
@@ -80,18 +80,18 @@ export default function TermsOfServicePage() {
 
             {/* No Medical Advice */}
             <div className="card mb-8 border-l-4 border-l-red-500">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
                 3. No Medical Advice
               </h2>
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
                 VerifyMyProvider is a directory service only. We do not provide:
               </p>
-              <ul className="list-disc pl-6 text-gray-600 space-y-2 mb-4">
+              <ul className="list-disc pl-6 text-gray-600 dark:text-gray-300 space-y-2 mb-4">
                 <li>Medical advice, diagnosis, or treatment recommendations</li>
                 <li>Endorsements of any healthcare provider</li>
                 <li>Guarantees about provider quality or availability</li>
               </ul>
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-300">
                 Always consult with qualified healthcare professionals for medical decisions.
               </p>
             </div>
@@ -152,17 +152,17 @@ export default function TermsOfServicePage() {
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
                 6. Limitation of Liability
               </h2>
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
                 VerifyMyProvider is provided "as is" without warranties of any kind. We are not
                 liable for:
               </p>
-              <ul className="list-disc pl-6 text-gray-600 space-y-2 mb-4">
+              <ul className="list-disc pl-6 text-gray-600 dark:text-gray-300 space-y-2 mb-4">
                 <li>Inaccurate, incomplete, or outdated provider information</li>
                 <li>Decisions you make based on information from our service</li>
                 <li>Financial losses, including surprise medical bills</li>
                 <li>Any damages arising from use of our service</li>
               </ul>
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-300">
                 Your use of VerifyMyProvider is at your own risk.
               </p>
             </div>
@@ -172,10 +172,10 @@ export default function TermsOfServicePage() {
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
                 7. Content Moderation
               </h2>
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
                 We reserve the right to:
               </p>
-              <ul className="list-disc pl-6 text-gray-600 space-y-2">
+              <ul className="list-disc pl-6 text-gray-600 dark:text-gray-300 space-y-2">
                 <li>Remove or modify any user-submitted content at our discretion</li>
                 <li>Block users who violate our terms or submit spam/abusive content</li>
                 <li>Implement rate limits to prevent abuse of our service</li>
@@ -188,12 +188,12 @@ export default function TermsOfServicePage() {
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
                 8. Data Sources & Attribution
               </h2>
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
                 Provider information is sourced from the CMS National Plan and Provider Enumeration
                 System (NPPES), a public database maintained by the U.S. government. This data is
                 supplemented by crowdsourced verifications from our users.
               </p>
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-300">
                 CMS NPPES data is public domain. User-submitted verifications remain the property
                 of VerifyMyProvider.
               </p>
@@ -204,7 +204,7 @@ export default function TermsOfServicePage() {
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
                 9. Changes to These Terms
               </h2>
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-300">
                 We may update these Terms of Service from time to time. Continued use of our
                 service after changes constitutes acceptance of the new terms. We encourage you
                 to review this page periodically.
@@ -216,7 +216,7 @@ export default function TermsOfServicePage() {
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
                 10. Governing Law
               </h2>
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-300">
                 These Terms of Service and any disputes arising from your use of VerifyMyProvider
                 shall be governed by and construed in accordance with the laws of the State of
                 Delaware, without regard to its conflict of law provisions. You agree to submit
@@ -230,10 +230,10 @@ export default function TermsOfServicePage() {
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
                 11. Contact Us
               </h2>
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
                 If you have questions about these Terms of Service, please contact us:
               </p>
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-300">
                 Email: <a href="mailto:legal@verifymyprovider.com" className="text-primary-600 hover:text-primary-700">legal@verifymyprovider.com</a>
               </p>
             </div>

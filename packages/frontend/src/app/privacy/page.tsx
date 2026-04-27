@@ -13,12 +13,12 @@ export default function PrivacyPolicyPage() {
   return (
     <div>
       {/* Header */}
-      <section className="bg-gradient-to-b from-primary-50 to-white py-12 md:py-16">
+      <section className="bg-gradient-to-b from-primary-50 to-white dark:from-primary-900/20 dark:to-gray-900 py-12 md:py-16">
         <div className="container-wide">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
             Privacy Policy
           </h1>
-          <p className="text-lg text-gray-600">
+          <p className="text-lg text-gray-600 dark:text-gray-300">
             Last updated: February 2026
           </p>
         </div>
@@ -31,15 +31,15 @@ export default function PrivacyPolicyPage() {
 
             {/* Introduction */}
             <div className="card mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
                 Your Privacy Matters
               </h2>
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
                 VerifyMyProvider ("we," "our," or "us") is committed to protecting your privacy.
                 This policy explains what information we collect, how we use it, and your rights
                 regarding your data.
               </p>
-              <p className="text-gray-600 font-medium">
+              <p className="text-gray-600 dark:text-gray-300 font-medium">
                 Key point: We do not collect personal health information. Our service uses public
                 data and anonymous verifications.
               </p>
@@ -47,14 +47,14 @@ export default function PrivacyPolicyPage() {
 
             {/* What We Collect */}
             <div className="card mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
                 1. Information We Collect
               </h2>
 
-              <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mt-6 mb-3">
                 Information you provide:
               </h3>
-              <ul className="list-disc pl-6 text-gray-600 space-y-2 mb-6">
+              <ul className="list-disc pl-6 text-gray-600 dark:text-gray-300 space-y-2 mb-6">
                 <li>
                   <strong>Verification submissions:</strong> When you verify a provider's insurance
                   acceptance, we collect the verification details (provider, insurance plan, acceptance status)
@@ -68,10 +68,10 @@ export default function PrivacyPolicyPage() {
                 </li>
               </ul>
 
-              <h3 className="text-lg font-medium text-gray-900 mb-3">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-3">
                 Information collected automatically:
               </h3>
-              <ul className="list-disc pl-6 text-gray-600 space-y-2">
+              <ul className="list-disc pl-6 text-gray-600 dark:text-gray-300 space-y-2">
                 <li>
                   <strong>IP address:</strong> Used by our server for rate limiting, spam prevention,
                   and security only. Not sent to analytics.
@@ -176,10 +176,10 @@ export default function PrivacyPolicyPage() {
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
                 4. How We Use Your Information
               </h2>
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
                 We use the information we collect to:
               </p>
-              <ul className="list-disc pl-6 text-gray-600 space-y-2">
+              <ul className="list-disc pl-6 text-gray-600 dark:text-gray-300 space-y-2">
                 <li>Display and improve provider directory information</li>
                 <li>Calculate confidence scores for provider-insurance matches</li>
                 <li>Prevent spam, abuse, and fraudulent verifications</li>
@@ -365,15 +365,15 @@ export default function PrivacyPolicyPage() {
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
                 8. Data Retention
               </h2>
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
                 Verification data is retained indefinitely to maintain the accuracy and history of
                 our crowdsourced database. However, we reserve the right to archive or remove stale,
                 redundant, or low-quality data to maintain database integrity.
               </p>
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
                 We retain data as follows:
               </p>
-              <ul className="list-disc pl-6 text-gray-600 space-y-2 mb-4">
+              <ul className="list-disc pl-6 text-gray-600 dark:text-gray-300 space-y-2 mb-4">
                 <li>
                   <strong>Verifications:</strong> Kept indefinitely to maintain directory accuracy
                   and calculate confidence scores
@@ -434,7 +434,7 @@ export default function PrivacyPolicyPage() {
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
                 10. Security
               </h2>
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-300">
                 We implement reasonable security measures to protect your information, including
                 HTTPS encryption, rate limiting, and secure cloud hosting. However, no method of
                 transmission over the Internet is 100% secure.
@@ -446,7 +446,7 @@ export default function PrivacyPolicyPage() {
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
                 11. Children&apos;s Privacy
               </h2>
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-300">
                 Our service is not directed to children under 13. We do not knowingly collect
                 information from children. If you believe a child has provided us with personal
                 information, please contact us.
@@ -458,7 +458,7 @@ export default function PrivacyPolicyPage() {
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
                 12. Changes to This Policy
               </h2>
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-300">
                 We may update this Privacy Policy from time to time. We'll post the updated policy
                 on this page with a new "Last updated" date. Continued use of our service after
                 changes constitutes acceptance of the updated policy.
@@ -470,7 +470,7 @@ export default function PrivacyPolicyPage() {
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
                 13. Contact Us
               </h2>
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
                 For privacy-related questions or to exercise your rights, contact us:
               </p>
               <p className="text-gray-600 dark:text-gray-300">
