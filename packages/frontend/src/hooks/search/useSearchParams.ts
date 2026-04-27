@@ -14,8 +14,18 @@ import type { SearchFilters } from '../../types';
 export function parseUrlToFilters(searchParams: URLSearchParams): Partial<SearchFilters> {
   const filters: Partial<SearchFilters> = {};
 
+  // Enum-shaped params get normalized to uppercase at the boundary so the
+  // SearchableSelect comparisons (and downstream API calls) never have to
+  // think about case. The dropdown options use uppercase values
+  // (CARDIOLOGY, PEDIATRICS in SPECIALTY_OPTIONS; NY, NJ in STATE_OPTIONS),
+  // and a shared URL like /search?specialty=cardiology would otherwise
+  // match no option and render as "All Specialties" even though the
+  // backend filter (case-insensitive equality on specialty_category)
+  // still works. entityType has the same enum shape (INDIVIDUAL /
+  // ORGANIZATION) and gets the same treatment.
+
   const state = searchParams.get('state');
-  if (state) filters.state = state;
+  if (state) filters.state = state.toUpperCase();
 
   const city = searchParams.get('city');
   if (city) filters.city = city;
@@ -24,7 +34,7 @@ export function parseUrlToFilters(searchParams: URLSearchParams): Partial<Search
   if (cities) filters.cities = cities.split(',').filter(Boolean);
 
   const specialty = searchParams.get('specialty');
-  if (specialty) filters.specialty = specialty;
+  if (specialty) filters.specialty = specialty.toUpperCase();
 
   const name = searchParams.get('name');
   if (name) filters.name = name;
@@ -33,7 +43,7 @@ export function parseUrlToFilters(searchParams: URLSearchParams): Partial<Search
   if (npi) filters.npi = npi;
 
   const entityType = searchParams.get('entityType');
-  if (entityType) filters.entityType = entityType;
+  if (entityType) filters.entityType = entityType.toUpperCase();
 
   const insurancePlanId = searchParams.get('insurancePlanId');
   if (insurancePlanId) filters.insurancePlanId = insurancePlanId;
