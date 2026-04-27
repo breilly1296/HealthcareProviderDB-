@@ -148,13 +148,6 @@ jobs:
             --max-instances=10
             --concurrency=80
             --add-cloudsql-instances=verifymyprovider-prod:us-central1:verifymyprovider-db
-            --startup-probe-http-path=/health
-            --startup-probe-initial-delay=5s
-            --startup-probe-period=10s
-            --startup-probe-failure-threshold=3
-            --liveness-probe-http-path=/health
-            --liveness-probe-period=30s
-            --liveness-probe-failure-threshold=3
           env_vars: |
             NODE_ENV=production
             FRONTEND_URL=${{ secrets.FRONTEND_URL }}
