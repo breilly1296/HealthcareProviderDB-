@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useCompare } from '@/hooks/useCompare';
 import { CompareModal } from './CompareModal';
 
@@ -25,20 +25,58 @@ function ProviderInitial({ name, className = '' }: { name: string; className?: s
 export function CompareBar() {
   const { selectedProviders, clearAll } = useCompare();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [announcement, setAnnouncement] = useState('');
+  // Track the previous list so we can compute the per-render diff and emit a
+  // single "Added X" / "Removed Y" message for screen readers. Initialized
+  // with the current list so the initial render produces no announcement —
+  // the user didn't just add anything, the page just loaded.
+  const prevProvidersRef = useRef(selectedProviders);
 
   const count = selectedProviders.length;
   const canCompare = count >= 2;
 
-  if (count === 0) {
-    return null;
-  }
+  useEffect(() => {
+    const prev = prevProvidersRef.current;
+    const current = selectedProviders;
+
+    if (prev === current) return;
+
+    // Special-case clearAll: prev had several, current has none. A simple
+    // "removed X" message would mislead about the others that disappeared.
+    if (current.length === 0 && prev.length > 1) {
+      setAnnouncement('Comparison cleared.');
+    } else {
+      const added = current.find((p) => !prev.some((pp) => pp.npi === p.npi));
+      const removed = prev.find((p) => !current.some((pp) => pp.npi === p.npi));
+      const countText = `${current.length} provider${current.length !== 1 ? 's' : ''} selected.`;
+
+      if (added) {
+        setAnnouncement(`Added ${added.name} to comparison. ${countText}`);
+      } else if (removed) {
+        setAnnouncement(`Removed ${removed.name} from comparison. ${countText}`);
+      }
+    }
+
+    prevProvidersRef.current = current;
+  }, [selectedProviders]);
 
   return (
     <>
+      {/* Live region for add/remove announcements. Always mounted (not gated
+          on count > 0) so the message that fires when the user removes the
+          last provider still reaches AT before the bar unmounts. */}
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+        {announcement}
+      </div>
+
+      {count === 0 ? null : (
+        <>
       {/* Desktop: Floating card in bottom-right */}
       <div
+        role="region"
+        aria-label="Provider comparison tray"
         className="
-          hidden md:flex
+          hidden md:flex print:hidden
           fixed bottom-6 right-6 z-40
           items-center gap-4
           bg-white dark:bg-gray-800
@@ -96,8 +134,10 @@ export function CompareBar() {
 
       {/* Mobile: Full-width bar above BottomNav */}
       <div
+        role="region"
+        aria-label="Provider comparison tray"
         className="
-          md:hidden
+          md:hidden print:hidden
           fixed bottom-16 left-0 right-0 z-40
           bg-white dark:bg-gray-800
           border-t border-gray-200 dark:border-gray-700
@@ -156,6 +196,8 @@ export function CompareBar() {
 
       {/* Comparison Modal */}
       <CompareModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+        </>
+      )}
     </>
   );
 }

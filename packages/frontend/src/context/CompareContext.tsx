@@ -31,13 +31,22 @@ interface CompareContextType {
 
 const CompareContext = createContext<CompareContextType | undefined>(undefined);
 
+// localStorage for cross-session persistence — sessionStorage was the
+// original choice (cleared on tab close) but users expected their compare
+// selection to survive closing/reopening the tab. The defensive code below
+// (SyntaxError on corrupted JSON, DOMException for SecurityError /
+// QuotaExceededError, typeof-window SSR guard, mounted flag) was already
+// shaped for localStorage's stricter quota and origin-shared scope.
+//
+// Key is `verifymyprovider-` namespaced to avoid collisions with other
+// apps on the same origin in dev / staging.
 const STORAGE_KEY = 'verifymyprovider-compare';
 
 function getStoredProviders(): CompareProvider[] {
   if (typeof window === 'undefined') return [];
 
   try {
-    const stored = sessionStorage.getItem(STORAGE_KEY);
+    const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) return [];
 
     const parsed = JSON.parse(stored);
@@ -45,7 +54,7 @@ function getStoredProviders(): CompareProvider[] {
     // Validate the parsed data is an array
     if (!Array.isArray(parsed)) {
       logError('CompareContext.getStoredProviders', new Error('Stored data is not an array, resetting'));
-      sessionStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(STORAGE_KEY);
       return [];
     }
 
@@ -55,7 +64,7 @@ function getStoredProviders(): CompareProvider[] {
     if (error instanceof SyntaxError) {
       logError('CompareContext.getStoredProviders', error);
       try {
-        sessionStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(STORAGE_KEY);
       } catch (removeError) {
         logError('CompareContext.removeCorruptedStorage', removeError);
       }
@@ -73,7 +82,7 @@ function storeProviders(providers: CompareProvider[]): void {
   if (typeof window === 'undefined') return;
 
   try {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(providers));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(providers));
   } catch (error) {
     // P0 FIX: Log the error with context
     if (error instanceof DOMException) {
@@ -94,13 +103,13 @@ export function CompareProvider({ children }: { children: ReactNode }) {
   const [selectedProviders, setSelectedProviders] = useState<CompareProvider[]>([]);
   const [mounted, setMounted] = useState(false);
 
-  // Initialize from sessionStorage (SSR-safe)
+  // Initialize from localStorage (SSR-safe)
   useEffect(() => {
     setSelectedProviders(getStoredProviders());
     setMounted(true);
   }, []);
 
-  // Persist to sessionStorage whenever selection changes
+  // Persist to localStorage whenever selection changes
   useEffect(() => {
     if (mounted) {
       storeProviders(selectedProviders);

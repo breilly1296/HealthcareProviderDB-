@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import ProviderDetailClient from '@/components/provider-detail/ProviderDetailClient';
 import type { ProviderWithPlans } from '@/components/provider-detail/ProviderDetailClient';
+import { safeJsonLd } from '@/lib/jsonLd';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://verifymyprovider.com';
@@ -70,6 +71,17 @@ export default async function ProviderDetailPage({
   const specialty = provider?.taxonomyDescription || provider?.specialtyCategory || null;
   const firstLocation = provider?.locations?.[0];
 
+  // Accepted insurance plans → schema.org `availableService`. Filters:
+  //   - acceptanceStatus must be ACCEPTED (PENDING/UNKNOWN aren't real signals)
+  //   - plan.planName must be non-null (schema.org Service requires name;
+  //     emitting null would produce invalid JSON-LD that Google ignores)
+  // Capped at 50 entries — Google's structured-data parsers process the
+  // first few dozen and the JSON-LD payload weight isn't worth more.
+  const acceptedPlans =
+    provider?.planAcceptances?.filter(
+      (pa) => pa.acceptanceStatus === 'ACCEPTED' && pa.plan?.planName
+    ) ?? [];
+
   const jsonLd = provider
     ? {
         '@context': 'https://schema.org',
@@ -86,6 +98,26 @@ export default async function ProviderDetailPage({
           },
         }),
         ...(firstLocation?.phone && { telephone: firstLocation.phone }),
+        ...(acceptedPlans.length > 0 && {
+          availableService: acceptedPlans.slice(0, 50).map((pa) => ({
+            '@type': 'Service',
+            // Filter above guarantees plan + planName are present, so the
+            // non-null assertion is safe here.
+            name: pa.plan!.planName,
+            category: 'Health Insurance',
+            // schema.org `Service.provider` = the entity OFFERING the
+            // service — for an insurance plan that's the issuer/carrier
+            // (Aetna, UnitedHealthcare, etc.), NOT the doctor. Skipped
+            // when issuerName is null rather than emitting an Organization
+            // node with a null name.
+            ...(pa.plan?.issuerName && {
+              provider: {
+                '@type': 'Organization',
+                name: pa.plan.issuerName,
+              },
+            }),
+          })),
+        }),
       }
     : null;
 
@@ -94,7 +126,7 @@ export default async function ProviderDetailPage({
       {jsonLd && (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }}
         />
       )}
       <ProviderDetailClient npi={npi} initialProvider={provider} />

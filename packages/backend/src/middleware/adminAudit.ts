@@ -21,6 +21,21 @@ import logger from '../utils/logger';
  * X-Admin-Secret itself — are never written. Request bodies are not
  * persisted at all.
  */
+
+/**
+ * Allowlist of query parameters that may be persisted to the
+ * `admin_actions` audit table.
+ *
+ * - Only params in this list are stored; everything else (including
+ *   secrets, free-form filters, debug toggles) is silently dropped.
+ * - Defense-in-depth against accidentally auditing sensitive values that
+ *   show up in admin URLs over time.
+ * - If you add a new query param to any admin endpoint AND that param is
+ *   safe to persist for incident review, add it here too. Otherwise leave
+ *   it off and the audit row will simply omit it.
+ *
+ * Current list: dryRun, batchSize, retentionDays, limit.
+ */
 const SAFE_QUERY_PARAMS = ['dryRun', 'batchSize', 'retentionDays', 'limit'] as const;
 
 type AdminResponseBody = {

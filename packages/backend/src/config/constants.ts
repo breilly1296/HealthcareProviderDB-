@@ -48,23 +48,27 @@ export const MIN_CONFIDENCE_FOR_STATUS_CHANGE = 60;
 /**
  * Minimum reCAPTCHA v3 score to pass verification.
  * Scores range from 0.0 (likely bot) to 1.0 (likely human).
+ * Override via CAPTCHA_MIN_SCORE env var; defaults to 0.5.
  */
-export const CAPTCHA_MIN_SCORE = 0.5;
+export const CAPTCHA_MIN_SCORE = parseFloat(process.env.CAPTCHA_MIN_SCORE || '0.5');
 
 /**
  * Timeout for Google reCAPTCHA API calls.
+ * Override via CAPTCHA_API_TIMEOUT_MS env var (ms); defaults to 5000.
  */
-export const CAPTCHA_API_TIMEOUT_MS = 5 * MS_PER_SECOND;
+export const CAPTCHA_API_TIMEOUT_MS = parseInt(process.env.CAPTCHA_API_TIMEOUT_MS || '5000', 10);
 
 /**
  * Maximum requests allowed in fallback mode (when CAPTCHA API is unavailable).
+ * Override via CAPTCHA_FALLBACK_MAX_REQUESTS env var; defaults to 3.
  */
-export const CAPTCHA_FALLBACK_MAX_REQUESTS = 3;
+export const CAPTCHA_FALLBACK_MAX_REQUESTS = parseInt(process.env.CAPTCHA_FALLBACK_MAX_REQUESTS || '3', 10);
 
 /**
  * Time window for fallback rate limiting.
+ * Override via CAPTCHA_FALLBACK_WINDOW_MS env var (ms); defaults to 3600000 (1 hour).
  */
-export const CAPTCHA_FALLBACK_WINDOW_MS = MS_PER_HOUR;
+export const CAPTCHA_FALLBACK_WINDOW_MS = parseInt(process.env.CAPTCHA_FALLBACK_WINDOW_MS || '3600000', 10);
 
 // ============================================================================
 // Rate Limiting

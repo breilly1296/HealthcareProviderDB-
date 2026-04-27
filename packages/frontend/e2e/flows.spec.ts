@@ -144,12 +144,14 @@ test.describe('Search Flows', () => {
 test.describe('Provider Comparison', () => {
   test('compare bar appears when providers are seeded and modal opens', async ({ page }) => {
     // The CompareCheckbox is not yet rendered in provider cards, so we seed
-    // sessionStorage directly with two fake providers to test the CompareBar
+    // localStorage directly with two fake providers to test the CompareBar
     // and CompareModal.
     await page.goto('/search');
     await page.waitForLoadState('networkidle');
 
-    // Seed two providers into the compare context via sessionStorage
+    // Seed two providers into the compare context via localStorage
+    // (CompareContext switched from sessionStorage to localStorage for
+    // cross-tab persistence).
     const fakeProviders = [
       {
         npi: '1000000001',
@@ -176,7 +178,7 @@ test.describe('Provider Comparison', () => {
     ];
 
     await page.evaluate((providers) => {
-      sessionStorage.setItem('verifymyprovider-compare', JSON.stringify(providers));
+      localStorage.setItem('verifymyprovider-compare', JSON.stringify(providers));
     }, fakeProviders);
 
     // Reload so the context picks up seeded data

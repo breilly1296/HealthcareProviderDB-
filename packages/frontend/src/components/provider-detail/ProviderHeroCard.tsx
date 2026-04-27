@@ -149,6 +149,7 @@ export function ProviderHeroCard({ provider, confidenceScore, verificationCount 
   const specialty = provider.specialty || provider.specialtyCategory || provider.taxonomyDescription || 'Healthcare Provider';
   const isVerified = confidenceScore >= 70;
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState(false);
 
   // Build full address (title-cased from NPPES ALL-CAPS)
   const streetAddress = [toAddressCase(provider.addressLine1), toAddressCase(provider.addressLine2)].filter(Boolean).join(', ');
@@ -166,18 +167,32 @@ export function ProviderHeroCard({ provider, confidenceScore, verificationCount 
 
   const handleShare = useCallback(async () => {
     const url = window.location.href;
-    const title = `${toDisplayCase(provider.displayName)} - VerifyMyProvider`;
+    const providerName = toDisplayCase(provider.displayName);
+    const title = `${providerName} - VerifyMyProvider`;
+    // `text` is used by some platforms' share sheets (Android Chrome,
+    // some progressive web apps) and silently ignored elsewhere
+    // (iOS Safari). No harm including it everywhere.
+    const text = `Check out ${providerName} on VerifyMyProvider — verified healthcare provider information.`;
 
     if (navigator.share) {
       try {
-        await navigator.share({ title, url });
+        await navigator.share({ title, text, url });
       } catch {
         // User cancelled or share failed — ignore
       }
     } else {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      // Clipboard API can throw on permission denial, non-secure context
+      // (rare today, but possible behind misconfigured proxies), or older
+      // browsers without the API. Surface a non-blocking toast instead of
+      // letting the promise rejection bubble.
+      try {
+        await navigator.clipboard.writeText(url);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch {
+        setCopyError(true);
+        setTimeout(() => setCopyError(false), 2000);
+      }
     }
   }, [provider.displayName]);
 
@@ -210,16 +225,23 @@ export function ProviderHeroCard({ provider, confidenceScore, verificationCount 
 
       {/* Toast notification for copy */}
       {copied && (
-        <div className="absolute top-14 right-3 sm:right-4 bg-stone-800 dark:bg-gray-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg shadow-lg animate-fade-in print:hidden">
+        <div role="status" aria-live="polite" className="absolute top-14 right-3 sm:right-4 bg-stone-800 dark:bg-gray-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg shadow-lg animate-fade-in print:hidden">
           Link copied!
+        </div>
+      )}
+      {copyError && (
+        <div role="status" aria-live="polite" className="absolute top-14 right-3 sm:right-4 bg-red-700 dark:bg-red-800 text-white text-xs font-medium px-3 py-1.5 rounded-lg shadow-lg animate-fade-in print:hidden">
+          Unable to copy link
         </div>
       )}
 
       <div className="flex flex-col md:flex-row md:items-start gap-6 md:gap-8">
         {/* Left section: Avatar and Info */}
         <div className="flex items-start gap-3 sm:gap-4 flex-1">
-          {/* Avatar - smaller on mobile */}
-          <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-[#137fec] to-[#0d5bb5] flex items-center justify-center flex-shrink-0">
+          {/* Avatar - smaller on mobile. aria-hidden because the provider's
+              full name is already announced via the adjacent h1 — without
+              this, SR users would hear "JS heading-1 John Smith". */}
+          <div aria-hidden="true" className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-[#137fec] to-[#0d5bb5] flex items-center justify-center flex-shrink-0">
             <span className="text-white font-bold text-xl sm:text-2xl">{initials}</span>
           </div>
 
@@ -296,14 +318,22 @@ export function ProviderHeroCard({ provider, confidenceScore, verificationCount 
                   const isStale = daysSince > 90;
                   return (
                     <span className={`inline-flex items-center gap-1 text-xs ${isStale ? 'text-yellow-500' : 'text-stone-400 dark:text-gray-500'}`}>
-                      {isStale && <span className="w-1.5 h-1.5 rounded-full bg-yellow-500" />}
+                      {/* M13 (F-09): dot carries no semantics on its own — SR
+                          users get a real "Stale" prefix; sighted users still
+                          see the yellow dot. */}
+                      {isStale && (
+                        <>
+                          <span className="w-1.5 h-1.5 rounded-full bg-yellow-500" aria-hidden="true" />
+                          <span className="sr-only">Stale data — </span>
+                        </>
+                      )}
                       CMS verified: {syncDate.toLocaleDateString()}
                     </span>
                   );
                 })()
               ) : (
                 <span className="inline-flex items-center gap-1 text-xs text-stone-400 dark:text-gray-500">
-                  <span className="w-1.5 h-1.5 rounded-full bg-stone-300 dark:bg-gray-600" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-stone-300 dark:bg-gray-600" aria-hidden="true" />
                   Not yet synced with CMS
                 </span>
               )}
@@ -322,25 +352,34 @@ export function ProviderHeroCard({ provider, confidenceScore, verificationCount 
 
           {/* Inline factor summary pills */}
           {highlights.length > 0 && (
-            <div className="flex flex-wrap justify-center md:justify-end gap-1.5">
+            <ul aria-label="Confidence factors" className="flex flex-wrap justify-center md:justify-end gap-1.5 list-none p-0">
+              {/* M14 (F-09): previously strong/moderate were distinguished
+                  by color alone (green vs amber). aria-label prepends the
+                  strength label so screen reader users hear "Strong:
+                  Updated today" or "Moderate: Partial agreement". The dot
+                  stays as a sighted-user visual, but is aria-hidden. */}
               {highlights.map((h) => (
-                <span
+                <li
                   key={h.label}
+                  aria-label={`${h.strength === 'strong' ? 'Strong' : 'Moderate'}: ${h.label}`}
                   className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full ${
                     h.strength === 'strong'
                       ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300'
                       : 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
                   }`}
                 >
-                  <span className={`w-1 h-1 rounded-full ${
-                    h.strength === 'strong'
-                      ? 'bg-green-500 dark:bg-green-400'
-                      : 'bg-amber-500 dark:bg-amber-400'
-                  }`} />
+                  <span
+                    aria-hidden="true"
+                    className={`w-1 h-1 rounded-full ${
+                      h.strength === 'strong'
+                        ? 'bg-green-500 dark:bg-green-400'
+                        : 'bg-amber-500 dark:bg-amber-400'
+                    }`}
+                  />
                   {h.label}
-                </span>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
         </div>
       </div>

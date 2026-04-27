@@ -1,12 +1,12 @@
 'use client';
 
 import { createContext, useContext, useState, useCallback, ReactNode, useRef, useEffect } from 'react';
-import { AppError, toAppError, getUserMessage, getErrorVariant, ErrorVariant } from '@/lib/errorUtils';
+import { ClientError, toClientError, getUserMessage, getErrorVariant, ErrorVariant } from '@/lib/errorUtils';
 import { trackException } from '@/lib/analytics';
 
 interface ErrorContextValue {
   // Current global error (if any)
-  error: AppError | null;
+  error: ClientError | null;
 
   // Error variant for styling
   errorVariant: ErrorVariant | null;
@@ -30,7 +30,7 @@ interface ErrorContextValue {
 const ErrorContext = createContext<ErrorContextValue | null>(null);
 
 export function ErrorProvider({ children }: { children: ReactNode }) {
-  const [error, setErrorState] = useState<AppError | null>(null);
+  const [error, setErrorState] = useState<ClientError | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Clear any pending timeout on unmount
@@ -49,8 +49,8 @@ export function ErrorProvider({ children }: { children: ReactNode }) {
       timeoutRef.current = null;
     }
 
-    const appError = toAppError(err);
-    setErrorState(appError);
+    const clientError = toClientError(err);
+    setErrorState(clientError);
     trackException(err, { source: 'ErrorContext' });
   }, []);
 
@@ -69,8 +69,8 @@ export function ErrorProvider({ children }: { children: ReactNode }) {
       timeoutRef.current = null;
     }
 
-    const appError = toAppError(err);
-    setErrorState(appError);
+    const clientError = toClientError(err);
+    setErrorState(clientError);
     trackException(err, { source: 'ErrorContext' });
 
     if (duration > 0) {

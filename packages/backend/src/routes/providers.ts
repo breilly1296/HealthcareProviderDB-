@@ -8,6 +8,7 @@ import {
   getProviderDisplayName,
   getCitiesByState,
   getPrimaryLocation,
+  findNearbyProviders,
   PROVIDER_INCLUDE,
 } from '../services/providerService';
 import { getColocatedNpis } from '../services/locationService';
@@ -16,7 +17,7 @@ import { getLocationHealthSystem } from '../services/locationEnrichment';
 import { enrichAcceptanceWithConfidence } from '../services/confidenceService';
 import { mapEntityTypeToApi } from '../services/utils';
 import prisma from '../lib/prisma';
-import { paginationSchema, npiParamSchema } from '../schemas/commonSchemas';
+import { paginationSchema, npiParamSchema, nearbyQuerySchema } from '../schemas/commonSchemas';
 import { buildPaginationMeta, sendSuccess } from '../utils/responseHelpers';
 import { cacheGet, cacheSet, generateSearchCacheKey, CACHE_TTL } from '../utils/cache';
 import { searchTimeout } from '../middleware/requestTimeout';
@@ -303,6 +304,79 @@ router.get(
 );
 
 /**
+ * GET /api/v1/providers/nearby
+ * Radius-based proximity search (F-16).
+ *
+ * Query params: lat, lng (required), radius miles (default 10, max 100),
+ * plus optional specialty / specialtyCategory / name / entityType /
+ * page / limit. Returns providers sorted by distance ascending; each
+ * row carries `distanceMiles` for UI rendering ("2.3 miles away").
+ *
+ * Caching: same 5-min TTL as /search, but the cache key rounds lat/lng
+ * to 3 decimals (~100m) so a user who drifts by a few feet doesn't
+ * miss an otherwise-warm cache. The key lives in the search: namespace
+ * so verification-driven cache invalidation also wipes nearby results.
+ */
+router.get(
+  '/nearby',
+  searchTimeout,
+  searchRateLimiter,
+  asyncHandler(async (req, res) => {
+    const params = nearbyQuerySchema.parse(req.query);
+
+    // ~100m cache-key precision. A user's browser geolocation typically
+    // reports at 10-50m so two cache hits can legitimately share a bucket.
+    const latKey = params.lat.toFixed(3);
+    const lngKey = params.lng.toFixed(3);
+    const cacheKey = [
+      'search:nearby',
+      latKey,
+      lngKey,
+      params.radius,
+      params.specialty ?? 'any',
+      params.specialtyCategory ?? 'any',
+      params.entityType ?? 'any',
+      params.name ?? 'any',
+      params.page,
+      params.limit,
+    ].join(':');
+
+    interface CachedNearbyResult {
+      providers: Awaited<ReturnType<typeof findNearbyProviders>>['providers'];
+      pagination: ReturnType<typeof buildPaginationMeta>;
+      searchCenter: { lat: number; lng: number; radiusMiles: number };
+    }
+
+    const cached = await cacheGet<CachedNearbyResult>(cacheKey);
+    if (cached) {
+      logger.debug({ cacheKey }, 'Nearby cache hit');
+      res.setHeader('X-Cache', 'HIT');
+      res.json({ success: true, data: cached });
+      return;
+    }
+
+    logger.debug({ cacheKey }, 'Nearby cache miss');
+    res.setHeader('X-Cache', 'MISS');
+
+    const result = await findNearbyProviders(params);
+
+    const responseData = {
+      providers: result.providers,
+      pagination: buildPaginationMeta(result.total, result.page, result.limit),
+      searchCenter: result.searchCenter,
+    };
+
+    // Only cache non-empty results — empty responses are cheap to recompute
+    // and caching them risks pinning a stale empty state after an import.
+    if (result.providers.length > 0) {
+      await cacheSet(cacheKey, responseData, CACHE_TTL.DEFAULT);
+    }
+
+    res.json({ success: true, data: responseData });
+  }),
+);
+
+/**
  * GET /api/v1/providers/cities
  * Get unique cities for a state
  */
@@ -383,6 +457,13 @@ router.get(
     }
 
     const location = {
+      // TODO: Once `PROVIDER_INCLUDE.practiceLocations.select` is widened
+      // to include `id`, switch this to `primaryLoc.id` so the frontend's
+      // ColocatedProviders link can resolve to /location/:id directly.
+      // Currently the include shape doesn't expose id on practiceLocations,
+      // so the synthetic location.id stays 0 and the frontend falls back to
+      // a city/zip search (intentional fallback path; see
+      // components/provider-detail/ColocatedProviders.tsx).
       id: 0,
       addressLine1: primaryLoc.addressLine1,
       addressLine2: primaryLoc.addressLine2 || null,

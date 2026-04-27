@@ -24,19 +24,21 @@ function ScanSuccessBanner({ extraction }: { extraction: ScanResponse['extractio
   const configMap = {
     high: {
       label: 'High Confidence',
-      color: 'text-green-600 dark:text-green-400',
+      // -700 on -50 ≈ 7:1 (AA pass for normal text); -300 on -900/20 ≈ 8:1
+      color: 'text-green-700 dark:text-green-300',
       bgColor: 'bg-green-50 dark:bg-green-900/20',
       barColor: 'bg-green-500',
     },
     medium: {
       label: 'Medium Confidence',
-      color: 'text-yellow-600 dark:text-yellow-400',
+      // -600 on -50 was ~4.4:1 (borderline AA fail); -700 on -50 ≈ 5.5:1 — pass
+      color: 'text-yellow-700 dark:text-yellow-300',
       bgColor: 'bg-yellow-50 dark:bg-yellow-900/20',
       barColor: 'bg-yellow-500',
     },
     low: {
       label: 'Low Confidence',
-      color: 'text-red-600 dark:text-red-400',
+      color: 'text-red-700 dark:text-red-300',
       bgColor: 'bg-red-50 dark:bg-red-900/20',
       barColor: 'bg-red-500',
     },
@@ -203,7 +205,7 @@ export default function InsuranceCardScanner({ onScanComplete, onCancel }: Insur
             className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center cursor-pointer hover:border-primary-500 dark:hover:border-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
           >
             <ImageIcon className="w-12 h-12 mx-auto text-gray-400 dark:text-gray-500 mb-4" aria-hidden="true" />
-            <p className="text-gray-600 dark:text-gray-300 mb-2">Click to upload or drag and drop</p>
+            <p className="text-gray-600 dark:text-gray-300 mb-2">Click or press Enter to upload</p>
             <p className="text-sm text-gray-500 dark:text-gray-400">PNG, JPG, WebP or GIF (max 10MB)</p>
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-2 flex items-center justify-center gap-1">
               <Shield className="w-3 h-3" aria-hidden="true" />
@@ -215,13 +217,13 @@ export default function InsuranceCardScanner({ onScanComplete, onCancel }: Insur
             <div className="relative">
               <img
                 src={selectedImage}
-                alt="Insurance card preview"
+                alt="Preview of the insurance card image you uploaded"
                 className="w-full rounded-lg border border-gray-200 dark:border-gray-700"
               />
               <button
                 onClick={handleReset}
                 disabled={isScanning}
-                aria-label="Remove image"
+                aria-label="Remove uploaded insurance card image"
                 className="absolute top-2 right-2 bg-white dark:bg-gray-700 rounded-full p-1 shadow-md hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-50"
               >
                 <X className="w-5 h-5 text-gray-600 dark:text-gray-300" aria-hidden="true" />

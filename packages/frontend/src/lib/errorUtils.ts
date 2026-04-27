@@ -6,13 +6,13 @@
  *
  * Usage:
  * ------
- * 1. In catch blocks, convert unknown errors to AppError:
+ * 1. In catch blocks, convert unknown errors to ClientError:
  *    ```typescript
  *    try {
  *      await api.call();
  *    } catch (err) {
- *      const appError = toAppError(err);
- *      setError(appError);
+ *      const clientError = toClientError(err);
+ *      setError(clientError);
  *    }
  *    ```
  *
@@ -40,7 +40,7 @@
 /**
  * Standardized error type used throughout the application
  */
-export interface AppError {
+export interface ClientError {
   /** The error message (may be technical) */
   message: string;
   /** Application-specific error code */
@@ -51,6 +51,14 @@ export interface AppError {
   retryable: boolean;
   /** X-Request-ID for the failing request, when available — usable as a support ref and for backend log correlation. */
   requestId?: string;
+  /**
+   * Field-level error details from the backend. Populated for two paths:
+   *   - Zod validation failures (errorHandler.ts auto-emits these)
+   *   - AppError.badRequest(message, code, details) callers that pass a
+   *     structured details array (added 2026-04-26)
+   * Form components can read this to highlight which input failed.
+   */
+  details?: Array<{ field?: string; message: string }>;
   /** Original error for debugging */
   originalError?: unknown;
 }
@@ -68,6 +76,30 @@ interface ApiError extends Error {
   code?: string;
   status?: number;
   requestId?: string | null;
+  /** Structured field-level details. Type is `unknown` because the
+   *  ApiErrorDetails legacy type in lib/api.ts allows a single object
+   *  shape, but the backend now also emits Array<{ field?, message }>.
+   *  `extractClientErrorDetails` runtime-checks for the array shape. */
+  details?: unknown;
+}
+
+/**
+ * Runtime-narrow an unknown `details` value into the ClientError shape.
+ * Returns `undefined` unless the input is an array of objects with a
+ * string `message`. Filters out malformed entries rather than rejecting
+ * the whole array, so a single bad entry doesn't drop the rest.
+ */
+function extractClientErrorDetails(
+  value: unknown
+): ClientError['details'] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const valid = value.filter(
+    (e): e is { field?: string; message: string } =>
+      typeof e === 'object' &&
+      e !== null &&
+      typeof (e as { message?: unknown }).message === 'string'
+  );
+  return valid.length > 0 ? valid : undefined;
 }
 
 // ============================================================================
@@ -175,17 +207,18 @@ export function isAbortError(error: unknown): boolean {
 // ============================================================================
 
 /**
- * Convert any caught error to a standardized AppError.
+ * Convert any caught error to a standardized ClientError.
  * Handles Error objects, API errors with status codes, and unknown types.
  *
  * @param error - The caught error (unknown type from catch blocks)
- * @returns Standardized AppError object
+ * @returns Standardized ClientError object
  */
-export function toAppError(error: unknown): AppError {
+export function toClientError(error: unknown): ClientError {
   // Handle Error instances (including API errors)
   if (error instanceof Error) {
     const apiError = error as ApiError;
     const statusCode = apiError.statusCode ?? apiError.status;
+    const details = extractClientErrorDetails(apiError.details);
 
     return {
       message: error.message,
@@ -193,6 +226,7 @@ export function toAppError(error: unknown): AppError {
       code: apiError.code,
       retryable: isRetryableStatus(statusCode) && !isNotFoundError(error.message),
       requestId: apiError.requestId ?? undefined,
+      ...(details && { details }),
       originalError: error,
     };
   }
@@ -208,12 +242,14 @@ export function toAppError(error: unknown): AppError {
       : typeof errorObj.status === 'number'
         ? errorObj.status
         : undefined;
+    const details = extractClientErrorDetails(errorObj.details);
 
     return {
       message,
       statusCode,
       code: typeof errorObj.code === 'string' ? errorObj.code : undefined,
       retryable: isRetryableStatus(statusCode),
+      ...(details && { details }),
       originalError: error,
     };
   }
@@ -243,12 +279,12 @@ export function toAppError(error: unknown): AppError {
  * Get a user-friendly error message suitable for display.
  * Transforms technical error messages into helpful user guidance.
  *
- * @param error - AppError or string message
+ * @param error - ClientError or string message
  * @returns User-friendly error message
  */
-export function getUserMessage(error: AppError | string): string {
-  const appError = typeof error === 'string' ? { message: error, retryable: true } : error;
-  const { message, statusCode } = appError;
+export function getUserMessage(error: ClientError | string): string {
+  const clientError = typeof error === 'string' ? { message: error, retryable: true } : error;
+  const { message, statusCode } = clientError;
 
   // Handle specific status codes
   if (statusCode === 429) {
@@ -303,12 +339,12 @@ export function getUserMessage(error: AppError | string): string {
  * Determine the appropriate UI variant for an error.
  * Maps to ErrorMessage component variants.
  *
- * @param error - AppError or string message
+ * @param error - ClientError or string message
  * @returns ErrorVariant for UI rendering
  */
-export function getErrorVariant(error: AppError | string): ErrorVariant {
-  const appError = typeof error === 'string' ? { message: error, retryable: true } : error;
-  const { message, statusCode } = appError;
+export function getErrorVariant(error: ClientError | string): ErrorVariant {
+  const clientError = typeof error === 'string' ? { message: error, retryable: true } : error;
+  const { message, statusCode } = clientError;
 
   // Status code based classification
   if (statusCode === 429) {
@@ -355,11 +391,11 @@ export function createErrorState(error: unknown): {
   type: ErrorVariant;
   retryable: boolean;
 } {
-  const appError = toAppError(error);
+  const clientError = toClientError(error);
   return {
-    message: getUserMessage(appError),
-    type: getErrorVariant(appError),
-    retryable: appError.retryable,
+    message: getUserMessage(clientError),
+    type: getErrorVariant(clientError),
+    retryable: clientError.retryable,
   };
 }
 
@@ -375,19 +411,19 @@ export function createErrorState(error: unknown): {
  * @param error - The error to log
  */
 export function logError(context: string, error: unknown): void {
-  const appError = toAppError(error);
+  const clientError = toClientError(error);
 
   if (process.env.NODE_ENV === 'development') {
     console.error(`[${context}] Error:`, {
-      message: appError.message,
-      code: appError.code,
-      statusCode: appError.statusCode,
-      retryable: appError.retryable,
-      originalError: appError.originalError,
+      message: clientError.message,
+      code: clientError.code,
+      statusCode: clientError.statusCode,
+      retryable: clientError.retryable,
+      originalError: clientError.originalError,
     });
   } else {
     // In production, log minimal info
-    console.error(`[${context}] ${appError.message}`);
+    console.error(`[${context}] ${clientError.message}`);
   }
 
   // Route through the centralized helper — it handles SSR guards, ApiError

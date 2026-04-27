@@ -149,7 +149,12 @@ interface ComparisonRowProps {
 
 function ComparisonRow({ label, icon, providers, renderValue, getBestIndices: getBestIndicesFn, isAlternate }: ComparisonRowProps) {
   const bestIndices = getBestIndicesFn ? getBestIndicesFn(providers) : [];
-  const highlightClass = 'bg-green-50 dark:bg-green-900/20';
+  // Best-value cell highlight. Bumped from -50/-900/20 to -100/-900/40 so
+  // the highlight is visible enough to read as "this cell is the winner"
+  // without relying on a color cue alone, and so any future text colors
+  // applied here keep a comfortable contrast margin (text-gray-900 on
+  // bg-green-100 ≈ 14:1; AA passes everywhere).
+  const highlightClass = 'bg-green-100 dark:bg-green-900/40';
 
   return (
     <tr className={isAlternate ? 'bg-gray-50 dark:bg-gray-800/50' : ''}>
@@ -386,6 +391,7 @@ export function CompareModal({ isOpen, onClose }: CompareModalProps) {
                         </div>
                         <button
                           onClick={() => handleRemoveProvider(provider.npi)}
+                          aria-label={`Remove ${toDisplayCase(provider.name)} from comparison`}
                           className="text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 mt-1"
                         >
                           Remove

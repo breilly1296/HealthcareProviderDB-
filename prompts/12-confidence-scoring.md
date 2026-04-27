@@ -5,7 +5,7 @@ tags:
   - high
 type: prompt
 priority: 2
-updated: 2026-02-05
+updated: 2026-04-26
 ---
 
 # Confidence Scoring Algorithm Review
@@ -184,7 +184,7 @@ Helper: `enrichAcceptanceWithConfidence()` — attaches full confidence breakdow
 ### 6. Frontend Display
 
 **Confidence Gauge:** Visual gauge component (`ConfidenceGauge.tsx`)
-**Score Breakdown:** Factor-by-factor display (`ScoreBreakdown.tsx`)
+**Score Breakdown:** Factor-by-factor display (`components/ConfidenceScoreBreakdown.tsx`, rendered inside the modal that opens from `components/provider-detail/ConfidenceGauge.tsx`'s "How is this calculated?" trigger). The earlier `components/provider-detail/ScoreBreakdown.tsx` was deleted 2026-04-26 as superseded dead code.
 **Confidence Badge:** Compact badge (`ConfidenceBadge.tsx`)
 **Explainer:** Educational component (`ConfidenceScoreExplainer.tsx`)
 **Freshness Warning:** Stale data warning (`FreshnessWarning.tsx`)
@@ -194,7 +194,13 @@ Helper: `enrichAcceptanceWithConfidence()` — attaches full confidence breakdow
 - [x] Confidence badge for compact display
 - [x] Freshness warning for stale data
 
-### 7. Confidence Decay (Implemented)
+### 7. User Identity on Verifications (NEW — IM-44, 2026-04-19)
+
+`VerificationLog.userId` and `VoteLog.userId` columns were added in the `20260419130000_add_user_id_to_verifications` migration. When a submitter is authenticated via magic link, `req.user?.id` (a cuid, not an email — safe to store) is persisted alongside `sourceIp`. Anonymous submissions still work — the column is nullable and Postgres's default `NULLS DISTINCT` on the `(verificationId, userId)` unique index means multiple anonymous rows coexist.
+
+The scoring algorithm itself is **unchanged** by this — IM-44 only adds the data. Future work could weight verifications by the submitting user's track record (trusted-user boost, recently-created-account penalty, etc.) without needing another migration. For now the value is Sybil detection (see 36-sybil-attack-prevention.md Layer 4 update) and the disputed-queue triage signal in `GET /admin/verifications/disputed` (`uniqueUsers` vs `totalVerifications` ratio).
+
+### 8. Confidence Decay (Implemented)
 
 **File:** `packages/backend/src/services/confidenceDecayService.ts`
 

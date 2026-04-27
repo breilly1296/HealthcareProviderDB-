@@ -251,13 +251,25 @@ jobs:
 
       - name: Smoke test frontend
         run: |
+          # Frontend cold starts (Next.js SSR + chunk hydration) can take longer
+          # than the backend's. Retry up to 3 times with a short sleep before
+          # failing the deploy.
+          MAX_ATTEMPTS=3
+          ATTEMPT=1
+          HTTP_STATUS=0
           sleep 10
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ steps.deploy.outputs.url }}")
-          if [ "$HTTP_STATUS" != "200" ]; then
-            echo "Frontend smoke test failed with status $HTTP_STATUS"
-            exit 1
-          fi
-          echo "Frontend smoke test passed (HTTP $HTTP_STATUS)"
+          while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "${{ steps.deploy.outputs.url }}" || true)
+            if [ "$HTTP_STATUS" = "200" ]; then
+              echo "Frontend smoke test passed (HTTP $HTTP_STATUS) on attempt $ATTEMPT"
+              exit 0
+            fi
+            echo "Attempt $ATTEMPT/$MAX_ATTEMPTS: got HTTP $HTTP_STATUS, retrying in 5s..."
+            ATTEMPT=$((ATTEMPT + 1))
+            sleep 5
+          done
+          echo "Frontend smoke test failed after $MAX_ATTEMPTS attempts; last status: $HTTP_STATUS"
+          exit 1
 
       - name: Show Frontend URL
         run: echo "Frontend deployed to ${{ steps.deploy.outputs.url }}"
@@ -316,22 +328,32 @@ jobs:
               core.error(`${environment.toUpperCase()} DEPLOYMENT FAILED — backend: ${backendStatus}, frontend: ${frontendStatus}`);
             }
 
-      # Placeholder for a future Slack/email notification. Kept as a failure-
-      # only step so successful deploys stay quiet; flip the commented curl
-      # once SLACK_WEBHOOK_URL is wired up.
+      # Failure-only notification — successful deploys stay quiet. The step
+      # is gated on SLACK_WEBHOOK_URL being set so the workflow doesn't
+      # break before the secret is configured.
       #
-      # To activate Slack notifications:
-      #   1. In Slack: create an incoming webhook (https://api.slack.com/messaging/webhooks)
+      # Setup:
+      #   1. In Slack, create an incoming webhook (https://api.slack.com/messaging/webhooks)
       #      for the channel that should receive deploy alerts.
       #   2. Add the resulting URL as a repo secret named SLACK_WEBHOOK_URL
       #      (Settings → Secrets and variables → Actions → New repository secret).
-      #   3. Uncomment the curl block below.
-      - name: Notify on failure (placeholder — wire SLACK_WEBHOOK_URL to activate)
+      - name: Notify Slack on failure
+        # GitHub Actions doesn't allow `secrets` context inside `if:`
+        # expressions, so the secret-presence check has to live at runtime
+        # (env-injection + bash). When SLACK_WEBHOOK_URL is unset the step
+        # logs a `::warning::` and exits cleanly — failures aren't silent
+        # while the integration is being wired.
         if: failure()
         env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           ENVIRONMENT: production
         run: |
-          echo "::warning::Deployment failed. Configure SLACK_WEBHOOK_URL secret to enable Slack notifications."
-          # curl -X POST -H 'Content-type: application/json' \
-          #   --data "{\"text\":\":rotating_light: *${ENVIRONMENT}* deploy failed for \`${GITHUB_SHA:0:7}\` on ${GITHUB_REF_NAME}. <https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}|View run>\"}" \
-          #   "${{ secrets.SLACK_WEBHOOK_URL }}"
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "::warning::Deployment failed. Configure the SLACK_WEBHOOK_URL repo secret to receive Slack notifications."
+            exit 0
+          fi
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          curl -sS -X POST -H 'Content-Type: application/json' \
+            --data "{\"text\":\"🚨 Deploy failed for ${GITHUB_REPOSITORY} on ${GITHUB_REF_NAME} (${SHORT_SHA})\\nWorkflow: ${GITHUB_WORKFLOW}\\n<${RUN_URL}|View run>\"}" \
+            "$SLACK_WEBHOOK_URL"

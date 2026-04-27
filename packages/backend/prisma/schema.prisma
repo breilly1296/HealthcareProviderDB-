@@ -198,6 +198,14 @@ model InsurancePlan {
   carrierId           Int?                     @map("carrier_id")
   healthSystemId      Int?                     @map("health_system_id")
   createdAt           DateTime?                @default(now()) @map("created_at") @db.Timestamptz(6)
+  // Auto-managed by Prisma on every update. Nullable so existing rows can
+  // backfill as null; Prisma populates on the next write.
+  updatedAt           DateTime?                @updatedAt @map("updated_at") @db.Timestamptz(6)
+  // Effective date of the source data used to populate this plan row.
+  // Set explicitly by import scripts (e.g. CMS Plan Finder release date,
+  // carrier directory snapshot date) so the UI can surface "Plans last
+  // refreshed X days ago" without conflating it with row-edit time.
+  dataAsOf            DateTime?                @map("data_as_of") @db.Timestamptz(6)
   providerAcceptances ProviderPlanAcceptance[]
   userInsuranceCards  UserInsuranceCard[]
   verificationLogs    VerificationLog[]

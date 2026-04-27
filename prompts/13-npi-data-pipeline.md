@@ -5,7 +5,7 @@ tags:
   - implemented
 type: prompt
 priority: 2
-updated: 2026-02-18
+updated: 2026-04-26
 ---
 
 # NPI Data Pipeline Review
@@ -14,12 +14,12 @@ updated: 2026-02-18
 
 ### Import Scripts (`scripts/`)
 - `scripts/pre-import-check.ts` (safety check — enriched record counts, pending conflicts)
-- `scripts/import-npi-direct.ts` (main NPI import — batch 5000, direct PostgreSQL, enrichment-safe)
-- `scripts/import-npi.ts` (alternative NPI import — Prisma-based, enrichment-safe)
-- `scripts/import-filtered-csv.ts` (filtered CSV import)
-- `scripts/import-csv-copy.ts` (PostgreSQL COPY-based import)
-- `scripts/import-csv-simple.ts` (simple CSV import)
-- `scripts/normalize-city-names.ts` (city name cleanup)
+- `scripts/archive/import-npi-direct.ts` (main NPI import — batch 5000, direct PostgreSQL, enrichment-safe) — **ARCHIVED 2026-04-26**: targeted pre-practice_locations split schema. See `scripts/archive/README.md`.
+- `scripts/archive/import-npi.ts` (alternative NPI import — Prisma-based, enrichment-safe) — **ARCHIVED 2026-04-26**: same schema-split reason; also imports Prisma enums no longer in the schema. See `scripts/archive/README.md`.
+- `scripts/archive/import-filtered-csv.ts` (filtered CSV import) — **ARCHIVED 2026-04-26**: same schema-split reason. See `scripts/archive/README.md`.
+- `scripts/archive/import-csv-copy.ts` (PostgreSQL COPY-based import) — **ARCHIVED 2026-04-26**: same schema-split reason. See `scripts/archive/README.md`.
+- `scripts/archive/import-csv-simple.ts` (simple CSV import) — **ARCHIVED 2026-04-26**: same schema-split reason. See `scripts/archive/README.md`.
+- `scripts/archive/normalize-city-names.ts` (city name cleanup) — **ARCHIVED 2026-04-26**: targeted `providers.city` (pre-practice_locations split). Replacement targeting `practice_locations.city` needed for DATA-02. See `scripts/archive/README.md`.
 - `scripts/cleanup-deactivated-providers.ts` (deactivated provider handling)
 - `scripts/backfill-verification-ttl.ts` / `.sql` (TTL backfill)
 - `scripts/backfill-specialty-fast.cjs` (specialty backfill)
@@ -53,11 +53,12 @@ updated: 2026-02-18
 ## Checklist
 
 ### 1. Import Script Status
-- [ ] Script location: `scripts/import-npi-direct.ts`
-- [ ] Batch size: 5000 records (optimized)
-- [ ] Direct PostgreSQL insertion (not Prisma)
-- [ ] State-based filtering works
-- [ ] Progress logging implemented
+- [x] Script location: `scripts/import-npi-direct.ts` (batch size constant at `:145`)
+- [x] Batch size: 5000 records (optimized)
+- [x] Direct PostgreSQL insertion via `pg` Pool (`createPool()` from `pre-import-check.ts:16-26` — strips `sslmode=` from URL and sets `ssl: { rejectUnauthorized: false }` to handle Cloud SQL CA on Node 24+)
+- [x] ON CONFLICT update is reduced to 11 NPI-sourced columns (no `EXCLUDED.*` spread); never overwrites enrichment fields (`provider_profile_url`, `confidence_score`, `verification_count`, etc.)
+- [x] State-based filtering works
+- [x] Progress logging implemented
 
 ### 2. Data Quality Issues Identified
 
@@ -89,24 +90,35 @@ updated: 2026-02-18
 - [x] Database table: `taxonomy_reference` stores taxonomy code → specialty mapping
 - [x] Provider taxonomies: `provider_taxonomies` links providers to taxonomy codes (primary flag)
 
-**Database Schema:**
+**Database Schema:** (verified against `packages/backend/prisma/schema.prisma:162-185`, **Corrected 2026-04-26** — earlier shape was wrong)
 ```prisma
-model taxonomy_reference {
-  code             String  @id @db.VarChar(20)
-  specialization   String? @db.VarChar(200)
+model TaxonomyReference {
+  taxonomyCode     String  @id @map("taxonomy_code") @db.VarChar(20)
+  displayName      String? @map("display_name") @db.VarChar(200)
+  groupingName     String? @map("grouping_name") @db.VarChar(200)
   classification   String? @db.VarChar(200)
-  grouping         String? @db.VarChar(200)
-  specialtyCategory String? @map("specialty_category") @db.VarChar(100)
+  specialization   String? @db.VarChar(200)
+  standardizedName String? @map("standardized_name") @db.VarChar(200)
+  providerCount    Int?    @map("provider_count")
+
+  @@map("taxonomy_reference")
 }
 
-model provider_taxonomies {
-  id           Int     @id @default(autoincrement())
-  npi          String  @db.VarChar(10)
-  taxonomyCode String  @map("taxonomy_code") @db.VarChar(20)
-  isPrimary    Boolean @default(false) @map("is_primary")
-  // ... provider relation, indexes
+model ProviderTaxonomy {
+  id           Int      @id @default(autoincrement())
+  npi          String   @db.VarChar(10)
+  taxonomyCode String?  @map("taxonomy_code") @db.VarChar(20)
+  isPrimary    String?  @map("is_primary") @db.VarChar(1)  // "Y"/"N" string, NOT Boolean
+  slotNumber   Int?     @map("slot_number")
+  providers    Provider @relation(fields: [npi], references: [npi], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([taxonomyCode], map: "idx_taxonomies_code")
+  @@index([npi], map: "idx_taxonomies_npi")
+  @@map("provider_taxonomies")
 }
 ```
+
+**Important:** `provider_taxonomies.isPrimary` is `String? VarChar(1)` (raw NPPES "Y"/"N" flag), not Boolean. There is no `specialtyCategory` column on `taxonomy_reference` — categorization happens via `Provider.specialtyCategory` populated by `backfill-specialty-fast.cjs` from `src/taxonomy-mappings.ts`.
 
 **Mapping Quality:**
 - [ ] All major specialties covered?
@@ -173,17 +185,21 @@ model provider_taxonomies {
 ### 8. NPI Registry API Integration
 
 **API Endpoint:**
-- [ ] `https://npiregistry.cms.hhs.gov/api/?version=2.1`
+- [x] `https://npiregistry.cms.hhs.gov/api/?version=2.1` — used live in `scripts/enrich-providers-nppes.ts:24, 59-69`
+- [x] Rate-limit delay between batches: 1000ms (constant in script). Batch size 50 NPIs per call.
+- [x] Conflicts logged to `import_conflicts` table for review (resolution = 'pending')
+- [x] Phone/fax filled only when current value is NULL (fill-not-overwrite)
+- [x] New locations get `data_source = 'nppes'`
 
 **Findings:**
-- [ ] `parent_organization_lbn` only for Type 2 subparts
-- [ ] Individual providers (Type 1) have NO employer field
-- [ ] API is rate-limited
-- [ ] Best for on-demand enrichment, not bulk
+- [x] `parent_organization_lbn` only for Type 2 subparts
+- [x] Individual providers (Type 1) have NO employer field
+- [x] API is rate-limited
+- [x] Best for on-demand enrichment, not bulk
 
 **Strategy:**
-- [ ] Bulk download = foundation (searchable database)
-- [ ] API = enrich individual records on provider detail page
+- [x] Bulk download = foundation (searchable database)
+- [ ] API = enrich individual records on provider detail page (planned, not yet wired into provider detail page)
 - [ ] Cache enrichments to avoid re-querying
 
 ## Pipeline Execution Order
@@ -191,8 +207,8 @@ model provider_taxonomies {
 For a fresh import, scripts should be run in this order:
 
 1. `pre-import-check.ts` — Safety check (enriched record counts, pending conflicts)
-2. `import-npi-direct.ts` — Import base provider data from NPPES CSV (enrichment-safe)
-3. `normalize-city-names.ts` — Clean up city name inconsistencies
+2. ~~`import-npi-direct.ts` — Import base provider data from NPPES CSV (enrichment-safe)~~ — **GAP**: archived 2026-04-26 to `scripts/archive/` (targeted pre-practice_locations split schema). A replacement bulk NPPES importer targeting `providers` + `practice_locations` is required before a fresh full import can run.
+3. ~~`normalize-city-names.ts` — Clean up city name inconsistencies~~ — **GAP**: archived 2026-04-26 (targeted old `providers.city` column). DATA-02 cleanup is currently un-tooled until a `practice_locations.city` replacement is written.
 4. `backfill-specialty-fast.cjs` — Map taxonomy codes to specialty categories
 5. `cleanup-deactivated-providers.ts` — Remove deactivated providers
 6. `match-facilities.ts` — Match providers to hospital facilities
@@ -397,7 +413,7 @@ Data priority hierarchy:
 
 1. **Immediate (Pre-Launch):**
    - [ ] Complete NYC provider data enrichment (CMS details, hospital affiliations, insurance networks)
-   - [ ] Run normalize-city-names.ts for NY state (424+ NYC mappings already exist)
+   - [ ] **BLOCKED (DATA-02)**: city-name cleanup. Old `normalize-city-names.ts` was archived 2026-04-26 because it targeted the pre-split `providers.city` column. Need a replacement targeting `practice_locations.city` before NY-state cleanup can run; the 424+ NYC mappings can be lifted from `scripts/archive/normalize-city-names.ts`.
    - [ ] Populate insurance plan data for NYC major carriers (UnitedHealthcare, Aetna, Cigna, MetroPlus, 1199)
 
 2. **After NYC import complete:**

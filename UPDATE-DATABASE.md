@@ -55,9 +55,24 @@ This is used for local development only and is not committed to git (in .gitigno
 - Date conversion successful (MM/DD/YYYY → PostgreSQL DATE format)
 - 99.8% field population rate
 
+> **Note (2026-04-26):** the NY.csv import described above was performed
+> against the pre-`practice_locations` schema, before the location split
+> on 2026-01-14. The scripts that did it (`import-csv-copy.ts`,
+> `import-csv-simple.ts`, `import-filtered-csv.ts`, `import-npi.ts`,
+> `import-npi-direct.ts`) have been archived under `scripts/archive/` —
+> they no longer match the current schema. The note above is preserved
+> for historical reference; the import is **not reproducible today**
+> without first writing a replacement script that targets the current
+> `providers` + `practice_locations` shape.
+
 ## Next Steps
 
 After deployment:
 1. Verify backend connects to new database
 2. Test API endpoints
-3. Import remaining state CSV files if needed
+3. **TODO**: import remaining state CSV files. The original importers are
+   archived (see note above and `scripts/archive/README.md`). A new
+   bulk-import script needs to be written against the current schema
+   before this step is reachable. The active incremental paths
+   (`enrich-providers-nppes.ts`, `import-enrichment-csv.ts`) cover
+   maintenance, not initial bulk load.

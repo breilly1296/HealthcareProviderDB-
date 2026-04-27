@@ -2,29 +2,44 @@ import { Request, Response, NextFunction, RequestHandler } from 'express';
 import logger from '../utils/logger';
 
 /**
+ * Structured field-level error info, surfaced on the JSON response so the
+ * frontend can highlight specific inputs without parsing the message.
+ *
+ * Shape mirrors the Zod-error path emitted by the global error handler
+ * (see `errorHandler` below) so consumers can read `error.details` the
+ * same way regardless of which path produced it.
+ */
+export interface AppErrorDetail {
+  field?: string;
+  message: string;
+}
+
+/**
  * Custom application error with status code
  */
 export class AppError extends Error {
   public readonly statusCode: number;
   public readonly isOperational: boolean;
   public readonly code?: string;
+  public readonly details?: AppErrorDetail[];
 
   constructor(
     message: string,
     statusCode: number = 500,
-    options: { isOperational?: boolean; code?: string } = {}
+    options: { isOperational?: boolean; code?: string; details?: AppErrorDetail[] } = {}
   ) {
     super(message);
     this.statusCode = statusCode;
     this.isOperational = options.isOperational ?? true;
     this.code = options.code;
+    this.details = options.details;
 
     // Maintains proper stack trace
     Error.captureStackTrace(this, this.constructor);
   }
 
-  static badRequest(message: string, code?: string): AppError {
-    return new AppError(message, 400, { code });
+  static badRequest(message: string, code?: string, details?: AppErrorDetail[]): AppError {
+    return new AppError(message, 400, { code, details });
   }
 
   static unauthorized(message: string = 'Unauthorized', code?: string): AppError {
@@ -93,6 +108,11 @@ export function errorHandler(
         code: err.code,
         statusCode: err.statusCode,
         requestId: req.id,
+        // Spread `details` only when the thrower passed it. Keeps the
+        // response shape unchanged for the common case of a one-line
+        // error and matches the Zod-error path's `details` shape so
+        // frontend consumers can read either uniformly.
+        ...(err.details && { details: err.details }),
       },
     });
     return;
@@ -227,6 +247,42 @@ export function errorHandler(
         message: 'Service temporarily unavailable',
         code: 'DATABASE_UNAVAILABLE',
         statusCode: 503,
+        requestId: req.id,
+      },
+    });
+    return;
+  }
+
+  // Catch-all for Prisma errors not handled by the specific branches above:
+  //   - PrismaClientKnownRequestError with codes other than P2002/P2025/
+  //     P2003/P2024/P2010 (e.g. P2014 invalid relation, P2026 unsupported
+  //     feature, P2034 transaction conflict)
+  //   - PrismaClientUnknownRequestError (engine-level errors with no code)
+  //   - PrismaClientValidationError (bad query shape — schema/code drift)
+  //   - PrismaClientRustPanicError (engine panic — should page someone)
+  // Log the full Prisma context for debugging and return a generic
+  // DATABASE_ERROR so the client gets a stable code without leaking schema
+  // details.
+  if (
+    err.name === 'PrismaClientKnownRequestError' ||
+    err.name === 'PrismaClientUnknownRequestError' ||
+    err.name === 'PrismaClientValidationError' ||
+    err.name === 'PrismaClientRustPanicError'
+  ) {
+    const prismaError = err as unknown as { code?: string; meta?: Record<string, unknown> };
+    logger.error({
+      requestId: req.id,
+      errorName: err.name,
+      prismaCode: prismaError.code,
+      meta: prismaError.meta,
+      path: req.path,
+    }, 'Unhandled Prisma error');
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'A database error occurred',
+        code: 'DATABASE_ERROR',
+        statusCode: 500,
         requestId: req.id,
       },
     });

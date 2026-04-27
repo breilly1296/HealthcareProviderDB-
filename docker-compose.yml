@@ -7,9 +7,11 @@ services:
     container_name: healthcaredb-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: healthcare_providers
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      # Default `postgres` is a non-secret placeholder for the local volume.
+      # Override in .env for any environment exposed beyond your laptop.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-healthcare_providers}
     ports:
       - "5432:5432"
     volumes:
@@ -27,14 +29,34 @@ services:
       dockerfile: packages/backend/Dockerfile
     container_name: healthcaredb-backend
     restart: unless-stopped
+    # ------------------------------------------------------------------
+    # LOCAL DEV SECRETS — Read from a local .env file (same directory
+    # as this compose file). Production does NOT run via docker-compose;
+    # secrets come from GCP Secret Manager via the `secrets:` block in
+    # .github/workflows/deploy.yml. Copy .env.example to .env and fill in
+    # real values for local auth/encryption/email testing.
+    #
+    # The ${VAR:-default} fallbacks below let the stack boot without a
+    # .env file, but the placeholder strings are deliberately non-secret
+    # ("change-me-local-dev-only") so secret scanners don't flag them.
+    # CSRF_SECRET is required at backend module-init time — the
+    # middleware throws if it's missing, so don't drop the default.
+    # ------------------------------------------------------------------
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/healthcare_providers
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/healthcare_providers}
       PORT: 8080
       NODE_ENV: production
       CORS_ORIGIN: http://localhost:3000
-      JWT_SECRET: local-dev-jwt-secret-change-me
-      MAGIC_LINK_BASE_URL: http://localhost:3001
-      # RESEND_API_KEY: re_xxxx  # Uncomment and set to enable magic link emails
+      JWT_SECRET: ${JWT_SECRET:-change-me-local-dev-only}
+      CSRF_SECRET: ${CSRF_SECRET:-change-me-local-dev-only}
+      # Empty defaults — features gracefully no-op when these are unset:
+      # ADMIN_SECRET unset → admin endpoints return 503
+      # INSURANCE_ENCRYPTION_KEY unset → card OCR/save throws when exercised
+      # RESEND_API_KEY unset → magic-link send is logged but not delivered
+      ADMIN_SECRET: ${ADMIN_SECRET:-}
+      INSURANCE_ENCRYPTION_KEY: ${INSURANCE_ENCRYPTION_KEY:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      MAGIC_LINK_BASE_URL: ${MAGIC_LINK_BASE_URL:-http://localhost:3001}
     ports:
       - "3001:8080"
     depends_on:

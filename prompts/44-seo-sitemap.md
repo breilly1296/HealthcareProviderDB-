@@ -6,7 +6,7 @@ tags:
 type: prompt
 priority: 3
 created: 2026-02-06
-updated: 2026-04-16
+updated: 2026-04-26
 role: auditor
 output_format: analysis
 ---
@@ -34,7 +34,7 @@ Generates an XML sitemap for search engine crawling:
 | `/disclaimer` | 0.3 | monthly |
 
 **Dynamic pages:**
-- Fetches top 500 most-verified providers from API
+- **Corrected 2026-04-26:** Fetches **all** providers, sharded into multiple sitemap files at `PROVIDERS_PER_SITEMAP = 10_000` URLs each (`app/sitemap.ts:9`). Shard 0 is static pages; shards 1..N hold provider pages. Effective cap is the backend's provider count, not a fixed 500. As of 2026-04-26 a quality filter excludes providers without practice locations or with `confidenceScore` null/0 so sparse pages don't dilute domain SEO.
 - Generates `/provider/[npi]` entries with 0.7 priority and weekly change frequency
 - Revalidates daily (`revalidate: 86400`)
 - Falls back to static pages only if API fetch fails
@@ -51,19 +51,20 @@ The provider detail page (`/provider/[npi]`) has server-side rendering with:
 ### Sitemap
 - [x] Dynamic XML sitemap generation
 - [x] Static page entries with priorities
-- [x] Dynamic provider page entries (top 500)
+- [x] Dynamic provider page entries — sharded 10K URLs/file via `generateSitemaps()` (no fixed 500 cap; corrected 2026-04-26)
 - [x] Daily revalidation
 - [x] Graceful fallback on API error
 
 ### Provider Page SEO
 - [x] Server-side rendering with ISR
 - [x] Dynamic metadata (title, description)
-- [ ] JSON-LD structured data (beyond metadata)
+- [x] JSON-LD structured data — `Physician`/`MedicalOrganization` on provider detail (`app/provider/[npi]/page.tsx`); `MedicalOrganization` on location detail (`app/location/[locationId]/page.tsx`, added 2026-04-26 with SSR + generateMetadata + JSON-LD). Both pages use the shared `safeJsonLd()` helper (`lib/jsonLd.ts`) to escape `</script>` breakout in user-influenceable strings.
 - [ ] Open Graph / social sharing tags
 
 ### Missing / Future
-- [ ] `robots.txt` configuration
-- [ ] Google Search Console verification
+- [x] `robots.txt` configuration — `app/robots.ts` generates `/robots.txt` dynamically with disallow rules for `/api/`, `/login`, `/dashboard/`, `/saved-providers`.
+- [x] Google Search Console verification — `app/layout.tsx:69` reads `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` and renders the verification meta tag in `<head>`. Set the env var to the token from Search Console.
+- [x] OpenGraph tags — provider detail page uses `type: 'profile'`; location detail page uses `type: 'website'`; both via `generateMetadata` `openGraph` blocks.
 - [ ] Insurance plan page SEO metadata
 - [ ] Location page SEO metadata
 - [ ] Canonical URLs for search results

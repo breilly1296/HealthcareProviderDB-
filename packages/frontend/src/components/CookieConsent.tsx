@@ -42,7 +42,7 @@ export function CookieConsent() {
     <div
       role="alert"
       aria-live="polite"
-      className="fixed bottom-20 md:bottom-4 left-4 right-4 z-50 mx-auto max-w-2xl
+      className="fixed bottom-20 md:bottom-4 left-4 right-4 z-50 mx-auto max-w-2xl print:hidden
         animate-[slideUp_0.3s_ease-out]
         bg-white dark:bg-gray-800
         border border-stone-200 dark:border-gray-700

@@ -15,12 +15,15 @@ A comprehensive database for healthcare providers specializing in osteoporosis-r
           ▼                      ▼                         ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                           Import Scripts                                     │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────────────┐  │
-│  │ import-npi.ts   │  │ import-plans.ts │  │ process-uploads.ts          │  │
-│  │ - Download      │  │ - Parse CMS     │  │ - Validate                  │  │
-│  │ - Parse CSV     │  │ - Map carriers  │  │ - Transform                 │  │
-│  │ - Filter specs  │  │ - Update DB     │  │ - Merge                     │  │
-│  └─────────────────┘  └─────────────────┘  └─────────────────────────────┘  │
+│  ┌──────────────────────────┐  ┌──────────────────────┐  ┌──────────────┐  │
+│  │ enrich-providers-        │  │ import-enrichment-   │  │ pre-import-  │  │
+│  │   nppes.ts               │  │   csv.ts             │  │   check.ts   │  │
+│  │ - NPPES API enrichment   │  │ - Practice CSVs      │  │ - Safety     │  │
+│  │ - Fill-not-overwrite     │  │ - Hours, websites    │  │   check      │  │
+│  │ - Conflict log           │  │ - Hospital systems   │  │              │  │
+│  └──────────────────────────┘  └──────────────────────┘  └──────────────┘  │
+│  (Archived bulk-NPI importers live in scripts/archive/. TODO: write a       │
+│   replacement that targets providers + practice_locations.)                 │
 └─────────────────────────────────┬───────────────────────────────────────────┘
                                   │
                                   ▼
@@ -63,10 +66,10 @@ A comprehensive database for healthcare providers specializing in osteoporosis-r
 │                                                                              │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
 │  │                        REST API (Express)                             │   │
-│  │  GET  /providers?state=FL&specialty=rheumatology                     │   │
-│  │  GET  /providers/:npi                                                 │   │
-│  │  GET  /providers/:npi/plans                                           │   │
-│  │  POST /providers/:npi/verify                                          │   │
+│  │  GET  /api/v1/providers/search?state=FL&specialty=rheumatology        │   │
+│  │  GET  /api/v1/providers/:npi                                          │   │
+│  │  GET  /api/v1/providers/:npi/plans                                    │   │
+│  │  POST /api/v1/verify                                                  │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────────┘
                                   │
@@ -132,25 +135,37 @@ npm run dev
 
 ### Import NPI Data
 
-Download the NPI data file from [CMS NPPES](https://download.cms.gov/nppes/NPI_Files.html), then:
-
-```bash
-# Import all osteoporosis-relevant providers
-npm run import:npi -- --file ./data/npidata.csv
-
-# Import only Florida providers
-npm run import:npi -- --file ./data/npidata.csv --states FL
-
-# Import all specialties (not just osteoporosis-relevant)
-npm run import:npi -- --file ./data/npidata.csv --all-specialties
-```
+> **TODO (2026-04-26):** the original bulk-import scripts (`import-npi.ts`,
+> `import-npi-direct.ts`, `import-csv-copy.ts`, `import-csv-simple.ts`,
+> `import-filtered-csv.ts`) were written against a pre-split schema where
+> `providers` carried address/phone columns directly. Those columns moved
+> to `practice_locations` on 2026-01-14 and the bulk-import scripts have
+> been archived under `scripts/archive/` (see `scripts/archive/README.md`).
+>
+> No replacement bulk-import script has been written yet. The active
+> data-maintenance path is incremental — there is no `npm run import:npi`
+> command anymore:
+>
+> - `scripts/pre-import-check.ts` — safety check (enriched-record counts,
+>   pending conflicts) before any import
+> - `scripts/enrich-providers-nppes.ts` — NPPES API enrichment, fill-not-
+>   overwrite, conflicts logged to `import_conflicts`
+> - `scripts/import-enrichment-csv.ts` — practice-level enrichment CSVs
+>   (names, websites, hospital systems, insurance, hours, confidence)
+>
+> If you need a fresh full NPPES bulk import, a new script targeting the
+> current `Provider` + `practice_locations` shape will need to be written
+> first. See `prompts/13-npi-data-pipeline.md` for the intended pipeline.
 
 ## API Reference
+
+> All endpoints are mounted under `/api/v1`. See `prompts/06-api-routes.md`
+> and `prompts/17-api-reference-doc.md` for the full inventory.
 
 ### Search Providers
 
 ```http
-GET /api/providers?state=FL&specialty=rheumatology
+GET /api/v1/providers/search?state=FL&specialty=rheumatology
 ```
 
 Query Parameters:
@@ -165,7 +180,7 @@ Query Parameters:
 ### Get Provider Details
 
 ```http
-GET /api/providers/:npi
+GET /api/v1/providers/:npi
 ```
 
 Returns full provider information including top accepted plans.
@@ -173,7 +188,7 @@ Returns full provider information including top accepted plans.
 ### Get Provider's Insurance Plans
 
 ```http
-GET /api/providers/:npi/plans
+GET /api/v1/providers/:npi/plans
 ```
 
 Query Parameters:
@@ -183,10 +198,12 @@ Query Parameters:
 ### Submit Verification
 
 ```http
-POST /api/providers/:npi/verify
+POST /api/v1/verify
 Content-Type: application/json
+X-CAPTCHA-Token: <reCAPTCHA v3 token>
 
 {
+  "npi": "1234567890",
   "planId": "H1234-001",
   "acceptsInsurance": true,
   "acceptsNewPatients": true,
@@ -199,8 +216,9 @@ Content-Type: application/json
 ### Vote on Verification
 
 ```http
-POST /api/verifications/:id/vote
+POST /api/v1/verify/:verificationId/vote
 Content-Type: application/json
+X-CAPTCHA-Token: <reCAPTCHA v3 token>
 
 {
   "vote": "up"  // or "down"
@@ -244,53 +262,86 @@ Tracks data imports with statistics and error logs.
 
 ## Project Structure
 
+This is an npm-workspaces monorepo. Backend, frontend, and shared types each
+live in their own package.
+
 ```
 HealthcareProviderDB/
-├── prisma/
-│   └── schema.prisma       # Database schema
-├── scripts/
-│   └── import-npi.ts       # NPI data import script
-├── src/
-│   ├── api/
-│   │   └── routes.ts       # REST API endpoints
-│   ├── lib/
-│   │   └── prisma.ts       # Prisma client singleton
-│   ├── matching/
-│   │   └── confidence.ts   # Confidence scoring engine
-│   └── index.ts            # Application entry point
+├── packages/
+│   ├── backend/                  # Express + Prisma API
+│   │   ├── prisma/
+│   │   │   ├── schema.prisma     # Database schema (22 models)
+│   │   │   └── migrations/       # Versioned Prisma migrations
+│   │   └── src/
+│   │       ├── routes/           # admin, auth, providers, plans, verify,
+│   │       │                     #   locations, savedProviders, insuranceCard
+│   │       ├── services/         # Business logic (confidence, anomaly, auth, ...)
+│   │       ├── middleware/       # auth, csrf, rateLimiter, captcha, errorHandler, ...
+│   │       ├── lib/              # prisma, redis, encryption, ...
+│   │       ├── utils/            # logger (pino), cache, responseHelpers
+│   │       ├── schemas/          # Zod validation schemas
+│   │       ├── config/           # Constants
+│   │       ├── scripts/          # Backend-local ops scripts (seed, setup-*.sh)
+│   │       ├── __tests__/        # Jest tests
+│   │       └── index.ts          # App entry point
+│   ├── frontend/                 # Next.js 14 (App Router)
+│   │   └── src/
+│   │       ├── app/              # Route segments + sitemap.ts + robots.ts
+│   │       ├── components/       # React components
+│   │       ├── hooks/            # React Query hooks
+│   │       ├── lib/              # API client (api.ts), queryClient
+│   │       └── context/          # React context providers
+│   └── shared/                   # Cross-package TypeScript types
+├── scripts/                      # Repo-level ops (data import, geocode, etc.)
+│   ├── enrich-providers-nppes.ts
+│   ├── import-enrichment-csv.ts
+│   ├── pre-import-check.ts
+│   └── archive/                  # Pre-schema-split importers (do not run)
+├── infra/                        # GCP infra-as-code (scheduler, alerts, armor, redis, uptime)
+├── prompts/                      # Audit / review / documentation prompts
+├── .github/workflows/            # CI/CD
 ├── .env.example
-├── package.json
-├── tsconfig.json
+├── package.json                  # Workspace root
+├── tsconfig.base.json
 └── README.md
 ```
 
 ## Development
 
 ```bash
-# Run development server with hot reload
+# Run backend + frontend concurrently with hot reload
 npm run dev
 
-# Run tests
+# Run tests (backend Jest)
 npm test
 
-# Type check
+# Type check / lint across all workspaces
 npm run lint
 
-# Build for production
+# Build all workspaces (shared → backend → frontend)
 npm run build
-
-# Start production server
-npm start
 ```
 
+> **TODO:** there is no root `npm start` script — production runs in
+> Cloud Run via the per-package Dockerfiles
+> (`packages/backend/Dockerfile`, `packages/frontend/Dockerfile`). See
+> `prompts/15-deployment-guide.md`.
+
 ## Environment Variables
+
+The full inventory lives in `.env.example` (grouped by section: Database,
+Server, Authentication, CAPTCHA, Admin, Encryption, Caching/Redis, External
+APIs, Frontend, Analytics, CI/CD). The commonly-needed ones:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | DATABASE_URL | PostgreSQL connection string | - |
-| PORT | API server port | 3000 |
+| PORT | API server port (Cloud Run overrides to 8080) | 3001 |
 | NODE_ENV | Environment (development/production) | development |
-| CORS_ORIGIN | Allowed CORS origins | * |
+| FRONTEND_URL | Frontend origin; appended to the CORS allowlist | - |
+
+CORS uses a hardcoded allowlist in `packages/backend/src/index.ts` plus
+`FRONTEND_URL`; there is no `CORS_ORIGIN` env var.
 
 ## License
 

@@ -253,7 +253,16 @@ export const SearchForm = forwardRef<SearchFormRef, SearchFormProps>(function Se
   // Drawer variant: single column layout with all fields visible
   if (isDrawer) {
     return (
-      <div className={`space-y-4 ${className}`}>
+      // M6 (F-09): drawer variant is still a form — wrap so the browser
+      // emits a form landmark + submit-on-enter semantics. Search button
+      // lives outside the drawer (in the drawer header), so `onSubmit`
+      // just calls searchImmediate() and closes the drawer via the ref.
+      <form
+        role="search"
+        aria-label="Provider search form"
+        onSubmit={(e) => { e.preventDefault(); searchImmediate(); }}
+        className={`space-y-4 ${className}`}
+      >
         <SearchableSelect
           label="Specialty"
           options={SPECIALTY_OPTIONS}
@@ -359,7 +368,7 @@ export const SearchForm = forwardRef<SearchFormRef, SearchFormProps>(function Se
             {error}
           </div>
         )}
-      </div>
+      </form>
     );
   }
 
@@ -536,7 +545,7 @@ export const SearchForm = forwardRef<SearchFormRef, SearchFormProps>(function Se
 
       {/* Active Filter Chips */}
       {hasActiveFilters && (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Active filters">
           <span className="text-sm text-gray-500 dark:text-gray-400">Filters:</span>
           {activeFilters.map(({ key, label }) => (
             <button

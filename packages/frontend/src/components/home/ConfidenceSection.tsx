@@ -51,22 +51,22 @@ export function ConfidenceSection() {
         </p>
 
         <div className="max-w-4xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <ul className="grid grid-cols-1 md:grid-cols-3 gap-6 list-none p-0">
             {confidenceLevels.map((level) => {
               const styles = colorStyles[level.color];
               return (
-                <div key={level.level} className={`bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-stone-200 dark:border-gray-700 p-6 border-l-4 ${styles.border}`}>
+                <li key={level.level} className={`bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-stone-200 dark:border-gray-700 p-6 border-l-4 ${styles.border}`}>
                   <div className="flex items-center gap-3 mb-4">
-                    <div className={`w-12 h-12 ${styles.bg} rounded-full flex items-center justify-center`}>
+                    <div aria-hidden="true" className={`w-12 h-12 ${styles.bg} rounded-full flex items-center justify-center`}>
                       {level.icon}
                     </div>
                     <div className="font-semibold text-stone-800 dark:text-white">{level.level}</div>
                   </div>
                   <p className="text-stone-600 dark:text-gray-300">{level.description}</p>
-                </div>
+                </li>
               );
             })}
-          </div>
+          </ul>
 
           <p className="text-center mt-8">
             <Link

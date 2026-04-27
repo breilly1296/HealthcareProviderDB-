@@ -5,7 +5,7 @@ tags:
   - quality
 type: prompt
 priority: 2
-updated: 2026-02-05
+updated: 2026-04-26
 ---
 
 # Data Quality Tracker
@@ -14,7 +14,7 @@ updated: 2026-02-05
 Track data quality issues in the VerifyMyProvider database, including NPI import quality, city name cleanup, deactivated providers, and verification data integrity.
 
 ## Files to Review
-- `scripts/normalize-city-names.ts` (city cleanup script)
+- `scripts/archive/normalize-city-names.ts` (ARCHIVED 2026-04-26 — see note under "Quality Scripts" below)
 - `scripts/cleanup-deactivated-providers.ts` (deactivated provider handling)
 - `scripts/verify-data-quality.ts` (quality checks)
 - `scripts/check-import-status.ts` (import verification)
@@ -27,9 +27,9 @@ Track data quality issues in the VerifyMyProvider database, including NPI import
 ### NPI Provider Data
 | Issue | Status | Impact |
 |-------|--------|--------|
-| City name typos ("Birmingam" vs "Birmingham") | Known, cleanup script exists | Bad city dropdown, missed search results |
-| Trailing state codes ("Birmingham,al") | Known, cleanup script exists | Duplicate cities in dropdown |
-| Trailing punctuation ("Birmingham,") | Known, cleanup script exists | Duplicate cities in dropdown |
+| City name typos ("Birmingam" vs "Birmingham") | DATA-02 — needs replacement script (old one archived 2026-04-26, targeted stale schema) | Bad city dropdown, missed search results |
+| Trailing state codes ("Birmingham,al") | DATA-02 — same | Duplicate cities in dropdown |
+| Trailing punctuation ("Birmingham,") | DATA-02 — same | Duplicate cities in dropdown |
 | Deactivated providers (~0.2%) | Known, kept in DB, filtered in queries | Stale data if not filtered |
 | Stale addresses (self-reported, rarely updated) | Inherent to NPI data | Inaccurate location display |
 | 6 states imported (pipeline testing) + NYC launch dataset | 6 states (FL, AL, AK, AR, AZ, CA) were for pipeline testing; NYC (5 boroughs, ~50-75K providers) is the Q2 2026 launch target | NYC coverage is the priority; other states are test data |
@@ -52,7 +52,7 @@ Track data quality issues in the VerifyMyProvider database, including NPI import
 ## Quality Scripts
 | Script | Purpose | Location |
 |--------|---------|----------|
-| `normalize-city-names.ts` | Fix city name typos and duplicates | `scripts/` |
+| ~~`normalize-city-names.ts`~~ | ~~Fix city name typos and duplicates~~ — **ARCHIVED 2026-04-26**: targeted `providers.city`/`providers.state` (moved to `practice_locations` in migration `20260114113939`). Replacement targeting `practice_locations.city` not yet written. See `scripts/archive/README.md`. | `scripts/archive/` |
 | `cleanup-deactivated-providers.ts` | Handle deactivated providers | `scripts/` |
 | `verify-data-quality.ts` | Run quality checks | `scripts/` |
 | `check-import-status.ts` | Verify import completeness | `scripts/` |
@@ -67,7 +67,7 @@ Track data quality issues in the VerifyMyProvider database, including NPI import
 
 ## Checklist
 - [x] City name issues identified
-- [x] Cleanup scripts exist
+- [ ] Cleanup script for current schema — **archived 2026-04-26, replacement needed for DATA-02**
 - [x] Deactivated provider strategy decided (keep + filter)
 - [x] Quality check script exists
 - [x] Import status verification script exists

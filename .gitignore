@@ -62,3 +62,14 @@ tmpclaude-*
 packages/frontend/test-results/
 packages/frontend/playwright-report/
 packages/frontend/playwright/.cache/
+
+# Loose data-validation scripts at repo root — Montefiore provider URL
+# validation work; outputs may contain provider PHI / addresses. Keep
+# these out of git until they're moved into a proper data-pipeline
+# location with appropriate scrubbing.
+/check-audit-data.js
+/extract-all-montefiore-urls-prisma.js
+/extract-montefiore-batch2.js
+/validate-montefiore-batch2.js
+/montefiore-batch2-urls.json
+/montefiore-batch2-validation-results.md

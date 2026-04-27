@@ -11,8 +11,6 @@ export const providerKeys = {
   search: (filters: Partial<SearchFilters>, page: number, limit: number) =>
     [...providerKeys.searches(), { filters, page, limit }] as const,
   detail: (npi: string) => [...providerKeys.all, 'detail', npi] as const,
-  plans: (npi: string, params?: Record<string, unknown>) =>
-    [...providerKeys.all, 'plans', npi, params] as const,
   colocated: (npi: string, params?: Record<string, unknown>) =>
     [...providerKeys.all, 'colocated', npi, params] as const,
 };
@@ -77,32 +75,6 @@ export function useProvider(npi: string, enabled = true) {
     enabled: enabled && Boolean(npi),
     // Provider details can be cached longer
     staleTime: 10 * 60 * 1000, // 10 minutes
-  });
-}
-
-/**
- * Hook for fetching provider's insurance plans
- *
- * @example
- * const { data, isLoading } = useProviderPlans('1234567890', { status: 'ACCEPTED' });
- */
-export function useProviderPlans(
-  npi: string,
-  params: {
-    status?: string;
-    minConfidence?: number;
-    page?: number;
-    limit?: number;
-  } = {},
-  enabled = true
-) {
-  return useQuery({
-    queryKey: providerKeys.plans(npi, params),
-    queryFn: async () => {
-      const response = await api.providers.getPlans(npi, params);
-      return response;
-    },
-    enabled: enabled && Boolean(npi),
   });
 }
 

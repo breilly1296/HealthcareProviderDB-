@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import api from '../../lib/api';
 import { NYC_ALL_BOROUGHS_VALUE, NYC_BOROUGHS } from '../useCities';
-import { isAbortError, toAppError, getUserMessage, logError } from '../../lib/errorUtils';
+import { isAbortError, toClientError, getUserMessage, logError } from '../../lib/errorUtils';
 import { debounce, SEARCH_DEBOUNCE_MS } from '../../lib/debounce';
 import type { DebouncedFunction } from '../../lib/debounce';
 import { trackSearch } from '../../lib/analytics';
@@ -155,9 +155,9 @@ export function useSearchExecution(options: UseSearchExecutionOptions): UseSearc
         }
 
         // Use standardized error handling
-        const appError = toAppError(err);
+        const clientError = toClientError(err);
         logError('useSearchExecution.performSearch', err);
-        setError(getUserMessage(appError));
+        setError(getUserMessage(clientError));
         setResults([]);
         setPagination(null);
       } finally {

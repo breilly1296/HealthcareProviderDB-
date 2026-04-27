@@ -139,14 +139,16 @@ export default function ProviderDetailClient({ npi, initialProvider }: ProviderD
 
         {/* Loading State */}
         {loading && (
-          <div className="flex justify-center items-center py-20">
+          <div role="status" aria-live="polite" className="flex justify-center items-center py-20">
+            <span className="sr-only">Loading provider details</span>
             <LoadingSpinner />
           </div>
         )}
 
-        {/* Error State */}
+        {/* Error State — M15 (F-09): role="alert" so SR users hear the
+            not-found message without needing to re-tab to the region. */}
         {error && !loading && (
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-stone-200 dark:border-gray-700 p-12 text-center">
+          <div role="alert" className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-stone-200 dark:border-gray-700 p-12 text-center">
             <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
               <span className="text-2xl">!</span>
             </div>

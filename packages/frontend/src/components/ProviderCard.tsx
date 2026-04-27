@@ -235,6 +235,14 @@ function ProviderCardComponent({
     <Link
       href={`/provider/${provider.npi}`}
       onKeyDown={handleKeyDown}
+      /* M2 (F-09): whole-card Link — without aria-label, screen readers read
+         every piece of content inside (name, address, phone, plans, etc.) as
+         link text, which is overwhelming and loses structure. aria-label
+         gives a concise "View details for X, Cardiology" announcement; the
+         inner <article> content is still present visually and is still read
+         when users explore by heading/landmark navigation rather than link
+         navigation. */
+      aria-label={`View details for ${getDisplayName(provider)}${specialty ? `, ${specialty}` : ''}`}
       className="block rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900"
     >
       <article
@@ -246,8 +254,10 @@ function ProviderCardComponent({
         style={{ animationDelay: `${index * 50}ms` }}
       >
         <div className="flex gap-3 sm:gap-4">
-          {/* Avatar - smaller on mobile */}
-          <div className="relative flex-shrink-0">
+          {/* Avatar - smaller on mobile. aria-hidden because the card's
+              accessible name (Link aria-label) already includes the full
+              provider name; the initials would otherwise be read aloud. */}
+          <div aria-hidden="true" className="relative flex-shrink-0">
             <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-[#137fec] to-[#0d5bb5] flex items-center justify-center">
               <span className="text-white font-bold text-base sm:text-lg">{initials}</span>
             </div>
@@ -321,6 +331,18 @@ function ProviderCardComponent({
                   <span>{formattedPhone}</span>
                 </div>
               )}
+
+              {/* F-16: distance badge shown only for /providers/nearby
+                  results (distanceMiles is absent on regular search). toFixed(1)
+                  matches the 1-decimal precision the backend already rounds to. */}
+              {provider.distanceMiles != null && (
+                <div className="flex items-center gap-2">
+                  <LocationIcon className="w-4 h-4 text-primary-500 dark:text-primary-400 flex-shrink-0" aria-hidden={true} />
+                  <span className="font-medium text-primary-600 dark:text-primary-400">
+                    {provider.distanceMiles.toFixed(1)} mi away
+                  </span>
+                </div>
+              )}
             </div>
 
           </div>
@@ -379,6 +401,9 @@ function arePropsEqual(prevProps: ProviderCardProps, nextProps: ProviderCardProp
   if (prevProps.provider.confidenceScore !== nextProps.provider.confidenceScore) return false;
   if (prevProps.showConfidence !== nextProps.showConfidence) return false;
   if (prevProps.provider.planAcceptances?.length !== nextProps.provider.planAcceptances?.length) return false;
+  // F-16: distanceMiles changes when the radius control adjusts — without
+  // this check the card would memoize the prior distance.
+  if (prevProps.provider.distanceMiles !== nextProps.provider.distanceMiles) return false;
   return true;
 }
 

@@ -6,7 +6,7 @@ tags:
 type: prompt
 priority: 2
 created: 2026-02-05
-updated: 2026-04-16
+updated: 2026-04-26
 role: auditor
 output_format: analysis
 ---
@@ -112,7 +112,7 @@ Steps:
 - `NODE_ENV=production` (env var)
 - `FRONTEND_URL` from GitHub secret (env var)
 - `DATABASE_URL` from Secret Manager (secret mount)
-- `ADMIN_SECRET` removed from secrets (`--remove-secrets` flag)
+- ~~`ADMIN_SECRET` removed from secrets (`--remove-secrets` flag)~~ — **Corrected 2026-04-26:** `ADMIN_SECRET` IS mounted via Secret Manager (`deploy.yml:159`, alongside `DATABASE_URL`, `JWT_SECRET`, `RESEND_API_KEY`, `INSURANCE_ENCRYPTION_KEY`, `CSRF_SECRET`, `RECAPTCHA_SECRET_KEY`).
 
 **Output:** `backend_url` (used by frontend job)
 
@@ -219,8 +219,8 @@ Steps:
 - [x] Deployment summary with status table
 - [x] Staging environment — `deploy-staging.yml` triggers on `staging` branch, deploys to `-staging` services
 - [x] Rollback automation — `rollback.yml` workflow exists (manual dispatch)
-- [ ] No smoke tests after deployment
-- [ ] No build caching in GitHub Actions (Docker layer caching)
+- [x] Post-deploy smoke tests — backend hits `/health` (`deploy.yml:166-173`); frontend retries `/` up to 3× with `--max-time 10` and 5s sleep between attempts (added 2026-04-26 to handle Next.js cold-start hydration).
+- [x] Build caching in GitHub Actions — Docker layer cache via `cache-from: type=gha` and `cache-to: type=gha,mode=max` on both backend (`deploy.yml:90-91`) and frontend (`deploy.yml:225-226`) image builds.
 - [ ] No Slack/email notification on deploy success/failure
 
 ### Security
@@ -250,4 +250,4 @@ Keep ≤400 lines. Cite file:line references; avoid generic advice.
 3. Should we add post-deploy smoke tests to verify the deployment?
 4. Should Docker builds use layer caching in GitHub Actions for faster builds?
 5. Should we add deploy notifications to Slack or email?
-6. Is the `ADMIN_SECRET` `--remove-secrets` flag intentional, or should it be added back?
+6. ~~Is the `ADMIN_SECRET` `--remove-secrets` flag intentional, or should it be added back?~~ **Resolved 2026-04-26** — `ADMIN_SECRET` is in the secrets block at `deploy.yml:159`; the earlier "removed" claim was stale.

@@ -26,13 +26,49 @@ const searchQuerySchema = z.object({
 
 /**
  * GET /api/v1/plans/search
- * Search insurance plans with filters
+ * Search insurance plans with filters.
+ *
+ * Caching: 5-min TTL (CACHE_TTL.DEFAULT) — same window as
+ * /providers/search. Plan rows are import-driven so they barely shift
+ * between imports; a short cache absorbs the dropdown chatter from the
+ * frontend without serving stale data after a fresh plan import.
+ *
+ * Cache key sits under the `plans:` namespace (same as /plans/grouped),
+ * so POST /api/v1/admin/cache/clear — which wipes the entire `cache:*`
+ * keyspace — automatically catches plan-search entries.
  */
 router.get(
   '/search',
   searchRateLimiter,
   asyncHandler(async (req, res) => {
     const query = searchQuerySchema.parse(req.query);
+
+    // Deterministic key: lowercase + trim string params, '_' for missing.
+    // All four string params are Zod-bounded to <=200 chars so the joined
+    // key stays well under any Redis key-length limit; no hash needed.
+    const norm = (v: string | undefined) => (v ? v.toLowerCase().trim() : '_');
+    const cacheKey = [
+      'plans:search',
+      norm(query.search),
+      norm(query.issuerName),
+      norm(query.planType),
+      query.state ?? '_',
+      query.page,
+      query.limit,
+    ].join(':');
+
+    interface CachedPlanSearch {
+      plans: Awaited<ReturnType<typeof searchPlans>>['plans'];
+      pagination: ReturnType<typeof buildPaginationMeta>;
+    }
+
+    const cached = await cacheGet<CachedPlanSearch>(cacheKey);
+    if (cached) {
+      res.setHeader('X-Cache', 'HIT');
+      res.json({ success: true, data: cached });
+      return;
+    }
+    res.setHeader('X-Cache', 'MISS');
 
     const result = await searchPlans({
       issuerName: query.issuerName,
@@ -43,13 +79,19 @@ router.get(
       limit: query.limit,
     });
 
-    res.json({
-      success: true,
-      data: {
-        plans: result.plans,
-        pagination: buildPaginationMeta(result.total, result.page, result.limit),
-      },
-    });
+    const responseData: CachedPlanSearch = {
+      plans: result.plans,
+      pagination: buildPaginationMeta(result.total, result.page, result.limit),
+    };
+
+    // Skip caching empty result sets so a typo doesn't lock in a "no
+    // plans" response for 5 minutes — mirrors the /providers/search
+    // policy at routes/providers.ts:295.
+    if (result.plans.length > 0) {
+      await cacheSet(cacheKey, responseData, CACHE_TTL.DEFAULT);
+    }
+
+    res.json({ success: true, data: responseData });
   })
 );
 
@@ -143,8 +185,13 @@ router.get(
 
 /**
  * GET /api/v1/plans/:planId/providers
- * Get providers who accept a specific plan
+ * Get providers who accept a specific plan.
  * Note: This route must be defined BEFORE /:planId to avoid route conflicts
+ *
+ * Caching: 5-min TTL (CACHE_TTL.DEFAULT). Cache key includes pagination
+ * params because different pages return different result sets. Sits in the
+ * `plans:` namespace so POST /api/v1/admin/cache/clear catches it via the
+ * global `cache:*` wipe.
  */
 router.get(
   '/:planId/providers',
@@ -153,51 +200,90 @@ router.get(
     const { planId } = planIdParamSchema.parse(req.params);
     const query = paginationSchema.parse(req.query);
 
+    // Cache key versioned (`v2`) so the rollout that enriched this response
+    // shape (real addressLine1/zip/credential/specialtyCategory/npiStatus
+    // instead of hardcoded nulls) auto-invalidates any v1 entries left in
+    // Redis from a prior deploy. v1 entries orphan and expire naturally at
+    // their 5-min TTL; no runtime cache-clear needed.
+    const cacheKey = `plans:providers:v2:${planId}:${query.page}:${query.limit}`;
+
+    interface CachedPlanProviders {
+      providers: Array<Record<string, unknown>>;
+      pagination: ReturnType<typeof buildPaginationMeta>;
+    }
+
+    const cached = await cacheGet<CachedPlanProviders>(cacheKey);
+    if (cached) {
+      res.setHeader('X-Cache', 'HIT');
+      res.json({ success: true, data: cached });
+      return;
+    }
+    res.setHeader('X-Cache', 'MISS');
+
     const result = await getProvidersForPlan(planId, {
       page: query.page,
       limit: query.limit,
     });
 
     if (!result) {
+      // Don't cache 404s — same policy as /:planId. A plan that's missing
+      // today might exist after the next import.
       throw AppError.notFound(`Plan with ID ${planId} not found`);
     }
 
-    res.json({
-      success: true,
-      data: {
-        providers: result.providers.map((p) => ({
-          id: p.npi,
-          npi: p.npi,
-          entityType: p.entityType,
-          firstName: p.firstName,
-          lastName: p.lastName,
-          middleName: null,
-          credential: null,
-          organizationName: p.organizationName,
-          addressLine1: null,
-          addressLine2: null,
-          city: p.city,
-          state: p.state,
-          zip: null,
-          phone: p.phone,
-          taxonomyCode: null,
-          taxonomyDescription: p.specialty,
-          specialtyCategory: null,
-          npiStatus: 'ACTIVE',
-          displayName: p.displayName,
-          confidenceScore: p.confidenceScore,
-          lastVerified: p.lastVerified,
-          verificationCount: p.verificationCount,
-        })),
-        pagination: buildPaginationMeta(result.total, result.page, result.limit),
-      },
-    });
+    const responseData: CachedPlanProviders = {
+      providers: result.providers.map((p) => ({
+        id: p.npi,
+        npi: p.npi,
+        entityType: p.entityType,
+        firstName: p.firstName,
+        lastName: p.lastName,
+        middleName: null, // not selected by getProvidersForPlan; add to service if ProviderCard needs it
+        credential: p.credential,
+        organizationName: p.organizationName,
+        addressLine1: p.addressLine1,
+        addressLine2: p.addressLine2,
+        city: p.city,
+        state: p.state,
+        zip: p.zipCode,
+        phone: p.phone,
+        taxonomyCode: p.primaryTaxonomyCode,
+        taxonomyDescription: p.specialty,
+        specialtyCategory: p.specialtyCategory,
+        // Schema's deactivationDate is VarChar(10); a non-empty string means
+        // the provider is currently deactivated. (Doesn't model the rare
+        // deactivate-then-reactivate case — same simplification used
+        // elsewhere; the routes/providers.ts transform behaves the same way.)
+        npiStatus: p.deactivationDate ? 'INACTIVE' : 'ACTIVE',
+        displayName: p.displayName,
+        confidenceScore: p.confidenceScore,
+        lastVerified: p.lastVerified,
+        verificationCount: p.verificationCount,
+      })),
+      pagination: buildPaginationMeta(result.total, result.page, result.limit),
+    };
+
+    // Skip caching empty result sets — mirrors the /search and /:planId
+    // policies. A typo or pathological page request shouldn't pin "no
+    // providers" for 5 minutes.
+    if (responseData.providers.length > 0) {
+      await cacheSet(cacheKey, responseData, CACHE_TTL.DEFAULT);
+    }
+
+    res.json({ success: true, data: responseData });
   })
 );
 
 /**
  * GET /api/v1/plans/:planId
- * Get plan by planId
+ * Get plan by planId.
+ *
+ * Caching: 5-min TTL (CACHE_TTL.DEFAULT) — same window as /plans/search.
+ * Plan rows are import-driven so a short cache absorbs detail-page reload
+ * chatter without serving stale data after a fresh plan import. Cache
+ * key sits under the `plans:` namespace, so POST /api/v1/admin/cache/clear
+ * — which wipes the entire `cache:*` keyspace — automatically catches
+ * plan-detail entries.
  */
 router.get(
   '/:planId',
@@ -205,22 +291,49 @@ router.get(
   asyncHandler(async (req, res) => {
     const { planId } = planIdParamSchema.parse(req.params);
 
+    const cacheKey = `plans:detail:${planId}`;
+
+    interface CachedPlanDetail {
+      plan: ReturnType<typeof buildPlanResponse>;
+    }
+
+    const cached = await cacheGet<CachedPlanDetail>(cacheKey);
+    if (cached) {
+      res.setHeader('X-Cache', 'HIT');
+      res.json({ success: true, data: cached });
+      return;
+    }
+    res.setHeader('X-Cache', 'MISS');
+
     const plan = await getPlanByPlanId(planId);
 
     if (!plan) {
+      // Don't cache 404s — a plan that's missing today might exist after
+      // the next import; we'd rather pay the DB miss than pin a 404.
       throw AppError.notFound(`Plan with ID ${planId} not found`);
     }
 
-    res.json({
-      success: true,
-      data: {
-        plan: {
-          ...plan,
-          providerCount: plan._count.providerAcceptances,
-        },
-      },
-    });
+    const responseData: CachedPlanDetail = {
+      plan: buildPlanResponse(plan),
+    };
+
+    await cacheSet(cacheKey, responseData, CACHE_TTL.DEFAULT);
+
+    res.json({ success: true, data: responseData });
   })
 );
+
+// Local helper kept beside the route so the cached payload shape and the
+// fresh-DB payload shape can never drift. `getPlanByPlanId` returns the
+// raw Prisma row with `_count.providerAcceptances`; the API exposes the
+// same row plus a flat `providerCount`.
+function buildPlanResponse(
+  plan: NonNullable<Awaited<ReturnType<typeof getPlanByPlanId>>>
+) {
+  return {
+    ...plan,
+    providerCount: plan._count.providerAcceptances,
+  };
+}
 
 export default router;

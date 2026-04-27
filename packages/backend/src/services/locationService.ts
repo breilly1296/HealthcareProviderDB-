@@ -108,7 +108,13 @@ export async function getLocationById(id: number) {
 
 /**
  * Get all providers that share the same physical address as the given location.
- * Matches on addressLine1 + city + state + zipCode (case-insensitive for text fields).
+ *
+ * Prefers a single-index lookup on `address_hash` (idx_locations_address_hash)
+ * over the legacy multi-field case-insensitive match. Same hashing approach
+ * the IM-43 map split + scripts/geocode-locations + scripts/deduplicate-
+ * locations all use, so detail-page colocation now agrees with map-pin
+ * colocation. Falls back to the multi-field ILIKE match for older rows
+ * that pre-date the hash backfill (where `address_hash` is null).
  */
 export async function getProvidersAtLocation(
   id: number,
@@ -116,25 +122,35 @@ export async function getProvidersAtLocation(
 ) {
   const { take, skip, page } = getPaginationValues(options.page, options.limit);
 
-  const location = await prisma.practiceLocation.findUnique({
+  // Internal select grabs address_hash alongside the consumer-facing fields
+  // so we can build a hash-based where clause without changing the global
+  // locationSelect shape (which other callers depend on).
+  const target = await prisma.practiceLocation.findUnique({
     where: { id },
-    select: locationSelect,
+    select: { ...locationSelect, address_hash: true },
   });
 
-  if (!location) return null;
+  if (!target) return null;
+
+  // Strip address_hash from the response so the returned `location` matches
+  // the existing consumer contract.
+  const { address_hash: targetHash, ...location } = target;
 
   // Need at least addressLine1 for a meaningful address match
   if (!location.addressLine1) {
     return { location, providers: [], total: 0, page, limit: take, totalPages: 0 };
   }
 
-  // Match colocated locations by address fields (only filter on non-null fields)
-  const where: Prisma.PracticeLocationWhereInput = {
-    addressLine1: { equals: location.addressLine1, mode: 'insensitive' },
-    ...(location.city && { city: { equals: location.city, mode: 'insensitive' as const } }),
-    ...(location.state && { state: location.state }),
-    ...(location.zipCode && { zipCode: location.zipCode }),
-  };
+  // Hash-based path when available: single-index lookup on idx_locations_
+  // address_hash. ILIKE fallback only fires for legacy rows missing a hash.
+  const where: Prisma.PracticeLocationWhereInput = targetHash
+    ? { address_hash: targetHash }
+    : {
+        addressLine1: { equals: location.addressLine1, mode: 'insensitive' },
+        ...(location.city && { city: { equals: location.city, mode: 'insensitive' as const } }),
+        ...(location.state && { state: location.state }),
+        ...(location.zipCode && { zipCode: location.zipCode }),
+      };
 
   const [colocated, total] = await Promise.all([
     prisma.practiceLocation.findMany({
@@ -156,6 +172,11 @@ export async function getProvidersAtLocation(
 /**
  * Get distinct NPIs of providers colocated at the same address.
  * Excludes the queried provider's NPI. Returns paginated NPI strings.
+ *
+ * Same hash-first / multi-field-fallback shape as getProvidersAtLocation —
+ * one cheap upfront lookup to derive `address_hash`, then a single-index
+ * scan via idx_locations_address_hash for the main DISTINCT query. Older
+ * rows without a hash fall back to the multi-field ILIKE match.
  */
 export async function getColocatedNpis(
   addressLine1: string,
@@ -167,13 +188,26 @@ export async function getColocatedNpis(
 ) {
   const { take, skip, page } = getPaginationValues(options.page, options.limit);
 
-  const where: Prisma.PracticeLocationWhereInput = {
+  // Multi-field match used both as the upfront hash-lookup filter and as
+  // the fallback when address_hash is null. Defining once avoids drift.
+  const fieldMatch: Prisma.PracticeLocationWhereInput = {
     addressLine1: { equals: addressLine1, mode: 'insensitive' },
     ...(city && { city: { equals: city, mode: 'insensitive' as const } }),
     ...(state && { state }),
     ...(zipCode && { zipCode: zipCode }),
-    npi: { not: excludeNpi },
   };
+
+  // Pull the hash off any single matching row. address_hash is deterministic
+  // for the canonical address shape (see scripts/deduplicate-locations.ts:
+  // computeAddressHash), so any row in the colocation set has the same hash.
+  const hashRow = await prisma.practiceLocation.findFirst({
+    where: fieldMatch,
+    select: { address_hash: true },
+  });
+
+  const where: Prisma.PracticeLocationWhereInput = hashRow?.address_hash
+    ? { address_hash: hashRow.address_hash, npi: { not: excludeNpi } }
+    : { ...fieldMatch, npi: { not: excludeNpi } };
 
   // Fetch all distinct NPIs for total count (Prisma doesn't support count + distinct together)
   const allDistinct = await prisma.practiceLocation.findMany({

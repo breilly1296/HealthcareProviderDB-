@@ -1,0 +1,38 @@
+{
+  "displayName": "Prisma Engine Panic Detected (verifymyprovider-backend)",
+  "documentation": {
+    "content": "PrismaClientRustPanicError indicates the Prisma query engine crashed. This is distinct from normal database errors (P-codes, init failures, query syntax errors). Investigate immediately \u2014 may indicate a corrupted query, OOM in the engine subprocess, or an engine bug. The catch-all Prisma branch in packages/backend/src/middleware/errorHandler.ts logs the full Prisma context (errorName, prismaCode, meta, path, requestId); start there. Metric source: log-based counter verifymyprovider_prisma_rust_panic.",
+    "mimeType": "text/markdown"
+  },
+  "severity": "CRITICAL",
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "Any Prisma engine panic occurrence",
+      "conditionThreshold": {
+        "filter": "metric.type=\"logging.googleapis.com/user/verifymyprovider_prisma_rust_panic\" resource.type=\"cloud_run_revision\"",
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": 0,
+        "duration": "0s",
+        "aggregations": [
+          {
+            "alignmentPeriod": "60s",
+            "perSeriesAligner": "ALIGN_DELTA",
+            "crossSeriesReducer": "REDUCE_SUM",
+            "groupByFields": [
+              "resource.label.service_name"
+            ]
+          }
+        ],
+        "trigger": {
+          "count": 1
+        }
+      }
+    }
+  ],
+  "alertStrategy": {
+    "autoClose": "1800s"
+  },
+  "enabled": true,
+  "notificationChannels": []
+}

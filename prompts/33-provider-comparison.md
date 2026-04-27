@@ -5,6 +5,7 @@ tags:
   - implemented
 type: prompt
 priority: 3
+updated: 2026-04-26
 ---
 
 # Provider Comparison Feature
@@ -18,7 +19,7 @@ priority: 3
 
 ## Feature Overview
 
-Users can compare up to 4 providers side-by-side to help make decisions about which provider to visit.
+Users can compare up to 3 providers side-by-side (`MAX_COMPARE_PROVIDERS = 3` in `packages/frontend/src/lib/constants.ts`) to help make decisions about which provider to visit. The cap is sized for the side-by-side modal table to remain readable on mobile.
 
 ### User Flow
 1. User searches for providers
@@ -35,19 +36,19 @@ Users can compare up to 4 providers side-by-side to help make decisions about wh
 ```typescript
 // packages/frontend/src/context/CompareContext.tsx
 interface CompareContextType {
-  providers: Provider[];           // Up to 4 providers
+  providers: Provider[];           // Up to MAX_COMPARE_PROVIDERS (3)
   addProvider: (provider: Provider) => void;
   removeProvider: (npi: string) => void;
   clearProviders: () => void;
   isInCompare: (npi: string) => boolean;
-  canAddMore: boolean;             // false when at 4
+  canAddMore: boolean;             // false when at MAX_COMPARE_PROVIDERS
 }
 
 export const CompareProvider: React.FC = ({ children }) => {
   const [providers, setProviders] = useState<Provider[]>([]);
 
   const addProvider = (provider: Provider) => {
-    if (providers.length >= 4) return;
+    if (providers.length >= MAX_COMPARE_PROVIDERS) return;
     if (providers.some(p => p.npi === provider.npi)) return;
     setProviders([...providers, provider]);
   };
@@ -173,7 +174,7 @@ Currently, comparison state is:
 ### Context
 - [x] CompareContext created
 - [x] Add/remove/clear functions
-- [x] Max 4 provider limit
+- [x] Max 3 provider limit (`MAX_COMPARE_PROVIDERS`)
 - [x] Duplicate prevention
 
 ### Components
@@ -197,7 +198,7 @@ Currently, comparison state is:
 
 ## Questions to Ask
 
-1. **Is the 4 provider limit appropriate?**
+1. **Is the 3 provider limit appropriate?**
    - Could allow more on larger screens?
 
 2. **Should comparison persist across sessions?**
@@ -226,7 +227,7 @@ Currently, comparison state is:
 **Status:** ✅ Implemented
 
 ## Features
-- [x] Add up to 4 providers
+- [x] Add up to 3 providers
 - [x] Side-by-side comparison
 - [x] Remove from compare
 - [x] Clear all

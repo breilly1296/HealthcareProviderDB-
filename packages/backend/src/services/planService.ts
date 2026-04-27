@@ -321,9 +321,22 @@ export async function getProvidersForPlan(
             entityType: true,
             primarySpecialty: true,
             primaryTaxonomyCode: true,
+            specialtyCategory: true,
+            credential: true,
+            // VarChar(10) string per schema; non-empty = currently deactivated
+            // (route layer derives npiStatus from this).
+            deactivationDate: true,
             practiceLocations: {
               where: { addressType: 'practice' },
               take: 1,
+              select: {
+                addressLine1: true,
+                addressLine2: true,
+                city: true,
+                state: true,
+                zipCode: true,
+                phone: true,
+              },
             },
           },
         },
@@ -331,6 +344,7 @@ export async function getProvidersForPlan(
           select: {
             id: true,
             addressLine1: true,
+            addressLine2: true,
             city: true,
             state: true,
             zipCode: true,
@@ -346,17 +360,30 @@ export async function getProvidersForPlan(
     .filter(a => a.provider)
     .map(a => {
       const prov = a.provider!;
-      const loc = prov.practiceLocations?.[0];
+      // Prefer the acceptance-specific location when the row carries one
+      // (locationId set by the import pipeline) — that's the address where
+      // this provider actually accepts THIS plan. Fall back to the
+      // provider's primary practice location for older rows that pre-date
+      // the locationId column.
+      const fallback = prov.practiceLocations?.[0];
+      const addrSource = a.location ?? fallback ?? null;
       return {
         npi: prov.npi,
         firstName: prov.firstName,
         lastName: prov.lastName,
         organizationName: prov.organizationName,
         entityType: prov.entityType,
+        credential: prov.credential,
         specialty: prov.primarySpecialty,
-        city: loc?.city || null,
-        state: loc?.state || null,
-        phone: loc?.phone || null,
+        primaryTaxonomyCode: prov.primaryTaxonomyCode,
+        specialtyCategory: prov.specialtyCategory,
+        deactivationDate: prov.deactivationDate,
+        addressLine1: addrSource?.addressLine1 ?? null,
+        addressLine2: addrSource?.addressLine2 ?? null,
+        city: addrSource?.city ?? null,
+        state: addrSource?.state ?? null,
+        zipCode: addrSource?.zipCode ?? null,
+        phone: addrSource?.phone ?? null,
         displayName: getProviderDisplayName(prov),
         confidenceScore: a.confidenceScore,
         lastVerified: a.lastVerified,

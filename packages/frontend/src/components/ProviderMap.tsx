@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, InfoWindowF } from '@react-google-maps/api';
+import { MarkerClusterer } from '@googlemaps/markerclusterer';
 import Link from 'next/link';
 import type { MapPin } from '@/types';
 import LoadingSpinner from './LoadingSpinner';
@@ -53,27 +54,30 @@ export default function ProviderMap({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
   });
 
-  const mapRef = useRef<google.maps.Map | null>(null);
+  // mapInstance is state (triggers re-render) rather than ref because the
+  // clustering effect below depends on it. The callbacks that still need a
+  // synchronous handle (onIdle/bounds-changed) use mapInstance directly.
+  const [mapInstance, setMapInstance] = useState<google.maps.Map | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [selectedPin, setSelectedPin] = useState<MapPin | null>(null);
 
   const onLoad = useCallback((map: google.maps.Map) => {
-    mapRef.current = map;
+    setMapInstance(map);
   }, []);
 
   const onUnmount = useCallback(() => {
-    mapRef.current = null;
+    setMapInstance(null);
   }, []);
 
   const onIdle = useCallback(() => {
-    if (!mapRef.current || !onBoundsChanged) return;
+    if (!mapInstance || !onBoundsChanged) return;
 
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
 
     debounceRef.current = setTimeout(() => {
-      const bounds = mapRef.current?.getBounds();
+      const bounds = mapInstance.getBounds();
       if (!bounds) return;
 
       const ne = bounds.getNorthEast();
@@ -85,9 +89,9 @@ export default function ProviderMap({
         west: sw.lng(),
       });
     }, DEBOUNCE_MS);
-  }, [onBoundsChanged]);
+  }, [mapInstance, onBoundsChanged]);
 
-  // Clean up debounce timer on unmount
+  // Debounce timer cleanup on unmount
   useEffect(() => {
     return () => {
       if (debounceRef.current) {
@@ -95,6 +99,51 @@ export default function ProviderMap({
       }
     };
   }, []);
+
+  // --- Marker clustering (IM-42 / I-49) ---
+  // Builds imperative google.maps.Marker instances from `pins`, hands them
+  // to @googlemaps/markerclusterer, and tears everything down on change.
+  // Creating ~500 markers per update is cheap; skipping incremental diffing
+  // keeps the code short and avoids stale-marker bugs.
+  //
+  // Clicking a marker sets `selectedPin` — the <InfoWindowF> below renders
+  // declaratively from that state, preserving the previous info-window UX
+  // without needing an imperative google.maps.InfoWindow.
+  useEffect(() => {
+    if (!isLoaded || !mapInstance) return;
+
+    const markers = pins.map((pin) => {
+      const marker = new google.maps.Marker({
+        position: { lat: pin.latitude, lng: pin.longitude },
+        title: pin.displayName,
+        // Preserve the "N providers at this address" badge that the old
+        // MarkerF rendering put on co-located pins. Clusters handle spatial
+        // grouping; the label handles same-address server-side dedup.
+        label:
+          pin.providerCount > 1
+            ? {
+                text: String(pin.providerCount),
+                color: '#ffffff',
+                fontSize: '11px',
+                fontWeight: 'bold',
+              }
+            : undefined,
+      });
+
+      marker.addListener('click', () => {
+        setSelectedPin(pin);
+      });
+
+      return marker;
+    });
+
+    const clusterer = new MarkerClusterer({ map: mapInstance, markers });
+
+    return () => {
+      clusterer.clearMarkers();
+      markers.forEach((m) => m.setMap(null));
+    };
+  }, [isLoaded, mapInstance, pins]);
 
   if (loadError) {
     return (
@@ -119,6 +168,11 @@ export default function ProviderMap({
   }
 
   return (
+    // TODO(a11y): Google Maps markers are not keyboard-reachable in this
+    // imperative-marker setup; clusters/markers can only be activated by
+    // mouse. Full keyboard nav (Tab to markers, Enter to open InfoWindow)
+    // requires either the react-google-maps MarkerF or a custom listbox
+    // overlay — see report 2026-04-26.
     <div className="relative" style={{ width: '100%', height }}>
       <GoogleMap
         mapContainerStyle={{ width: '100%', height: '100%' }}
@@ -130,23 +184,8 @@ export default function ProviderMap({
         onIdle={onIdle}
         onClick={() => setSelectedPin(null)}
       >
-        {pins.map((pin) => (
-          <MarkerF
-            key={`${pin.npi}-${pin.addressHash}`}
-            position={{ lat: pin.latitude, lng: pin.longitude }}
-            label={
-              pin.providerCount > 1
-                ? {
-                    text: String(pin.providerCount),
-                    color: '#ffffff',
-                    fontSize: '11px',
-                    fontWeight: 'bold',
-                  }
-                : undefined
-            }
-            onClick={() => setSelectedPin(pin)}
-          />
-        ))}
+        {/* Markers rendered imperatively via MarkerClusterer above —
+            no MarkerF children here. */}
 
         {selectedPin && (
           <InfoWindowF
@@ -199,7 +238,9 @@ export default function ProviderMap({
         )}
       </GoogleMap>
 
-      {/* Clustered indicator */}
+      {/* "Showing X of Y" message — still driven by the server's `clustered`
+          flag (which means total > API limit, not actual clustering).
+          Kept verbatim per task spec. */}
       {clustered && (
         <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow text-xs text-gray-700 dark:text-gray-300">
           Showing {pins.length} of {total.toLocaleString()} providers. Zoom in

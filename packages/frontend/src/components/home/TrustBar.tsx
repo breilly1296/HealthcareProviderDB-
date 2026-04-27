@@ -27,15 +27,15 @@ const TRUST_STATS = [
 
 export function TrustBar() {
   return (
-    <section className="bg-stone-50 dark:bg-gray-800/50 border-y border-stone-200 dark:border-gray-700">
+    <section aria-label="Trust indicators" className="bg-stone-50 dark:bg-gray-800/50 border-y border-stone-200 dark:border-gray-700">
       <div className="container-wide py-5">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
+        <ul className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 list-none p-0">
           {TRUST_STATS.map((stat) => (
-            <div
+            <li
               key={stat.label}
               className="flex items-center gap-3 justify-center"
             >
-              <stat.Icon className="w-5 h-5 text-primary-600 dark:text-primary-400 flex-shrink-0" />
+              <stat.Icon className="w-5 h-5 text-primary-600 dark:text-primary-400 flex-shrink-0" aria-hidden="true" />
               <div className="text-left">
                 <p className="text-sm font-semibold text-stone-800 dark:text-white leading-tight">
                   {stat.value}
@@ -44,9 +44,9 @@ export function TrustBar() {
                   {stat.label}
                 </p>
               </div>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       </div>
     </section>
   );
