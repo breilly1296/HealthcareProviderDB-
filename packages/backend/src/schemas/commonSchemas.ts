@@ -39,6 +39,27 @@ export const planIdParamSchema = z.object({
   planId: z.string().min(1).max(50),
 });
 
+/**
+ * Nearby (proximity) search schema (F-16).
+ *
+ * - lat/lng validated against WGS84 bounds so garbage input is rejected
+ *   before it reaches the Haversine formula (acos domain errors otherwise).
+ * - radius capped at 100 miles: above that the bounding-box pre-filter
+ *   becomes useless (~30k sq mi) and the spherical-law-of-cosines
+ *   approximation error grows past ~0.5%.
+ * - specialty/name/entityType mirror the /providers/search filters so a
+ *   user can narrow results after geolocation.
+ */
+export const nearbyQuerySchema = z.object({
+  lat: z.coerce.number().min(-90).max(90),
+  lng: z.coerce.number().min(-180).max(180),
+  radius: z.coerce.number().min(0.5).max(100).default(10),
+  specialty: z.string().min(1).max(200).optional(),
+  specialtyCategory: z.string().min(1).max(100).optional(),
+  name: z.string().min(1).max(200).optional(),
+  entityType: z.enum(['INDIVIDUAL', 'ORGANIZATION']).optional(),
+}).merge(paginationSchema);
+
 // ============================================================================
 // Type Exports
 // ============================================================================
@@ -47,3 +68,4 @@ export type PaginationInput = z.infer<typeof paginationSchema>;
 export type NpiParamInput = z.infer<typeof npiParamSchema>;
 export type StateQueryInput = z.infer<typeof stateQuerySchema>;
 export type PlanIdParamInput = z.infer<typeof planIdParamSchema>;
+export type NearbyQueryInput = z.infer<typeof nearbyQuerySchema>;
