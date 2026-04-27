@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { MapPin, Phone, BadgeCheck, Navigation, Share2, Printer, Check } from 'lucide-react';
 import { BookmarkButton } from '@/components/BookmarkButton';
 import { ConfidenceGauge } from './ConfidenceGauge';
-import { toDisplayCase, toAddressCase, toTitleCase } from '@/lib/formatName';
+import { toDisplayCase, toAddressCase, toTitleCase, formatZipCode } from '@/lib/formatName';
 import { getSpecialtyDisplay } from '@/lib/provider-utils';
 
 interface Provider {
@@ -160,7 +160,7 @@ export function ProviderHeroCard({ provider, confidenceScore, verificationCount 
   const streetAddress = [toAddressCase(provider.addressLine1), toAddressCase(provider.addressLine2)].filter(Boolean).join(', ');
   const cityStateZip = [
     toTitleCase(provider.city),
-    provider.state ? `${provider.state}${provider.zip ? ` ${provider.zip}` : ''}` : null
+    provider.state ? `${provider.state}${provider.zip ? ` ${formatZipCode(provider.zip)}` : ''}` : null
   ].filter(Boolean).join(', ');
 
   const highlights = useMemo(

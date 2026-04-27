@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { providerApi } from '@/lib/api';
 import { toClientError, getUserMessage, logError } from '@/lib/errorUtils';
 import { Shimmer } from '@/components/ui/Shimmer';
-import { toDisplayCase, toAddressCase, toTitleCase } from '@/lib/formatName';
+import { toDisplayCase, toAddressCase, toTitleCase, formatZipCode } from '@/lib/formatName';
 import { ChevronRight, MapPin, Phone } from 'lucide-react';
 import type { ProviderDisplay, Location } from '@/types';
 
@@ -123,7 +123,7 @@ export function ColocatedProviders({ npi }: ColocatedProvidersProps) {
               )}
               <p className="font-medium">{toAddressCase(location.addressLine1)}</p>
               {location.addressLine2 && <p>{toAddressCase(location.addressLine2)}</p>}
-              <p>{toTitleCase(location.city)}, {location.state} {location.zipCode}</p>
+              <p>{toTitleCase(location.city)}, {location.state} {formatZipCode(location.zipCode)}</p>
               <p className="text-gray-500 dark:text-gray-400 mt-1">
                 {colocatedTotal + 1} provider{colocatedTotal + 1 !== 1 ? 's' : ''} at this {location.facilityType ? location.facilityType.toLowerCase() : 'address'}
               </p>

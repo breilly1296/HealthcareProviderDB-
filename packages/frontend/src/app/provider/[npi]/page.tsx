@@ -3,6 +3,7 @@ import ProviderDetailClient from '@/components/provider-detail/ProviderDetailCli
 import type { ProviderWithPlans } from '@/components/provider-detail/ProviderDetailClient';
 import { safeJsonLd } from '@/lib/jsonLd';
 import { getSpecialtyDisplay } from '@/lib/provider-utils';
+import { formatZipCode } from '@/lib/formatName';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://verifymyprovider.com';
@@ -106,7 +107,7 @@ export default async function ProviderDetailPage({
             streetAddress: firstLocation.addressLine1,
             addressLocality: firstLocation.city,
             addressRegion: firstLocation.state,
-            postalCode: firstLocation.zipCode,
+            postalCode: formatZipCode(firstLocation.zipCode),
           },
         }),
         ...(firstLocation?.phone && { telephone: firstLocation.phone }),

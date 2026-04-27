@@ -8,7 +8,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/lib/api';
 import type { SavedProviderDisplay } from '@/lib/api';
-import { toDisplayCase, toTitleCase, toAddressCase } from '@/lib/formatName';
+import { toDisplayCase, toTitleCase, toAddressCase, formatZipCode } from '@/lib/formatName';
 import { LocationIcon, ChevronRightIcon } from '@/components/icons';
 import { Shimmer } from '@/components/ui/Shimmer';
 
@@ -104,7 +104,7 @@ function SavedProviderCard({
               <span>
                 {loc.addressLine1 && <>{toAddressCase(loc.addressLine1)}, </>}
                 {toTitleCase(loc.city)}, {loc.state}
-                {loc.zipCode && ` ${loc.zipCode}`}
+                {loc.zipCode && ` ${formatZipCode(loc.zipCode)}`}
               </span>
             </div>
           )}

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { ProviderDisplay } from '@/types';
 import { getSpecialtyDisplay } from '@/lib/provider-utils';
-import { toDisplayCase, toAddressCase, toTitleCase } from '@/lib/formatName';
+import { toDisplayCase, toAddressCase, toTitleCase, formatZipCode } from '@/lib/formatName';
 import { LocationIcon, PhoneIcon, ChevronRightIcon } from '@/components/icons';
 import { CheckCircle, BadgeCheck } from 'lucide-react';
 import { BookmarkButton } from '@/components/BookmarkButton';
@@ -207,7 +207,7 @@ function ProviderCardComponent({
   const formattedAddress = useMemo(() => {
     const city = toTitleCase(provider.city);
     const cityState = `${city}, ${provider.state}`;
-    const zipPart = provider.zip && provider.zip !== 'undefined' ? ` ${provider.zip}` : '';
+    const zipPart = provider.zip && provider.zip !== 'undefined' ? ` ${formatZipCode(provider.zip)}` : '';
     const street = toAddressCase(provider.addressLine1) + (provider.addressLine2 ? `, ${toAddressCase(provider.addressLine2)}` : '');
     return {
       street,

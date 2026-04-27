@@ -8,6 +8,7 @@ import { Building2, Users, MapPin } from 'lucide-react';
 import { DEFAULT_PAGE_SIZE } from '@/lib/constants';
 import type { ProviderDisplay, Location, PaginationState } from '@/types';
 import { ProviderCard } from '@/components/ProviderCard';
+import { formatZipCode } from '@/lib/formatName';
 import { LocationDetailSkeleton } from '@/components/ProviderCardSkeleton';
 import ErrorMessage from '@/components/ErrorMessage';
 
@@ -164,7 +165,7 @@ export default function LocationDetailClient({
                 <p className="text-lg text-gray-700 mb-2">{location.addressLine2}</p>
               )}
               <p className="text-lg text-gray-600 mb-4">
-                {location.city}, {location.state} {location.zipCode}
+                {location.city}, {location.state} {formatZipCode(location.zipCode)}
               </p>
 
               <div className="flex flex-wrap items-center gap-4 text-sm">

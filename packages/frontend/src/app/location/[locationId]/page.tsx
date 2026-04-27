@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import LocationDetailClient from './LocationDetailClient';
 import type { Location } from '@/types';
 import { safeJsonLd } from '@/lib/jsonLd';
+import { formatZipCode } from '@/lib/formatName';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://verifymyprovider.com';
@@ -25,7 +26,7 @@ function formatLocationLabel(location: Location): string {
   const parts = [
     location.addressLine1,
     location.city,
-    [location.state, location.zipCode].filter(Boolean).join(' '),
+    [location.state, formatZipCode(location.zipCode)].filter(Boolean).join(' '),
   ].filter(Boolean);
   return parts.join(', ');
 }
@@ -104,7 +105,7 @@ export default async function LocationDetailPage({
         .join(', '),
       addressLocality: location.city,
       addressRegion: location.state,
-      postalCode: location.zipCode,
+      postalCode: formatZipCode(location.zipCode),
       addressCountry: 'US',
     },
     url: `${SITE_URL}/location/${id}`,

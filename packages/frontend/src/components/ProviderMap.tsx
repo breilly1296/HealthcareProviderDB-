@@ -6,6 +6,7 @@ import { MarkerClusterer } from '@googlemaps/markerclusterer';
 import Link from 'next/link';
 import type { MapPin } from '@/types';
 import LoadingSpinner from './LoadingSpinner';
+import { formatZipCode } from '@/lib/formatName';
 
 interface ProviderMapProps {
   pins: MapPin[];
@@ -213,7 +214,7 @@ export default function ProviderMap({
                   [selectedPin.city, selectedPin.state]
                     .filter(Boolean)
                     .join(', '),
-                  selectedPin.zipCode,
+                  formatZipCode(selectedPin.zipCode),
                 ]
                   .filter(Boolean)
                   .join(', ')}

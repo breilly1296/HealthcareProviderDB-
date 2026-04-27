@@ -179,6 +179,21 @@ export function toAddressCase(str: string | null | undefined): string {
 }
 
 /**
+ * Format a US ZIP code for display. NPPES stores ZIP+4 as a 9-digit
+ * concatenated string (e.g. "100323729"); rendering that verbatim is
+ * unreadable. Pure 5-digit codes pass through unchanged. Anything that
+ * doesn't match either shape is returned as-is so the UI never silently
+ * drops data we don't recognize.
+ */
+export function formatZipCode(zip: string | null | undefined): string {
+  if (!zip) return '';
+  const cleaned = zip.replace(/\D/g, '');
+  if (cleaned.length === 9) return `${cleaned.slice(0, 5)}-${cleaned.slice(5)}`;
+  if (cleaned.length === 5) return cleaned;
+  return zip;
+}
+
+/**
  * Format a full address from NPPES ALL-CAPS fields.
  * State stays uppercase, everything else is title-cased.
  */
@@ -196,7 +211,7 @@ export function formatAddress(
   if (state) locale.push(state.toUpperCase());
   if (locale.length > 0) {
     let location = locale.join(', ');
-    if (zipCode) location += ' ' + zipCode;
+    if (zipCode) location += ' ' + formatZipCode(zipCode);
     parts.push(location);
   }
 

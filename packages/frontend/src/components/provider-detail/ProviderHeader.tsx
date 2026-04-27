@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { VerificationButton } from '@/components/VerificationButton';
 import type { ProviderDisplay } from '@/types';
 import { DocumentIcon, LocationIcon, PhoneIcon } from '@/components/icons';
+import { formatZipCode } from '@/lib/formatName';
 
 const SPECIALTY_LABELS: Record<string, string> = {
   ENDOCRINOLOGY: 'Endocrinology',
@@ -59,7 +60,7 @@ export function ProviderHeader({ provider }: ProviderHeaderProps) {
                 {provider.addressLine1}
                 {provider.addressLine2 && <><br />{provider.addressLine2}</>}
                 <br />
-                {provider.city}, {provider.state} {provider.zip}
+                {provider.city}, {provider.state} {formatZipCode(provider.zip)}
                 <span className="text-xs ml-1 opacity-75">(opens in new tab)</span>
               </span>
             </a>

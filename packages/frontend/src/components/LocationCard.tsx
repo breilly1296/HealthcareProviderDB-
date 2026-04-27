@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { Location } from '@/types';
-import { toDisplayCase, toAddressCase, toTitleCase } from '@/lib/formatName';
+import { toDisplayCase, toAddressCase, toTitleCase, formatZipCode } from '@/lib/formatName';
 import { Building2, Users, MapPin, ChevronRight } from 'lucide-react';
 
 interface LocationCardProps {
@@ -34,7 +34,7 @@ export function LocationCard({ location }: LocationCardProps) {
                 </p>
               )}
               <p className="text-sm text-gray-600">
-                {toTitleCase(location.city)}, {location.state} {location.zipCode}
+                {toTitleCase(location.city)}, {location.state} {formatZipCode(location.zipCode)}
               </p>
               {location.healthSystem && (
                 <p className="text-sm text-primary-600 mt-1">
@@ -45,12 +45,17 @@ export function LocationCard({ location }: LocationCardProps) {
           </div>
 
           <div className="flex items-center gap-4 text-sm">
-            <div className="flex items-center gap-1.5 text-primary-600 font-medium">
-              <Users className="w-4 h-4" />
-              <span>
-                {location.providerCount} provider{location.providerCount !== 1 ? 's' : ''}
-              </span>
-            </div>
+            {/* providerCount is not populated by the current /locations API
+                (see types/index.ts); only render when the backend ever
+                starts returning it. */}
+            {typeof location.providerCount === 'number' && location.providerCount > 0 && (
+              <div className="flex items-center gap-1.5 text-primary-600 font-medium">
+                <Users className="w-4 h-4" aria-hidden="true" />
+                <span>
+                  {location.providerCount} provider{location.providerCount !== 1 ? 's' : ''}
+                </span>
+              </div>
+            )}
 
             <a
               href={`https://maps.google.com/?q=${encodeURIComponent(`${location.addressLine1}${location.addressLine2 ? ' ' + location.addressLine2 : ''}, ${location.city}, ${location.state} ${location.zipCode}`)}`}

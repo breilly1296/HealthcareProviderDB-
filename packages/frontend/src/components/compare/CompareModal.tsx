@@ -4,7 +4,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import FocusTrap from 'focus-trap-react';
 import { useCompare, CompareProvider } from '@/hooks/useCompare';
 import { CONFIDENCE_THRESHOLDS } from '@/lib/constants';
-import { toDisplayCase, toAddressCase, toTitleCase } from '@/lib/formatName';
+import { toDisplayCase, toAddressCase, toTitleCase, formatZipCode } from '@/lib/formatName';
 import { ClipboardList, Building2, MapPin, CheckCircle2, ClipboardCheck, Users, Clock, Phone, X } from 'lucide-react';
 
 interface CompareModalProps {
@@ -251,7 +251,7 @@ export function CompareModal({ isOpen, onClose }: CompareModalProps) {
         <div className="text-sm">
           <div>{toAddressCase(p.address)}</div>
           <div className="text-gray-500 dark:text-gray-400">
-            {toTitleCase(p.city)}, {p.state} {p.zip}
+            {toTitleCase(p.city)}, {p.state} {formatZipCode(p.zip)}
           </div>
         </div>
       ),
