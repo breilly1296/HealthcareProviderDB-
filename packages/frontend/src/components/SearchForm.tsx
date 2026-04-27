@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef, useImperativeHandle, forwardRef, useCallback } from 'react';
 import { Search, X, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useSearchParams as useNextSearchParams } from 'next/navigation';
-import { useSearchForm, useCities, useHealthSystems, useInsurancePlans, useGeoLocation, useInsuranceCard, NYC_ALL_BOROUGHS_VALUE, NYC_BOROUGHS } from '@/hooks';
+import { useSearchForm, useCities, useHealthSystems, useInsurancePlans, useInsuranceCard, NYC_ALL_BOROUGHS_VALUE, NYC_BOROUGHS } from '@/hooks';
 import { SearchableSelect } from './ui/SearchableSelect';
 import { SPECIALTY_OPTIONS, STATE_OPTIONS } from '@/lib/provider-utils';
 import type { SearchFilters, ProviderDisplay, PaginationState, SelectOption, GroupedSelectOptions } from '@/types';
@@ -113,13 +113,11 @@ export const SearchForm = forwardRef<SearchFormRef, SearchFormProps>(function Se
     }
   }, [insuranceLoading, hintIssuerName, hintPlanName, findPlanByName, setFilter, savedCard]);
 
-  // Auto-fill state from geolocation if no state is set (e.g. no URL params)
-  const geo = useGeoLocation();
-  useEffect(() => {
-    if (geo.state && !filters.state) {
-      setFilter('state', geo.state);
-    }
-  }, [geo.state]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Default state is NY (DEFAULT_FILTERS in useFilterState.ts) — matches
+  // the NYC launch focus. We removed an earlier geo-based state autofill
+  // because for an NYC-focused product, defaulting to a user's physical
+  // state of e.g. NJ ran their first search against the wrong dataset.
+  // Geo is still used for "Near Me" lat/lng searches.
 
   // Track if initial search has been triggered
   const hasInitialSearched = useRef(false);

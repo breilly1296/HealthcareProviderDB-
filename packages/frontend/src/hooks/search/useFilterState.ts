@@ -7,8 +7,14 @@ import type { SearchFilters } from '../../types';
 // Default Values
 // ============================================================================
 
+// Default state is NY because the product launches NYC-first ("50,000+ NYC
+// providers" copy on the homepage hero, About page mentions NYC). All
+// states remain selectable in the dropdown — this is just the initial
+// value when nothing else is specified (URL param, manual selection).
+// Consequence: filtersToSearchParams omits `?state=NY` from URLs since
+// it matches the default — non-NY searches still get explicit ?state= params.
 export const DEFAULT_FILTERS: SearchFilters = {
-  state: '',
+  state: 'NY',
   city: '',
   cities: [],
   specialty: '',
